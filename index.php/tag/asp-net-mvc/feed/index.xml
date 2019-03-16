@@ -1,0 +1,1583 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>asp.net mvc &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/asp-net-mvc/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Handling Unauthenticated AJAX Requests</title>
+		<link>/index.php/webdev/uidevelopment/handling-unauthenticated-ajax-requests/</link>
+		<comments>/index.php/webdev/uidevelopment/handling-unauthenticated-ajax-requests/#respond</comments>
+		<pubDate>Wed, 15 Feb 2012 11:12:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[UI Development]]></category>
+		<category><![CDATA[ajax]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[jquery]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/02/handling-unauthenticated-ajax-requests/</guid>
+		<description><![CDATA[A common pattern that I use in creating ajaxy applications is to return a small HTML fragment from the request, and then inject this fragment into the DOM in the callback executed after a successful request.  This tends to be a bit simpler than returnin&#8230;]]></description>
+				<content:encoded><![CDATA[<p>A common pattern that I use in creating ajaxy applications is to return a small HTML fragment from the request, and then inject this fragment into the DOM in the callback executed after a successful request.  This tends to be a bit simpler than returning JSON and picking it apart to update the page, but it has one major problem, at least when using normal forms authentication.  If the user gets logged out (either by logging out from another tab or an expiring session), the AJAX request gets redirected to the login page, which is then returned and inserted into the page.  You can see how hideous this can become in the picture below.</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/WebDev/handling-unauthenticated-ajax-requests/bad-logon.PNG?mtime=1328983889"><img alt="" src="/wp-content/uploads/blogs/WebDev/handling-unauthenticated-ajax-requests/bad-logon.PNG?mtime=1328983889" width="941" height="644" /></a></div>
+<p>In this case, when you sign up for a task it is supposed to return the updated task, and use this task to replace the notecard into the DOM on the right hand side.  It can actually get uglier, as we support signing up for multiple tasks at a time.  However, if the session expires we get a big, ugly login page displayed in the midst of all our pretty notecards.  What I&#8217;d like to find is a way to retain the convenience of using forms authentication, but handle scenarios like this more gracefully.</p>
+<p>Adding a piece of metadata to the login page seemed like a good way to get this done without making things any harder on the user.  I initially wanted to get the login page classified as an error, so that redirection could be accomplished on the client side using the error callback available when using jQuery for AJAX requests.  This would be nice, but in jQuery 1.5 and above a &#8220;statusCode&#8221; callback has been added that is even nicer.  You can use the callback like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">$.<span class="me1">ajax</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; statusCode<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="nu0">404</span><span class="sy0">:</span> <span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; alert<span class="br0">&#40;</span><span class="st0">'page not found'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$.ajax({
+  statusCode: {
+    404: function() {
+      alert('page not found');
+    }
+  }
+});</pre></div></div>
+
+<p>The ease with which this allows you to define behavior for different status codes is fantastic.  As I set off down this path, the most obvious choice seemed to be adding a 401 (unauthorized) status code to the login page, but this got us into a weird redirect loop because forms authentication redirects all 401&#8217;s to the login page &#8211; causing you lose the return URL, and redirect users back to the login page once they are authenticated.  Not exactly a paragon of usability.</p>
+<p>Having found this out the hard way, I decided a custom status code might be better.  It&#8217;s easy enough to add the custom status code to the login page with a single line of C#:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Response<span class="sy0">.</span><span class="me1">StatusCode</span> <span class="sy0">=</span> <span class="nu0">999</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Response.StatusCode = 999;</pre></div></div>
+
+<p>We can then make our requests using something along these lines:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1">$.<span class="me1">ajax</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; type<span class="sy0">:</span> <span class="st0">'POST'</span><span class="sy0">,</span>
+&nbsp; &nbsp; url<span class="sy0">:</span> <span class="st0">'/Task/SignUp'</span><span class="sy0">,</span>
+&nbsp; &nbsp; data<span class="sy0">:</span> <span class="st0">'projectId='</span> <span class="sy0">+</span> pid <span class="sy0">+</span> <span class="st0">'&amp;storyId='</span> <span class="sy0">+</span> sid <span class="sy0">+</span> <span class="st0">'&amp;id='</span> <span class="sy0">+</span> id <span class="sy0">+</span> <span class="st0">'&amp;initials='</span> <span class="sy0">+</span> initials<span class="sy0">,</span>
+&nbsp; &nbsp; success<span class="sy0">:</span> <span class="kw1">function</span> <span class="br0">&#40;</span>html<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; $<span class="br0">&#40;</span><span class="st0">'#'</span> <span class="sy0">+</span> id<span class="br0">&#41;</span>.<span class="me1">replaceWith</span><span class="br0">&#40;</span>html<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp; &nbsp; statusCode<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="nu0">999</span><span class="sy0">:</span> <span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; location.<span class="me1">href</span> <span class="sy0">=</span> <span class="st0">'/Account/LogOn?returnUrl='</span> <span class="sy0">+</span> location.<span class="me1">href</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$.ajax({
+    type: 'POST',
+    url: '/Task/SignUp',
+    data: 'projectId=' + pid + '&amp;storyId=' + sid + '&amp;id=' + id + '&amp;initials=' + initials,
+    success: function (html) {
+        $('#' + id).replaceWith(html);
+    },
+    statusCode: {
+        999: function() {
+            location.href = '/Account/LogOn?returnUrl=' + location.href;
+        }
+    }
+});</pre></div></div>
+
+<p>This works well enough, at least from cassini.  When deployed to an IIS server however, we noticed that the 999 status code was getting picked up by the error handling modules, and of course we did not have an error page set up for that code.  To get around that we had to add the following to the code to display our login view:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Response<span class="sy0">.</span><span class="me1">TrySkipIisCustomErrors</span> <span class="sy0">=</span> <span class="kw1">true</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Response.TrySkipIisCustomErrors = true;</pre></div></div>
+
+<p>That&#8217;s kind of nasty, but it seems to allow us to accomplish our goal.  I think I can stomach it on this one page in the name of improving the user&#8217;s experience on the site.  </p>
+<p>There&#8217;s one more thing we can do to make our lives easier.  There is no special behavior in our statusCode handler, so it would be nice define it only once.  Luckily, the folks at jQuery are a step ahead of us.  We can define our statusCode handler using the ajaxSetup method in our master page:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">$.<span class="me1">ajaxSetup</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; statusCode<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="nu0">999</span><span class="sy0">:</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; location.<span class="me1">href</span> <span class="sy0">=</span> <span class="st0">'/Account/LogOn?returnUrl='</span> <span class="sy0">+</span> location.<span class="me1">href</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$.ajaxSetup({
+    statusCode: {
+        999: function () {
+            location.href = '/Account/LogOn?returnUrl=' + location.href;
+        }
+    }
+});</pre></div></div>
+
+<p>Now that everything is set up, we are properly redirected to the login page:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/WebDev/handling-unauthenticated-ajax-requests/good-logon.PNG?mtime=1328987447"><img alt="" src="/wp-content/uploads/blogs/WebDev/handling-unauthenticated-ajax-requests/good-logon.PNG?mtime=1328987447" width="557" height="435" /></a></div>
+<p>I&#8217;m not sure this is the best solution to our problem, but it is certainly a solution.  It allows us to keep leveraging ASP.net&#8217;s built in error handling and authentication (I know they aren&#8217;t perfect, but they are good enough for us in this scenario) while making the user&#8217;s life a bit easier in the event something goes wrong.  In this case, my team is the primary user of the application so it makes our lives easier <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p>Complete source code for the application in question is available on <a href="https://github.com/jawsthegame/PivotalExtension">github</a>.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/uidevelopment/handling-unauthenticated-ajax-requests/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Delivery Project &#8211; Incorporating the Unit Tests</title>
+		<link>/index.php/enterprisedev/unittest/continuous-delivery-project-incorporating-the/</link>
+		<comments>/index.php/enterprisedev/unittest/continuous-delivery-project-incorporating-the/#comments</comments>
+		<pubDate>Mon, 19 Dec 2011 13:44:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[Unit Testing]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[jenkins]]></category>
+		<category><![CDATA[ms test]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[unit testing]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/continuous-delivery-project-incorporating-the/</guid>
+		<description><![CDATA[The purpose of the integration build is to bring potential issues to the surface as quickly as possible. Unit tests run quickly and adding them to the continuous integration build helps flush out defects as close to the beginning of the process as possible. Generally build engines will support unit test framework by directly integrating with them or by providing an ability to execute the test framework and import their results.]]></description>
+				<content:encoded><![CDATA[<p>The purpose of the integration build is to bring potential issues to the surface as quickly as possible. Unit tests run quickly and adding them to the continuous integration build helps flush out defects as close to the beginning of the process as possible. Generally build engines will support unit test framework by directly integrating with them or by providing an ability to execute the test framework and import their results.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview_p3.png" title="Delivery Pipeline - Focus of Current Post" /><br />
+	Delivery Pipeline &#8211; Focus of Current Post
+</div>
+<p>This is the fourth post in a multi-part series on my Continuous Delivery pipeline project. The <a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making MVCMusic Store Testable">previous post</a> followed the changes necessary to add unit testing to the MVC Music Store project, a process that ended in the creation of unit tests for the Checkout process. In this post I will configure the CI build job to run the unit test suite, including extra steps necessary to get the MS Test framework runnable on the build server.</p>
+<h2>Run the Build</h2>
+<p>With the automated build already polling changes from the source code repository, this process actually started while I was still writing the initial unit tests for the prior post. With the little red &#8220;failed build&#8221; dot as my guide, and the ever present twitter bot reminding me on each broken commit, I ended up working on both the unit tests and the server configuration in overlapping steps.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_firstfail.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_firstfail.png" title="Failing Unit Test Build" /></a><br />
+	Failing Unit Test Build
+</div>
+<p>The initial build failure was due to the addition of the MS Test project to the solution. This test project includes necessary references for the MS Test libraries, but unfortunately those libraries are not included in the project or as part of the .Net framework installation. This causes the build to fail with missing reference errors.</p>
+<p>There are several blogs and methods outlined to get MS Test running on a build server, including some registry hacks and other unsupported trickery. After spending some time exploring that route, I eventually gave up and installed Visual Studio on the test server. </p>
+<p><i>This is an area that Microsoft could definitely use some improvement in (MS Test integration), but what&#8217;s interesting is that many experts on continuous delivery (of which I am definitely not one) actually suggest using the same software on the build server as the developers use to minimize differences in the builds. Whatever the case, the choice of MS Test generally ends with us having Visual Studio on our build server.</i></p>
+<p>Once the install was completed and I had patched Visual Studio up to date, I was able to run successful builds again.</p>
+<h2>Run the Tests in the Build</h2>
+<p>At this point I am building the test project every time the build runs, but I&#8217;m not actually running any of the tests. In order to run the tests, I am going to drop to the command line and run the MS Test executable directly. To execute a command directly as a build step, I&#8217;ll add a &#8220;Windows Batch Command&#8221; step to the &#8220;Build&#8221; section of my CI Build job.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_command.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_command.png" title="Jenkins Configuration - New Windows Batch Command" /></a><br />
+	Jenkins Configuration &#8211; New Windows Batch Command
+</div>
+<p>The MS Test executable is located in the Visual Studio folder at <code class="codespan">C:Program Files (x86)Microsoft Visual Studio 10.0Common7IDEmstest.exe</code>. I&#8217;ll execute this against the compiled assembly from the MVCMusicStoreTests project and configure the results file to land somewhere obvious so i can import it later. </p>
+<p>Jenkins provides a list of variables we can use in commands, in this case I&#8217;ll use the %WORKSPACE% variable to locate the assembly:<br />
+<code class="codespan">"C:Program Files (x86)Microsoft Visual Studio 10.0Common7IDEmstest.exe" /resultsfile:"%WORKSPACE%MvcMusicStoreTestsbinReleaseMyTests.Results.xml" /testcontainer:"%WORKSPACE%MvcMusicStoreTestsbinReleaseMvcMusicStoreTests.dll" /nologo</code></p>
+<p>At this point, I can run the build again but it doesn&#8217;t show anything different than before until I open the command log. Inside the command log I can see that the tests ran successfully as part of the build. I also can manually verify the results file was published to the location I specified above.</p>
+<h2>Integrating the Test Run</h2>
+<p>To integrate the MS Test results into Jenkins, I&#8217;ll use a plugin to map the MS Test format to a format that Jenkins natively understands (Junit XML results). A plugin is available from the &#8220;Manage Plugins&#8221; screen (Jenkins, Manage Jenkins, Manage Plugins, Click the Available Tab) to do this work for me. </p>
+<p>After the plugin installs successfully, there is a new entry in the &#8220;Post-Build Actions&#8221; section of the job configuration. All I need to do is check the new &#8220;Publish MSTest test result report&#8221; checkbox and enter the path I used above for the result files. </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_results.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_results.png" title="Jenkins Configuration - New Windows Batch Command" /></a><br />
+	Jenkins Configuration &#8211; New Windows Batch Command
+</div>
+<p>Now when I run the build again, a new section shows up on the run summary screen that indicates I don&#8217;t have any failing tests. Clicking that link for more details, I can see that Jenkins has parsed that results file from MS Test and provided information on all of the running tests and their execution times.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_success.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_success.png" title="Jenkins Configuration - Successful Job w/ Unit Tests" /></a><br />
+	Jenkins Configuration &#8211; Successful Job w/ Unit Tests
+</div>
+<p>In addition to the test information, there is also a new menu item on the left side named &#8220;History&#8221;. Clicking this will show historical information on the test runs, including a graph of the execution times and test counts. </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_history_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_history.png" title="Jenkins Configuration - Unit Test History" /></a><br />
+	Jenkins Configuration &#8211; Unit Test History
+</div>
+<p><i>Note: If, like me, you didn&#8217;t bother to define a server name in the Jenkins configuration panel, you will find that some of these links will not work from a remote server because they are defined with the full server name instead of relative links.</i></p>
+<p>I am naturally paranoid when things work right away, so at this point I purposefully broke a unit test and reran the build to verify it would report it correctly.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_failedrun_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_failedrun.png" title="Jenkins Configuration - Failed Unit Test Run" /></a><br />
+	Failed Unit Test Run
+</div>
+<p>And my twitter bot is, of course, more than happy to broadcast that failure far and wide.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="https://twitter.com/#!/TarwnBuildSrvr" title="@TarwnBuildSrvr on Twitter" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_twitter.png" title="Jenkins Configuration - Failed Unit Test Run" /></a><br />
+	Failed Unit Test Run
+</div>
+<h2>Next Steps</h2>
+<p>With unit tests integrated into the build job, I am nearly done with the Continuous Integration stage of this pipeline. The last thing step will be to verify the packaged code can actually be deployed and to build in the ability to smoke test that deployed code.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li class="cur"><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-dashboard-qa-and" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/unittest/continuous-delivery-project-incorporating-the/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Delivery Project &#8211; Making MVCMusicStore Testable</title>
+		<link>/index.php/enterprisedev/unittest/continuous-delivery-project-making-mvcmusicstore/</link>
+		<comments>/index.php/enterprisedev/unittest/continuous-delivery-project-making-mvcmusicstore/#respond</comments>
+		<pubDate>Fri, 16 Dec 2011 11:28:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[Unit Testing]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[ms test]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[mvccontrib]]></category>
+		<category><![CDATA[rhinomocks]]></category>
+		<category><![CDATA[unit testing]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/continuous-delivery-project-making-mvcmusicstore/</guid>
+		<description><![CDATA[It can be challenging to add unit testing to a project that was built without planning to incorporate it. The ASP.Net MVC Music Store tutorial was not built with unit testing in mind, but today we're going to walk through the addition of Controller unit tests, focusing on a controller that directly references Entity Framework objects and implicitly interacts with ASP.Net Membership objects and Request data from the current HttpContext.]]></description>
+				<content:encoded><![CDATA[<p>It can be challenging to add unit testing to a project that was built without planning to incorporate it. The ASP.Net MVC Music Store tutorial was not built with unit testing in mind, but today we&#8217;re going to walk through the addition of Controller unit tests, focusing on a controller that directly references Entity Framework objects and implicitly interacts with ASP.Net Membership objects and Request data from the current HttpContext.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview_p2.png" title="Delivery Pipeline - Focus of Current Post" /><br />
+	Delivery Pipeline &#8211; Focus of Current Post
+</div>
+<p>This is the third post in a multi-part series on my Continuous Delivery pipeline project. The <a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Starting the Continuous Delivery project">previous post</a> followed the setup of the Continuous Integration engine and the CI build job. This post follows the addition of Unit Tests to the ASP.Net MVC Music Store application so those tests can be incorporated in the CI build job (in the next post).</p>
+<h2>Adding the Unit Tests</h2>
+<p>I chose to use MS Test for the Unit Test project due to it&#8217;s integration into Visual Studio. Later I&#8217;ll use Nunit for the automated interface testing where that integration is not as useful. This will also let us see both integrated into the build engine as we add those portions in.</p>
+<p>The first step to adding Unit Testing to an existing project is picking a place to start. I selected the CheckoutController, as it is one of the more complex controllers in the project and will provide the best set of examples. Besides the implicit access of HttpContext data and instantiating the MusicStoreEntities DbContext directly, the Checkout Controller interacts with a cart model object that also interacts with HttpContext and it own instance of the DbContext.</p>
+<p><i>Note: There is a <a href="http://msdn.microsoft.com/en-us/gg618510" title="ASP.NET MVC 3 Testing">MSDN Hands On Lab</a> to add &#8220;Unit Tests&#8221; to the MVCMusicStore site. The methods outlined in that post are lower impact to the production code (little or no changes required), but is actually Integration Testing, since the tests are executing across more than one unit of code and across application boundaries to a database. Integration Tests are useful, but typically more costly to maintain, provide less specific information, take longer to run, and are more fragile than unit tests. This is not to say that they aren&#8217;t useful, just that they are different.</i></p>
+<p>The code for this project is available in a <a href="https://bitbucket.org/tarwn/mvcmusicstore.main/changesets" title="Changesets for the source code">BitBucket repository</a>, but the order I follow here will be somewhat different than the actual order of the changesets, as the changes for this post overlapped some with the content of the next post.</p>
+<h2>Testable Entity Framework</h2>
+<p>Before writing the first test, I need to drive a wedge between the Entity Framework DbContext and the Controllers so I can give the controller a data context that doesn&#8217;t really talk to a database. Currently the CheckoutController creates an instance of the MusicStoreEntities object when it is instantiated, and that instantiated MusicStoreEntities object gets it&#8217;s connection information from the web.config:</p>
+<p><b>MVCMusicStore/Controllers/CheckoutController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStore<span class="sy0">.</span><span class="me1">Controllers</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>Authorize<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> CheckoutController <span class="sy0">:</span> Controller <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; MusicStoreEntities storeDB <span class="sy0">=</span> <span class="kw3">new</span> MusicStoreEntities<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">const</span> <span class="kw4">string</span> PromoCode <span class="sy0">=</span> <span class="st0">&quot;FREE&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// GET: /Checkout/AddressAndPayment</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> ActionResult AddressAndPayment<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> View<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="sy0">...</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStore.Controllers {
+
+	[Authorize]
+	public class CheckoutController : Controller {
+		MusicStoreEntities storeDB = new MusicStoreEntities();
+		const string PromoCode = "FREE";
+
+		//
+		// GET: /Checkout/AddressAndPayment
+		public ActionResult AddressAndPayment() {
+			return View();
+		}
+...</pre></div></div>
+
+<p>Replacing this concrete object with an interface will allow the production version of the site to continue working with a live database context while providing the ability to use a fake version for testing. </p>
+<p>To create the replacement, I&#8217;ll start replacing the concrete context with the name of an interface, then use the errors from the compiler to help define the minimum set of interface members required to satisfy the production code.</p>
+<p><b>MVCMusicStore/Controllers/CheckoutController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStore<span class="sy0">.</span><span class="me1">Controllers</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>Authorize<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> CheckoutController <span class="sy0">:</span> Controller <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IMusicStoreEntities storeDB<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">const</span> <span class="kw4">string</span> PromoCode <span class="sy0">=</span> <span class="st0">&quot;FREE&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> CheckoutController<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">:</span> <span class="kw1">this</span><span class="br0">&#40;</span><span class="kw3">new</span> MusicStoreEntities<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> CheckoutController<span class="br0">&#40;</span>IMusicStoreEntities storeDb<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">storeDB</span> <span class="sy0">=</span> storeDb<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="sy0">...</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStore.Controllers {
+
+	[Authorize]
+	public class CheckoutController : Controller {
+		IMusicStoreEntities storeDB;
+		const string PromoCode = "FREE";
+
+		public CheckoutController() : this(new MusicStoreEntities()) { }
+
+		public CheckoutController(IMusicStoreEntities storeDb) {
+			this.storeDB = storeDb;
+		}
+...</pre></div></div>
+
+<p><i>Why define the interface first and debug forward? Why not build a copy of the DbContext first? Starting with a minimal interface like this will help me keep the interface to the minimum necessary functionality. Had I started with the DbContext I could easily start defining methods that seem like they will be useful at some point, but don&#8217;t reflect what I will actually need or may never be used. Extra code is extra maintenance and finding out sooner that something doesn&#8217;t work (or is unnecessary) leads to less wasted effort.</i></p>
+<p>The first error is the attempted assignment of the new MusicStoreEntities to the IMusicStoreEntities constructor. That one is easy enough to resolve:</p>
+<p><b>MVCMusicStore/Models/MusicStoreEntities.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStore<span class="sy0">.</span><span class="me1">Models</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> MusicStoreEntities <span class="sy0">:</span> DbContext, IMusicStoreEntities <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">interface</span> IMusicStoreEntities <span class="br0">&#123;</span> <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStore.Models {
+	public class MusicStoreEntities : DbContext, IMusicStoreEntities {
+		// ...
+	}
+
+	public interface IMusicStoreEntities { }
+}</pre></div></div>
+
+<p>I&#8217;ve added the interface declaration and the implements statement to MusicStoreEntities. Next I&#8217;ll define the collections and make sure the interface implements IDisposable:</p>
+<p><b>MVCMusicStore/Models/MusicStoreEntities.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStore<span class="sy0">.</span><span class="me1">Models</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> MusicStoreEntities <span class="sy0">:</span> DbContext, IMusicStoreEntities <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> IDbSet<span class="sy0">&lt;</span>Album<span class="sy0">&gt;</span> Albums <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> IDbSet<span class="sy0">&lt;</span>Genre<span class="sy0">&gt;</span> Genres <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> IDbSet<span class="sy0">&lt;</span>Artist<span class="sy0">&gt;</span> Artists <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> IDbSet<span class="sy0">&lt;</span>Cart<span class="sy0">&gt;</span> Carts <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> IDbSet<span class="sy0">&lt;</span>Order<span class="sy0">&gt;</span> Orders <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> IDbSet<span class="sy0">&lt;</span>OrderDetail<span class="sy0">&gt;</span> OrderDetails <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">interface</span> IMusicStoreEntities <span class="sy0">:</span> IDisposable <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IDbSet<span class="sy0">&lt;</span>Album<span class="sy0">&gt;</span> Albums <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IDbSet<span class="sy0">&lt;</span>Genre<span class="sy0">&gt;</span> Genres <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; IDbSet<span class="sy0">&lt;</span>Artist<span class="sy0">&gt;</span> Artists <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; IDbSet<span class="sy0">&lt;</span>Cart<span class="sy0">&gt;</span> Carts <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IDbSet<span class="sy0">&lt;</span>Order<span class="sy0">&gt;</span> Orders <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IDbSet<span class="sy0">&lt;</span>OrderDetail<span class="sy0">&gt;</span> OrderDetails <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="kw1">set</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStore.Models {
+	public class MusicStoreEntities : DbContext, IMusicStoreEntities {
+		public IDbSet&lt;Album&gt; Albums { get; set; }
+		public IDbSet&lt;Genre&gt; Genres { get; set; }
+
+		public IDbSet&lt;Artist&gt; Artists { get; set; }
+
+		public IDbSet&lt;Cart&gt; Carts { get; set; }
+		public IDbSet&lt;Order&gt; Orders { get; set; }
+		public IDbSet&lt;OrderDetail&gt; OrderDetails { get; set; }
+
+	}
+
+	public interface IMusicStoreEntities : IDisposable {
+		IDbSet&lt;Album&gt; Albums { get; set; }
+		IDbSet&lt;Genre&gt; Genres { get; set; }
+
+		IDbSet&lt;Artist&gt; Artists { get; set; }
+
+		IDbSet&lt;Cart&gt; Carts { get; set; }
+		IDbSet&lt;Order&gt; Orders { get; set; }
+		IDbSet&lt;OrderDetail&gt; OrderDetails { get; set; }
+	}
+}</pre></div></div>
+
+<p>At this point I have a couple errors to clean up. In one case the compiler is upset with using Include() off of an IDbSet instance, this is easily solved by adding <code class="codespan">using System.Data.Entity;</code> to the file so the extension will be available. The second error points out a missing SaveChanges call on my interface which I can easily add:</p>
+<p><b>MVCMusicStore/Models/MusicStoreEntities.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStore<span class="sy0">.</span><span class="me1">Models</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> MusicStoreEntities <span class="sy0">:</span> DbContext, IMusicStoreEntities <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">interface</span> IMusicStoreEntities <span class="sy0">:</span> IDisposable <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">int</span> SaveChanges<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStore.Models {
+	public class MusicStoreEntities : DbContext, IMusicStoreEntities {
+		// ...
+	}
+
+	public interface IMusicStoreEntities : IDisposable {
+		// ...
+
+		int SaveChanges();
+	}
+}</pre></div></div>
+
+<p>With those last couple changes completed, the build is happy and I have a minimal interface. </p>
+<p>Next I want to replace the behavior in the controllers of creating their own local DbContext instance with using one that is provided to them. I started this by defining the two constructors above for my CheckoutController, but rather than copy and paste this new behavior to all of the controllers, I&#8217;ll move the responsibility to a ControllerBase class:</p>
+<p><b>MVCMusicStore/Controllers/ControllerBase.cs</b> (New File)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStore<span class="sy0">.</span><span class="me1">Controllers</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> ControllerBase <span class="sy0">:</span>Controller <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">private</span> IMusicStoreEntities _storeDB<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">protected</span> IMusicStoreEntities StoreDB <span class="br0">&#123;</span> <span class="kw1">get</span> <span class="br0">&#123;</span> <span class="kw1">return</span> _storeDB<span class="sy0">;</span> <span class="br0">&#125;</span> <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> ControllerBase<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">:</span> <span class="kw1">this</span><span class="br0">&#40;</span><span class="kw3">new</span> MusicStoreEntities<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> ControllerBase<span class="br0">&#40;</span>IMusicStoreEntities storeDb<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _storeDB <span class="sy0">=</span> storeDb<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStore.Controllers {
+	public class ControllerBase :Controller {
+		private IMusicStoreEntities _storeDB;
+
+		protected IMusicStoreEntities StoreDB { get { return _storeDB; } }
+
+		public ControllerBase() : this(new MusicStoreEntities()) { }
+
+		public ControllerBase(IMusicStoreEntities storeDb) {
+			_storeDB = storeDb;
+		}
+	}
+}</pre></div></div>
+
+<p><b>MVCMusicStore/Controllers/CheckoutController.cs</b> (New File)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStore<span class="sy0">.</span><span class="me1">Controllers</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>Authorize<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> CheckoutController <span class="sy0">:</span> ControllerBase <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">const</span> <span class="kw4">string</span> PromoCode <span class="sy0">=</span> <span class="st0">&quot;FREE&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> CheckoutController<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> CheckoutController<span class="br0">&#40;</span>IMusicStoreEntities storeDb<span class="br0">&#41;</span> <span class="sy0">:</span> <span class="kw1">base</span><span class="br0">&#40;</span>storeDb<span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// POST: /Checkout/AddressAndPayment</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>HttpPost<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> ActionResult AddressAndPayment<span class="br0">&#40;</span>FormCollection values<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//Save Order</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; StoreDB<span class="sy0">.</span><span class="me1">Orders</span><span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span>order<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; StoreDB<span class="sy0">.</span><span class="me1">SaveChanges</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStore.Controllers {
+
+	[Authorize]
+	public class CheckoutController : ControllerBase {
+		const string PromoCode = "FREE";
+
+		public CheckoutController() { }
+		public CheckoutController(IMusicStoreEntities storeDb) : base(storeDb) { }
+
+		// ...
+
+		//
+		// POST: /Checkout/AddressAndPayment
+		[HttpPost]
+		public ActionResult AddressAndPayment(FormCollection values) {
+			// ...
+				//Save Order
+				StoreDB.Orders.Add(order);
+				StoreDB.SaveChanges();
+			// ...
+		}
+
+		// ...
+	}
+}</pre></div></div>
+
+<p>After replacing the private variable and constructors from the CheckoutController with inheritance from the ControllerBase, the three places referencing the old variable are showing as errors and I&#8217;ll simply update them to the public property in the ControllerBase. </p>
+<p>The last place I need to change is the ShoppingCart object. Despite being a model object, the ShoppingCart object instantiates it&#8217;s own local instance of the MusicStoreEntities context. The first time I converted the project, I missed this case and had some odd unit test results until I realized the cart was still accessing a real database.</p>
+<p><i>In larger projects it can be common to have components separately instantiated in random nooks and crannies, not only making it tricky to convert for unit testing but also making the production code more fragile and harder to change and troubleshoot. After replacing the local ones, it&#8217;s a good idea to execute some searches through the codebase to find other references to the concrete classes.</i></p>
+<p>Just like the Controllers, I&#8217;ll update the ShoppingCart object to use the interface and use <a href="http://en.wikipedia.org/wiki/Dependency_injection" title="Dependancy Injection at Wikipedia">Dependancy Injection</a> to pass in the context I expect it to use. Besides updating the constructor to require an IMusicStoreEntities context, I&#8217;ll also need to update the static methods that return instances of the cart:</p>
+<p><b>MVCMusicStore/Models/ShoppingCart.cs</b> (New File)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStore<span class="sy0">.</span><span class="me1">Models</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">partial</span> <span class="kw4">class</span> ShoppingCart <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IMusicStoreEntities storeDB<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> ShoppingCart<span class="br0">&#40;</span>IMusicStoreEntities dbContext<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">storeDB</span> <span class="sy0">=</span> dbContext<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> ShoppingCart GetCart<span class="br0">&#40;</span>HttpContextBase context, IMusicStoreEntities dbContext<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> cart <span class="sy0">=</span> <span class="kw3">new</span> ShoppingCart<span class="br0">&#40;</span>dbContext<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; cart<span class="sy0">.</span><span class="me1">ShoppingCartId</span> <span class="sy0">=</span> cart<span class="sy0">.</span><span class="me1">GetCartId</span><span class="br0">&#40;</span>context<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> cart<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Helper method to simplify shopping cart calls</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> ShoppingCart GetCart<span class="br0">&#40;</span>Controller controller, IMusicStoreEntities dbContext<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> GetCart<span class="br0">&#40;</span>controller<span class="sy0">.</span><span class="me1">HttpContext</span>, dbContext<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStore.Models {
+	public partial class ShoppingCart {
+		IMusicStoreEntities storeDB;
+
+		// ...
+
+		public ShoppingCart(IMusicStoreEntities dbContext) {
+			this.storeDB = dbContext;
+		}
+		
+		public static ShoppingCart GetCart(HttpContextBase context, IMusicStoreEntities dbContext) {
+			var cart = new ShoppingCart(dbContext);
+			cart.ShoppingCartId = cart.GetCartId(context);
+			return cart;
+		}
+
+		// Helper method to simplify shopping cart calls
+		public static ShoppingCart GetCart(Controller controller, IMusicStoreEntities dbContext) {
+			return GetCart(controller.HttpContext, dbContext);
+		}
+
+		// ...
+	}
+}</pre></div></div>
+
+<p>With these changes added, the next build errors direct me to the places that need to pass the extra argument. For the CheckoutController, I&#8217;ll use the public property exposed by the Controllerbase. For the AccountController I need to instantiate a MusicStoreEntities object to pass (or convert it to use ControllerBase), and for the others I can plug in their local storeDb variable.</p>
+<p><i>Note: In my <a href="https://bitbucket.org/tarwn/mvcmusicstore.main/changeset/82d254cd9f1d" title="First Changeset for Unit Test Changes">implementation</a>, I went ahead and converted all of my controllers over to the new ControllerBase. The downside of this method is that the more you convert, the more you have to test. Since I don&#8217;t have unit tests in place, this means a full manual regression test. On a larger project I would limit my changes only to the pieces I was planning on adding unit tests to and had time to manually regression test, but I would build my objects (like the ControllerBase) in such a way that the next conversions could take advantage and extend them when it&#8217;s their turn.</i></p>
+<h2>Adding a Test Project</h2>
+<p>After manually regression testing my changes to ensure they work, I&#8217;ll add the test project and create the first test class.</p>
+<p>To get started, I&#8217;ll create the test project and use the package manager to get the RhinoMocks package. This will allow me to mock some of the resources the controller requires. With the project and resuorces ready, I can create the first CheckoutController test.</p>
+<p><b>MvcMusicStoreTests/Controllers/CheckoutController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStoreTests<span class="sy0">.</span><span class="me1">Controllers</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestClass<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> CheckoutControllerTests <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>TestMethod<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> AddressAndPayment_ReturnsView<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; CheckoutController controller <span class="sy0">=</span> <span class="kw3">new</span> CheckoutController<span class="br0">&#40;</span>MusicStoreEntitiesFactory<span class="sy0">.</span><span class="me1">GetEmpty</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ActionResult result <span class="sy0">=</span> controller<span class="sy0">.</span><span class="me1">AddressAndPayment</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">IsNotNull</span><span class="br0">&#40;</span>result<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStoreTests.Controllers {
+
+	[TestClass]
+	public class CheckoutControllerTests {
+
+		[TestMethod]
+		public void AddressAndPayment_ReturnsView() {
+			CheckoutController controller = new CheckoutController(MusicStoreEntitiesFactory.GetEmpty());
+
+			ActionResult result = controller.AddressAndPayment();
+
+			Assert.IsNotNull(result);
+		}
+	}
+}</pre></div></div>
+
+<p>This test is using the Arrange, Act, Assert (AAA) unit testing pattern and is a basic test that asserts that the CheckoutController returns a result when we call AddressAndPayment. In the first step I call a Factory class to populate the data context of our CheckoutController. I have also started abstracting out obvious resources that will need to be fleshed out later, but haven&#8217;t started to define what those behaviors will be (I&#8217;ll let future tests decide that for me).</p>
+<p><i>You may also notice that the folder structure for my test matches the structure for the class that is under tests, this makes it easier to keep the project organized and to find matching files across the projects.</i></p>
+<p><b>MvcMusicStoreTests/MusicStoreEntitiesFactory.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStoreTests <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw4">class</span> MusicStoreEntitiesFactory <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> IMusicStoreEntities GetEmpty<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> MockRepository<span class="sy0">.</span><span class="me1">GenerateMock</span><span class="sy0">&lt;</span>IMusicStoreEntities<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStoreTests {
+	class MusicStoreEntitiesFactory {
+		public static IMusicStoreEntities GetEmpty() {
+			return MockRepository.GenerateMock&lt;IMusicStoreEntities&gt;();
+		}
+	}
+}</pre></div></div>
+
+<p>I don&#8217;t actually need any data yet, so I can use RhinoMock&#8217;s MockRepository to automaitcally create a stub implementation of the IMusicStoreEntities interface the controller requires.</p>
+<h2>Fake Db and Http Contexts</h2>
+<p>Now that I have a basic unit test working, I can start moving into more complex (and useful) tests. This is where things start to get challenging. The data context is already abstracted from the controllers, but the framework also depends heavily on the web server context, including bits like querystring and form post variables from the client browser, session and cookie state containers, and additional context for Membership information.</p>
+<p>While it is possible to start mocking or stubbing our way through this whole list, it can be pretty painful and isn&#8217;t really necessary. This particular problem has already been solved before, so I&#8217;ll import the MVC3 TestHelper package (<a href="http://nuget.org/List/Packages/MvcContrib.Mvc3.TestHelper-ci" title="Install the MvcContrib.Mvc3.TestHelper-ci package from Nuget">Install-Package MvcContrib.Mvc3.TestHelper-ci</a>) to do the work for me.</p>
+<h3>Initial Data-Free Tests</h3>
+<p>I&#8217;m going to continue to ease into making this controller testable by choosing an action that has minimal data store interactions. This will allow me to focus on getting the HttpContext work out of the way first, instead of trying to do both at the same time.</p>
+<p>Rather than trying to guess ahead as to what pieces of the package I&#8217;ll need, I&#8217;m going to create an instance of the test and build out just the logic I need to make it pass (Test Driven Test Development?). Here is that test:</p>
+<p><b>MvcMusicStoreTests/Controllers/CheckoutController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStoreTests<span class="sy0">.</span><span class="me1">Controllers</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestClass<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> CheckoutControllerTests <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>TestMethod<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> AddressAndPayment_PostInvalidOrderNoPromotion_ReturnsOrderWithErrors<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; CheckoutController controller <span class="sy0">=</span> GetWiredUpController<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FormCollection orderCollection <span class="sy0">=</span> <span class="kw3">new</span> FormCollection<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span><span class="st0">&quot;FirstName&quot;</span>,<span class="st0">&quot;fn&quot;</span><span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; controller<span class="sy0">.</span><span class="me1">ValueProvider</span> <span class="sy0">=</span> orderCollection<span class="sy0">.</span><span class="me1">ToValueProvider</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ViewResult result <span class="sy0">=</span> controller<span class="sy0">.</span><span class="me1">AddressAndPayment</span><span class="br0">&#40;</span>orderCollection<span class="br0">&#41;</span> <span class="kw1">as</span> ViewResult<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">IsInstanceOfType</span><span class="br0">&#40;</span>result<span class="sy0">.</span><span class="me1">ViewData</span><span class="sy0">.</span><span class="me1">Model</span>, <span class="kw3">typeof</span><span class="br0">&#40;</span>Order<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreNotEqual</span><span class="br0">&#40;</span><span class="nu0">0</span>, result<span class="sy0">.</span><span class="me1">ViewData</span><span class="sy0">.</span><span class="me1">ModelState</span><span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStoreTests.Controllers {
+
+	[TestClass]
+	public class CheckoutControllerTests {
+		// ...
+
+		[TestMethod]
+		public void AddressAndPayment_PostInvalidOrderNoPromotion_ReturnsOrderWithErrors() {
+			CheckoutController controller = GetWiredUpController();
+			FormCollection orderCollection = new FormCollection() {
+				{"FirstName","fn"}
+			};
+			controller.ValueProvider = orderCollection.ToValueProvider();
+
+			ViewResult result = controller.AddressAndPayment(orderCollection) as ViewResult;
+
+			Assert.IsInstanceOfType(result.ViewData.Model, typeof(Order));
+			Assert.AreNotEqual(0, result.ViewData.ModelState.Count);
+		}
+	}
+}</pre></div></div>
+
+<p>I&#8217;m relegating the logic of creating the controller to a local function called <code class="codespan">GetWiredUpController()</code>, trusting it to return a functioning controller. I then create a FormCollection of values and assign it to the controller as if they had been sent from a client browser. The rest of the code is the Act and Assert steps of the test to call the controller and verify the result.</p>
+<p>On the first run, the <code class="codespan">GetWiredUpController()</code> method isn&#8217;t giving me everything I need, but I can work through that iteratively until I have all the pieces I need. This took several iterations, so I&#8217;ll skip ahead to the end results. </p>
+<p><b>MvcMusicStoreTests/Controllers/CheckoutController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStoreTests<span class="sy0">.</span><span class="me1">Controllers</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestClass<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> CheckoutControllerTests <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">private</span> CheckoutController GetWiredUpController<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; CheckoutController controller <span class="sy0">=</span> <span class="kw3">new</span> CheckoutController<span class="br0">&#40;</span>MusicStoreEntitiesFactory<span class="sy0">.</span><span class="me1">GetEmpty</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; TestControllerBuilder _builder <span class="sy0">=</span> <span class="kw3">new</span> TestControllerBuilder<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _builder<span class="sy0">.</span><span class="me1">HttpContext</span><span class="sy0">.</span><span class="me1">User</span> <span class="sy0">=</span> <span class="kw3">new</span> FakeUser<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _builder<span class="sy0">.</span><span class="me1">InitializeController</span><span class="br0">&#40;</span>controller<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> controller<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStoreTests.Controllers {
+
+	[TestClass]
+	public class CheckoutControllerTests {
+		// ...
+
+		private CheckoutController GetWiredUpController() {
+			CheckoutController controller = new CheckoutController(MusicStoreEntitiesFactory.GetEmpty());
+			TestControllerBuilder _builder = new TestControllerBuilder();
+			_builder.HttpContext.User = new FakeUser();
+
+			_builder.InitializeController(controller);
+			return controller;
+		}
+	}
+}</pre></div></div>
+
+<p>Like the initial test, I create the controller and populate it with an empty IMusicStoreEntities call from the factory. I then create an instance of the TestControllerBuilder class from the MVCContrib package, which will wire together all the stubs and fakes necessary to present Application, Session, and other necessary HttpContext values to the controller. I&#8217;ll add my own FakeUser object (an implementation of IPrincipal) to the builder, then have it do it&#8217;s magic on the CheckoutController instance. Voila, one fully wired up CheckoutController.</p>
+<h3>Totally Faked Out, Just Add Data&#8230;</h3>
+<p>Now that I have the controller logic able to run independently from a real HTTP request, I can return to finish work on the methods that interact more heavily with the data store.</p>
+<p>In order to inject some fake data, I need to replace the stubbed out IMusicStoreEntities data context in the MusicStoreEntitiesFactory with a concrete Fake implementation. This will allow me to add collections that I can locally push data into in order to setup scenarios for individual tests.</p>
+<p><b>MvcMusicStoreTests/MusicStoreEntitiesFactory.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStoreTests <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw4">class</span> MusicStoreEntitiesFactory <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> IMusicStoreEntities GetEmpty<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FakeDataStore datastore <span class="sy0">=</span> <span class="kw3">new</span> FakeDataStore<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; datastore<span class="sy0">.</span><span class="me1">Albums</span> <span class="sy0">=</span> <span class="kw3">new</span> FakeDbSet<span class="sy0">&lt;</span>Album<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; datastore<span class="sy0">.</span><span class="me1">Artists</span> <span class="sy0">=</span> <span class="kw3">new</span> FakeDbSet<span class="sy0">&lt;</span>Artist<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; datastore<span class="sy0">.</span><span class="me1">Carts</span> <span class="sy0">=</span> <span class="kw3">new</span> FakeDbSet<span class="sy0">&lt;</span>Cart<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; datastore<span class="sy0">.</span><span class="me1">Genres</span> <span class="sy0">=</span> <span class="kw3">new</span> FakeDbSet<span class="sy0">&lt;</span>Genre<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; datastore<span class="sy0">.</span><span class="me1">OrderDetails</span> <span class="sy0">=</span> <span class="kw3">new</span> FakeDbSet<span class="sy0">&lt;</span>OrderDetail<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; datastore<span class="sy0">.</span><span class="me1">Orders</span> <span class="sy0">=</span> <span class="kw3">new</span> FakeDbSet<span class="sy0">&lt;</span>Order<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> datastore<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStoreTests {
+	class MusicStoreEntitiesFactory {
+		public static IMusicStoreEntities GetEmpty() {
+			FakeDataStore datastore = new FakeDataStore();
+			datastore.Albums = new FakeDbSet&lt;Album&gt;();
+			datastore.Artists = new FakeDbSet&lt;Artist&gt;();
+			datastore.Carts = new FakeDbSet&lt;Cart&gt;();
+			datastore.Genres = new FakeDbSet&lt;Genre&gt;();
+			datastore.OrderDetails = new FakeDbSet&lt;OrderDetail&gt;();
+			datastore.Orders = new FakeDbSet&lt;Order&gt;();
+			return datastore;
+		}
+	}
+}</pre></div></div>
+
+<p>The fake implementations of the <a href="https://bitbucket.org/tarwn/mvcmusicstore.main/src/8831221efe43/MvcMusicStoreTests/Fakes/FakeDataStore.cs" title="See the FakeDataStore class" target="_blank">datastore</a> exposes collections that implement <a href="https://bitbucket.org/tarwn/mvcmusicstore.main/src/8831221efe43/MvcMusicStoreTests/Fakes/FakeDbSet.cs" title="See the FakeDbSet class" target="_blank">IDbSet</a>. With this setup, it is easy to add test data on a per-test basis and without the overhead of a database (work) or some form of test data management (more work).</p>
+<p>Using this new capability, I can start building out more extensive tests.</p>
+<p><b>MvcMusicStoreTests/Controllers/CheckoutController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> MvcMusicStoreTests<span class="sy0">.</span><span class="me1">Controllers</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestClass<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> CheckoutControllerTests <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>TestMethod<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Complete_ValidOrderIdAndUser_ReturnsProperView<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FakeDataStore dataStore <span class="sy0">=</span> MusicStoreEntitiesFactory<span class="sy0">.</span><span class="me1">GetEmpty</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; dataStore<span class="sy0">.</span><span class="me1">Orders</span><span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="kw3">new</span> Order<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> OrderId<span class="sy0">=</span><span class="nu0">5</span>, Username<span class="sy0">=</span><span class="st0">&quot;Bob&quot;</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FakeUser user <span class="sy0">=</span> <span class="kw3">new</span> FakeUser<span class="br0">&#40;</span><span class="kw3">new</span> FakeIdentity<span class="br0">&#40;</span><span class="st0">&quot;Bob&quot;</span>,<span class="st0">&quot;&quot;</span>,<span class="kw1">true</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; CheckoutController controller <span class="sy0">=</span> GetWiredUpController<span class="br0">&#40;</span>store<span class="sy0">:</span> dataStore, user<span class="sy0">:</span> user<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ViewResult result <span class="sy0">=</span> controller<span class="sy0">.</span><span class="me1">Complete</span><span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span> <span class="kw1">as</span> ViewResult<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreEqual</span><span class="br0">&#40;</span><span class="nu0">5</span>, result<span class="sy0">.</span><span class="me1">ViewData</span><span class="sy0">.</span><span class="me1">Model</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace MvcMusicStoreTests.Controllers {
+
+	[TestClass]
+	public class CheckoutControllerTests {
+		// ...
+
+		[TestMethod]
+		public void Complete_ValidOrderIdAndUser_ReturnsProperView() {
+			FakeDataStore dataStore = MusicStoreEntitiesFactory.GetEmpty();
+			dataStore.Orders.Add(new Order() { OrderId=5, Username="Bob" });
+			FakeUser user = new FakeUser(new FakeIdentity("Bob","",true));
+			CheckoutController controller = GetWiredUpController(store: dataStore, user: user);
+			
+			ViewResult result = controller.Complete(5) as ViewResult;
+
+			Assert.AreEqual(5, result.ViewData.Model);
+		}</pre></div></div>
+
+<p>Without any database or HttpContext, I can now test that a valid user with a valid order id will complete processing successfully. I&#8217;ve extended the WiredUpController to take optional arguments to simplify creating scenarios specific to an individual test, again adding functionality only as we need it to satisfy our tests.</p>
+<p>With a working fake data context a working fake HttpContext and sample tests that interact with both, I can make additional tests very easily and have the groundwork in place to start adding test coverage to other controllers.</p>
+<h2>Finishing Up</h2>
+<p>The source code is available <a href="https://bitbucket.org/tarwn/mvcmusicstore.main/src" title="Source code on BitBucket">on BitBucket</a>. Initially I went down a number of blind alleys before I started using the MVC3 Contrib package, that one decision greatly simplified seperating the test code from it&#8217;s expectations of a real HttpContext. I tried to cover the most important parts and this same process should be applicable to other projects as well. If you have any questions about how I got from one step to the next, or what happened between changesets in the source repository, please don&#8217;t hesitate to ask here, in the forum, or via the contact form on my website.</p>
+<p>Creating the tests incrementally and writing only the minimum code necessary may have looked longer, but it actually helped create a pretty tight codebase for the testing and helped to uncover the lack of server-side validation in the checkout routine, a bug in the tutorial code. Had I tried to build everything I needed up front, I probably would have gone further down several blind alleys and ended up with a much larger codebase then I actually needed.</p>
+<h2>Next Steps</h2>
+<p>The project now has the beginning of unit test coverage and the tools necessary to start spreading those tests to the rest of our controllers. In the next post I&#8217;ll incorporate these test into the build process, running and capturing the test results as part of the CI build job.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li class="cur"><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-dashboard-qa-and" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/unittest/continuous-delivery-project-making-mvcmusicstore/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Delivery Project &#8211; Setting up Continuous Integration</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-project-setting-up/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-project-setting-up/#comments</comments>
+		<pubDate>Thu, 15 Dec 2011 11:06:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[jenkins]]></category>
+		<category><![CDATA[msbuild]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[webdeploy]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/continuous-delivery-project-setting-up/</guid>
+		<description><![CDATA[A continuous integration server verifies that all of the currently committed changes play well together and reduces the elapsed time between a team member committing a change and finding out it leaves the build in a poor state. The faster we find out about a defect or unstable build, the fresher the changes are in our minds and the faster we can fix it.]]></description>
+				<content:encoded><![CDATA[<p>A continuous integration server verifies that all of the currently committed changes play well together and reduces the elapsed time between a team member committing a change and finding out it leaves the build in a poor state. The faster we find out about a defect or unstable build, the fresher the changes are in our minds and the faster we can fix it.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview_p1.png" title="Delivery Pipeline - Focus of Current Post" /><br />
+	Delivery Pipeline &#8211; Focus of Current Post
+</div>
+<p>This is the second post in a multi-part series on my Continuous Delivery pipeline project. The <a href="/index.php/EnterpriseDev/starting-a-continuous-delivery-project" title="Starting the Continuous Delivery project">first post</a> discussed Continuous Delivery, defined the process I am building, and outlined the technology selections I&#8217;ve made for the project. In this post I will begin setting up Continuous Integration for the project using Jenkins as a build server, MS Build to execute builds, and BitBucket to serve as the source code repository. </p>
+<h2>Server Setup</h2>
+<p>Prior to setting up the build server, I added a <a href="https://bitbucket.org/tarwn/mvcmusicstore.main" title="Source repository on BitBucket">repository on BitBucket</a> to serve as the central code repository, completed the <a href="http://www.asp.net/mvc/tutorials/mvc-music-store" title="MVC Music Store Tutorial on ASP.Net site">MVC Music Store tutorial</a> (full code available <a href="http://mvcmusicstore.codeplex.com/" title="See tutorial on CodePlex">on Codeplex</a>), and pushed the commits to the remote repository. </p>
+<p>There are three major differences between my version of the database and the one on MSDN:</p>
+<ol>
+<li>My copy uses a second sdf (SQL CE) database for authentication instead of SQL Express</li>
+<li>I&#8217;m using the Universal Providers for ASP.Net membership (<a href="http://nuget.org/List/Packages/System.Web.Providers" title="Universal Providers on Nuget">Install-Package System.Web.Providers</a>)</li>
+<li>I have included the sdf files in the ASP.Net project (not something you would want to do in a production environment)</li>
+</ol>
+<p>My server is a Windows 2008 R2 VM with 2GB of RAM assigned to it and a single 32GB harddrive. It was a clean, sysprepped image with no additional software installed.</p>
+<h2>Installation</h2>
+<p>To get started on the new build server VM, I&#8217;ve installed the following software:</p>
+<ul>
+<li><a href="http://www.google.com/chrome" title="Chrome install link">Chrome</a> &#8211; because IE was annoying me</li>
+<li><a href="http://sourceforge.net/projects/unxutils/" title="Install Unxtools">UnxTools</a> &#8211; Extra tools Jenkins needs that mimic several Unix commands</li>
+<li><a href=http://jenkins-ci.org/"" title="Jenkins Downloads">Jenkins</a> &#8211; The installer will install the JRE and latest version of Jenkins</li>
+<li><a href="http://www.microsoft.com/download/en/details.aspx?id=17851" title=".Net Framework 4 Downloads">Jenkins</a> &#8211; .Net Framework 4 (Check windows updates afterwards)</li>
+<li><a href="http://mercurial.selenic.com/" title="Mercurial Download">Mercurial</a> &#8211; the windows version will install with tortoiseHg</li>
+</ul>
+<p>With a couple reboots along the way, all the packages are installed with little extra effort.</p>
+<h2>Jenkins Configuration</h2>
+<p>With the packages above in place, I can start up Jenkins and began configuring it. To start Jenkins, run <code class="codespan">java -jar "C:Program Files (x86)JenkinsJenkins.war"</code> and then point a browser to http://localhost:8080/ to access the dashboard. There are also instructions to <a href="https://wiki.jenkins-ci.org/display/JENKINS/Installing+Jenkins+as+a+Windows+service" title="">set up Jenkins as a service</a>.</p>
+<p><i>Note: Jenkins somehow magically set itself up as a service on my system (or I was really low on coffee when I was initially poking around it), so if you are following along on your own install, you may want to try accessing the dashboard prior to running the jar to see if it&#8217;s already running.</i></p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/dashboard_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/dashboard.png" title="Jenkins Dashboard" /></a><br />
+	Jenkins Dashboard (unfortunately a later shot as I misplaced some of my earlier screenshots)
+</div>
+<p>The side menu offers a link to the server settings (Manage Jenkins), and from there I get a list of sub-menus in the main area that includes &#8220;Plugins&#8221;. To start with I&#8217;ll install the plugins for Mercurial, Twitter, and MS Build from the &#8220;Available&#8221; tab on the plugins screen. After installing, system-wide options for the plugins are added in the system configuration screen (Manage Jenkins &#8211; Configure System). </p>
+<h3>Mercurial</h3>
+<p>The mercurial configuration is straightforward and offers a reasonable set of defaults, so of course I changed it. I added the path for the mercurial binaries to my PATH environment to make command-line access easier outside of the build server and then modified the mercurial configs in the build server to reflect that change.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_mercurial_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_mercurial.png" title="Jenkins Configuration - Mercurial" /></a><br />
+	Jenkins Configuration &#8211; Mercurial
+</div>
+<p>My simplified configuration is the name of the executable and all blanks for the rest of the values.</p>
+<h3>MS Build</h3>
+<p>The latest MS Build executable is installed as part of the .Net framework installation. In the Jenkins server setup, I add an MS Build item, naming it with it&#8217;s version number (I can add separate, named configurations for each version later if I&#8217;m so inclined) and pointing the path to <code class="codespan">"C:WindowsMicrosoft.NETFrameworkv4.0.30319MSBuild.exe"</code>.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_msbuild_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_msbuild.png" title="Jenkins Configuration - MS Build, Framework 4" /></a><br />
+	Jenkins Configuration &#8211; MS Build, Framework 4
+</div>
+<p><i>Note: You can define multiple MS Build executables if you have projects that run on different versions. Naming them clearly will help when you later need to select the appropriate MS Build exe to build with</i></p>
+<h3>Twitter</h3>
+<p>As I pointed out in the first post, I decided I would use twitter for status notifications, as twitter is more widely accessible and won&#8217;t clog up my inbox (the downside being limited status information). There is important additional information on the <a href="https://wiki.jenkins-ci.org/display/JENKINS/Twitter+Plugin" title="Jenkins Twitter Plugin">plugin page</a> for setting it up.</p>
+<h2>Setting up the CI Job</h2>
+<p>With the server configured, I can move on to setup the initial CI build job. Initially, this job will be responsible for picking up changes from mercurial, executing the build, and reporting the results.</p>
+<ol>
+<li>Select &#8220;New Job&#8221; from top left menu</li>
+<li>Select &#8220;Build a free-style software project&#8221;</li>
+<li>Enter a Name</li>
+<li>Enter Details
+<ol>
+<li>Select Mercurial for SCM and enter URL for the repository (I am using bitbucket for this example) as well as selecting repository browser (bitbucket)</li>
+<li>Initially I&#8217;ll leave build triggers not defined</li>
+<li>Configure MS Build by specifying the <code class="codespan">*.sln</code> </li>
+<li>check the &#8220;twitter&#8221; checkbox at bottom</li>
+<li>Run build by clicking &#8220;Build Now&#8221; at top left</li>
+</ol>
+</li>
+<li>Start debugging build problems</li>
+</ol>
+<p><i>Note: Though I didn&#8217;t show it here, there is also an advanced option under the mecurial settings called &#8220;Clean Build&#8221;. This will clean the workspace before each build so binaries and test results won&#8217;t pollute later builds</i></p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_dashboard_failed.png" title="Jenkins Configuration - Failed Build on Dashboard" /><br />
+	Dashboard View of Failed Build
+</div>
+<p>My first attempted build fails. The details are available by opening the build and clicking the Console Log link in the left menu (which changes to reflect the context of the screen we are on). The console log displays the raw output of the commands executed during the build.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_failedbuild.png" title="Jenkins Configuration - Failed Build Console Log" /><br />
+	Looking at the Console Log for a Failed Build
+</div>
+<p>Here are the errors I had to work through in order to get the initial build to work. Some of them were me missing feedback from the system or incorrect configurations.</p>
+<ol>
+<li>Error (twice), console log told me hg wasn&#8217;t recognized
+<ul>
+<li>hg hadn&#8217;t actually installed the first time due to windows updates being in middle of another install</li>
+<li>I rebooted to finish windows update, installed tortoisehg, rebooted to have clean startup (and paths), and the issue was corrected</li>
+</ul>
+</li>
+<li>Failure &#8211; In the console log it complained about not being able to find the MS Build executable
+<ul>
+<li>Returned to project settings and switched MS Build option from (default) to the one I had configured above in global settings</li>
+</ul>
+</li>
+<li>Error MSB4019: The imported project &#8220;C: &#8230; Microsoft.WebApplication.targets&#8221; was not found
+<ul>
+<li>Options:
+<ul>
+<li>Install VS 2010 Shell (http://www.microsoft.com/download/en/details.aspx?id=115)</li>
+<li>Install Visual Studio</li>
+<li>Copy folder from existing install (C:Program FilesMSBuildMicrosoftVisualStudiov10.0WebApplications)</li>
+</ul>
+</li>
+<li>I went with option 1 and ran windows updates again before continuing</li>
+</ul>
+</li>
+<li>error CS0234: The type or namespace name &#8216;Mvc&#8217; does not exist
+<ul>
+<li>Would have been fixed if I had installed VS (oh well)</li>
+<li>Download and install MVC: http://www.microsoft.com/download/en/details.aspx?displaylang=en&amp;id=4211</li>
+</ul>
+</li>
+</ol>
+<p>At this point the initial build runs successfully. </p>
+<h3>Refining the Setup</h3>
+<p>After getting the initial build setup, it&#8217;s time to add some refinements. First up is switching the build to run in release mode by adding <code class="codespan">"/p:Configuration=Release"</code> to the command line arguments in the MS Build section.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_buildchanges_rel.png" title="Jenkins Configuration - Adding Release to Build Args" /><br />
+	Jenkins Configuration &#8211; Adding Release to Build Args
+</div>
+<p>Now that I have it working, I also want to add the option to automatically run when new changes are committed to source control. The Build Triggers section of the job configuration controls how jobs are triggered, so I&#8217;ll select the &#8220;Poll SCM&#8221; option to poll my source control repository. A value of <code class="codespan">"*/5 * * * *"</code> will set it to check every 5 minutes (which may be overkill given how few updates I will be making over the course of this project, but oh well).</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_buildchanges_poll.png" title="Jenkins Configuration - Polling for Build Trigger" /><br />
+	Jenkins Configuration &#8211; Defining Polling for Build Trigger
+</div>
+<p><i>Note: Timing uses Unix cron-style values. Basically the string is used as a test against the current time to see if a particular step is to be run, so 5 * * * * would run only if the minutes value was a 5, while */5 * * * * runs if it is divisible by 5.</i></p>
+<h2>Capturing the Results</h2>
+<p>The last step of the build stage is to capture the resulting binaries and website pages so they can be deployed consistently to other environments. The addition of WebDeploy to Visual Studio and IIS has made web deployment easy* to manage, which will simplify getting an archive of the results and my deployment scripts later.</p>
+<p><i>Note: ***Web Deploy has made this really easy IN THEORY. This is the topic of a later post in the series and is also the reason screenshots and check-ins for the early stages may reflect dates in early November and these posts are being written in December.</i></p>
+<p>By default, when I create a deployment package I will get a folder of all the cshtml, dll, and so on files I need to run the site. In the project properties for the website, there is a build option to zip these files as a package after building it, which will simplify archival even further.</p>
+<p><i>Project properties, select the tab for &#8220;Package/Publish Web&#8221; and check the &#8220;Create deployment package as zip&#8221; option</i></p>
+<p>The last piece is to tell MSBuild I want to build the web deployment package. In the MSBuild step of the CI job, I add the command-line flag of <code class="codespan">"/p:DeployOnBuild=True"</code>, which will be passed on to the individual projects in the solution to act on if they understand it (which the web project will and the unit test project will not, handy).</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_buildchanges.png" title="Jenkins Configuration - Failed Build Console Log" /><br />
+	Looking at the Console Log for a Failed Build
+</div>
+<p>At this point running another build fails, with multiple errors complaining about Package steps (like CheckAndCleanMSDeployPackageIfNeeded) failing. The solution is to install the WebDeploy 2.0 refresh package on the server, located <a href="http://blogs.iis.net/msdeploy/archive/2011/04/05/announcing-web-deploy-2-0-refresh.aspx" title="WebDeploy 2.0 Refresh">here</a>. Once this is installed, the build is able to complete successfully.</p>
+<p>Now that I have a nice, tidy package of the deployable build, I need to put it somewhere for longer term use. In the Post-Build Actions of my job configuration, there is an option to archive artifacts from the build. Checking this box and entering the path for the zip file from the Project Properties screen (objDebugPackageMvcMusicStore.zip) tells Jenkins to archive that zip file as the artifacts from each build.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_successfulbuild_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_successfulbuild.png" title="Jenkins Configuration - Successful Build" /></a><br />
+	Jenkins Configuration &#8211; Successful Build
+</div>
+<p>After executing another successful build, we can see the build server has archived the zip file (above). If I click that zip file I&#8217;ll be prompted to download it to a local machine.</p>
+<h2>Test the Package</h2>
+<p>We&#8217;re not done until we test the package. Luckily testing a WebDeploy package is pretty easy, all we have to do is open the IIS configuration screen, select the default web site, and then use the import button on the right side of the interface to import the zip file. This imports all of the files, sets up the application, and gives me a running website. There is more information on WebDeploy in <a href=" http://weblogs.asp.net/scottgu/archive/2010/09/13/automating-deployment-with-microsoft-web-deploy.aspx" title="Automating Deployment with Microsoft Web Deploy">this post by ScottGu</a> and we will get more in depth with it in later steps.</p>
+<p><i>Note: It&#8217;s interesting to note that this is where I found the first bug in MVC Music Store. The images in the CSS file were defined assuming the application was at the root level (<a href="https://bitbucket.org/tarwn/practicerepo/changeset/87b38e362428" title="Changeset for the fix">fix</a>), as were the navigation paths in the header (<a href="https://bitbucket.org/tarwn/practicerepo/changeset/843bc10fdd7c" title="Changeset for the fix">fix</a>).</i></p>
+<h2>Next Steps</h2>
+<p>We now have a working Continuous Integration stage that will detect checked in changes, build them, and create a deploy package. The next step is to execute and capture the results for the unit tests, however before capturing the results we need to have unit tests, and to have unit test we have to make the Music Store tutorial code testable. The next post will cover that conversion. It&#8217;s interesting to note, especially if you are one of those people that believe unit tests to be wasteful, that the very first controller I put under test in this very public, very widely deployed, open source project contains a defect.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li class="cur"><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-dashboard-qa-and" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-project-setting-up/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Starting a Continuous Delivery Project</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/starting-a-continuous-delivery-project/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/starting-a-continuous-delivery-project/#comments</comments>
+		<pubDate>Wed, 14 Dec 2011 10:43:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[unit testing]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/starting-a-continuous-delivery-project/</guid>
+		<description><![CDATA[I find that often the hardest part of trying a new technology or principle is finding a project that is simple enough to work on in my spare time, yet complex enough to be useful. Several weeks ago I came up with the idea to use a common project to serve as a platform for additional projects and experiments. The first project, build an automated pipeline that will verify the project remains stable (or notify me when it isn't) throughout its lifetime.]]></description>
+				<content:encoded><![CDATA[<p>I find that often the hardest part of trying a new technology or principle is finding a project that is simple enough to work on in my spare time, yet complex enough to be useful. Several weeks ago I came up with the idea to use a common project to serve as a platform for additional projects and experiments. The first project, build an automated pipeline that will verify the project remains stable (or notify me when it isn&#8217;t) throughout its lifetime.</p>
+<h2>Why a Continuous Delivery Model?</h2>
+<p>Continuous Delivery focuses on standardizing the environments and processes for product delivery, with an aim to create a clear and consistent process from committing new code to having a deliverable product. Creating a consistent process reduces variability and risks involved with manual deployment, ensures all &#8220;ready to be released&#8221; products meet our build and testing standards, creates a faster feedback loop so that problems are detected sooner (and thus can be fixed cheaper), and adds a level of auditability that rarely exists with manual deployment processes. </p>
+<p>There is a good article <a href="http://www.informit.com/articles/article.aspx?p=1641923" title="Continuous Delivery: The Value Proposition">on InformIT</a> by Jez Humble (who also coauthored the book <a href="http://www.amazon.com/Continuous-Delivery-Deployment-Automation-Addison-Wesley/dp/0321601912/" title="Continuous Delivery at Amazon">Continuous Delivery</a>) that covers the benefits more in depth.</p>
+<p>So why use a continuous delivery model for my home lab? </p>
+<p>When I spend a weekend playing with caching in my ASP.Net project, I want to be able to walk away from the project knowing it still works and I won&#8217;t be spending my next Saturday trying to figure what I did to break my test systems. This project will also provide a future testbed for load testing and static analysis tools. </p>
+<p>Plus seeing all the green &#8220;pass&#8221; lights is nice <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<h2>Designing the Process</h2>
+<p>I already know several of the components I am going to use. In some cases I have purposefully decided to use technologies I am not familiar with. I am going to be enforcing unit and acceptance tests, potentially adding static analysis tools, and publishing the results to the world via public code repositories, this blog, and a wiki entry.</p>
+<p><i>One of the challenges is that all work on this project, including background research, will be in my spare time. My current work environment doesn&#8217;t include a CI system and some of the technologies are new to me. In addition, this project will also be competing with new computer games that come out and my 9 month old son. So it may take more then a few weekends.</i></p>
+<h3>The Project</h3>
+<p>Prior to designing the deployment pipeline, I selected the project that will serve as the ongoing guinea pig. The ASP.Net MVC3 Music Store tutorial project offered an opportunity to work more with ASP.Net MVC and Entity Framework Code-First as well as serve as a future platform to play with adaptive web design techniques, HTML 5, various output and data caching methods, data layer implementations or NoSQL back-ends, and I&#8217;m sure many more ideas I have yet to consider. It&#8217;s both big enough to have a variety of use cases but small enough that I can finish future projects in a weekend or two.</p>
+<h3>The Pipeline</h3>
+<p>The delivery pipeline will look something like this:</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview.png" title="Pipeline overview diagram" /><br />
+	Overview of the delivery pipeline
+</div>
+<p>Initially there won&#8217;t be any configuration management or database change management, and the test coverage will be less than complete. These are all follow-up projects I can take on once I get the main pipeline working.</p>
+<h3>Technology Selection</h3>
+<p>There are (or were) a number of technology decisions needed to get started. This is the line-up:</p>
+<dl>
+<dt>ASP.Net MVC 3</dt>
+<dd>Development stage, to get more practice with MVC</dd>
+<dt>Entity Framework</dt>
+<dd>Development stage, I don&#8217;t really care for entity framework, so I&#8217;m trying to use it more</dd>
+<dt>MS Test</dt>
+<dd>Development stage, I like MS Test for the dev stage because of it&#8217;s integration into Visual Studio</dd>
+<dt>Mercurial</dt>
+<dd>Source Control, local and BitBucket</dd>
+<dt>Jenkins</dt>
+<dd>Jenkins, I&#8217;d heard good things about it, lots of plugins, I&#8217;d only ever used TFS in the past for CI and Chrissie already has posts on TeamCity <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></dd>
+<dt>MS Build</dt>
+<dd>CI Stage, MS Build to build the code, transform configurations, and create the deployment package</dd>
+<dt>MS Test</dt>
+<dd>CI Stage, MS Test standalone executable to run the MS Test unit tests</dd>
+<dt>IIS 7</dt>
+<dd>Deploy Steps, IIS 7 supports the new webdeploy capabilities, which will make deployment much easier</dd>
+<dt>MS Deploy</dt>
+<dd>Deploy Steps, I haven&#8217;t had an opportunity to do more than push the &#8220;Deploy&#8221; button in WebMatrix, looking forward to getting more in depth with WebDeploy</dd>
+<dt>VBScript</dt>
+<dd>Deploy Steps, A small vbscript capable of using XMLHTTP to make raw HTTP GET requests (potentially switch to PowerShell later)</dd>
+<dt>Nunit</dt>
+<dd>Automated Test Stage, Platform and testrunner for the automated interface tests</dd>
+<dt>Selenium WebDriver</dt>
+<dd>Automated Test Stage, Automated interface testing to be driven by the Nunit framework</dd>
+<dt>Build Pipeline Plugin</dt>
+<dd>Dashboard, There is a build pipeline plugin for Jenkins that I intend to try out</dd>
+<dt>Twitter</dt>
+<dd>Communications, I&#8217;ll be using twitter for status notifications at each stage</dd>
+</dl>
+<p>There are also a number of other plugins for Jenkins which I&#8217;ll mention at the appropriate steps.</p>
+<h2>Next Steps</h2>
+<p>That&#8217;s the setup. I&#8217;ve created <a href="http://forum.lessthandot.com/viewtopic.php?f=121&amp;t=15760" title="Forum post for discussion">a forum post</a> to discuss the whole process (although comments on individual blogs are obviously still welcome). I also have created <a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">a wiki page</a> to tie all the posts together and give a current status for the project. You can also watch me break things by following <a href="http://twitter.com/TarwnBuildSrvr" title="Eli's Build Server on Twitter">@TarwnBuildSrvr</a> (currently pretty dull output, may be another project there). I&#8217;ll also post the &#8216;production&#8217; URL for the project and URLs for the source code on bitbucket.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li class="cur"><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-dashboard-qa-and" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/starting-a-continuous-delivery-project/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Patch for the ASP.NET Padding Oracle vulnerability has been released</title>
+		<link>/index.php/webdev/serverprogramming/aspnet/patch-for-the-asp-net-padding-oracle-vul/</link>
+		<comments>/index.php/webdev/serverprogramming/aspnet/patch-for-the-asp-net-padding-oracle-vul/#respond</comments>
+		<pubDate>Tue, 28 Sep 2010 21:24:58 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[mvc]]></category>
+		<category><![CDATA[patch]]></category>
+		<category><![CDATA[sharepoint]]></category>
+		<category><![CDATA[vulnerability]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/09/patch-for-the-asp-net-padding-oracle-vul/</guid>
+		<description><![CDATA[If you are running an ASP.NET, ASP.NET MVC or Sharepoint site, grab the patch for the ASP.NET Padding Oracle vulnerability 
+
+Some info:
+This security update resolves a publicly disclosed vulnerability in ASP.NET. The vulnerability could allow informa&#8230;]]></description>
+				<content:encoded><![CDATA[<p>If you are running an ASP.NET, ASP.NET MVC or Sharepoint site, grab the patch for the ASP.NET Padding Oracle vulnerability </p>
+<p>Some info:</p>
+<blockquote><p>This security update resolves a publicly disclosed vulnerability in ASP.NET. The vulnerability could allow information disclosure. An attacker who successfully exploited this vulnerability could read data, such as the view state, which was encrypted by the server. This vulnerability can also be used for data tampering, which, if successfully exploited, could be used to decrypt and tamper with the data encrypted by the server. Microsoft .NET Framework versions prior to Microsoft .NET Framework 3.5 Service Pack 1 are not affected by the file content disclosure portion of this vulnerability.</p></blockquote>
+<p>And a little more info:</p>
+<blockquote><p>An information disclosure vulnerability exists in ASP.NET due to improper error handling during encryption padding verification. An attacker who successfully exploited this vulnerability could read data, such as the view state, which was encrypted by the server. This vulnerability can also be used for data tampering, which, if successfully exploited, could be used to decrypt and tamper with the data encrypted by the server. Note that this vulnerability would not allow an attacker to execute code or to elevate their user rights directly, but it could be used to produce information that could be used to try to further compromise the affected system. In Microsoft .NET Framework 3.5 Service Pack 1 and above,<strong> this vulnerability can also be used by an attacker to retrieve the contents of any file within the ASP.NET application, including web.config.</strong></p></blockquote>
+<p>Get it here: http://www.microsoft.com/technet/security/bulletin/ms10-070.mspx</p>
+<p>The Padding Oracle Exploit Tool is available here http://netifera.com/research/ in case you want to see how it works</p>
+<p>Here is a video of the attack in action<br />
+[video:youtube:yghiC_U2RaM]</p>
+<p><strong>Again, get the patch here:</strong> http://www.microsoft.com/technet/security/bulletin/ms10-070.mspx</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/aspnet/patch-for-the-asp-net-padding-oracle-vul/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>ASP.NET MVC 2 RTM for Visual Studio 2008 SP1 Released</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-rtm-for-visual-studio-2008/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-rtm-for-visual-studio-2008/#respond</comments>
+		<pubDate>Thu, 11 Mar 2010 13:11:26 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[ajax]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[iis]]></category>
+		<category><![CDATA[mvc]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/03/asp-net-mvc-2-rtm-for-visual-studio-2008/</guid>
+		<description><![CDATA[Microsoft has released ASP.NET MVC 2 RTM for Visual Studio 2008 SP1. Note Because Visual Studio 2008 and Visual Studio 2010 RC share a component of ASP.NET MVC 2, installing the ASP.NET MVC 2 RTM release on a computer where Visual Studio 2010 RC is also installed is not supported. New Features in ASP.NET MVC [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Microsoft has released ASP.NET MVC 2 RTM for Visual Studio 2008 SP1.</p>
+<p><em>Note   Because Visual Studio 2008 and Visual Studio 2010 RC share a component of ASP.NET MVC 2, installing the ASP.NET MVC 2 RTM release on a computer where Visual Studio 2010 RC is also installed is not supported.</em></p>
+<p><strong>New Features in ASP.NET MVC 2 RTM</strong><br />
+The following features are new since the RC release of ASP.NET MVC 2.<br />
+Templated Helpers Allow You to Specify Extra View Data<br />
+ASP.NET MVC 2 now includes new overloads of the EditorFor and DisplayFor methods. These overloads contain a parameter that accepts an anonymous object that can be used to provide extra view data. The view data provided in this parameter is merged with any existing view data that is passed to the template.</p>
+<p>ASP.NET MVC 2 RTM for Visual Studio 2008 SP1 can be downloaded from the following page: http://go.microsoft.com/fwlink/?LinkID=157074</p>
+<p>Make sure to also download and read ASP.NET-MVC-2-RTM-Release-Notes.doc. This document has the release notes and the know issues.</p>
+<p>To learn how to upgrade an ASP.NET MVC 1.0 application to ASP.NET MVC 2 in Visual Studio 2008 SP1 visit this link: http://www.asp.net/learn/whitepapers/aspnet-mvc2-upgrade-notes/</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-rtm-for-visual-studio-2008/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>ASP.NET MVC 2 (Release Candidate 2) Released</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-release-candidate-2-releas/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-release-candidate-2-releas/#respond</comments>
+		<pubDate>Fri, 05 Feb 2010 10:48:16 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[mvc]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/02/asp-net-mvc-2-release-candidate-2-releas/</guid>
+		<description><![CDATA[ASP.NET MVC 2 RC 2 has been released and is available for download. For those that don&#8217;t know what ASP.NET MVC 2 is. ASP.NET MVC 2 is a framework for developing highly testable and maintainable Web applications by leveraging the Model-View-Controller (MVC) pattern. The framework encourages developers to maintain a clear separation of concerns among [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>ASP.NET MVC 2 RC 2 has been released and is available for download.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev//mvc-logo-landing-page.png" alt="" title="" width="142" height="58" /></div>
+<p>For those that don&#8217;t know what ASP.NET MVC 2 is. ASP.NET MVC 2 is a framework for developing highly testable and maintainable Web applications by leveraging the Model-View-Controller (MVC) pattern. The framework encourages developers to maintain a clear separation of concerns among the responsibilities of the application – the UI logic using the view, user-input handling using the controller, and the domain logic using the model. ASP.NET MVC applications are easily testable using techniques such as test-driven development (TDD).</p>
+<p>The installation package includes templates and tools for Visual Studio 2008 SP 1 to increase productivity when writing ASP.NET MVC applications. For example, the Add View dialog box takes advantage of customizable code generation (T4) templates to generate a view based on a model object. The default project template allows the developer to automatically hook up a unit-test project that is associated with the ASP.NET MVC application.<br />
+Because the ASP.NET MVC framework is built on ASP.NET 3.5 SP 1, developers can take advantage of existing ASP.NET features like authentication and authorization, profile settings, localization, and so on.</p>
+<p><strong>New Features in RC 2</strong><br />
+Default validation system validates entire model<br />
+The default validation system in ASP.NET MVC 1.0 and in previews of ASP.NET MVC 2 prior to RC 2 validated only model properties that were posted to the server. In ASP.NET MVC 2, the new behavior is that all model properties are validated when the model is validated, regardless of whether a new value was posted. Applications that depend on the ASP.NET MVC 1.0 behavior may require changes</p>
+<p><strong>Other Improvements </strong><br />
+The following changes have been made to existing types and members for the ASP.NET MVC 2 RC 2 release.
+<ul>
+<li>The MicrosoftAjax.js script file in new projects has been updated to the version of ASP.NET Ajax that is included in ASP.NET 4. The new script file is compatible with both ASP.NET 3.5 SP1 and ASP.NET 4.</li>
+<li>Many areas of the framework have had performance improvements.</li>
+<li>The TempDataDictionary type has a new Peek method that reads values from TempData without removing the values from the dictionary.</li>
+<li>Templated helpers such as Html.EditorFor and Html.DisplayFor show only simple properties by default. If you need to show complex properties, you can create a custom template to show any set of properties.</li>
+<li>The Add View context menu in Visual Studio lets you create a view to delete items. The existing List template has a new Delete link for each item in the list.</li>
+<li>The validation helpers no longer render a default “form0” prefix for the id attribute.</li>
+<li>Expression-based helpers that render input elements generate correct name attributes when the expression contains an array or collection index. For example, the value of the name attribute rendered by Html.EditorFor(m => m.Orders[i]) for the first order in a list would be Orders[0].</li>
+<li>The new UrlParameter type allows default values in routes to be removed after URL routing runs. If an incoming route parameter has a value of UrlParameter.Optional, the MvcHandler instance will remove it from RouteData.Values collection before the controller action is executed. The Global.asax file in new projects uses UrlParameter.Optional in the default route definition. This makes it easier to bind to models that have a property named ID, because the default ID route parameter will not conflict with the binding operation.</li>
+<li>The empty project template includes a small Site.css file that contains styles that are used by validation helpers such as Html.ValidationSummary and Html.ValidationMessage. </li>
+<li>T4 template files can use the <#@ output extension=".ext" #> directive to specify the file extension for the generated file.</li>
+</ul>
+<p>You can download ASP.NET MVC 2 (Release Candidate 2) here: http://www.microsoft.com/downloads/details.aspx?FamilyID=7aba081a-19b9-44c4-a247-3882c8f749e3&amp;displaylang=en</p>
+<p>Make sure to check Scott Guthrie&#8217;s blog post about ASP.NET MVC 2 RC 2 here: http://weblogs.asp.net/scottgu/archive/2010/02/05/asp-net-mvc-2-release-candidate-2-now-available.aspx</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-release-candidate-2-releas/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Setting up SQL Server with ASP.NET MVC</title>
+		<link>/index.php/webdev/serveradmin/msiis/setting-up-sql-server-with-asp-net-mvc/</link>
+		<comments>/index.php/webdev/serveradmin/msiis/setting-up-sql-server-with-asp-net-mvc/#comments</comments>
+		<pubDate>Sun, 17 Jan 2010 12:18:28 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/01/setting-up-sql-server-with-asp-net-mvc/</guid>
+		<description><![CDATA[If you download ASP.NET MVC from Microsoft, install it and create a MVC website you might run into a couple of gotchas in regards to the database. First of all ASP.NET MVC use SQL Server Express by default in the connection string. So if you were to run your ASP.NET MVC website, then clicking on [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>If you download <a href="http://www.asp.net/mvc/">ASP.NET MVC</a> from Microsoft, install it and create a MVC website you might run into a couple of gotchas in regards to the database. First of all ASP.NET MVC use SQL Server Express by default in the connection string. So if you were to run your ASP.NET MVC website, then clicking on login you would get this error:</p>
+<p><em><span class="MT_smaller">A network-related or instance-specific error occurred while establishing a connection to SQL Server. The server was not found or was not accessible. Verify that the instance name is correct and that SQL Server is configured to allow remote connections. (provider: SQL Network Interfaces, error: 26 &#8211; Error Locating Server/Instance Specified</span>)</em></p>
+<p>A little more info below that error will tell you that it is trying to create a SQL Server Express database. Here is that info</p>
+<p><em><span class="MT_smaller">SQLExpress database file auto-creation error: </p>
+<p>The connection string specifies a local Sql Server Express instance using a database location within the applications App_Data directory. The provider attempted to automatically create the application services database because the provider determined that the database does not exist. The following configuration requirements are necessary to successfully check for existence of the application services database and automatically create the application services database:</p>
+<p>If the applications App_Data directory does not already exist, the web server account must have read and write access to the applications directory. This is necessary because the web server account will automatically create the App_Data directory if it does not already exist.</p>
+<p>If the applications App_Data directory already exists, the web server account only requires read and write access to the applications App_Data directory. This is necessary because the web server account will attempt to verify that the Sql Server Express database already exists within the applications App_Data directory. Revoking read access on the App_Data directory from the web server account will prevent the provider from correctly determining if the Sql Server Express database already exists. This will cause an error when the provider attempts to create a duplicate of an already existing database. Write access is required because the web server accounts credentials are used when creating the new database.</p>
+<p>Sql Server Express must be installed on the machine.<br />
+The process identity for the web server account must have a local user profile. See the readme document for details on how to create a local user profile for both machine and domain accounts.</span></em></p>
+<p>So I don&#8217;t have the Express version of SQL Server on my machine. The first thing I have to do is open the Web.config file and change the connection string from this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;connectionStrings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">name</span>=<span class="st0">&quot;ApplicationServices&quot;</span> </span>
+<span class="sc3">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">connectionString</span>=<span class="st0">&quot;data source=.SQLEXPRESS;Integrated Security=SSPI;AttachDBFilename=|DataDirectory|aspnetdb.mdf;</span></span>
+<span class="sc3"><span class="st0">&nbsp; &nbsp; &nbsp; &nbsp; User Instance=true&quot;</span> <span class="re0">providerName</span>=<span class="st0">&quot;System.Data.SqlClient&quot;</span><span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/connectionStrings<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;connectionStrings&gt;
+		&lt;add name="ApplicationServices" 
+			connectionString="data source=.SQLEXPRESS;Integrated Security=SSPI;AttachDBFilename=|DataDirectory|aspnetdb.mdf;
+		User Instance=true" providerName="System.Data.SqlClient"/&gt;
+	&lt;/connectionStrings&gt;</pre></div></div>
+
+<p>to this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;connectionStrings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">name</span>=<span class="st0">&quot;ApplicationServices&quot;</span> </span>
+<span class="sc3">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">connectionString</span>=<span class="st0">&quot;data source=.;Integrated Security=SSPI;Initial Catalog=aspnetdb&quot;</span><span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/connectionStrings<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;connectionStrings&gt;
+		&lt;add name="ApplicationServices" 
+			connectionString="data source=.;Integrated Security=SSPI;Initial Catalog=aspnetdb"/&gt;
+	&lt;/connectionStrings&gt;</pre></div></div>
+
+<p>Now let&#8217;s try again by clicking on the login page. Still a problem for me, now I get the following error</p>
+<p><strong>Cannot open database &#8220;aspnetdb&#8221; requested by the login. The login failed.<br />
+Login failed for user &#8216;Denis-PCDenis&#8217;.</strong></p>
+<p>Okay this makes sense since I don&#8217;t have this database, I need to create it. There are 2 ways you can do this. Either navigate to C:WindowsMicrosoft.NETFrameworkv2.0.50727 and execute aspnet_regsql.exe or run the Visual Studio command prompt.</p>
+<p>Start &#8211;> All Programs &#8211;> Microsoft Visual Studio 2008 &#8211;> Visual Studio Tools &#8211;> Visual Studio 2008 Command Prompt</p>
+<p>After the Visual Studio Command Prompt is up type aspnet_regsq and hit enter</p>
+<p>Below is a screenshot of what it looks like if you run it from the command prompt</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev//Setup1.png" alt="" title="" width="678" height="399" /></div>
+<p>Click Next on the first screen of the wizard, this will bring you to the screen shown below</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev//Setup2.png" alt="" title="" width="579" height="450" /></div>
+<p>Leave the top option selected and click Next, this will bring you to the screen shown below</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev//Setup3.png" alt="" title="" width="588" height="454" /></div>
+<p>In the Server field type your SQL Server name or type a dot if it is on your local server, type a username and password if you use sql authentication or select windows authentication  if you use that. Leave the last option as it is and click Next. Now you will see a summary screen, click Next on the summary screen and then if everything went as it should you should see a Database has been created or modified screen, click finish to exit the wizard.</p>
+<p>Now you can go back to your ASP.NET MVC site, hit F5 in Visual Studio and click Log On, click on the register link, fill out the fields and you should see something like the screen below.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev//Setup4.png" alt="" title="" width="553" height="300" /></div>
+<p>Congratulations, you have now completed a small step toward you first ASP.NET MVC site, you now have a functional site but you need to add Models, Controllers and Views.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serveradmin/msiis/setting-up-sql-server-with-asp-net-mvc/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>MIX09, SilverLight 3, Expression Blend 3, IE8, ASP.NET MVC 1.0 And Much More</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/mix09-silverlight-3-expression-blend-3-i/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/mix09-silverlight-3-expression-blend-3-i/#comments</comments>
+		<pubDate>Thu, 19 Mar 2009 13:47:18 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[expression blend 3]]></category>
+		<category><![CDATA[ie8]]></category>
+		<category><![CDATA[mix09]]></category>
+		<category><![CDATA[silverlight 3]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/03/mix09-silverlight-3-expression-blend-3-i/</guid>
+		<description><![CDATA[Mix 09 really turned out to be quite an event, a lot of cool new stuff was announced. ASP.NET MVC 1.0 The first thing I saw was ASP.NET MVC 1.0. I have been waiting for this for a while now since I want to do a MVC site for some stuff at work and don&#8217;t [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Mix 09 really turned out to be quite an event, a lot of cool new stuff was announced. </p>
+<h2>ASP.NET MVC 1.0</h2>
+<p>The first thing I saw was ASP.NET MVC 1.0. I have been waiting for this for a while now since I want to do a MVC site for some stuff at work and don&#8217;t want to deal with CTP or RC releases. Now that it is finalized I finally can start working on that. You can download ASP.NET MVC 1.0 here: http://www.microsoft.com/downloads/details.aspx?FamilyID=53289097-73ce-43bf-b6a6-35e00103cb4b&amp;displaylang=en</p>
+<h2>Silverlight 3</h2>
+<p>The biggest announcement I would say about Silverlight 3 is that you can go Out-of-Browser. This is of course a direct attack on Adobe AIR which has a ton of desktop clients. Check out the following post to see how simple this is: <a href="http://wildermuth.com/2009/03/18/Enabling_Out-of-Browser_Support_in_Silverlight_3">Enabling Out-of-Browser Support in Silverlight 3</a></p>
+<p>Here is a screen shot<br />
+<br /><img src="http://www.microsoft.com/presspass/events/mix/images/Silverlight3OutofBrowser_NEW_web.jpg" alt="Silverlight 3 Out Of Browser" title="Silverlight 3 Out Of Browser" /></p>
+<p>Here is what Microsoft says about Silverlight 3 Out Of Browser<br />
+The new out-of-browser experience in Silverlight 3 Beta enables users to place their favorite Silverlight applications directly onto any PC or Mac desktop, start menu or application folder, without the need to download an additional runtime or browser plug-in. Further, the new experience enables Silverlight applications to work whether the computer is connected to the Internet or not – a radical improvement to the traditional Web experience. </p>
+<p><strong>Silverlight 3 Bitmap API and Shader Effects</strong><br />
+<br /><img src="http://www.microsoft.com/presspass/events/mix/images/Silverlight3BitmapAPIandShaderEffects_thumb.jpg" alt="Silverlight 3 Bitmap API and Shader Effects" title="Silverlight 3 Bitmap API and Shader Effects" /></p>
+<p>With Silverlight 3 Beta, users can now write pixels to a bitmap. Thus, they can build a photo editor to do red-eye correction, perform edits on scanned documents or create specials effects for cached bitmaps from elements on the screen. Shader effects include blur and drop shadow.</p>
+<p>Download Silverlight 3 Beta here: http://silverlight.net/getstarted/silverlight3/default.aspx</p>
+<p>Silverlight 3 Beta Fact Sheet: http://www.microsoft.com/presspass/events/mix/docs/Silverlight3FS.doc</p>
+<h2>Expression Blend 3</h2>
+<p>Expression Blend 3 has a ton of cool stuff, here is a little description of some of these features</p>
+<p><strong>Expression Blend 3 SketchFlow Feature</strong><br />
+<br /><img src="http://www.microsoft.com/presspass/events/mix/images/ExpressionBlend3SketchFlowFeature_web.jpg" alt="Expression Blend 3 SketchFlow" title="Expression Blend 3 SketchFlow" /><br />
+The SketchFlow feature in Expression Blend 3 allows designers to demonstrate concepts effectively by enabling them to follow multiple paths through a concept, test different scenarios and provide comments in context by annotating their experience.</p>
+<p><strong>Expression Blend 3 Photoshop Import Feature</strong><br />
+<br /><img src="http://www.microsoft.com/presspass/events/mix/images/ExpressionBlend3PhotoshopImportFeature_web.jpg" alt="Expression Blend 3 Photoshop Import" title="Expression Blend 3 Photoshop Import" /><br />
+Expression Blend 3 delivers a Photoshop import feature, which enables designers to generate design time sample data within Expression Blend or import it from an XML file, making it easy to build data-connected applications without access to live data. Users can easily switch between using sample data and using live data at run-time.</p>
+<p>Download Expression Blend 3 Preview here: http://expression.microsoft.com/en-us/dd565875.aspx</p>
+<h2>Internet Explorer 8</h2>
+<p>Internet Explorer 8 can be downloaded in 25 languages at http://www.microsoft.com/ie8 starting at noon EDT on March 19. There is a ton of new stuff in IE8, I have been using the RC versions for a while now and I must say that I really like it. It is definitely much faster than IE7 and IE6</p>
+<p><strong>Internet Explorer 8 Accelerator</strong><br />
+<br /><img src="http://www.microsoft.com/presspass/presskits/windowsvista/images/ie8Accelerator_web.jpg" alt="Internet Explorer 8 Accelerator" title="Internet Explorer 8 Accelerator" /><br />
+Accelerators make it faster and easier to perform common tasks online by making Web-based services such as ESPN.com, Live Search and Sina available for use directly from the page people are viewing. Users can simply right-click a word or phrase and instantly map, e-mail, or share it.</p>
+<p><strong>Web Slices</strong><br />
+<br /><img src="http://www.microsoft.com/presspass/presskits/windowsvista/images/ie8WebSlice_web.jpg" alt="Internet Explorer 8 Web Slices" title="Internet Explorer 8 Web Slices" /><br />
+Web Slices in Internet Explorer 8 makes favorite information from sites such as Digg, Yahoo! Mail, OneRiot, and eBay instantly available wherever someone goes on the Web.</p>
+<p><strong>Domain Highlighting and Tab Coloring</strong><br />
+<br /><img src="http://www.microsoft.com/presspass/presskits/windowsvista/images/ie8tabcolor_web.jpg" alt="Internet Explorer 8 Domain Highlighting and Tab Coloring" title="Internet Explorer 8 Domain Highlighting and Tab Coloring" /><br />
+Domain Highlighting is a nice feature because you can tell right away if you are on a fake site or on the real ebay site since that will be highlighted</p>
+<p>So that is it for day one, I will update this post after day 2 starts</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/mix09-silverlight-3-expression-blend-3-i/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

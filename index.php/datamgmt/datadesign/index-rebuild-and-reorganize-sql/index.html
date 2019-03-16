@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
+		<link rel="shortcut icon" href="http://lessthandot.com/favicon.ico" type="image/vnd.microsoft.icon" />
+	<title>Less Than Dot - Blog -   SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE</title>
+	<meta prefix="og: http://ogp.me/ns#" property="og:title" content="Less Than Dot - Blog -   SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:url" content="/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/" />
+		<meta prefix="og: http://ogp.me/ns#" property="og:image" content="http://lessthandot.com/images/logo_prod.png" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:site_name" content="LessThanDot" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:description" content="Today we are going to look at how to recreate and defragment indexes. Back in the SQL Server 2000 days you would do a CREATE INDEX WITH DROP_EXISTING/DBCC DBREINDEX  or DBCC INDEXDEFRAG. To check fragmentation, you would use DBCC SHOWCONTIG. To check fragmentation in SQL Server 2005 and up, you now can use the Dynamic Management View sys.dm_db_index_physical_stats.  To rebuild an index, you use ALTER INDEX IndexName REBUILD; to defragment and index, you use ALTER INDEX IndexName REORGANIZE;" />
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0" href="/index.php/feed/" />
+	<link rel="alternate" type="application/atom+xml" title="Atom" href="/index.php/feed/atom/" />
+
+	<!-- this page is the canonical URL -->	
+	<link rel="stylesheet" href="/wp-content/themes/lessthandot2009/style.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsite.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsiteprint.css" media="print" type="text/css" />
+
+	<link rel='dns-prefetch' href='//ajax.googleapis.com' />
+<link rel='dns-prefetch' href='//s.w.org' />
+<link rel="alternate" type="application/rss+xml" title="LessthanDot &raquo; SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE Comments Feed" href="/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/feed/" />
+		<script type="text/javascript">
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/svg\/","svgExt":".svg","source":{"concatemoji":"\/wp-includes\/js\/wp-emoji-release.min.js?ver=4.6.1"}};
+			!function(a,b,c){function d(a){var c,d,e,f,g,h=b.createElement("canvas"),i=h.getContext&&h.getContext("2d"),j=String.fromCharCode;if(!i||!i.fillText)return!1;switch(i.textBaseline="top",i.font="600 32px Arial",a){case"flag":return i.fillText(j(55356,56806,55356,56826),0,0),!(h.toDataURL().length<3e3)&&(i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,65039,8205,55356,57096),0,0),c=h.toDataURL(),i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,55356,57096),0,0),d=h.toDataURL(),c!==d);case"diversity":return i.fillText(j(55356,57221),0,0),e=i.getImageData(16,16,1,1).data,f=e[0]+","+e[1]+","+e[2]+","+e[3],i.fillText(j(55356,57221,55356,57343),0,0),e=i.getImageData(16,16,1,1).data,g=e[0]+","+e[1]+","+e[2]+","+e[3],f!==g;case"simple":return i.fillText(j(55357,56835),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode8":return i.fillText(j(55356,57135),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode9":return i.fillText(j(55358,56631),0,0),0!==i.getImageData(16,16,1,1).data[0]}return!1}function e(a){var c=b.createElement("script");c.src=a,c.type="text/javascript",b.getElementsByTagName("head")[0].appendChild(c)}var f,g,h,i;for(i=Array("simple","flag","unicode8","diversity","unicode9"),c.supports={everything:!0,everythingExceptFlag:!0},h=0;h<i.length;h++)c.supports[i[h]]=d(i[h]),c.supports.everything=c.supports.everything&&c.supports[i[h]],"flag"!==i[h]&&(c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&c.supports[i[h]]);c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&!c.supports.flag,c.DOMReady=!1,c.readyCallback=function(){c.DOMReady=!0},c.supports.everything||(g=function(){c.readyCallback()},b.addEventListener?(b.addEventListener("DOMContentLoaded",g,!1),a.addEventListener("load",g,!1)):(a.attachEvent("onload",g),b.attachEvent("onreadystatechange",function(){"complete"===b.readyState&&c.readyCallback()})),f=c.source||{},f.concatemoji?e(f.concatemoji):f.wpemoji&&f.twemoji&&(e(f.twemoji),e(f.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+<link rel='stylesheet' id='bwp-syntax-css'  href='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/css/bwp-syntax-global.css?ver=4.6.1' type='text/css' media='all' />
+<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js?ver=1.12.4'></script>
+<script type='text/javascript' src='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/js/bwp-syntax.js?ver=4.6.1'></script>
+<link rel='https://api.w.org/' href='/wp-json/' />
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="/wp-includes/wlwmanifest.xml" /> 
+<link rel='prev' title='Upgrade Assistant for SQL Server 2012 available for download' href='/index.php/datamgmt/datadesign/upgrade-assistant-for-sql-server/' />
+<link rel='next' title='SQL Advent 2011 Recap' href='/index.php/datamgmt/datadesign/sql-advent-2011-recap/' />
+<meta name="generator" content="WordPress 4.6.1" />
+<link rel="canonical" href="/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/" />
+<link rel='shortlink' href='/?p=1463' />
+<link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdatadesign%2Findex-rebuild-and-reorganize-sql%2F" />
+<link rel="alternate" type="text/xml+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdatadesign%2Findex-rebuild-and-reorganize-sql%2F&#038;format=xml" />
+<style type='text/css'>.rp4wp-related-posts ul{width:100%;padding:0;margin:0;float:left;}
+.rp4wp-related-posts ul>li{list-style:none;padding:0;margin:0;padding-bottom:20px;clear:both;}
+.rp4wp-related-posts ul>li>p{margin:0;padding:0;}
+.rp4wp-related-post-image{width:35%;padding-right:25px;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;float:left;}</style>
+	<script src="http://lessthandot.com/includes/allsite.js" type="text/javascript" ></script>
+</head>
+<body>
+<div id="contain"><div id="subcontain"><div id="ttl"><div id="hdr"><div id="snav"><a href="http://lessthandot.com/login.php?backtrack=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/?">Member Login</a>
+</div><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="logoc"><img src="http://lessthandot.com/images/logo_prod.png" alt="LessThanDot Site Logo" border="0" /></a><h1>LessThanDot</h1><div class="pgsttl">A decade of helpful technical content</div></div><div id="nav">
+<ul>
+<li><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="h" ><span>Launchpad</span></a></li>
+<li class="cur"><a href="/" title="LessThanDot Blogs" id="b" ><span>Blogs</span></a></li>
+<li><a href="http://forum.lessthandot.com/" title="LessThanDot Community Forums" id="f" ><span>Forum</span></a></li>
+<li><a href="http://wiki.lessthandot.com/" title="LessThanDot Wiki Articles" id="w" ><span>Wiki</span></a></li>
+<li><a href="http://sqlcop.lessthandot.com/" title="LessThanDot SQLCop" id="a" ><span>SQLCop</span></a></li>
+<li><a href="http://lessthandot.com/account.php" title="Your Account Settings" id="r"  class="l_ie"><span>My Account</span></a></li></ul></div>
+</div><div id="content">
+<div id="fac"><div id="fa">
+		<p>Less Than Dot is a community of passionate IT professionals and enthusiasts dedicated to sharing technical knowledge, experience, and assistance. Inside you will find reference materials, interesting technical discussions, and expert tips and commentary.</p></div></div><div class="content-sidebar">
+	<div id="social" class="sdsec">
+		<h2>LTD Social Sitings</h2>
+		<div>
+		<a id="social_twitter" href="http://twitter.com/LessThanDot/" title="Follow us on Twitter" ><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Lessthandot twitter"/></a> 
+		<a href="http://www.linkedin.com/groups?home=&amp;gid=113440" title="Join us on LinkedIn" ><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="Lessthandot Linkedin" /></a> 
+		<a href="http://www.facebook.com/group.php?gid=19330511063" title="Join us on Facebook" ><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Lessthandot facebook"/></a> 
+		<a href="http://lessthandot.com/rss.php" title="LessThanDot News Feed" ><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="Lessthandot rss"/></a> 
+		</div>
+		<p><em>Note: Watch for social icons on posts by your favorite authors to follow their postings on these and other social sites.</em></p>
+	</div><div class="content-sidebar-section">
+<h2>Tag cloud</h2>
+	<p class="tag-cloud">
+		<a href='/index.php/tag/net/' class='tag-link-245 tag-link-position-1' title='21 topics' style='font-size: 8.9565217391304pt;'>.net</a> <a href='/index.php/tag/asp-net/' class='tag-link-168 tag-link-position-2' title='21 topics' style='font-size: 8.9565217391304pt;'>asp.net</a> <a href='/index.php/tag/azure-2/' class='tag-link-321 tag-link-position-3' title='29 topics' style='font-size: 10.173913043478pt;'>azure</a> <a href='/index.php/tag/book/' class='tag-link-130 tag-link-position-4' title='26 topics' style='font-size: 9.7391304347826pt;'>book</a> <a href='/index.php/tag/business-intelligence-2/' class='tag-link-256 tag-link-position-5' title='30 topics' style='font-size: 10.260869565217pt;'>business intelligence</a> <a href='/index.php/tag/c/' class='tag-link-138 tag-link-position-6' title='40 topics' style='font-size: 11.304347826087pt;'>c#</a> <a href='/index.php/tag/database/' class='tag-link-134 tag-link-position-7' title='31 topics' style='font-size: 10.434782608696pt;'>database</a> <a href='/index.php/tag/excel/' class='tag-link-155 tag-link-position-8' title='16 topics' style='font-size: 8pt;'>excel</a> <a href='/index.php/tag/gotcha/' class='tag-link-240 tag-link-position-9' title='19 topics' style='font-size: 8.6086956521739pt;'>gotcha</a> <a href='/index.php/tag/how-to/' class='tag-link-272 tag-link-position-10' title='44 topics' style='font-size: 11.652173913043pt;'>how to</a> <a href='/index.php/tag/mongodb/' class='tag-link-765 tag-link-position-11' title='17 topics' style='font-size: 8.2608695652174pt;'>mongodb</a> <a href='/index.php/tag/nosql/' class='tag-link-775 tag-link-position-12' title='18 topics' style='font-size: 8.4347826086957pt;'>nosql</a> <a href='/index.php/tag/performance/' class='tag-link-179 tag-link-position-13' title='26 topics' style='font-size: 9.7391304347826pt;'>performance</a> <a href='/index.php/tag/security-2/' class='tag-link-398 tag-link-position-14' title='25 topics' style='font-size: 9.5652173913043pt;'>security</a> <a href='/index.php/tag/sql/' class='tag-link-132 tag-link-position-15' title='42 topics' style='font-size: 11.478260869565pt;'>sql</a> <a href='/index.php/tag/sql-advent-2012/' class='tag-link-1416 tag-link-position-16' title='18 topics' style='font-size: 8.4347826086957pt;'>sql advent 2012</a> <a href='/index.php/tag/sql-friday/' class='tag-link-377 tag-link-position-17' title='18 topics' style='font-size: 8.4347826086957pt;'>sql friday</a> <a href='/index.php/tag/sql-server/' class='tag-link-154 tag-link-position-18' title='145 topics' style='font-size: 16.086956521739pt;'>sql server</a> <a href='/index.php/tag/sql-server-2000/' class='tag-link-366 tag-link-position-19' title='45 topics' style='font-size: 11.739130434783pt;'>sql server 2000</a> <a href='/index.php/tag/sql-server-2005/' class='tag-link-327 tag-link-position-20' title='118 topics' style='font-size: 15.391304347826pt;'>sql server 2005</a> <a href='/index.php/tag/sql-server-2008/' class='tag-link-152 tag-link-position-21' title='237 topics' style='font-size: 18pt;'>sql server 2008</a> <a href='/index.php/tag/sql-server-2008-r2/' class='tag-link-548 tag-link-position-22' title='38 topics' style='font-size: 11.130434782609pt;'>sql server 2008 r2</a> <a href='/index.php/tag/sql-server-2012/' class='tag-link-1161 tag-link-position-23' title='76 topics' style='font-size: 13.739130434783pt;'>sql server 2012</a> <a href='/index.php/tag/ssis-2/' class='tag-link-501 tag-link-position-24' title='52 topics' style='font-size: 12.260869565217pt;'>ssis</a> <a href='/index.php/tag/ssms/' class='tag-link-640 tag-link-position-25' title='18 topics' style='font-size: 8.4347826086957pt;'>ssms</a> <a href='/index.php/tag/ssrs-2/' class='tag-link-557 tag-link-position-26' title='27 topics' style='font-size: 9.9130434782609pt;'>ssrs</a> <a href='/index.php/tag/syndicated/' class='tag-link-1407 tag-link-position-27' title='67 topics' style='font-size: 13.217391304348pt;'>syndicated</a> <a href='/index.php/tag/t-sql/' class='tag-link-185 tag-link-position-28' title='26 topics' style='font-size: 9.7391304347826pt;'>t-sql</a> <a href='/index.php/tag/tip/' class='tag-link-194 tag-link-position-29' title='46 topics' style='font-size: 11.826086956522pt;'>tip</a> <a href='/index.php/tag/unit-testing/' class='tag-link-162 tag-link-position-30' title='17 topics' style='font-size: 8.2608695652174pt;'>unit testing</a>	</p>
+</div>		<div class="content-sidebar-section">
+		<h2>Authors</h2>
+			<ul class="author-list dimmed">
+				<li><a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis">SQLDenis</a> <a href="/index.php/author/SQLDenis/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (597)</li><li><a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)">Ted Krueger (onpnt)</a> <a href="/index.php/author/onpnt/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (355)</li><li><a href="/index.php/author/grrlgeek/" title="Posts by Jes Borland">Jes Borland</a> <a href="/index.php/author/grrlgeek/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (202)</li><li><a href="/index.php/author/tarwn/" title="Posts by Eli Weinstock-Herman (tarwn)">Eli Weinstock-Herman (tarwn)</a> <a href="/index.php/author/tarwn/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (190)</li><li><a href="/index.php/author/koenverbeeck/" title="Posts by Koen Verbeeck">Koen Verbeeck</a> <a href="/index.php/author/koenverbeeck/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (100)</li><li><a href="/index.php/author/alexcuse/" title="Posts by Alex Ullrich">Alex Ullrich</a> <a href="/index.php/author/alexcuse/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (55)</li><li><a href="/index.php/author/gmmastros/" title="Posts by George Mastros (gmmastros)">George Mastros (gmmastros)</a> <a href="/index.php/author/gmmastros/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (45)</li><li><a href="/index.php/author/axel8s/" title="Posts by Axel Achten (axel8s)">Axel Achten (axel8s)</a> <a href="/index.php/author/axel8s/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (28)</li><li><a href="/index.php/author/naomi/" title="Posts by Naomi Nosonovsky">Naomi Nosonovsky</a> <a href="/index.php/author/naomi/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (27)</li><li><a href="/index.php/author/thirster42/" title="Posts by David Forck (thirster42)">David Forck (thirster42)</a> <a href="/index.php/author/thirster42/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (24)</li><li><a href="/index.php/author/chopstik/" title="Posts by chopstik">chopstik</a> <a href="/index.php/author/chopstik/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (20)</li><li><a href="/index.php/author/kconan/" title="Posts by Kevin Conan">Kevin Conan</a> <a href="/index.php/author/kconan/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (18)</li><li><a href="/index.php/author/robearl/" title="Posts by Rob Earl">Rob Earl</a> <a href="/index.php/author/robearl/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (14)</li><li><a href="/index.php/author/thatrickguy/" title="Posts by ThatRickGuy">ThatRickGuy</a> <a href="/index.php/author/thatrickguy/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (12)</li><li><a href="/index.php/author/sqlarcher/" title="Posts by SQLArcher">SQLArcher</a> <a href="/index.php/author/sqlarcher/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (11)</li>                <li><a href="http://lessthandot.com/Stats/BlogAuthors.php">More...</a></li>
+			</ul>
+		</div>
+				<div class="content-sidebar-section">
+		<h2>Categories</h2>
+			<ul class="categories-list">
+					<li class="cat-item cat-item-10"><a href="/index.php/category/all/" >All Blogs</a>
+</li>
+	<li class="cat-item cat-item-5"><a href="/index.php/category/architect/" >Architecture, Design and Strategy</a>
+</li>
+	<li class="cat-item cat-item-1759"><a href="/index.php/category/artificial-intelligence/" >Artificial Intelligence</a>
+</li>
+	<li class="cat-item cat-item-6"><a href="/index.php/category/datamgmt/" >Data Management</a>
+</li>
+	<li class="cat-item cat-item-7"><a href="/index.php/category/desktopdev/" >Desktop Developer</a>
+</li>
+	<li class="cat-item cat-item-8"><a href="/index.php/category/enterprisedev/" >Enterprise Developer</a>
+</li>
+	<li class="cat-item cat-item-11"><a href="/index.php/category/itprofessionals/" >IT Professionals</a>
+</li>
+	<li class="cat-item cat-item-12"><a href="/index.php/category/itstudents/" >IT Students and Researchers</a>
+</li>
+	<li class="cat-item cat-item-1743"><a href="/index.php/category/management/" >Management</a>
+</li>
+	<li class="cat-item cat-item-9"><a href="/index.php/category/sysadmins/" >System Admins</a>
+</li>
+	<li class="cat-item cat-item-1"><a href="/index.php/category/uncategorized/" >Uncategorized</a>
+</li>
+	<li class="cat-item cat-item-4"><a href="/index.php/category/webdev/" >Web Developer</a>
+</li>
+			</ul>
+		</div>
+		</div><div class="content-main">
+				<div class="post-navigation">
+				<div class="post-navigation-forward"><a href="/index.php/datamgmt/datadesign/sql-advent-2011-recap/" rel="next">SQL Advent 2011 Recap</a> &raquo; </div>
+				<div class="post-navigation-back">&laquo; <a href="/index.php/datamgmt/datadesign/upgrade-assistant-for-sql-server/" rel="prev">Upgrade Assistant for SQL Server 2012 available for download</a></div>
+			</div>
+			<div class="post-area instapaper_body">
+				<div class="post-title-line">
+										<h1 class="instapaper_ignore"><a href="/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/" class="post-title">SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE</a></h1>
+					<div class="post-byline">by <a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis" rel="author">SQLDenis</a> on December 24, 2011 in category <a href="/index.php/category/datamgmt/datadesign/" rel="category tag">Data Modelling and Design</a>. Article views: 10,825 </div>
+				</div>
+				<div class="post-tagline"><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&text=RT @LessThanDot Blog - SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE by @denisgobo" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&title=SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE&source=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&title=SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&quote=SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&title=SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE" class="instapaper_button">Instapaper</a></div>
+
+				<div class="post-content"><p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>This is the third indexing post in this series, we already looked at <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/sql-advent-2011-day-19">Filtered Indexes</a> and <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-20">Indexes with Included Columns</a>. Today we are going to look at how to recreate and defragment indexes. Back in the SQL Server 2000 days you would do a CREATE INDEX WITH DROP_EXISTING/DBCC DBREINDEX  or DBCC INDEXDEFRAG. To check fragmentation, you would use DBCC SHOWCONTIG. To check fragmentation in SQL Server 2005 and up, you now can use the Dynamic Management View sys.dm_db_index_physical_stats.  To rebuild an index, you use <em>ALTER INDEX IndexName REBUILD;</em> to defragment and index, you use <em>ALTER INDEX IndexName REORGANIZE</em>;</p>
+<p>Let&#8217;s write some T-SQL to see this all in action, first create this table.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestIndex <span class="br0">&#40;</span>name1 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">500</span><span class="br0">&#41;</span>not null,
+id <span class="kw1">int</span> not null,
+userstat <span class="kw1">int</span> not null,
+name2 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">500</span><span class="br0">&#41;</span> not null,
+SomeVal <span class="kw1">uniqueidentifier</span> not null<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestIndex (name1 varchar(500)not null,
+id int not null,
+userstat int not null,
+name2 varchar(500) not null,
+SomeVal uniqueidentifier not null)</pre></div></div>
+
+<p>Now insert 50000 rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestIndex
+<span class="kw1">SELECT</span> <span class="kw1">top</span> <span class="nu0">50000</span> s.<span class="me1">name</span>,s.<span class="me1">id</span>,s.<span class="me1">userstat</span>,s2.<span class="me1">name</span>,newid<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> master..<span class="me1">sysobjects</span> s
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> master..<span class="me1">sysobjects</span> s2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestIndex
+SELECT top 50000 s.name,s.id,s.userstat,s2.name,newid() 
+FROM master..sysobjects s
+CROSS JOIN master..sysobjects s2</pre></div></div>
+
+<p>Now create this index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_TestIndex_Index <span class="kw1">ON</span> TestIndex<span class="br0">&#40;</span>SomeVal<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX IX_TestIndex_Index ON TestIndex(SomeVal)</pre></div></div>
+
+<p>Now let us look at some data by using the sys.dm_db_index_physical_stats Dynamic Management View. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">Object_name</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">as</span> Tablename,s.<span class="me1">name</span> <span class="kw1">as</span> Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> d
+join sysindexes s <span class="kw1">on</span> d.<span class="kw2">object_id</span> <span class="sy0">=</span> s.<span class="me1">id</span>
+and d.<span class="me1">index_id</span> <span class="sy0">=</span> s.<span class="me1">indid</span>
+and s.<span class="me1">name</span> <span class="sy0">=</span><span class="st0">'IX_TestIndex_Index'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT Object_name(object_id) as Tablename,s.name as Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') d
+join sysindexes s on d.object_id = s.id
+and d.index_id = s.indid
+and s.name ='IX_TestIndex_Index'</pre></div></div>
+
+<p>(Result Set)
+<div class="tables">
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 0.22172949002217296
+</td>
+<td> 451
+</td>
+</tr>
+</table>
+</div>
+<p>That is good, almost no fragmentation, let&#8217;s change that shall we? You remember<a href="/index.php/DataMgmt/DBProgramming/best-practice-don-t-not-cluster-on-uniqu"> not to cluster an index on a uniqueidentifier when using the NEWID function</a> right? That will completely fragment your index because of page splits</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> TestIndex
+<span class="kw1">SET</span> SomeVal <span class="sy0">=</span> NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE TestIndex
+SET SomeVal = NEWID()</pre></div></div>
+
+<p>Okay, now you can see that the index is completely fragmented, we are also using 955 pages to store the data instead of 451<br />
+(Result Set)
+<div class="tables">
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 99.3717277486911
+</td>
+<td> 955
+</td>
+</tr>
+</table></div>
+<p>There are two ways to fix fragmentation, one is to reorganize the index and the other is to rebuild the index. REORGANIZE is an online operation while REBUILD is not unless you specify ONLINE = ON, ONLINE = ON will only work on Enterprise editions of SQL Server. If you rebuild the index with the ON option then your data is available while that is running, if it set to OFF then the data is not available while the rebuild is running. You can also stop a REORGANIZE of the index at any time.<br />
+Here is how to do a REORGANIZE</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> IX_TestIndex_Index <span class="kw1">ON</span> TestIndex
+RE<span class="sy0">OR</span>GANIZE;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX IX_TestIndex_Index ON TestIndex
+REORGANIZE;</pre></div></div>
+
+<p>(Result Set)
+<div class="tables">
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 2.8824833702882482
+</td>
+<td> 451
+</td>
+</tr>
+</table></div>
+<p>As you can see after the reorganize(DBCC INDEXDEFRAG for you SQL Server 2000 folks) fragmentation levels dropped to less than 3 percent.</p>
+<p>Just for fun let&#8217;s also rebuild (Drop and recreate/DBCC REINDEX for you SQL Server 2000 folks) the index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> IX_TestIndex_Index <span class="kw1">ON</span> TestIndex
+REBUILD;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX IX_TestIndex_Index ON TestIndex
+REBUILD;</pre></div></div>
+
+<p>(Result Set)</p>
+<div class="tables">
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 0.22222222222222221
+</td>
+<td> 450
+</td>
+</tr>
+</table></div>
+<p>As you can see the rebuild made fragmentation almost 0.</p>
+<p>You can rebuild an index ONLINE (enterprise edition only) or OFFLINE, OFFLINE is the default</p>
+<p>Here are two differences between REBUILD ONLINE = ON and REBUILD ONLINE = OFF<br />
+<strong>ON</strong><br />
+Long-term table locks are not held for the duration of the index operation. During the main phase of the index operation, only an Intent Share (IS) lock is held on the source table. This allows queries or updates to the underlying table and indexes to continue. At the start of the operation, a Shared (S) lock is very briefly held on the source object. At the end of the operation, an S lock is very briefly held on the source if a nonclustered index is being created, or an SCH-M (Schema Modification) lock is acquired when a clustered index is created or dropped online, or when a clustered or nonclustered index is being rebuilt. ONLINE cannot be set to ON when an index is being created on a local temporary table.</p>
+<p><strong>OFF</strong><br />
+Table locks are applied for the duration of the index operation. An offline index operation that creates, rebuilds, or drops a clustered, spatial, or XML index, or rebuilds or drops a nonclustered index, acquires a Schema modification (Sch-M) lock on the table. This prevents all user access to the underlying table for the duration of the operation. An offline index operation that creates a nonclustered index acquires a Shared (S) lock on the table. This prevents updates to the underlying table but allows read operations, such as SELECT statements.</p>
+<p>Of course you will not run rebuild/reorganize manually for every index in your database, Michelle Ufford from the <a href="http://sqlfool.com/" class="external text" title="http://sqlfool.com" rel="nofollow">SQL Fool</a> blog has a nice post with just a script which can do this automatically, you can find that here: <a href="http://sqlfool.com/2011/06/index-defrag-script-v4-1/" class="external text" title="http://sqlfool.com/?p=63" rel="nofollow">Index Defrag Script</a> </p>
+<h2>Bonus, are my indexes used and is it mostly seeks or scans?. </h2>
+<p>The sys.dm_db_index_usage_stats dynamic management view is extremely helpful in a couple of ways. It can help you identify if an index is used or not. You can also find out the scan to seek ratio. Another helpful thing is the fact that the last seek and scan dates are in the view, this can help you determine if the index is still being used. Keep in mind that when you restart the SQL instance the data is wiped out. </p>
+<p>Run the query below</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span>
+TableName <span class="sy0">=</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>s.<span class="br0">&#91;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#93;</span><span class="br0">&#41;</span>,
+IndexName <span class="sy0">=</span> i.<span class="me1">name</span>,
+s.<span class="me1">last_user_seek</span>,
+s.<span class="me1">user_seeks</span>,
+<span class="kw1">CASE</span> s.<span class="me1">user_seeks</span> <span class="kw1">WHEN</span> <span class="nu0">0</span> <span class="kw1">THEN</span> <span class="nu0">0</span>
+<span class="kw1">ELSE</span> s.<span class="me1">user_seeks</span><span class="sy0">*</span><span class="nu0">1.0</span> <span class="sy0">/</span><span class="br0">&#40;</span>s.<span class="me1">user_scans</span> <span class="sy0">+</span> s.<span class="me1">user_seeks</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">100.0</span> <span class="kw1">END</span> <span class="kw1">AS</span> SeekPercentage,
+s.<span class="me1">last_user_scan</span>,
+s.<span class="me1">user_scans</span>,
+<span class="kw1">CASE</span> s.<span class="me1">user_scans</span> <span class="kw1">WHEN</span> <span class="nu0">0</span> <span class="kw1">THEN</span> <span class="nu0">0</span>
+<span class="kw1">ELSE</span> s.<span class="me1">user_scans</span><span class="sy0">*</span><span class="nu0">1.0</span> <span class="sy0">/</span><span class="br0">&#40;</span>s.<span class="me1">user_scans</span> <span class="sy0">+</span> s.<span class="me1">user_seeks</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">100.0</span> <span class="kw1">END</span> <span class="kw1">AS</span> ScanPercentage,
+s.<span class="me1">last_user_lookup</span>,
+s.<span class="me1">user_lookups</span>,
+s.<span class="me1">last_user_update</span>,
+s.<span class="me1">user_updates</span>,
+s.<span class="me1">last_system_seek</span>,
+s.<span class="me1">last_system_scan</span>,
+s.<span class="me1">last_system_lookup</span>,
+s.<span class="me1">last_system_update</span>,<span class="sy0">*</span>
+<span class="kw1">FROM</span>
+sys.<span class="me1">dm_db_index_usage_stats</span> s
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span>
+sys.<span class="me1">indexes</span> i
+<span class="kw1">ON</span>
+s.<span class="br0">&#91;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#93;</span> <span class="sy0">=</span> i.<span class="br0">&#91;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#93;</span>
+<span class="sy0">AND</span> s.<span class="me1">index_id</span> <span class="sy0">=</span> i.<span class="me1">index_id</span>
+<span class="kw1">WHERE</span>
+s.<span class="me1">database_id</span> <span class="sy0">=</span> <span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="sy0">AND</span> <span class="kw2">OBJECTPROPERTY</span><span class="br0">&#40;</span>s.<span class="br0">&#91;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#93;</span>, <span class="st0">'IsMsShipped'</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="nu0">0</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT
+TableName = OBJECT_NAME(s.[OBJECT_ID]),
+IndexName = i.name,
+s.last_user_seek,
+s.user_seeks,
+CASE s.user_seeks WHEN 0 THEN 0
+ELSE s.user_seeks*1.0 /(s.user_scans + s.user_seeks) * 100.0 END AS SeekPercentage,
+s.last_user_scan,
+s.user_scans,
+CASE s.user_scans WHEN 0 THEN 0
+ELSE s.user_scans*1.0 /(s.user_scans + s.user_seeks) * 100.0 END AS ScanPercentage,
+s.last_user_lookup,
+s.user_lookups,
+s.last_user_update,
+s.user_updates,
+s.last_system_seek,
+s.last_system_scan,
+s.last_system_lookup,
+s.last_system_update,*
+FROM
+sys.dm_db_index_usage_stats s
+INNER JOIN
+sys.indexes i
+ON
+s.[OBJECT_ID] = i.[OBJECT_ID]
+AND s.index_id = i.index_id
+WHERE
+s.database_id = DB_ID()
+AND OBJECTPROPERTY(s.[OBJECT_ID], 'IsMsShipped') = 0;</pre></div></div>
+
+<p>Note that every individual seek, scan, lookup, or update on the specified index by one query execution is counted as a use of that index and increments the corresponding counter in this view. Information is reported both for operations caused by user-submitted queries, and for operations caused by internally generated queries, such as scans for gathering statistics.</p>
+<p>The user_updates counter indicates the level of maintenance on the index caused by insert, update, or delete operations on the underlying table or view. You can use this view to determine which indexes are used only lightly all by your applications. You can also use the view to determine which indexes are incurring maintenance overhead. You may want to consider dropping indexes that incur maintenance overhead, but are not used for queries, or are only infrequently used for queries.</p>
+<p>That is it for SQL Advent 2011, come back tomorrow for the recap and I will also have a post pointing to my SQL 2012 posts so that you can look at what is coming in the next year</p>
+<div class='rp4wp-related-posts'>
+<h3>Related Posts</h3>
+<ul>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/datadesign/are-you-ready-for-sql/'>Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a><p>SQL Server 2012 is around the corner, perhaps you are ready to upgrade and perhaps&hellip;</p></div>
+</li>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/datadesign/sql-advent-2011-recap/'>SQL Advent 2011 Recap</a><p>Here is a recap of all the 24 SQL Advent 2011 posts Day 1: Date&hellip;</p></div>
+</li>
+</ul>
+</div>
+</div>
+				<div class="post-author">
+					<div class="userInfo"><h2>About the Author</h2><img class="bioPic" src="http://www.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d.png" alt="User bio image"/>Denis has been working with SQL Server since version 6.5. Although he worked as an ASP/JSP/ColdFusion developer before the dot com bust, he has been working exclusively as a database developer/architect since 2002. In addition to English, Denis is also fluent in Croatian and Dutch, but he can curse in many other languages and dialects (just ask the SQL optimizer) He lives in Princeton, NJ with his wife and three kids.<br style="clear: left" /><div class="bioSoc"><span class="bioSocTitle">Social Sitings</span><a href="http://twitter.com/denisgobo" title="SQLDenis at Twitter" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Twitter" /></a><a href="http://www.facebook.com/profile.php?id=http://www.facebook.com/denis.gobo" title="SQLDenis at Facebook" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Facebook" /></a><a href="http://www.linkedin.com/in/denisgobo" title="SQLDenis at LinkedIn" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="LinkedIn" /></a><a href="http://denisgobo.blogspot.com/" title="SQLDenis at HomePage" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_homepage.png" alt="HomePage" /></a><a href="http://www.flickr.com/photos/denisgobo//" title="SQLDenis at Flickr" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_flickr.png" alt="Flickr" /></a><a href="/index.php/author/SQLDenis/feed/" title="Blog RSS feed for SQLDenis" class="bioSocLink"><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="LTD RSS Feed" /></a></div></div>				</div>
+				<div class="post-foot instapaper_ignore">
+					<div class="post-tagline">
+						<div class="post-foot-views"><label>Article views:</label> 10,825 </div>
+						<div class="post-foot-more-posts">
+                            <a href="/index.php/author/SQLDenis/">Read More Posts by SQLDenis</a>
+						</div>
+					</div>
+					<div>
+						<label>Tags:</label> <a href="/index.php/tag/indexing/" rel="tag">indexing</a>, <a href="/index.php/tag/sql-server-2005/" rel="tag">sql server 2005</a>, <a href="/index.php/tag/sql-server-2008/" rel="tag">sql server 2008</a>, <a href="/index.php/tag/sql-server-2012/" rel="tag">sql server 2012</a> 
+					</div>
+					<div class="post-tagline" style="height: auto">
+						<span class="social-button-label">Share:</span><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&text=RT @LessThanDot Blog - SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE by @denisgobo" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&title=SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE&source=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&title=SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&quote=SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/&title=SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE" class="instapaper_button">Instapaper</a>					</div>			
+				</div>
+				<div class="comments-area instapaper_ignore">
+	<h4 class="comments-title">
+		No comments posted so far	</h4>
+					<div id="respond" class="comment-respond">
+			<h3 id="reply-title" class="comment-reply-title">Leave a Reply <small><a rel="nofollow" id="cancel-comment-reply-link" href="/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/#respond" style="display:none;">Cancel reply</a></small></h3>				<form action="/wp-comments-post.php" method="post" id="commentform" class="comment-form">
+					<p class="comment-notes"><span id="email-notes">Your email address will not be published.</span> Required fields are marked <span class="required">*</span></p><p class="comment-form-comment"><label for="comment">Comment</label> <textarea id="comment" name="comment" cols="45" rows="8" maxlength="65525" aria-required="true" required="required"></textarea></p><p class="comment-form-author"><label for="author">Name <span class="required">*</span></label> <input id="author" name="author" type="text" value="" size="30" maxlength="245" aria-required='true' required='required' /></p>
+<p class="comment-form-email"><label for="email">Email <span class="required">*</span></label> <input id="email" name="email" type="text" value="" size="30" maxlength="100" aria-describedby="email-notes" aria-required='true' required='required' /></p>
+<p class="comment-form-url"><label for="url">Website</label> <input id="url" name="url" type="text" value="" size="30" maxlength="200" /></p>
+<p class="form-submit"><input name="submit" type="submit" id="submit" class="submit" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='1463' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='0' />
+</p><input type="hidden" id="killer_value" name="killer_value" value="01882513d5fa7c329e940dda99b12147"/><noscript>Sorry, but you are required to use a javascript enabled brower to comment here.</noscript>				</form>
+					</div><!-- #respond -->
+		</div>			</div>
+				<br style="clear: both;" />
+</div>
+		</div>
+		<div id="page-footer">
+			<div id="botnav"><a href="http://lessthandot.com/" title="LessThanDot Launchpad">Launchpad</a> | <a href="http://lessthandot.com/account.php" title="Your Account Settings">My Account</a> | <a href="http://lessthandot.com/statistics.php" title="Statistics">Statistics</a> | <a href="http://lessthandot.com/donate.php" title="Donate">Donate</a> | <a href="http://lessthandot.com/contactus.php" title="Contact Us">Contact Us</a> | <a href="http://lessthandot.com/aboutus.php" title="About the LessThanDot Team">&copy;2008 - 2019 LessThanDot, LLC</a></div>
+
+		<script type='text/javascript'>
+		var _gaq = _gaq || [];
+		_gaq.push(['_setAccount', 'UA-4471405-1']);
+		_gaq.push(['_trackPageview']);
+		_gaq.push(['_setCustomVar', 1, 'Environment', 'lessthandot.com', 3]);
+
+		(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		})();
+	  </script>			<div class="validator"><a href="http://validator.w3.org/check?uri=referer">Valid XHTML</a> | <a href="http://jigsaw.w3.org/css-validator/check/referer" title="Validate the CSS for this page at the W3C website">Valid CSS</a> | 2018-11-11 15:52</div>
+		</div>
+	</div>
+</div>
+<!-- <script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script> -->
+<script type='text/javascript' src='/wp-includes/js/wp-embed.min.js?ver=4.6.1'></script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var spam_destroyer = {"key":"159ff9dcc225580310c2de238cdd1f1a","lifetime":"3600","limit":"1552765585"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='/wp-content/plugins/spam-destroyer/kill.js?ver=1.2'></script>
+</body>
+</html>

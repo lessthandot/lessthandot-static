@@ -1,0 +1,2194 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>powershell &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/powershell/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Deploying to ServiceFabric from TeamCity</title>
+		<link>/index.php/enterprisedev/cloud/azure/deploying-to-servicefabric-from-teamcity/</link>
+		<comments>/index.php/enterprisedev/cloud/azure/deploying-to-servicefabric-from-teamcity/#respond</comments>
+		<pubDate>Mon, 07 Aug 2017 12:30:56 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Azure]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[powershell]]></category>
+		<category><![CDATA[Service Fabric]]></category>
+		<category><![CDATA[teamcity]]></category>
+
+		<guid isPermaLink="false">/?p=8755</guid>
+		<description><![CDATA[Recently I&#8217;ve been working on an application that runs partially in Azure ServiceFabric. I&#8217;ve created a local cluster to work against and now it&#8217;s time to configure my TeamCity deployment to deploy upgrades to my application automatically. Initial details: Deploying 2 projects: a .Net 4.6.2 ASP.Net Core app to web app .Net 4.6.2 ServiceFabric project [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Recently I&#8217;ve been working on an application that runs partially in Azure ServiceFabric. I&#8217;ve <a href="">created a local cluster</a> to work against and now it&#8217;s time to configure my TeamCity deployment to deploy upgrades to my application automatically.</p>
+<p>Initial details:</p>
+<ul>
+<li>Deploying 2 projects:
+<ul>
+<li>a .Net 4.6.2 ASP.Net Core app to web app</li>
+<li>.Net 4.6.2 ServiceFabric project to ServiceFabric cluster</li>
+</ul>
+</li>
+<li>Server:
+<ul>
+<li>VM: 2-core, 2048 GB of RAM</li>
+<li>Windows Server 2016 x64</li>
+<li>TeamCity 2017.1</li>
+<li>SQL Server 2016</li>
+</ul>
+</li>
+</ul>
+<p>In the previous post I walked through the setup of a Service Fabric cluster on a local Hyper-V server and 3 VMs, followed by publishing a Service Fabric service manually to the cluster. In this post, I&#8217;m evolving from the manual publish step to a TeamCity automated deployment.</p>
+<p>Here are the system details:</p>
+<ul>
+<li><b>TeamCity</b>: VM w/ 2 cores assigned and 2048 MB of memory running Windows 2016 x64 with TeamCity 2017.1 and SQL Server 2016</li>
+<li><b>ServiceFabricNodes:</b> 3 single core VMs w/ 2048 MB of memory running Windows 2016 x64</li>
+</ul>
+<p>Let&#8217;s go!</p>
+<h2>Installing Dependencies</h2>
+<p>This solution has two deliverables: a front-end API that is deployed to Azure Web Site (now App Service) and a back-end agent intended to run in Service Fabric. I&#8217;ve already setup a Continuous Integration step to build the projects, run the database migration, perform front-end gulp tasks, and verify a set of unit and integration tests, so I should have most of the dependencies I need.</p>
+<p>I&#8217;ve installed VS 2017 Community, VS 2017 Build tools, <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-get-started">Service Fabric SDK 2.6.220</a>, Node.js 6.11.1 (LTS), NuGet 4.1, and <a href="https://github.com/jonnyzzz/TeamCity.Node">jonnyzzz&#8217;s Node plugin</a>. </p>
+<div style="background-color: #eeeeee; margin: 1em; padding: 1em">
+I installed VS 2017 because historically I&#8217;ve run into issues with Azure projects (and MVC before that, and parts of WebForms before that). I originally was opposed to have the IDE installed on the build server, but have since decided I don&#8217;t mind and look at it as building with the same toolset on the build server that I built and tested with locally.
+</div>
+<p>This is also the place I ran into the madness that is the current <a href="/index.php/itprofessionals/softwareandconfigmgmt/multiple-nuget-methods-for-vs2017-msbuild-15-in-teamcity/" title="Multiple NuGet Methods for VS2017 + MSBuild 15 in TeamCity">mess of NuGet and C# Projects</a>.</p>
+<h2>Deploying the Service Fabric Project</h2>
+<p>My build pipeline for this project will be a single CI stage that runs the tests for both projects, and package stage that packages releasable versions for both projects, then two independent deploy stages to deploy the website and service fabric packages to their appropriate places. </p>
+<div id="attachment_8781" style="width: 557px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/08/DeployserviceFabric.png" alt="Deployment Pipeline - API updates before ServiceFabric" width="547" height="129" class="size-full wp-image-8781" srcset="/wp-content/uploads/2017/08/DeployserviceFabric.png 547w, /wp-content/uploads/2017/08/DeployserviceFabric-300x71.png 300w" sizes="(max-width: 547px) 100vw, 547px" /><p class="wp-caption-text">Deployment Pipeline &#8211; API updates before ServiceFabric</p></div>
+<p>This is my &#8220;good enough for now&#8221; setup. If I run into versioning issues, I can come back and add some backwards compatibility tests between the packages after CI and run the deployments serially instead of in parallel.</p>
+<div id="attachment_8756" style="width: 310px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/DeployScript-300x172.png" alt="Service Fabric Deploy Script" width="300" height="172" class="size-medium wp-image-8756" srcset="/wp-content/uploads/2017/07/DeployScript-300x172.png 300w, /wp-content/uploads/2017/07/DeployScript.png 520w" sizes="(max-width: 300px) 100vw, 300px" /><p class="wp-caption-text">Service Fabric Deploy Script</p></div>
+<p>The Service Fabric package is created with a <code>Deploy-FabricApplication.ps1</code> script that we&#8217;ll use to deploy the package once it&#8217;s built.</p>
+<p><b>Local Script Deploy to ServiceFabric</b></p>
+<p>The first step is testing the script locally to make sure I know how to use it. </p>
+<ol style="padding-left: 40px">
+<li>Right click the Service Fabric project and select &#8220;Package&#8221;</li>
+<li>Open a powershell console and direct it to the Scripts folder in the Service Fabric project</li>
+<li>Run a sample deployment with any parameters you have in the file: <code>.\Deploy-FabricApplication.ps1 -ApplicationPackagePath '..\pkg\Debug\' -PublishProfileFile '..\PublishProfiles\Local.1Node.xml'  -ApplicationParameter @{PhantomAgent_InstanceCount='1'; CoordinatorURL='http://localhost:52860/' }</code></li>
+</ol>
+<p>I had to do this several times, so I also got to learn how to update versions:</p>
+<ol style="padding-left: 40px">
+<li>Add UpgradeDeployment to your PublishProfile:
+<ul style="padding-left: 40px">
+<li>Option 1: Right click in Visual Studio, select Publish, use the link near the bottom to edit your deployment options and then close the dialog, choose &#8220;yes&#8221; when it asks if you want to save the profile&#8221;</li>
+<li>Option 2: Open the relevant PublishProfile XML file and add this to the bottom for the default Unmonitored Upgrade settings
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;UpgradeDeployment</span> <span class="re0">Mode</span>=<span class="st0">&quot;UnmonitoredAuto&quot;</span> <span class="re0">Enabled</span>=<span class="st0">&quot;true&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Parameters</span> <span class="re0">UpgradeReplicaSetCheckTimeoutSec</span>=<span class="st0">&quot;1&quot;</span> <span class="re0">Force</span>=<span class="st0">&quot;True&quot;</span> <span class="re2">/&gt;</span></span>
+<span class="sc3"><span class="re1">&lt;/UpgradeDeployment<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;UpgradeDeployment Mode="UnmonitoredAuto" Enabled="true"&gt;
+    &lt;Parameters UpgradeReplicaSetCheckTimeoutSec="1" Force="True" /&gt;
+&lt;/UpgradeDeployment&gt;</pre></div></div>
+
+</li>
+</ul>
+</li>
+<li>Go to the pkg\Debug</li>
+<li>Open [YourProject]Pkg\ServiceManifest.xml
+<ol style="padding-left: 40px">
+<li>Update the version in either <code>&lt;CodePackage Name="Code" Version="1.0.3"&gt;</code> or <code>&lt;ConfigPackage Name="Config" Version="1.0.4" /&gt;</code></li>
+<li>Update the Package version in the <code>&lt;ServiceManifest … Version="1.0.2" …&gt;</code> root element</li>
+<li>Save</li>
+</ol>
+</li>
+<li>Open ApplicationManifest.xml
+<ol style="padding-left: 40px">
+<li>Find <code>&lt;ServiceManifestRef ..&gt;</code> and update ServiceManifestVersion to match the ServiceManifest version above</li>
+<li>Update the ApplicationTypeVersion property in the <code>&lt;ApplicationManifest … &gt;</code> root element</li>
+<li>Save</li>
+</ol>
+</li>
+<li>Now try your deployment again!</li>
+</ol>
+<p>So now we have a working command locally, now we just have to get TeamCity to update versions appropriately and run this. </p>
+<h3>Build the package</h3>
+<p>Building the package is straightforward. We just need to build the package in release mode, then configure Archiving to capture the bin/Release folder and PublishProfiles folder.</p>
+<p>The Build Step in my &#8220;Package Stage&#8221; configuration looks like this:</p>
+<div id="attachment_8757" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/BuildPackageStage-1024x730.png" alt="TeamCity Package Stage" width="1024" height="730" class="size-large wp-image-8757" srcset="/wp-content/uploads/2017/07/BuildPackageStage-1024x730.png 1024w, /wp-content/uploads/2017/07/BuildPackageStage-300x214.png 300w, /wp-content/uploads/2017/07/BuildPackageStage-768x548.png 768w, /wp-content/uploads/2017/07/BuildPackageStage.png 1491w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">TeamCity Package Stage</p></div>
+<p>Once I have the package built, I am going to replace the versions with a value that ties to the TeamCity version number.</p>
+<p>In the &#8220;General&#8221; tab in TeamCity, I use the build number token from my CI step as the version for this step:</p>
+<div id="attachment_8758" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCity_Package_BuildNumber-1024x51.png" alt="TeamCity Package Build Number" width="1024" height="51" class="size-large wp-image-8758" srcset="/wp-content/uploads/2017/07/TeamCity_Package_BuildNumber-1024x51.png 1024w, /wp-content/uploads/2017/07/TeamCity_Package_BuildNumber-300x15.png 300w, /wp-content/uploads/2017/07/TeamCity_Package_BuildNumber-768x38.png 768w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">TeamCity Package Build Number</p></div>
+<p>My CI step has this for it&#8217;s build number:</p>
+<div id="attachment_8759" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCity_CI_BuildNumber-1024x73.png" alt="TeamCity CI Build Number" width="1024" height="73" class="size-large wp-image-8759" srcset="/wp-content/uploads/2017/07/TeamCity_CI_BuildNumber-1024x73.png 1024w, /wp-content/uploads/2017/07/TeamCity_CI_BuildNumber-300x21.png 300w, /wp-content/uploads/2017/07/TeamCity_CI_BuildNumber-768x54.png 768w, /wp-content/uploads/2017/07/TeamCity_CI_BuildNumber.png 1510w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">TeamCity CI Build Number</p></div>
+<p>So now I will have a matching 1.X.0 value all the way from CI through to the ServiceFabric manager.</p>
+<p>Then in a new build step, I replace the versions in my two manifest files with the build version token from TeamCity:</p>
+<div id="attachment_8760" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCity_Package_Versions-1024x201.png" alt="TeamCity Package Versions" width="1024" height="201" class="size-large wp-image-8760" srcset="/wp-content/uploads/2017/07/TeamCity_Package_Versions-1024x201.png 1024w, /wp-content/uploads/2017/07/TeamCity_Package_Versions-300x59.png 300w, /wp-content/uploads/2017/07/TeamCity_Package_Versions-768x151.png 768w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">TeamCity Package Versions</p></div>
+<p>Finally, I add entries to the &#8220;Artifact Paths&#8221; back in the &#8220;General&#8221; tab to zip up the package for use by the next step:</p>
+<div id="attachment_8761" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCity_Package_Artifacts-1024x104.png" alt="TeamCity Package Artifacts" width="1024" height="104" class="size-large wp-image-8761" srcset="/wp-content/uploads/2017/07/TeamCity_Package_Artifacts-1024x104.png 1024w, /wp-content/uploads/2017/07/TeamCity_Package_Artifacts-300x30.png 300w, /wp-content/uploads/2017/07/TeamCity_Package_Artifacts-768x78.png 768w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">TeamCity Package Artifacts</p></div>
+<p>The final steps look like this:</p>
+<div id="attachment_8762" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCity_Package_Steps-1024x234.png" alt="TeamCity Package Steps" width="1024" height="234" class="size-large wp-image-8762" srcset="/wp-content/uploads/2017/07/TeamCity_Package_Steps-1024x234.png 1024w, /wp-content/uploads/2017/07/TeamCity_Package_Steps-300x68.png 300w, /wp-content/uploads/2017/07/TeamCity_Package_Steps-768x175.png 768w, /wp-content/uploads/2017/07/TeamCity_Package_Steps.png 1517w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">TeamCity Package Steps</p></div>
+<p>Running the build, I can verify everything is successful by opening up the archived package:</p>
+<div id="attachment_8763" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCity_Package_Success-1024x321.png" alt="TeamCity Package - Verifying Versions" width="1024" height="321" class="size-large wp-image-8763" srcset="/wp-content/uploads/2017/07/TeamCity_Package_Success-1024x321.png 1024w, /wp-content/uploads/2017/07/TeamCity_Package_Success-300x94.png 300w, /wp-content/uploads/2017/07/TeamCity_Package_Success-768x241.png 768w, /wp-content/uploads/2017/07/TeamCity_Package_Success.png 1392w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">TeamCity Package &#8211; Verifying Versions</p></div>
+<h3>Deploy</h3>
+<p>Now that I have a step building the files I need, I&#8217;ll add a new Build Configuration named &#8220;Deploy to Service Fabric&#8221;. I&#8217;ll set Snapshot and Artifact Dependencies to the prior Build Configuration and update the Build Number to use the value from that config (which is in turn using the one from CI).</p>
+<div id="attachment_8764" style="width: 922px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCity_Deploy_Dependencies.png" alt="TeamCity Deploy Dependencies" width="912" height="406" class="size-full wp-image-8764" srcset="/wp-content/uploads/2017/07/TeamCity_Deploy_Dependencies.png 912w, /wp-content/uploads/2017/07/TeamCity_Deploy_Dependencies-300x134.png 300w, /wp-content/uploads/2017/07/TeamCity_Deploy_Dependencies-768x342.png 768w" sizes="(max-width: 912px) 100vw, 912px" /><p class="wp-caption-text">TeamCity Deploy Dependencies</p></div>
+<p>I have one build step, a powershell command that matches the manual one I was running earlier that is set to treat powershell errors as errors (instead of the default, warnings). I run this as a single PowerShell source script so I can use dot notation (ServiceFabric scripts make some assumptions about having the connection variable available):</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Invoke-Expression &quot;. .\Deploy-FabricApplication.ps1 -ApplicationPackagePath ../../../Artifacts -PublishProfileFile ../PublishProfiles/LocalCluster.xml -ApplicationParameter @{PhantomAgent_InstanceCount='1'; CoordinatorURL='http://app.launchready.co/'}&quot;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Invoke-Expression ". .\Deploy-FabricApplication.ps1 -ApplicationPackagePath ../../../Artifacts -PublishProfileFile ../PublishProfiles/LocalCluster.xml -ApplicationParameter @{PhantomAgent_InstanceCount='1'; CoordinatorURL='http://app.launchready.co/'}"</pre></div></div>
+
+<p>My build step then runs this command like so:</p>
+<div id="attachment_8765" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCity_Deploy_Script-1024x272.png" alt="TeamCity Deploy Script" width="1024" height="272" class="size-large wp-image-8765" srcset="/wp-content/uploads/2017/07/TeamCity_Deploy_Script-1024x272.png 1024w, /wp-content/uploads/2017/07/TeamCity_Deploy_Script-300x80.png 300w, /wp-content/uploads/2017/07/TeamCity_Deploy_Script-768x204.png 768w, /wp-content/uploads/2017/07/TeamCity_Deploy_Script.png 1226w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">TeamCity Deploy Script</p></div>
+<p>Note 1: Make sure your Server certificate is installed and permission granted to the user that TeamCity runs under.</p>
+<p>Note 2: I also had to alter my LocalCluster.xml profile to <code>StoreLocation="LocalMachine"</code> instead of <code>StoreLocation="CurrentUser"</code>, since that I where I installed the certificate.</p>
+<p>And there we have it:</p>
+<div id="attachment_8766" style="width: 387px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCity_Deploy_Success.png" alt="TeamCity Deploy Success for v1.43.0" width="377" height="104" class="size-full wp-image-8766" srcset="/wp-content/uploads/2017/07/TeamCity_Deploy_Success.png 377w, /wp-content/uploads/2017/07/TeamCity_Deploy_Success-300x83.png 300w" sizes="(max-width: 377px) 100vw, 377px" /><p class="wp-caption-text">TeamCity Deploy Success for v1.43.0</p></div>
+<div id="attachment_8767" style="width: 817px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/ServiceFabric_Deploy_Success.png" alt="ServiceFabric Success for v1.43.0" width="807" height="98" class="size-full wp-image-8767" srcset="/wp-content/uploads/2017/07/ServiceFabric_Deploy_Success.png 807w, /wp-content/uploads/2017/07/ServiceFabric_Deploy_Success-300x36.png 300w, /wp-content/uploads/2017/07/ServiceFabric_Deploy_Success-768x93.png 768w" sizes="(max-width: 807px) 100vw, 807px" /><p class="wp-caption-text">ServiceFabric Success for v1.43.0</p></div>
+<p>We can see matching versions in both places (1.43.0), so we know the pipeline is functioning.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/cloud/azure/deploying-to-servicefabric-from-teamcity/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Creating a local Service Fabric Cluster</title>
+		<link>/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/</link>
+		<comments>/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/#respond</comments>
+		<pubDate>Wed, 26 Jul 2017 15:37:14 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Azure]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[powershell]]></category>
+		<category><![CDATA[Service Fabric]]></category>
+
+		<guid isPermaLink="false">/?p=8713</guid>
+		<description><![CDATA[Working with Service Fabric and want a local cluster to test and develop against? Here&#8217;s the step-by-step path I took from a set of fresh Windows VMs to a running, secured Service Fabric cluster using self-signed X509 certificates. There are a number of Microsoft docs that cover this subject, this is a single beginning-to-end path [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Working with Service Fabric and want a local cluster to test and develop against? Here&#8217;s the step-by-step path I took from a set of fresh Windows VMs to a running, secured Service Fabric cluster using self-signed X509 certificates. There are a number of Microsoft docs that cover this subject, this is a single beginning-to-end path that also includes fixes for gaps or errors in those docs as I went.</p>
+<p>Here are the technical details:</p>
+<ul>
+<li>3 Hyper-V VMs running Windows 2016 x64, single-core, 2046MB RAM</li>
+<li>ServiceFabric 5.6.220.9494</li>
+</ul>
+<p>My VMs are: </p>
+<ul>
+<li>SFNode0 &#8211; 192.168.1.200</li>
+<li>SFNode1 &#8211; 192.168.1.201</li>
+<li>SFNode2 &#8211; 192.168.1.202</li>
+</ul>
+<p>Here we go!</p>
+<h2>Step 1: Download the Service Fabric Standalone Package</h2>
+<p>Starting on SFNode0, I <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-cluster-creation-for-windows-server#downloadpackage">download the package</a>. There is a brief struggle through the overly strict IE security settings (did you know docs.microsoft.com uses google-analytics?).</p>
+<p>Unpack the downloaded archive and make a copy of the ClusterConfig.X509.MultiMachine.json so we can modify a copy without changing the original. I&#8217;ve named this &#8220;ClusterConfig.LaunchReady.LocalCluster.json&#8221; for my cluster.</p>
+<h2>Step 2: Cluster Configuration File</h2>
+<p>The configuration (or &#8220;manifest&#8221;) is explained in detail in <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-cluster-manifest">Microsoft Docs</a>. I&#8217;ll call out the specifics of what I&#8217;m changing as I go.</p>
+<div id="attachment_8718" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/SFNode0ConfigScreen.png" alt="Initial Cluster Configuration" width="1024" height="768" class="size-full wp-image-8718" srcset="/wp-content/uploads/2017/07/SFNode0ConfigScreen.png 1024w, /wp-content/uploads/2017/07/SFNode0ConfigScreen-300x225.png 300w, /wp-content/uploads/2017/07/SFNode0ConfigScreen-768x576.png 768w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">Initial Cluster Configuration</p></div>
+<p>The first update is the name of the cluster:</p>
+<pre>"name": "LaunchReady.LocalCluster",
+"clusterConfigurationVersion": "1.0.0",
+"apiVersion": "04-2017",</pre>
+<p>The clusterConfigurationVersion and apiVersion can stay unchanged. Later when we make changes to the cluster, we&#8217;ll increment the clusterConfigurationVersion (and commit it to our git repository).</p>
+<h3>Configuring Nodes</h3>
+<p>The next section is the node definitions. I&#8217;ve updated these to reflect the names of my VMs, a common fault domain to indicate the shared server they are running on, and a common update domain (it woul dbe better to make these different, I wasn&#8217;t thinking when I first created this).</p>
+<pre>{
+	"nodeName": "SFNode0",
+	"iPAddress": "SFNode0",
+	"nodeTypeRef": "NodeType0",
+	"faultDomain": "fd:/hyperv0",
+	"upgradeDomain": "UD0"
+},
+{
+	"nodeName": "SFNode1",
+	"iPAddress": "SFNode1",
+	"nodeTypeRef": "NodeType0",
+	"faultDomain": "fd:/hyperv0",
+	"upgradeDomain": "UD0"
+},
+{
+	"nodeName": "SFNode2",
+	"iPAddress": "SFNode2",
+	"nodeTypeRef": "NodeType0",
+	"faultDomain": "fd:/hyperv0",
+	"upgradeDomain": "UD0"
+}</pre>
+<p>Here&#8217;s a break down of the properties:</p>
+<ul>
+<li>nodeName: is the name that we will see in logs and the management console.</li>
+<li>iPAddress: is a discoverable name or IPAddress for the node</li>
+<li>nodeTypeRef: NodeTypes are defined later in the configuration and represent port and reliability settings for the node <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-cluster-manifest#nodetypes">See MSDN</a></li>
+<li>faultDomain: An indicator of (potentially) shared physical resources that the node relies on (if this goes down, all nodes with this indicator will as well)</li>
+<li>upgradeDomain: Identifier to group (or not) which nodes will be upgraded simultaneously during an upgrade</li>
+</ul>
+<p>I am going to skip over the diagnosticsStore section for now, as the defaults will be good enough until I have the cluster running, which requires the configs above and the X509 configs coming up next.</p>
+<h3>Configuring X509 certificates</h3>
+<p>More background detail: <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-windows-cluster-x509-security">Secure a standalone cluster on Windows using X.509 certificates</a></p>
+<p>I am going to secure this as if it is a production cluster, to ensure any work I do in my local lab won&#8217;t suddenly blow up when I switch to an Azure cluster, but I&#8217;ll use self-signed certificates since it is a local lab. I&#8217;ll use a single certificate for node-to-node and server-to-client (<code>ClusterCertificate</code>, <code>ServerCertificate</code>) because I don&#8217;t plan on performing certificate rollovers. I&#8217;ll have a second certificate for clients to authenticate with when connecting (<code>ClientCertificateThumbprints</code>).</p>
+<div style="background-color: #FFCCCC; padding: 1em; margin: 1em;">
+<b>Warning:</b> The <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-windows-cluster-x509-security#optional-create-a-self-signed-certificate">Self-Signed Certificate instructions</a> are generally ok, but make some assumptions about the Service Fabric SDK, copy and paste for Certificate Thumbprints, file permissions, etc. The instructions below borrow from this document, but correct some of those deficiencies and assumptions to work in the context of following the Service Fabric setup instructions.
+</div>
+<p>First, switch to a system that has the ServiceFabric SDK installed. It won&#8217;t be present on your nodes at this point. </p>
+<p>Next copy the CertSetup.ps1 file to your desktop or another location that will allow you to edit the file (we don&#8217;t want to replace one the SDK relies on and Windows security will prevent you from saving over it in the current location).</p>
+<p>Next, follow the instructions to generate a cluster/server certificate and a client certificate (I named mine &#8220;LaunchReadyLocalClusterCert&#8221; and &#8220;LaunchReadyLocalClientCert&#8221;). This requires editing the names in CertSetup.ps1 on line 22 (Cleanup-Cert function), line 96, and line 163.</p>
+<p>Launch PowerShell as an Administrator, then run the altered script <code>.\CertSetup.ps1 -Install</code>. When it completes, edit the script to enter the second certificate subject name and run it a second time.</p>
+<p>Opening &#8220;Manage computer certificates&#8221; from the Start menu, I can see my two certificates listed in Personal/Certificates:</p>
+<div id="attachment_8719" style="width: 769px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/Certificates.png" alt="Certificates Successfully Generated" width="759" height="155" class="size-full wp-image-8719" srcset="/wp-content/uploads/2017/07/Certificates.png 759w, /wp-content/uploads/2017/07/Certificates-300x61.png 300w" sizes="(max-width: 759px) 100vw, 759px" /><p class="wp-caption-text">Certificates Successfully Generated</p></div>
+<p>To export these to pfx files, I copied the thumbprint from the details for each certificate and ran it like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$pswd</span> <span class="sy0">=</span> <span class="kw1">ConvertTo-SecureString</span> <span class="kw5">-String</span> <span class="st0">&quot;NotMyRealPassword!&quot;</span> <span class="kw5">-Force</span> –AsPlainText
+&nbsp;
+<span class="co1">#Client cert</span>
+<span class="kw1">Get-ChildItem</span> <span class="kw5">-Path</span> <span class="st0">&quot;cert:\localMachine\my\ae 01 64 c8 27 56 71 59 e8 3b c9 37 c4 47 b8 75 7d 1c f3 7e&quot;</span> <span class="sy0">|</span> Export<span class="sy0">-</span>PfxCertificate <span class="kw5">-FilePath</span> C:\LaunchReadyLocalClientCert.pfx <span class="sy0">-</span>Password <span class="re0">$pswd</span>
+<span class="co1">#Server cert</span>
+<span class="kw1">Get-ChildItem</span> <span class="kw5">-Path</span> <span class="st0">&quot;cert:\localMachine\my\e7 98 12 6c 5c 04 46 55 ef ad f7 e3 99 88 0a 82 e7 87 c8 6f&quot;</span> <span class="sy0">|</span> Export<span class="sy0">-</span>PfxCertificate <span class="kw5">-FilePath</span> C:\LaunchReadyLocalClusterCert.pfx <span class="sy0">-</span>Password $pswd</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$pswd = ConvertTo-SecureString -String "NotMyRealPassword!" -Force –AsPlainText
+
+#Client cert
+Get-ChildItem -Path "cert:\localMachine\my\ae 01 64 c8 27 56 71 59 e8 3b c9 37 c4 47 b8 75 7d 1c f3 7e" | Export-PfxCertificate -FilePath C:\LaunchReadyLocalClientCert.pfx -Password $pswd
+#Server cert
+Get-ChildItem -Path "cert:\localMachine\my\e7 98 12 6c 5c 04 46 55 ef ad f7 e3 99 88 0a 82 e7 87 c8 6f" | Export-PfxCertificate -FilePath C:\LaunchReadyLocalClusterCert.pfx -Password $pswd</pre></div></div>
+
+<div style="background-color: #FFFFCC; padding: 1em; margin: 1em;">
+Potential Error: If you receive a null object error, you may have an invisible character at the beginning of the thumbprint. I put my cursor at the beginning of the thumbprint and pressed backspace once and was able to run the script no the next try.
+</div>
+<p>With the PFX files produced, now we have to get them onto the nodes. </p>
+<p>The quickest solution, since I&#8217;m on the same network, is to open up a shared folder from my desktop temporarily and download to each of the 3 nodes. From the <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-windows-cluster-x509-security#install-the-certificates">Install the Certificates</a> instructions, I create a script to install the certs and copy their second script to set permissions and drop those in the fileshare also.</p>
+<p><b>Install my certs:</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$pswd</span> <span class="sy0">=</span> <span class="kw1">ConvertTo-SecureString</span> <span class="kw5">-String</span> <span class="st0">&quot;NotMyRealPassword!&quot;</span> <span class="kw5">-Force</span> –AsPlainText
+&nbsp;
+<span class="co1">## Client Cert</span>
+Import<span class="sy0">-</span>PfxCertificate <span class="sy0">-</span>Exportable <span class="sy0">-</span>CertStoreLocation Cert:\LocalMachine\My <span class="kw5">-FilePath</span> <span class="st0">&quot;C:\LaunchReadyLocalClientCert.pfx&quot;</span> <span class="sy0">-</span>Password <span class="br0">&#40;</span><span class="kw1">ConvertTo-SecureString</span> <span class="kw5">-String</span> <span class="re0">$pswd</span> <span class="kw5">-AsPlainText</span> <span class="kw5">-Force</span><span class="br0">&#41;</span>
+<span class="co1">## Server Cert</span>
+Import<span class="sy0">-</span>PfxCertificate <span class="sy0">-</span>Exportable <span class="sy0">-</span>CertStoreLocation Cert:\LocalMachine\My <span class="kw5">-FilePath</span> <span class="st0">&quot;C:\LaunchReadyLocalClusterCert.pfx&quot;</span> <span class="sy0">-</span>Password <span class="br0">&#40;</span><span class="kw1">ConvertTo-SecureString</span> <span class="kw5">-String</span> <span class="re0">$pswd</span> <span class="kw5">-AsPlainText</span> <span class="kw5">-Force</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$pswd = ConvertTo-SecureString -String "NotMyRealPassword!" -Force –AsPlainText
+
+## Client Cert
+Import-PfxCertificate -Exportable -CertStoreLocation Cert:\LocalMachine\My -FilePath "C:\LaunchReadyLocalClientCert.pfx" -Password (ConvertTo-SecureString -String $pswd -AsPlainText -Force)
+## Server Cert
+Import-PfxCertificate -Exportable -CertStoreLocation Cert:\LocalMachine\My -FilePath "C:\LaunchReadyLocalClusterCert.pfx" -Password (ConvertTo-SecureString -String $pswd -AsPlainText -Force)</pre></div></div>
+
+<p>On each node, I copy the 4 files, run the Install script, then run the Permissions script once for each Thumbprint:</p>
+<div id="attachment_8720" style="width: 869px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/InstallCertificates.png" alt="Install Certificates and Grant Access" width="859" height="586" class="size-full wp-image-8720" srcset="/wp-content/uploads/2017/07/InstallCertificates.png 859w, /wp-content/uploads/2017/07/InstallCertificates-300x205.png 300w, /wp-content/uploads/2017/07/InstallCertificates-768x524.png 768w" sizes="(max-width: 859px) 100vw, 859px" /><p class="wp-caption-text">Install Certificates and Grant Access</p></div>
+<p>Finally, I return to SFNode0 and enter the thumbprints in the &#8220;Security&#8221; section of my cluster configuration, removing the ThumbprintSecondary properties, the ClientCertificateCommonNames property, and the ReverseProxyCertificate property that I don&#8217;t intend to use.</p>
+<h2>Step 3: Test the Configuration</h3>
+<p>Note: Make sure you look at the paths in the fabricSettings section and move these to a non-OS drive if available. These are not changeable once the cluster is created. I chose to keep the defaults for this local cluster.</p>
+<p>Before testing, there are some notable prerequisites buried in the <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-cluster-standalone-deployment-preparation#step-7-environment-setup">Environment Setup</a>:</p>
+<ul>
+<li>#9: Add firewall entry to allow ports 135, 137, 138, 139, and 445</li>
+</ul>
+<p>To test the configuration, I opened a powershell console on SFNode0 and run <code>.\TestConfiguration.ps1 -ClusterConfigFilePath .\ClusterConfig.LaunchReady.LocalCluster.json</code></p>
+<div style="background-color: #FFFFCC; padding: 1em; margin: 1em;">
+Tip: open a powershell console to the current folder in Windows Explorer by typing &#8220;powershell&#8221; in the address bar!
+</div>
+<p>Here are the errors as I work through them:</p>
+<h3>Name Resolution Failure</h3>
+<p><b>Error:</b> &#8220;Machine &#8216;SFNode2&#8217; is not reachable on port 445. Check connectivity/open ports. Error: No such host is known&#8221;</p>
+<p><b>Fix:</b> Name resolution failed to find the host on my local network, so I switched my <code>iPAddress</code> properties to actual IP Addresses.</p>
+<h3>Missing Firewall Rule</h3>
+<p><b>Error:</b> &#8220;Machine &#8216;SFNode2&#8217; is not reachable on port 445. Check connectivity/open ports. Error: A connection attempt failed because the conncted party did not properly respond…&#8221; (classic timeout error)</p>
+<p><b>Fix:</b> Add the Firewall rule I mentioned above to allow traffic on 135, 137, 138, 139, and 445.</p>
+<h3>SMB? Reboot all the things</h3>
+<p><b>Error: </b> &#8220;Machine &#8216;SFNode2&#8217; is not reachable on port 445. Check connectivity/open ports. Error: The connection was actively refused&#8221;</p>
+<p><b>Fix:</b><br />
+1. Open the Network Adapter properties and make sure &#8220;File and Printer Sharing for Microsoft Networks&#8221; is enabled (or netstat -ao and make sure you&#8217;re listening on 445)<br />
+2. Reboot <- It's like Windows NT all over again! (I don't know why this fixed it, but it did)
+
+<img src="/wp-content/uploads/2017/07/SuccessfulConfigTest.png" alt="Successful Configuration Test" width="517" height="258" class="size-full wp-image-8721" srcset="/wp-content/uploads/2017/07/SuccessfulConfigTest.png 517w, /wp-content/uploads/2017/07/SuccessfulConfigTest-300x150.png 300w" sizes="(max-width: 517px) 100vw, 517px" /></p>
+<p>Much Success!</p>
+<h2>Step 4: Deploy the cluster</h3>
+<p>Time to try deploying the cluster, using the provided <code>CreateServiceFabricCluster</code> script.</p>
+<p>(cue ominous organ music)</p>
+<p><code>.\CreateServiceFabricCluster.ps1 -ClusterConfigFilePath .\ClusterConfig.LaunchReady.LocalCluster.json -AcceptEULA</code></p>
+<p>Here&#8217;s a summary of what the script is running (so you know it hasn&#8217;t gone off the rails):</p>
+<ul>
+<li>Check and create if necessary: Runtime directory</li>
+<li>Check and create if necessary: Trace folder</li>
+<li>Download Runtime package (small delay for download time)</li>
+<li>Creating Service fabric Cluster…</li>
+<li>Details per machine: Configuring, Configured, Started FabricInstallerSvc, …(HDD clicky clicky)…, Started FabricHostSvc, (short delay)</li>
+<li>Your cluster is successful created! …</li>
+</ul>
+<p>This took a few minutes to run for me, but of course YMMV depending on internet speed, CPU resources, etc.</p>
+<h2>Step 5: Connect to the cluster</h2>
+<p>Connecting via web browser is easy, but the documentation assumes you are using an insecure setup. <code>http://localhost:19080/Explorer/index.html</code> will time out.</p>
+<p>Use https instead and use something like Chrome instead of IE. Chrome will popup an option for you to select the Client Certificate we produced earlier, and then connect successfully:</p>
+<div id="attachment_8722" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/ServiceFabricDashboard-1024x593.png" alt="Service Fabric Dashboard" width="1024" height="593" class="size-large wp-image-8722" srcset="/wp-content/uploads/2017/07/ServiceFabricDashboard-1024x593.png 1024w, /wp-content/uploads/2017/07/ServiceFabricDashboard-300x174.png 300w, /wp-content/uploads/2017/07/ServiceFabricDashboard-768x444.png 768w, /wp-content/uploads/2017/07/ServiceFabricDashboard.png 1360w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">Service Fabric Dashboard</p></div>
+<p>Because the certificate is self-generated, it will be treated as insecure by the browser and may require you to also go through a &#8220;no, really, I trust this certificate&#8221; routine.</p>
+<h2>Step 6: Publish a ServiceFabric Project from VisualStudio</h2>
+<p>Switching to Visual Studio, your ServiceFabric project should have a folder named &#8220;PublishProfiles&#8221;. Make a copy of the default &#8220;Cloud.xml&#8221; profile and rename it to &#8220;LocalCluster.xml&#8221;. </p>
+<p>There is an example for connecting via X509 certificates in a comment in the xml file, so replace the current content with that example and edit appropriately. Use the Thumbprint from the Server certificate above (also can be found in the cluster manifest screen at https://(ip/ address):19080/Explorer/index.html#/tab/manifest).</p>
+<p>My file now looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;?xml</span> <span class="re0">version</span>=<span class="st0">&quot;1.0&quot;</span> <span class="re0">encoding</span>=<span class="st0">&quot;utf-8&quot;</span><span class="re2">?&gt;</span></span>
+<span class="sc3"><span class="re1">&lt;PublishProfile</span> <span class="re0">xmlns</span>=<span class="st0">&quot;http://schemas.microsoft.com/2015/05/fabrictools&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="sc3"><span class="re1">&lt;ClusterConnectionParameters</span> <span class="re0">ConnectionEndpoint</span>=<span class="st0">&quot;192.168.173.200:19000&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">X509Credential</span>=<span class="st0">&quot;true&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">ServerCertThumbprint</span>=<span class="st0">&quot;E798126C5C044655EFADF7E399880A82E787C86F&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">FindType</span>=<span class="st0">&quot;FindByThumbprint&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">FindValue</span>=<span class="st0">&quot;E798126C5C044655EFADF7E399880A82E787C86F&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">StoreLocation</span>=<span class="st0">&quot;CurrentUser&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">StoreName</span>=<span class="st0">&quot;My&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp;
+&nbsp; <span class="sc3"><span class="re1">&lt;ApplicationParameterFile</span> <span class="re0">Path</span>=<span class="st0">&quot;..\ApplicationParameters\LocalCluster.xml&quot;</span> <span class="re2">/&gt;</span></span>
+<span class="sc3"><span class="re1">&lt;/PublishProfile<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;PublishProfile xmlns="http://schemas.microsoft.com/2015/05/fabrictools"&gt;
+       &lt;ClusterConnectionParameters ConnectionEndpoint="192.168.173.200:19000"
+                                    X509Credential="true"
+                                    ServerCertThumbprint="E798126C5C044655EFADF7E399880A82E787C86F"
+                                    FindType="FindByThumbprint"
+                                    FindValue="E798126C5C044655EFADF7E399880A82E787C86F"
+                                    StoreLocation="CurrentUser"
+                                    StoreName="My" /&gt;
+
+  &lt;ApplicationParameterFile Path="..\ApplicationParameters\LocalCluster.xml" /&gt;
+&lt;/PublishProfile&gt;</pre></div></div>
+
+<p>Add the new profile file to the project in Visual Studio.</p>
+<p>Right click the project and select &#8220;Publish&#8221;. In the Publish dialog, select your new Profile file from the first dropdown. The dialog will verify it can connect to the Cluster:</p>
+<div id="attachment_8723" style="width: 648px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/PublishPackage.png" alt="VS 2017 - Publish Package for Service Fabric" width="638" height="434" class="size-full wp-image-8723" srcset="/wp-content/uploads/2017/07/PublishPackage.png 638w, /wp-content/uploads/2017/07/PublishPackage-300x204.png 300w" sizes="(max-width: 638px) 100vw, 638px" /><p class="wp-caption-text">VS 2017 &#8211; Publish Package for Service Fabric</p></div>
+<p>(Yes, I&#8217;m using a hotmail address, it amuses me <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /> )</p>
+<p>Click Publish and Visual Studio will build the project and publish it to the cluster. Visual Studio will provide feedback as it publishes the application and we can see the results in the dashboard:</p>
+<div id="attachment_8724" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/UnhealthyDeployedPackage-1024x879.png" alt="Unhealthy, But Deployed Dashboard View" width="1024" height="879" class="size-large wp-image-8724" srcset="/wp-content/uploads/2017/07/UnhealthyDeployedPackage-1024x879.png 1024w, /wp-content/uploads/2017/07/UnhealthyDeployedPackage-300x258.png 300w, /wp-content/uploads/2017/07/UnhealthyDeployedPackage-768x660.png 768w, /wp-content/uploads/2017/07/UnhealthyDeployedPackage.png 1345w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">Unhealthy, But Deployed Dashboard View</p></div>
+<p>Successful deployment! Except my application is unhealthy in this case, which I will now go start to debug <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Putting files into year folders using powershell</title>
+		<link>/index.php/uncategorized/putting-files-into-year-folders-using-powershell/</link>
+		<comments>/index.php/uncategorized/putting-files-into-year-folders-using-powershell/#respond</comments>
+		<pubDate>Wed, 10 Feb 2016 09:38:09 +0000</pubDate>
+		<dc:creator><![CDATA[Christiaan Baes (chrissie1)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[powershell]]></category>
+
+		<guid isPermaLink="false">/?p=4349</guid>
+		<description><![CDATA[Powershell is great (as am I) for automating boring little tasks. So the question came to put 18 thousand plus image files that were in one folder into folders per year of Date created. So to no longer keep you in suspense, here is the complete code PowerShell1 2 3 4 5 6 7 8 [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Powershell is great (as am I) for automating boring little tasks. </p>
+<p>So the question came to put 18 thousand plus image files that were in one folder into folders per year of Date created. </p>
+<p>So to no longer keep you in suspense, here is the complete code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$SourceDir</span> <span class="sy0">=</span> <span class="st0">&quot;&quot;</span>
+<span class="re0">$DestinationDir</span> <span class="sy0">=</span> <span class="st0">&quot;&quot;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Source directory: &quot;</span> <span class="sy0">+</span> <span class="re0">$SourceDir</span>
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Destination directory:&quot;</span> <span class="sy0">+</span> <span class="re0">$DestinationDir</span>
+&nbsp;
+<span class="re0">$files</span> <span class="sy0">=</span> <span class="kw1">get-childitem</span> <span class="re0">$SourceDir</span> <span class="sy0">*</span>.<span class="sy0">*</span> <span class="kw4">-File</span> <span class="sy0">|</span><span class="kw1">Select-Object</span> <span class="kw5">-last</span> <span class="nu0">10</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Number of files to move:&quot;</span> <span class="re0">$files</span>.Count
+<span class="kw3">foreach</span><span class="br0">&#40;</span><span class="re0">$file</span> <span class="kw3">in</span> <span class="re0">$files</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="re0">$Directory</span> <span class="sy0">=</span> <span class="re0">$DestinationDir</span> <span class="sy0">+</span> <span class="st0">&quot;\&quot;</span> <span class="sy0">+</span> <span class="re0">$file</span>.LastWriteTime.Date.ToString<span class="br0">&#40;</span><span class="st0">&quot;yyyy&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw3">if</span><span class="br0">&#40;</span><span class="sy0">!</span><span class="br0">&#40;</span><span class="kw1">Test-Path</span> <span class="re0">$Directory</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Creating directory&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">New-Item</span> <span class="re0">$Directory</span> <span class="sy0">-</span><span class="kw2">type</span> directory
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;To directory:&quot;</span> <span class="re0">$Directory</span>
+&nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Moving file:&quot;</span> <span class="re0">$file</span>.ToString<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">Move-Item</span> <span class="re0">$file</span>.fullname <span class="re0">$Directory</span>
+&nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;File moved&quot;</span>
+<span class="br0">&#125;</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$SourceDir = ""
+$DestinationDir = ""
+
+Write-Host "Source directory: " + $SourceDir
+Write-Host "Destination directory:" + $DestinationDir
+
+$files = get-childitem $SourceDir *.* -File |Select-Object -last 10
+
+Write-Host "Number of files to move:" $files.Count
+foreach($file in $files)
+{
+    $Directory = $DestinationDir + "\" + $file.LastWriteTime.Date.ToString("yyyy")
+    if(!(Test-Path $Directory))
+    {
+        Write-Host "Creating directory"
+        New-Item $Directory -type directory
+    }
+    Write-Host "To directory:" $Directory
+    Write-Host "Moving file:" $file.ToString()
+    Move-Item $file.fullname $Directory
+    Write-Host "File moved"
+} </pre></div></div>
+
+<p>This only takes the last 10 files and it uses the LastWriteTime but you get the drift.</p>
+<p>Just fill in the Source and Destination Directories and you&#8217;re good to go.</p>
+<p>Most important parts.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$files</span> <span class="sy0">=</span> <span class="kw1">get-childitem</span> <span class="re0">$SourceDir</span> <span class="sy0">*</span>.<span class="sy0">*</span> <span class="kw4">-File</span> <span class="sy0">|</span><span class="kw1">Select-Object</span> <span class="kw5">-last</span> <span class="nu0">10</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$files = get-childitem $SourceDir *.* -File |Select-Object -last 10</pre></div></div>
+
+<p>Gets the files form the sourcedirectory and selects the last 10</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$Directory</span> <span class="sy0">=</span> <span class="re0">$DestinationDir</span> <span class="sy0">+</span> <span class="st0">&quot;\&quot;</span> <span class="sy0">+</span> <span class="re0">$file</span>.LastWriteTime.Date.ToString<span class="br0">&#40;</span><span class="st0">&quot;yyyy&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw3">if</span><span class="br0">&#40;</span><span class="sy0">!</span><span class="br0">&#40;</span><span class="kw1">Test-Path</span> <span class="re0">$Directory</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Creating directory&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">New-Item</span> <span class="re0">$Directory</span> <span class="sy0">-</span><span class="kw2">type</span> directory
+&nbsp; &nbsp; <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$Directory = $DestinationDir + "\" + $file.LastWriteTime.Date.ToString("yyyy")
+    if(!(Test-Path $Directory))
+    {
+        Write-Host "Creating directory"
+        New-Item $Directory -type directory
+    }</pre></div></div>
+
+<p>Makes a new directory per year if it not already exists.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Move-Item</span> <span class="re0">$file</span>.fullname $Directory</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Move-Item $file.fullname $Directory</pre></div></div>
+
+<p>Moves the file.</p>
+<p>Simple and quick. All 18k files moved in less than a minute. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/putting-files-into-year-folders-using-powershell/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Access Git Commits during a TeamCity Build using Powershell</title>
+		<link>/index.php/uncategorized/access-git-commits-during-a-teamcity-build-using-powershell/</link>
+		<comments>/index.php/uncategorized/access-git-commits-during-a-teamcity-build-using-powershell/#respond</comments>
+		<pubDate>Wed, 29 Oct 2014 19:13:12 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[build automation]]></category>
+		<category><![CDATA[git]]></category>
+		<category><![CDATA[powershell]]></category>
+		<category><![CDATA[teamcity]]></category>
+
+		<guid isPermaLink="false">/?p=3026</guid>
+		<description><![CDATA[Recently I needed access to the list of commits that were included with each of my TeamCity builds. TeamCity provides a pretty big list of Predefined Build Parameters, but it doesn&#8217;t provide access to details of the commits it is currently building. Having Powershell and Git on my server, though, I can write some scripts [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Recently I needed access to the list of commits that were included with each of my TeamCity builds. TeamCity provides a pretty big list of <a href="https://confluence.jetbrains.com/display/TCD8/Predefined+Build+Parameters" title="TeamCity 8.x - Predefined Build Parameters">Predefined Build Parameters</a>, but it doesn&#8217;t provide access to details of the commits it is currently building. Having Powershell and Git on my server, though, I can write some scripts to extract not just information about the latest commit, but about any series of commits that have occurred.</p>
+<h1>Extracting Usable Commit Details</h1>
+<p>In this script, I am extracting just the list of authors, dates, and commit messages. I formatted the git log output so I could easily feed it into Powershell&#8217;s <a href="http://technet.microsoft.com/en-us/library/hh849900.aspx" title="MSDN - ConvertFrom-StringData">ConvertFrom-StringData</a> method to get an array of objects.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">function</span> Get<span class="sy0">-</span>CommitsFromGitLog<span class="br0">&#40;</span><span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$StartCommit</span><span class="sy0">,</span> <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$EndCommit</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="re0">$Cmd</span> <span class="sy0">=</span> <span class="st0">&quot;git log --pretty=format:&quot;</span><span class="st0">&quot;CommitHash=%H :: AuthorEmail=%ae :: AuthorDate=%ad :: Subject=%s&quot;</span><span class="st0">&quot; $StartCommit...$EndCommit&quot;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$Result</span> <span class="sy0">=</span> <span class="kw1">Invoke-Expression</span> <span class="re0">$Cmd</span>
+&nbsp; &nbsp; <span class="re0">$ParsedResult</span> <span class="sy0">=</span> <span class="re0">$Result</span> <span class="sy0">|</span> <span class="sy0">%</span><span class="br0">&#123;</span> ConvertFrom<span class="sy0">-</span>StringData<span class="br0">&#40;</span><span class="kw6">$_</span> <span class="kw4">-replace</span> <span class="st0">&quot; :: &quot;</span><span class="sy0">,</span> <span class="st0">&quot;<span class="es0">`n</span>&quot;</span><span class="br0">&#41;</span> &nbsp;<span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">return</span> <span class="re0">$ParsedResult</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">function Get-CommitsFromGitLog([string] $StartCommit, [string] $EndCommit){
+    $Cmd = "git log --pretty=format:""CommitHash=%H :: AuthorEmail=%ae :: AuthorDate=%ad :: Subject=%s"" $StartCommit...$EndCommit"
+
+    $Result = Invoke-Expression $Cmd
+    $ParsedResult = $Result | %{ ConvertFrom-StringData($_ -replace " :: ", "`n")  }
+
+    return $ParsedResult
+}</pre></div></div>
+
+<p>TeamCity defines a Build Parameter named <a href="https://confluence.jetbrains.com/display/TCD8/Predefined+Build+Parameters#PredefinedBuildParameters-ServerBuildProperties">build.vcs.number</a>, so we could use this script to get details about that specific commit like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Get<span class="sy0">-</span>CommitsFromGitLog <span class="sy0">-</span>StartCommit <span class="st0">&quot;%build.vcs.number%^&quot;</span> <span class="sy0">-</span>EndCommit <span class="st0">&quot;%build.vcs.number%&quot;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Get-CommitsFromGitLog -StartCommit "%build.vcs.number%^" -EndCommit "%build.vcs.number%"</pre></div></div>
+
+<p>The net effect is that I&#8217;m asking for all changes starting one commit before the identified one (the ^ at the end) through that identified one. </p>
+<p>Unfortunately, this is only the latest commit. Retrieving the details for a group of commits requires some additional work.</p>
+<h1>Finding the Previous Commit Hash</h1>
+<p>This is the tricky part. If TeamCity provided the build.vcs.number from the previous build, we would probably be using that. Though, realistically, if our build is successful and the prior one wasn&#8217;t, we would only be listing some of the changes being deployed. Really what we need is the build.vcs.number from the <em>last successful build</em>, which definitely isn&#8217;t built in.</p>
+<p>However, TeamCity does have a <a href="https://confluence.jetbrains.com/display/TCD8/REST+API" title="TeamCity REST API">REST API</a> that exposes details about prior builds. There is also a built in service account we can use to access that API, and the credentials and URL are all available in the REST API. So we can implement some calls without the extra pain of accidentally breaking the build every time Joe the developer changes his password and forgets he had it in the script too.</p>
+<p>The API exposes methods to access prior <a href="https://confluence.jetbrains.com/display/TCD8/REST+API#RESTAPI-BuildRequests" title="TeamCity 8.x - REST API - Build Requests">Build Requests</a>. For what we are doing, we want to get a build for a specific Build Type (the running build configuration) and in my case I want the last successful build, not just the last build. using the request for build by build type id, we would be looking for something like:</p>
+<p><code>$($TeamCityUrl)/app/rest/buildTypes/id:$($TeamCityBuildTypeId)/builds/status:SUCCESS</code></p>
+<p>Using <a href="http://technet.microsoft.com/en-us/library/hh849901.aspx" title="Powershell - Invoke-WebRequest">Invoke-WebRequest</a>, we can write a script that accesses that build information:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">function</span> Get<span class="sy0">-</span>TeamCityLastSuccessfulRun<span class="br0">&#40;</span><span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$TeamCityUrl</span><span class="sy0">,</span> <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$TeamCityBuildTypeId</span><span class="sy0">,</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$TeamCityUsername</span><span class="sy0">,</span> <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$TeamCityPassword</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$Credentials</span> <span class="sy0">=</span> <span class="st0">&quot;$($TeamCityUsername):$($TeamCityPassword)&quot;</span>
+&nbsp; &nbsp; <span class="re0">$AuthString</span> <span class="sy0">=</span> <span class="br0">&#91;</span>System.Convert<span class="br0">&#93;</span>::ToBase64String<span class="br0">&#40;</span><span class="br0">&#91;</span>System.Text.Encoding<span class="br0">&#93;</span>::UTF8.GetBytes<span class="br0">&#40;</span><span class="st0">&quot;$Credentials&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$Url</span> <span class="sy0">=</span> <span class="st0">&quot;$($TeamCityUrl)/app/rest/buildTypes/id:$($TeamCityBuildTypeId)/builds/status:SUCCESS&quot;</span> 
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$Content</span> <span class="sy0">=</span> Invoke<span class="sy0">-</span>WebRequest <span class="st0">&quot;$Url&quot;</span> <span class="sy0">-</span>Headers <span class="sy0">@</span><span class="br0">&#123;</span><span class="st0">&quot;Authorization&quot;</span> <span class="sy0">=</span> <span class="st0">&quot;Basic $AuthString&quot;</span><span class="br0">&#41;</span><span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">return</span> <span class="re0">$Content</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">function Get-TeamCityLastSuccessfulRun([string] $TeamCityUrl, [string] $TeamCityBuildTypeId, 
+                                       [string] $TeamCityUsername, [string] $TeamCityPassword){
+
+    $Credentials = "$($TeamCityUsername):$($TeamCityPassword)"
+    $AuthString = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("$Credentials")
+
+    $Url = "$($TeamCityUrl)/app/rest/buildTypes/id:$($TeamCityBuildTypeId)/builds/status:SUCCESS" 
+
+    $Content = Invoke-WebRequest "$Url" -Headers @{"Authorization" = "Basic $AuthString")}
+
+    return $Content
+}</pre></div></div>
+
+<p>Now I can combine some parameters from TeamCity, <a href="https://technet.microsoft.com/en-us/library/hh849968.aspx" title="Powershell - Select-Xml">Select-Xml</a>, and the first script to get a list of commit information since the last successful TeamCity run.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$Run</span> <span class="sy0">=</span> Get<span class="sy0">-</span>TeamCityLastSuccessfulRun <span class="sy0">-</span>TeamCityUrl <span class="st0">&quot;%teamcity.serverUrl%&quot;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">-</span>TeamCityBuildTypeId <span class="st0">&quot;%system.teamcity.buildType.id%&quot;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">-</span>TeamCityUsername <span class="st0">&quot;%system.teamcity.auth.userId%&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">-</span>TeamCityPassword <span class="st0">&quot;%system.teamcity.auth.password%&quot;</span>
+&nbsp;
+<span class="re0">$LatestCommitFromRun</span> <span class="sy0">=</span> <span class="br0">&#40;</span>Select<span class="sy0">-</span>Xml <span class="sy0">-</span>Content <span class="st0">&quot;$Run&quot;</span> <span class="sy0">-</span>Xpath <span class="st0">&quot;/build/revisions/revision/@version&quot;</span><span class="br0">&#41;</span>.Node.Value
+&nbsp;
+<span class="re0">$CommitsSinceLastSuccess</span> <span class="sy0">=</span> Get<span class="sy0">-</span>CommitsFromGitLog <span class="sy0">-</span>StartCommit <span class="st0">&quot;$LatestCommitFromRun&quot;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">-</span>EndCommit <span class="st0">&quot;%build.vcs.number%&quot;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$Run = Get-TeamCityLastSuccessfulRun -TeamCityUrl "%teamcity.serverUrl%" 
+                                     -TeamCityBuildTypeId "%system.teamcity.buildType.id%" 
+                                     -TeamCityUsername "%system.teamcity.auth.userId%"
+                                     -TeamCityPassword "%system.teamcity.auth.password%"
+
+$LatestCommitFromRun = (Select-Xml -Content "$Run" -Xpath "/build/revisions/revision/@version").Node.Value
+
+$CommitsSinceLastSuccess = Get-CommitsFromGitLog -StartCommit "$LatestCommitFromRun" 
+                                                 -EndCommit "%build.vcs.number%"</pre></div></div>
+
+<p>And there we have it, a cumulative list of authors and commits since the last successful build. You could use similar logic to pass in parameters to get the whole history since the last pinned build, a specific tag in the git repository, etc.</p>
+<h1>What Can You Do With This?</h1>
+<p>With those two functions, you now have the raw data about all commits that are being built/deployed with this build. You could use this data to automatically produce release notes, adding a basic HTML page to the product or website you are building. You could automatically append a list of contributors to a LATEST file with specifics about the build. If you have issue numbers or ticket numbers in the build, you could easily parse them out of the commit messages and output links in those documents. A richer contributors page is possible by outputting gravatar image tags using the authors emails addresses. Need auditability? Call a logging API with details about the commits, authors, and the URL back to the build in TeamCity.</p>
+<p>The development team at <a href="https://precisionlender.com/">PrecisionLender</a> uses similar scripts as part of our automated deployment processes, specifically to help add audit information to our tickets so that every ticket reflects when it successfully passed through the automated tests and was later deployed to production. When an auditor asks for proof that N tickets went through our process correctly, we simply open up the ticket and point at the activity log attached to it, including those custom entries from TeamCity that link back to the relevant successful build results.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/access-git-commits-during-a-teamcity-build-using-powershell/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Automated Deployment to Azure Hosted Services</title>
+		<link>/index.php/enterprisedev/cloud/azure/automated-deployment-to-azure-hosted-services/</link>
+		<comments>/index.php/enterprisedev/cloud/azure/automated-deployment-to-azure-hosted-services/#respond</comments>
+		<pubDate>Tue, 27 May 2014 18:50:21 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Azure]]></category>
+		<category><![CDATA[automation]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[deployment]]></category>
+		<category><![CDATA[powershell]]></category>
+
+		<guid isPermaLink="false">/?p=2644</guid>
+		<description><![CDATA[Azure Hosted Services offers several really awesome features over using physical servers or standard VM infrastructure. Two of these are the staged deployment model and management SDK, which includes a powershell module. Using these two features, we are going to build a deployment script that deploys a new set of services (servers) in Azure, using [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Azure Hosted Services offers several really awesome features over using physical servers or standard VM infrastructure. Two of these are the staged deployment model and management SDK, which includes a powershell module. Using these two features, we are going to build a deployment script that deploys a new set of services (servers) in Azure, using a Virtual IP swap to replace the existing production instances only after the new deployment is fully running. </p>
+<p>The goal of this post is to build a powershell script that will:</p>
+<ul>
+<li>Upload a compiled Package to Azure Storage</li>
+<li>Create a new Staging deployment</li>
+<li>Wait for all of the instances of the new deployment to be running</li>
+<li>Promote the new deployment to Production</li>
+<li>Stop the instances of the old production deployment and keep them handy in the Staging slot</li>
+</ul>
+<p>The sample project and script are available on github: <a href="https://github.com/tarwn/AzureHostedServiceDeploymentSample" title="tarwn/AzureHostedServiceDeploymentSample on github">tarwn/AzureHostedServiceDeploymentSample on github</a></p>
+<p>This script is not intended to be production ready. I have spent no time at all refactoring into readily re-usable methods and do not use it in a production environment myself. It will show you how to use the individual methods and give you the pieces you need to build one that fits your processes.</p>
+<h2>Initial Steps</h2>
+<p>If you would like to build a sample project of your own and follow along, here&#8217;s the steps you will need to perform first:</p>
+<ol style="margin-left:3em; line-height: 1.4em">
+<li>Create an Azure project in Visual Studio &#8211; Create/attach one or more web or worker roles</li>
+<li>Remove the Diagnostics entry in the web.config or add storage settings</li>
+<li>In the Project References, select &#8220;Microsoft.Web.Infrastructure&#8221; and set &#8220;Copy Local&#8221; to &#8220;True&#8221;</li>
+<li>Create a Hosted Service in the Azure Dashboard</li>
+<li>Create a Storage Account in the Azure Dashboard (pick the same region as prior step)</li>
+<li>Install the latest Azure SDK + Azure Powershell Module (available in Web Platform Installer)</li>
+<li>Download your publish settings from https://windows.azure.com/download/publishprofile.aspx</li>
+</ol>
+<p>If you know your way around Azure, steps 4-7 are mostly reading <a href="http://xkcd.com/" title="If we are what we eat, what could be better for our brains than a steady diet of intelligent humor? And title tags, you have to love title tags.">xkcd</a> while the installers run.</p>
+<h2>Create the Deployment Script</h2>
+<p>Now that we have a project and all the prerequisites out of the way, let&#8217;s start building the script. As a reminder, these are the steps we intend to follow:</p>
+<ul>
+<li>Upload a compiled Package to Azure Storage</li>
+<li>Create a new Staging deployment</li>
+<li>Wait for all of the instances of the new deployment to be running</li>
+<li>Promote the new deployment to Production</li>
+<li>Suspend the instances of the old production deployment and keep them handy in the Staging slot</li>
+</ul>
+<p>Let&#8217;s go!</p>
+<h3>Connect to Azure</h3>
+<p>The first thing we need to do is import the Powershell module and use the publish settings to set our subscription.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">Import<span class="sy0">-</span>Module <span class="st0">&quot;C:\Program Files (x86)\Microsoft SDKs\Windows Azure\PowerShell\ServiceManagement\Azure\Azure.psd1&quot;</span>
+&nbsp;
+Import<span class="sy0">-</span>AzurePublishSettingsFile <span class="re0">$publishSettingsPath</span>
+&nbsp;
+Set<span class="sy0">-</span>AzureSubscription <span class="re0">$subscriptionName</span> <span class="sy0">-</span>CurrentStorageAccount <span class="re0">$storageAccountName</span>
+&nbsp;
+Select<span class="sy0">-</span>AzureSubscription <span class="re0">$subscriptionName</span> <span class="sy0">-</span>Current</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Import-Module "C:\Program Files (x86)\Microsoft SDKs\Windows Azure\PowerShell\ServiceManagement\Azure\Azure.psd1"
+
+Import-AzurePublishSettingsFile $publishSettingsPath
+ 
+Set-AzureSubscription $subscriptionName -CurrentStorageAccount $storageAccountName
+
+Select-AzureSubscription $subscriptionName -Current</pre></div></div>
+
+<p><i>$publishSettingsPath, $subscriptionName, and $storageAccountName are parameters I have passed into my script</i></p>
+<p>We load the Azure module from the Microsoft SDKs folder (this is where it installs from Web PI). We then use the *.publishsettings file to &#8220;log in&#8221; to the Azure subscription, set the storage account we will be using by default, and set this subscription as the default one for our current powershell session.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn722512.aspx" title="Import-AzurePublishSettingsFile on MSDN">Import-AzurePublishSettingsFile</a> basically logs into your Azure account using the supplied publishsettings file, storing a management certificate and a subscription data file. Once we&#8217;re &#8220;logged in&#8221;, we can use the rest of the Azure cmdlets to interact with our Azure resources.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn722501.aspx" title="Set-AzureSubscription on MSDN">Set-AzureSubscription</a> sets the &#8220;current&#8221; storage account for the subscription, basically defining a default so we don&#8217;t have to specify it throughout the script. Another option would be to use <a href="http://msdn.microsoft.com/en-us/library/dn495246.aspx" title="New-AzureStorageContext on MSDN">New-AzureStorageContext</a> to create context for the Storage Account and pass this to the calls that interact with Storage.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn722499.aspx" title="Select-AzureSubscription">Select-AzureSubscription</a> does exactly what you would expect, it updates the subscription data in our Powershell context. By specifying -Current, we only update the subscription for our current session.
+</div>
+<h3>Upload a compiled Package to Azure Storage</h3>
+<p>Now that we have access to Azure, we can move on to upload the package. This package can be generated from Visual Studio by right clicking on the Cloud Project and choosing &#8220;Package&#8221;. In an automated process, we can use MSBuild to create this package before calling this script to upload and deploy it.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$container</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureStorageContainer <span class="kw5">-Name</span> <span class="re0">$containerName</span> <span class="kw5">-ErrorAction</span> SilentlyContinue
+&nbsp;
+<span class="kw3">if</span><span class="br0">&#40;</span><span class="sy0">!</span><span class="re0">$container</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; New<span class="sy0">-</span>AzureStorageContainer <span class="kw5">-Name</span> <span class="re0">$containerName</span>
+<span class="br0">&#125;</span>
+&nbsp;
+Set<span class="sy0">-</span>AzureStorageBlobContent <span class="kw4">-File</span> <span class="re0">$packagePath</span> <span class="kw5">-Container</span> <span class="re0">$containerName</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">-</span>Blob <span class="re0">$fullTargetPackageName</span> <span class="kw5">-Force</span>
+&nbsp;
+<span class="re0">$blobInfo</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureStorageBlob &nbsp;<span class="kw5">-Container</span> <span class="re0">$containerName</span> <span class="sy0">-</span>blob <span class="re0">$fullTargetPackageName</span>
+&nbsp;
+<span class="re0">$packageUri</span> <span class="sy0">=</span> <span class="re0">$blobInfo</span>.ICloudBlob.Uri</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$container = Get-AzureStorageContainer -Name $containerName -ErrorAction SilentlyContinue
+
+if(!$container){
+    New-AzureStorageContainer -Name $containerName
+}
+
+Set-AzureStorageBlobContent -File $packagePath -Container $containerName `
+                            -Blob $fullTargetPackageName -Force
+
+$blobInfo = Get-AzureStorageBlob  -Container $containerName -blob $fullTargetPackageName
+
+$packageUri = $blobInfo.ICloudBlob.Uri</pre></div></div>
+
+<p><i>$packagePath and $containerName are parameters passed to the script, $fullTargetPackageName is generated with a timestamp.</i></p>
+<p>First we create the container if it doesn&#8217;t already exist, then we upload the package (without prompting), and once that is complete we capture the blob information and extract the URL for later use in the deployment.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn495272.aspx" title="Get-AzureStorageContainer on MSDN">Get-AzureStorageContainer</a> attempts to retrieve a container with the given name. In this case I&#8217;ve used the ErrorAction of SilentlyContinue so that if it doesn&#8217;t exist I can create it.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495291.aspx" title="New-AzureStorageContainer on MSDN">New-AzureStorageContainer</a> creates a container with the given name. Since I haven&#8217;t specified permissions, the container will be created with the most restrictive rights.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495279.aspx" title="Set-AzureStorageBlobContent on MSDN">Set-AzureStorageBlobContent</a> uploads the contents of a file specified by -File to the given -Container value with a final name specified by the -Blob property. The -Force overrides any questions the command might have, like &#8220;are you sure you want to do that&#8221;.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495260.aspx" title="Get-AzureStorageBlob on MSDN">Get-AzureStorageBlob</a> retrieves the information about a given Blob, allowing us to extract the Uri property for later use.
+</div>
+<h3>Create a new Staging Deployment</h3>
+<p>Once we have the package uploaded to blob storage, we are ready to create the new Staging deployment.  </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$deployment</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw5">-ErrorAction</span> SilentlyContinue 
+&nbsp;
+<span class="kw3">if</span><span class="br0">&#40;</span><span class="re0">$deployment</span>.name <span class="kw4">-ne</span> <span class="re0">$null</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; Remove<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging <span class="kw5">-Force</span>
+<span class="br0">&#125;</span>
+&nbsp;
+New<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging <span class="sy0">-</span>Package <span class="re0">$packageUri</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">-</span>Configuration <span class="re0">$configPath</span> <span class="kw5">-Name</span> <span class="re0">$fullTargetDeploymentName</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">-</span>TreatWarningsAsError</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$deployment = Get-AzureDeployment -ServiceName $serviceName -Slot Staging `
+                                  -ErrorAction SilentlyContinue 
+
+if($deployment.name -ne $null){
+    Remove-AzureDeployment -ServiceName $serviceName -Slot Staging -Force
+}
+
+New-AzureDeployment -ServiceName $serviceName -Slot Staging -Package $packageUri `
+                    -Configuration $configPath -Name $fullTargetDeploymentName `
+                    -TreatWarningsAsError</pre></div></div>
+
+<p><i>The $servicename, $fulltargetDeploymentName, and $configPath are assumed to have been provided, while the $packageUri was defined in the previous step</i></p>
+<p>Before we can create the new deployment, we check to see if there is already a deployment present in the Staging slot and delete it. We then create the new deployment, using the package we just uploaded and a local configuration (*.cscfg) file.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn495146.aspx" title="Get-AzureDeployment on MSDN">Get-AzureDeployment</a> retrieves details on the current deployment in the specified slot. I&#8217;ve used ErrorAction SilentlyContinue here because I am only making this call to determine if something is already there and don&#8217;t want to exit out if the slot turns out to be empty.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495296.aspx" title="Remove-AzureDeployment on MSDN">Remove-AzureDeployment</a> removes the deployment we have detected in the Staging slot, using -Force to again suppress any interactive questions the command might have.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495143.aspx" title="New-AzureDeployment on MSDN">New-AzureDeployment</a> creates a new deployment in the specified slot, using the supplied package URI and the configuration file path. I opted to treat warnings as errors because I&#8217;d rather clean up warnings immediately. Unfortunately this parameter does not support URLs. By default the deployment will be started, though there is a -DoNotStart parameter if you do not want this behavior.
+</div>
+<h3>Wait for all of the instances&#8230;</h3>
+<p>The new deployment has been created and told to start, but it takes time for the individual instances to be provisioned and to go through their start-up sequence. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$statusReady</span> <span class="sy0">=</span> <span class="st0">&quot;ReadyRole&quot;</span>
+<span class="re0">$statusStopped</span> <span class="sy0">=</span> <span class="st0">&quot;StoppedVM&quot;</span>
+&nbsp;
+<span class="kw3">function</span> Get<span class="sy0">-</span>AllInstancesAreStatus<span class="br0">&#40;</span><span class="re0">$instances</span><span class="sy0">,</span> <span class="re0">$targetStatus</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw3">foreach</span> <span class="br0">&#40;</span><span class="re0">$instance</span> <span class="kw3">in</span> <span class="re0">$instances</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">if</span> <span class="br0">&#40;</span><span class="re0">$instance</span>.InstanceStatus <span class="kw4">-ne</span> <span class="re0">$targetStatus</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">return</span> <span class="re0">$false</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw3">return</span> <span class="re0">$true</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="co1"># ... ... ...</span>
+&nbsp;
+<span class="re0">$deployment</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging
+&nbsp;
+<span class="re0">$waitTime</span> <span class="sy0">=</span> <span class="br0">&#91;</span>System.Diagnostics.Stopwatch<span class="br0">&#93;</span>::StartNew<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw3">while</span> <span class="br0">&#40;</span><span class="br0">&#40;</span>Get<span class="sy0">-</span>AllInstancesAreStatus <span class="re0">$deployment</span>.RoleInstanceList <span class="re0">$statusReady</span><span class="br0">&#41;</span> <span class="kw4">-eq</span> <span class="re0">$false</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw3">if</span><span class="br0">&#40;</span><span class="re0">$waitTime</span>.Elapsed.TotalSeconds <span class="kw4">-gt</span> <span class="re0">$instancePollLimit</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">Throw</span> <span class="st0">&quot;$instancePollLimit seconds elapsed without all the instances reaching 'ReadyRun'&quot;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">Start-Sleep</span> <span class="kw5">-Seconds</span> <span class="re0">$instancePollRate</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$deployment</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$statusReady = "ReadyRole"
+$statusStopped = "StoppedVM"
+
+function Get-AllInstancesAreStatus($instances, $targetStatus){
+    foreach ($instance in $instances)
+    {
+        if ($instance.InstanceStatus -ne $targetStatus)
+        {
+            return $false
+        }
+    }
+    return $true
+}
+
+# ... ... ...
+
+$deployment = Get-AzureDeployment -ServiceName $serviceName -Slot Staging
+
+$waitTime = [System.Diagnostics.Stopwatch]::StartNew()
+while ((Get-AllInstancesAreStatus $deployment.RoleInstanceList $statusReady) -eq $false)
+{
+    if($waitTime.Elapsed.TotalSeconds -gt $instancePollLimit){
+        Throw "$instancePollLimit seconds elapsed without all the instances reaching 'ReadyRun'"
+    }
+
+    Start-Sleep -Seconds $instancePollRate
+
+    $deployment = Get-AzureDeployment -ServiceName $serviceName -Slot Staging
+}</pre></div></div>
+
+<p><i>$serviceName is supplied as a script parameter.</i></p>
+<p>While there are any instances that are not in &#8216;ReadyRun&#8217; status, we sleep for $instancepollRate seconds and continue to check again. If more than $instancePollLimit seconds go by while waiting, we&#8217;ll throw an error that will cause our script to exit.</p>
+<p><b>This poll limit is necessary.</b> In the real world of Azure, you can have azure instances that do not boot for long periods of time. Additional logic has been added in Azure that is supposed to detect VMs not booting and replace them, but no one writes perfect code and I have experienced deployments hung for hours or more due to non-booting instances. We also can break our own code, resulting in rapidly re-booting instances that we would not want to deploy to production.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn495146.aspx" title="Get-AzureDeployment on MSDN">Get-AzureDeployment</a> gets the azure deployment details, including the list of instances with their names, current statuses, size, etc.
+</div>
+<h3>Promote the new deployment to Production, Suspend the old one</h3>
+<p>Once the staging deployment is up and running, we can promote it to the Production slot.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1">Move<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span>
+&nbsp;
+<span class="re0">$deployment</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw5">-ErrorAction</span> SilentlyContinue
+&nbsp;
+<span class="kw3">if</span><span class="br0">&#40;</span><span class="re0">$deployment</span>.DeploymentName <span class="kw4">-ne</span> <span class="re0">$null</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; Set<span class="sy0">-</span>AzureDeployment <span class="kw5">-Status</span> <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">-</span>NewStatus Suspended
+<span class="br0">&#125;</span>
+&nbsp;
+Remove<span class="sy0">-</span>AzureAccount <span class="kw5">-Name</span> <span class="re0">$subscriptionName</span> <span class="kw5">-Force</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Move-AzureDeployment -ServiceName $serviceName
+
+$deployment = Get-AzureDeployment -ServiceName $serviceName -Slot Staging `
+                                  -ErrorAction SilentlyContinue
+
+if($deployment.DeploymentName -ne $null){
+    Set-AzureDeployment -Status -ServiceName $serviceName -Slot Staging `
+                        -NewStatus Suspended
+}
+
+Remove-AzureAccount -Name $subscriptionName -Force</pre></div></div>
+
+<p><i>$serviceName is a parameter passed to the script</i></p>
+<p>Performing the VIP swap is a simple command and the Powershell cmdlet turns that asynchronous method into a synchronous call for us, like so many of the others. Once the swap is complete, if we have a deployment in the Staging slot (the old Production one), we go ahead and tell it to suspend, but don&#8217;t wait for the individual instances to stop before exiting.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn495282.aspx" title="Move-AzureDeployment">Move-AzureDeployment</a> performs a VIP swap to swap the Staging and Production deployments.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495146.aspx" title="Get-AzureDeployment on MSDN">Get-AzureDeployment</a> gets the azure deployment details, including the list of instances with their names, current statuses, size, etc.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495140.aspx" title="Set-AzureDeployment">Set-AzureDeployment</a> with the -Status parameter is used to change the status of a given deployment, in this case Suspending the deployment in the Staging slot.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn722529.aspx" title="Remove-AzureAccount on MSDN">Remove-AzureAccount</a> is used to remove the Azure subscription data from the Powershell session, basically the &#8220;logout&#8221; equivalent to Import-AzurePublishSettingsFile&#8217;s &#8220;login&#8221;
+</div>
+<h2>And we&#8217;re deployed&#8230;</h2>
+<p>There is a full script available in the github repository here: <a href="https://github.com/tarwn/AzureHostedServiceDeploymentSample/blob/master/scripts/deployHostedService.ps1" title="/scripts/deployHostedService.ps1">/scripts/deployHostedService.ps1</a>. It is not clean and pretty, but it does have more output and error handling than the snippets above. Among other things, it does not clean out all those packages it uploads to blob storage and it most definitely should not be blindly pasted and used for your production environment.</p>
+<p>While this may not be a production-ready script, it&#8217;s not far off (and I&#8217;ve used worse). The few cmdlets above should start to show the pattern that Microsoft used with this Powershell library. There are plenty of additional cmdlets to interact with storage services, VMs, affinity groups, HDInsight, Media Services&#8230;you name it, it&#8217;s probably in there.  </p>
+<p>Writing this post, I am reminded how magical this all is. That sample project was only configured to ask for a single server, but I could just as easily have asked for 4 16-core servers and then added in additional web or worker roles, each with their own servers. And I could have done all of that without changing anything at all about this script and I would have had tons of servers deployed, load balanced, and ready to go with just a minor blip as I swapped them into production. I can remember projects with multi-hour manual deployment processes (and month or more system provisioning times), and we just replaced them with a one page script.</p>
+<p>The best part is that, unlike some Microsoft frameworks/packages, this magic doesn&#8217;t just make a great demo, it also works in real production environments. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/cloud/azure/automated-deployment-to-azure-hosted-services/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Combine Azure Storage Analytics Logs with Powershell</title>
+		<link>/index.php/enterprisedev/cloud/azure/combine-azure-storage-analytics-logs-with-powershell/</link>
+		<comments>/index.php/enterprisedev/cloud/azure/combine-azure-storage-analytics-logs-with-powershell/#respond</comments>
+		<pubDate>Fri, 14 Mar 2014 15:17:33 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Azure]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[powershell]]></category>
+
+		<guid isPermaLink="false">/?p=2515</guid>
+		<description><![CDATA[When you have Storage Analytics transaction logging turned on, it produces transaction log files for each service call you make to blob, table, or queue service. Unfortunately it captures these in multiple files per hour, stored in a folder hierarchy by service (blob, queue, table), year, month, day, and hour. Trying to dig through these [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>When you have Storage Analytics transaction logging turned on, it produces transaction log files for each service call you make to blob, table, or queue service. Unfortunately it captures these in multiple files per hour, stored in a folder hierarchy by service (blob, queue, table), year, month, day, and hour. Trying to dig through these files or combine them into a single excel file can be time consuming and, unfortunately, is one of the first things you will be asked if you submit a storage-related support ticket. </p>
+<div id="attachment_2518" style="width: 710px" class="wp-caption aligncenter"><a href="/wp-content/uploads/2014/03/AzureManagementStudio_RawLogs.png"><img src="/wp-content/uploads/2014/03/AzureManagementStudio_RawLogs.png" alt="1 Hour of Raw Diagnostics Logs (in Azure Management Studio)" width="700" height="423" class="size-full wp-image-2518" srcset="/wp-content/uploads/2014/03/AzureManagementStudio_RawLogs.png 700w, /wp-content/uploads/2014/03/AzureManagementStudio_RawLogs-300x181.png 300w" sizes="(max-width: 700px) 100vw, 700px" /></a><p class="wp-caption-text">1 Hour of Raw Diagnostics Logs (in Azure Management Studio)</p></div>
+<p>At some point, I created a powershell script to do the heavy lifting for me. The goal was to be able to start anywhere in the folder hierarchy and combine the files, converting them from semi-colon to comma-delimited as it went. This way I could download one or more folders from any level to a single folder, run the powershell script, and spend my time filtering and querying in the resulting CSV instead of digging through multiple files.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1">&nbsp;<span class="kw3">param</span> <span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>Alias<span class="br0">&#40;</span><span class="st0">&quot;i&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="re0">$InputFolder</span> <span class="sy0">=</span> <span class="st0">&quot;.&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>Alias<span class="br0">&#40;</span><span class="st0">&quot;o&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="re0">$OutputFile</span> <span class="sy0">=</span> <span class="st0">&quot;CombinedFile.csv&quot;</span>
+&nbsp;<span class="br0">&#41;</span>
+&nbsp;
+<span class="re0">$Headers</span> <span class="sy0">=</span> <span class="st0">&quot;Log Version&quot;</span><span class="sy0">,</span><span class="st0">&quot; Transaction Start Time&quot;</span><span class="sy0">,</span><span class="st0">&quot; REST Operation Type&quot;</span><span class="sy0">,</span><span class="st0">&quot; Request Status&quot;</span><span class="sy0">,</span><span class="st0">&quot; HTTP Status Code&quot;</span><span class="sy0">,</span><span class="st0">&quot; E2E Latency&quot;</span><span class="sy0">,</span><span class="st0">&quot; Server Latency&quot;</span><span class="sy0">,</span><span class="st0">&quot; Authentication type&quot;</span><span class="sy0">,</span><span class="st0">&quot; Requestor Account Name&quot;</span><span class="sy0">,</span><span class="st0">&quot; Owner Account Name&quot;</span><span class="sy0">,</span><span class="st0">&quot; Service Type&quot;</span><span class="sy0">,</span><span class="st0">&quot; Request URL&quot;</span><span class="sy0">,</span><span class="st0">&quot; Object Key&quot;</span><span class="sy0">,</span><span class="st0">&quot; Request ID&quot;</span><span class="sy0">,</span><span class="st0">&quot; Operation Number&quot;</span><span class="sy0">,</span><span class="st0">&quot; Client IP&quot;</span><span class="sy0">,</span><span class="st0">&quot; Request Version&quot;</span><span class="sy0">,</span><span class="st0">&quot; Request Header Size&quot;</span><span class="sy0">,</span><span class="st0">&quot; Request Packet Size&quot;</span><span class="sy0">,</span><span class="st0">&quot; Response Header Size&quot;</span><span class="sy0">,</span><span class="st0">&quot; Response Packet Size&quot;</span><span class="sy0">,</span><span class="st0">&quot; Request Content Length&quot;</span><span class="sy0">,</span><span class="st0">&quot; Request MD5&quot;</span><span class="sy0">,</span><span class="st0">&quot; Server MD5&quot;</span><span class="sy0">,</span><span class="st0">&quot; ETag&quot;</span><span class="sy0">,</span><span class="st0">&quot; Last Modified Time&quot;</span><span class="sy0">,</span><span class="st0">&quot; ConditionsUsed&quot;</span><span class="sy0">,</span><span class="st0">&quot; User Agent&quot;</span><span class="sy0">,</span><span class="st0">&quot; Referrer&quot;</span><span class="sy0">,</span><span class="st0">&quot; Client Request ID&quot;</span>
+&nbsp;
+<span class="br0">&#40;</span><span class="re0">$Headers</span> <span class="sy0">-</span>Join <span class="st0">&quot;,&quot;</span><span class="br0">&#41;</span> <span class="sy0">|</span> <span class="kw1">Set-Content</span> <span class="re0">$OutputFile</span>
+&nbsp;
+<span class="kw2">dir</span> <span class="kw5">-recurse</span> <span class="re0">$InputFolder</span> <span class="kw5">-Include</span> <span class="st0">&quot;*.log&quot;</span> <span class="sy0">|</span> <span class="sy0">%</span><span class="br0">&#123;</span> <span class="kw1">Import-Csv</span> <span class="kw6">$_</span>.FullName <span class="kw5">-Delimiter</span> <span class="st0">&quot;;&quot;</span> <span class="sy0">-</span>Header <span class="re0">$Headers</span> <span class="sy0">|</span> ConvertTo<span class="sy0">-</span>Csv <span class="kw5">-Delimiter</span> <span class="st0">&quot;,&quot;</span> <span class="kw5">-NoTypeInformation</span> <span class="sy0">|</span> <span class="kw2">select</span> <span class="sy0">-</span>skip <span class="nu0">1</span> <span class="sy0">|</span> <span class="kw1">Add-Content</span> <span class="re0">$OutputFile</span> <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"> param (
+    [string]
+    [Alias("i")]
+    $InputFolder = ".",
+    [string]
+    [Alias("o")]
+    $OutputFile = "CombinedFile.csv"
+ )
+
+$Headers = "Log Version"," Transaction Start Time"," REST Operation Type"," Request Status"," HTTP Status Code"," E2E Latency"," Server Latency"," Authentication type"," Requestor Account Name"," Owner Account Name"," Service Type"," Request URL"," Object Key"," Request ID"," Operation Number"," Client IP"," Request Version"," Request Header Size"," Request Packet Size"," Response Header Size"," Response Packet Size"," Request Content Length"," Request MD5"," Server MD5"," ETag"," Last Modified Time"," ConditionsUsed"," User Agent"," Referrer"," Client Request ID"
+
+($Headers -Join ",") | Set-Content $OutputFile
+
+dir -recurse $InputFolder -Include "*.log" | %{ Import-Csv $_.FullName -Delimiter ";" -Header $Headers | ConvertTo-Csv -Delimiter "," -NoTypeInformation | select -skip 1 | Add-Content $OutputFile }</pre></div></div>
+
+<p>Running it from a powershell prompt is easy. I downloaded a different hour&#8217;s worth of blob transactions to a folder named &#8220;blob_2014_03_11&#8221; and then ran:</p>
+<p><code>.\CombineLogFiles.ps1  "blob_2014_03_11\1200" combinedfiles.csv </code></p>
+<p>Quickly combining a sample download of 7000 transactions from multiple files into a single 3.4MB CSV almost instantaneously. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/cloud/azure/combine-azure-storage-analytics-logs-with-powershell/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SSIS Deployment with PowerShell: Adding Environment References</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/ssis-deployment-with-powershell-adding/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/ssis-deployment-with-powershell-adding/#comments</comments>
+		<pubDate>Wed, 21 Aug 2013 13:04:00 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[SSIS]]></category>
+		<category><![CDATA[catalog]]></category>
+		<category><![CDATA[deployment]]></category>
+		<category><![CDATA[powershell]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[ssis]]></category>
+		<category><![CDATA[syndicated]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/08/ssis-deployment-with-powershell-adding/</guid>
+		<description><![CDATA[This blog post explains how you can add environment references in a PowerShell deployment script for SSIS 2012.]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify;">With the release of the revamped Integration Services in SQL Server 2012, a bunch of new deployment methods were introduced for the project deployment model. My article <a href="http://www.sqlservercentral.com/articles/Integration+Services+(SSIS)/101240/">SSIS Deployments with SQL Server 2012</a> gives an overview of these deployment methods. One of these methods is using PowerShell to deploy your project to the SSIS Catalog. Matt Masson (<a href="http://www.mattmasson.com/">blog</a> | <a href="https://twitter.com/mattmasson">twitter</a>) has an excellent blog post on the subject: <a href="http://www.mattmasson.com/2012/06/publish-to-ssis-catalog-using-powershell/">Publish to SSIS Catalog using PowerShell</a>.</p>
+<p style="text-align: justify;">However, there’s one small step missing in the deployment script posted by Matt. I’ll use this blog article to post the entire deployment script, so that I have a full script online as an easy reference.</p>
+<p style="text-align: justify;">I have a very simple SSIS project that I want to deploy to the Catalog. It contains only one package that transfers data from AdventureWorks to another database. It has two connection managers: one for each database. Nothing fancy here.</p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SSISDeploymentPowershell/ssisproject.png?mtime=1377025062"><img src="/wp-content/uploads/users/koenverbeeck/SSISDeploymentPowershell/ssisproject.png?mtime=1377025062" alt="" width="542" height="385" /></a></p>
+<p><span style="text-align: justify;">When I deploy the project, I want to hook the OLE_TEST connection manager to an environment, so that I can easily change the destination server and/or database.</span></p>
+<p style="text-align: justify;">The original script from Matt’s blog – modified for my project – looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+</pre></td><td class="de1"><pre class="de1"><span class="co1"># Variables</span>
+<span class="re0">$SSIS_server</span> <span class="sy0">=</span><span class="st0">&quot;localhost&quot;</span>
+<span class="re0">$ProjectFilePath</span> <span class="sy0">=</span> <span class="st0">&quot;E:TestSSIS2012PowerShell_TestPowerShell_TestbinDevelopmentPowerShell_Test.ispac&quot;</span>
+&nbsp;
+<span class="re0">$ProjectName</span> <span class="sy0">=</span> <span class="st0">&quot;PowerShell_Test&quot;</span>
+<span class="re0">$FolderName</span> <span class="sy0">=</span> <span class="st0">&quot;PowerShellTest&quot;</span>
+<span class="re0">$EnvironmentName</span> <span class="sy0">=</span> <span class="st0">&quot;Test2&quot;</span>
+&nbsp;
+<span class="co1"># Load the IntegrationServices Assembly</span>
+<span class="br0">&#91;</span><span class="re4">System.Reflection.Assembly</span><span class="br0">&#93;</span>::<span class="re5">LoadWithPartialName</span><span class="br0">&#40;</span><span class="st0">&quot;Microsoft.SqlServer.Management.IntegrationServices&quot;</span><span class="br0">&#41;</span> <span class="sy0">|</span> <span class="kw1">Out-Null</span>;
+&nbsp;
+<span class="co1"># Store the IntegrationServices Assembly namespace to avoid typing it every time</span>
+<span class="re0">$ISNamespace</span> <span class="sy0">=</span> <span class="st0">&quot;Microsoft.SqlServer.Management.IntegrationServices&quot;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Connecting to server ...&quot;</span>
+&nbsp;
+<span class="co1"># Create a connection to the server</span>
+<span class="re0">$sqlConnectionString</span> <span class="sy0">=</span> <span class="st0">&quot;Data Source=&quot;</span> <span class="sy0">+</span> <span class="re0">$SSIS_server</span> <span class="sy0">+</span> <span class="st0">&quot;;Initial Catalog=master;Integrated Security=SSPI;&quot;</span>
+<span class="re0">$sqlConnection</span> <span class="sy0">=</span> <span class="kw1">New-Object</span> System.Data.SqlClient.SqlConnection <span class="re0">$sqlConnectionString</span>
+&nbsp;
+<span class="co1"># Create the Integration Services object</span>
+<span class="re0">$integrationServices</span> <span class="sy0">=</span> <span class="kw1">New-Object</span> $ISNamespace<span class="st0">&quot;.IntegrationServices&quot;</span> <span class="re0">$sqlConnection</span>
+&nbsp;
+<span class="re0">$catalog</span> <span class="sy0">=</span> <span class="re0">$integrationServices</span>.Catalogs<span class="br0">&#91;</span><span class="st0">&quot;SSISDB&quot;</span><span class="br0">&#93;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Creating Folder &quot;</span> <span class="re0">$FolderName</span> <span class="st0">&quot; ...&quot;</span>
+&nbsp;
+<span class="co1"># Create a new folder</span>
+<span class="re0">$folder</span> <span class="sy0">=</span> <span class="kw1">New-Object</span> $ISNamespace<span class="st0">&quot;.CatalogFolder&quot;</span> <span class="br0">&#40;</span><span class="re0">$catalog</span><span class="sy0">,</span> <span class="re0">$FolderName</span><span class="sy0">,</span> <span class="st0">&quot;Folder description&quot;</span><span class="br0">&#41;</span>
+<span class="re0">$folder</span>.Create<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Deploying &quot;</span> <span class="re0">$ProjectName</span> <span class="st0">&quot; project ...&quot;</span>
+&nbsp;
+<span class="co1"># Read the project file, and deploy it to the folder</span>
+<span class="br0">&#91;</span><span class="re3">byte</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#93;</span> <span class="re0">$projectFile</span> <span class="sy0">=</span> <span class="br0">&#91;</span>System.IO.File<span class="br0">&#93;</span>::ReadAllBytes<span class="br0">&#40;</span><span class="re0">$ProjectFilePath</span><span class="br0">&#41;</span>
+<span class="re0">$folder</span>.DeployProject<span class="br0">&#40;</span><span class="re0">$ProjectName</span><span class="sy0">,</span> <span class="re0">$projectFile</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Creating environment ...&quot;</span>
+&nbsp;
+<span class="re0">$environment</span> <span class="sy0">=</span> <span class="kw1">New-Object</span> $ISNamespace<span class="st0">&quot;.EnvironmentInfo&quot;</span> <span class="br0">&#40;</span><span class="re0">$folder</span><span class="sy0">,</span> <span class="re0">$EnvironmentName</span><span class="sy0">,</span> <span class="st0">&quot;Description&quot;</span><span class="br0">&#41;</span>
+<span class="re0">$environment</span>.Create<span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Adding server variables ...&quot;</span>
+&nbsp;
+<span class="co1"># Adding variable to our environment</span>
+<span class="co1"># Constructor args: variable name, type, default value, sensitivity, description</span>
+<span class="re0">$environment</span>.Variables.Add<span class="br0">&#40;</span><span class="st0">&quot;ServerName&quot;</span><span class="sy0">,</span> <span class="br0">&#91;</span>System.TypeCode<span class="br0">&#93;</span>::String<span class="sy0">,</span> <span class="re0">$SSIS_server</span><span class="sy0">,</span> <span class="re0">$false</span><span class="sy0">,</span> <span class="st0">&quot;ServerName&quot;</span><span class="br0">&#41;</span>
+<span class="re0">$environment</span>.Variables.Add<span class="br0">&#40;</span><span class="st0">&quot;DatabaseName&quot;</span><span class="sy0">,</span><span class="br0">&#91;</span>System.TypeCode<span class="br0">&#93;</span>::String<span class="sy0">,</span> <span class="st0">&quot;Test2&quot;</span><span class="sy0">,</span> <span class="re0">$false</span><span class="sy0">,</span><span class="st0">&quot;DatabaseName&quot;</span><span class="br0">&#41;</span>
+<span class="re0">$environment</span>.Alter<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Adding environment reference to project ...&quot;</span>
+&nbsp;
+<span class="co1"># making project refer to this environment</span>
+<span class="re0">$project</span> <span class="sy0">=</span> <span class="re0">$folder</span>.Projects<span class="br0">&#91;</span><span class="re0">$ProjectName</span><span class="br0">&#93;</span>
+<span class="re0">$project</span>.References.Add<span class="br0">&#40;</span><span class="re0">$EnvironmentName</span><span class="sy0">,</span> <span class="re0">$folder</span>.Name<span class="br0">&#41;</span>
+<span class="re0">$project</span>.Alter<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;All done.&quot;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"># Variables
+$SSIS_server ="localhost"
+$ProjectFilePath = "E:TestSSIS2012PowerShell_TestPowerShell_TestbinDevelopmentPowerShell_Test.ispac"
+
+$ProjectName = "PowerShell_Test"
+$FolderName = "PowerShellTest"
+$EnvironmentName = "Test2"
+ 
+# Load the IntegrationServices Assembly
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.IntegrationServices") | Out-Null;
+ 
+# Store the IntegrationServices Assembly namespace to avoid typing it every time
+$ISNamespace = "Microsoft.SqlServer.Management.IntegrationServices"
+ 
+Write-Host "Connecting to server ..."
+ 
+# Create a connection to the server
+$sqlConnectionString = "Data Source=" + $SSIS_server + ";Initial Catalog=master;Integrated Security=SSPI;"
+$sqlConnection = New-Object System.Data.SqlClient.SqlConnection $sqlConnectionString
+ 
+# Create the Integration Services object
+$integrationServices = New-Object $ISNamespace".IntegrationServices" $sqlConnection
+
+$catalog = $integrationServices.Catalogs["SSISDB"]
+ 
+Write-Host "Creating Folder " $FolderName " ..."
+ 
+# Create a new folder
+$folder = New-Object $ISNamespace".CatalogFolder" ($catalog, $FolderName, "Folder description")
+$folder.Create()
+ 
+Write-Host "Deploying " $ProjectName " project ..."
+ 
+# Read the project file, and deploy it to the folder
+[byte[]] $projectFile = [System.IO.File]::ReadAllBytes($ProjectFilePath)
+$folder.DeployProject($ProjectName, $projectFile)
+ 
+Write-Host "Creating environment ..."
+ 
+$environment = New-Object $ISNamespace".EnvironmentInfo" ($folder, $EnvironmentName, "Description")
+$environment.Create()            
+ 
+Write-Host "Adding server variables ..."
+ 
+# Adding variable to our environment
+# Constructor args: variable name, type, default value, sensitivity, description
+$environment.Variables.Add("ServerName", [System.TypeCode]::String, $SSIS_server, $false, "ServerName")
+$environment.Variables.Add("DatabaseName",[System.TypeCode]::String, "Test2", $false,"DatabaseName")
+$environment.Alter()
+ 
+Write-Host "Adding environment reference to project ..."
+ 
+# making project refer to this environment
+$project = $folder.Projects[$ProjectName]
+$project.References.Add($EnvironmentName, $folder.Name)
+$project.Alter() 
+ 
+Write-Host "All done."</pre></div></div>
+
+<p style="text-align: justify;">The script deploys the project to the Catalog, creates an environment and links the environment to the project. The environment has two variables: one to set the server name and one to set the database. Let’s inspect the results. When you right-click on the project, you can choose <em>Configure</em>. In the Configure window, you can see the connection managers used in the project in the Connection Managers tab. When we take a look at the Initial Catalog property of the OLE_TEST connection manager, you can see it is not yet linked to an environment variable.</p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SSISDeploymentPowershell/configureProject_before.png?mtime=1377025062"><img src="/wp-content/uploads/users/koenverbeeck/SSISDeploymentPowershell/configureProject_before.png?mtime=1377025062" alt="" width="785" height="536" /></a></p>
+<p><span style="text-align: justify;">Instead, it is still linked to the default design-time value. Remark that you can configure a package/project with an environment without actually using parameters. This is because a few properties of a connection manager are linked to parameters behind the scenes. For example, the Initial Catalog property is linked to the parameter with the name </span><em>[CM.&lt;connection manager name&gt;.InitialCatalog]</em><span style="text-align: justify;">. You can find the parameter name at the top of the </span><em>Set Parameter Value</em><span style="text-align: justify;"> dialog box.</span></p>
+<p style="text-align: justify;">To link the environment variables to the connection manager, we need to add just a few lines to the script:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Write-Host</span> <span class="st0">&quot;Setting environment variable on package connection string ...&quot;</span>
+<span class="re0">$ssisPackage</span> <span class="sy0">=</span> <span class="re0">$project</span>.Packages.Item<span class="br0">&#40;</span><span class="st0">&quot;PowerShellTest.dtsx&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="re0">$parServerName</span> <span class="sy0">=</span> <span class="st0">&quot;CM.OLE_Test.ServerName&quot;</span>
+<span class="re0">$ssisPackage</span>.Parameters<span class="br0">&#91;</span><span class="re0">$parServerName</span><span class="br0">&#93;</span>.<span class="kw2">Set</span><span class="br0">&#40;</span><span class="st0">&quot;Referenced&quot;</span><span class="sy0">,</span><span class="st0">&quot;ServerName&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="re0">$parDatabaseName</span> <span class="sy0">=</span> <span class="st0">&quot;CM.OLE_Test.InitialCatalog&quot;</span>
+<span class="re0">$ssisPackage</span>.Parameters<span class="br0">&#91;</span><span class="re0">$parDatabaseName</span><span class="br0">&#93;</span>.<span class="kw2">Set</span><span class="br0">&#40;</span><span class="st0">&quot;Referenced&quot;</span><span class="sy0">,</span><span class="st0">&quot;DatabaseName&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="re0">$ssisPackage</span>.Alter<span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Write-Host "Setting environment variable on package connection string ..."
+$ssisPackage = $project.Packages.Item("PowerShellTest.dtsx")
+
+$parServerName = "CM.OLE_Test.ServerName"
+$ssisPackage.Parameters[$parServerName].Set("Referenced","ServerName")
+
+$parDatabaseName = "CM.OLE_Test.InitialCatalog"
+$ssisPackage.Parameters[$parDatabaseName].Set("Referenced","DatabaseName")
+
+$ssisPackage.Alter()</pre></div></div>
+
+<p style="text-align: justify;">When you deploy the project to the server with these adjustments, we get the result we want:</p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SSISDeploymentPowershell/configureProject_after.png?mtime=1377025061"><img src="/wp-content/uploads/users/koenverbeeck/SSISDeploymentPowershell/configureProject_after.png?mtime=1377025061" alt="" width="747" height="375" /></a></p>
+<p><span style="text-align: justify;">The environment variables are now linked to the two properties of the connection manager. When you run the package and choose the environment, the data is transferred to another database different from the one configured in the package, due to the reconfiguring of the connection manager by the environment variables.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SSISDeploymentPowershell/executePackage.png?mtime=1377025062"><img src="/wp-content/uploads/users/koenverbeeck/SSISDeploymentPowershell/executePackage.png?mtime=1377025062" alt="" width="530" height="363" /></a></p>
+<p><span style="text-align: justify;">To wrap-up this post, here’s the entire deployment script for easier copy-paste:</span></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+</pre></td><td class="de1"><pre class="de1"><span class="co1"># Variables</span>
+<span class="re0">$SSIS_server</span> <span class="sy0">=</span><span class="st0">&quot;localhost&quot;</span>
+<span class="re0">$ProjectFilePath</span> <span class="sy0">=</span> <span class="st0">&quot;E:TestSSIS2012PowerShell_TestPowerShell_TestbinDevelopmentPowerShell_Test.ispac&quot;</span>
+&nbsp;
+<span class="re0">$ProjectName</span> <span class="sy0">=</span> <span class="st0">&quot;PowerShell_Test&quot;</span>
+<span class="re0">$FolderName</span> <span class="sy0">=</span> <span class="st0">&quot;PowerShellTest&quot;</span>
+<span class="re0">$EnvironmentName</span> <span class="sy0">=</span> <span class="st0">&quot;Test2&quot;</span>
+&nbsp;
+<span class="co1"># Load the IntegrationServices Assembly</span>
+<span class="br0">&#91;</span><span class="re4">System.Reflection.Assembly</span><span class="br0">&#93;</span>::<span class="re5">LoadWithPartialName</span><span class="br0">&#40;</span><span class="st0">&quot;Microsoft.SqlServer.Management.IntegrationServices&quot;</span><span class="br0">&#41;</span> <span class="sy0">|</span> <span class="kw1">Out-Null</span>;
+&nbsp;
+<span class="co1"># Store the IntegrationServices Assembly namespace to avoid typing it every time</span>
+<span class="re0">$ISNamespace</span> <span class="sy0">=</span> <span class="st0">&quot;Microsoft.SqlServer.Management.IntegrationServices&quot;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Connecting to server ...&quot;</span>
+&nbsp;
+<span class="co1"># Create a connection to the server</span>
+<span class="re0">$sqlConnectionString</span> <span class="sy0">=</span> <span class="st0">&quot;Data Source=&quot;</span> <span class="sy0">+</span> <span class="re0">$SSIS_server</span> <span class="sy0">+</span> <span class="st0">&quot;;Initial Catalog=master;Integrated Security=SSPI;&quot;</span>
+<span class="re0">$sqlConnection</span> <span class="sy0">=</span> <span class="kw1">New-Object</span> System.Data.SqlClient.SqlConnection <span class="re0">$sqlConnectionString</span>
+&nbsp;
+<span class="co1"># Create the Integration Services object</span>
+<span class="re0">$integrationServices</span> <span class="sy0">=</span> <span class="kw1">New-Object</span> $ISNamespace<span class="st0">&quot;.IntegrationServices&quot;</span> <span class="re0">$sqlConnection</span>
+&nbsp;
+<span class="re0">$catalog</span> <span class="sy0">=</span> <span class="re0">$integrationServices</span>.Catalogs<span class="br0">&#91;</span><span class="st0">&quot;SSISDB&quot;</span><span class="br0">&#93;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Creating Folder &quot;</span> <span class="re0">$FolderName</span> <span class="st0">&quot; ...&quot;</span>
+&nbsp;
+<span class="co1"># Create a new folder</span>
+<span class="re0">$folder</span> <span class="sy0">=</span> <span class="kw1">New-Object</span> $ISNamespace<span class="st0">&quot;.CatalogFolder&quot;</span> <span class="br0">&#40;</span><span class="re0">$catalog</span><span class="sy0">,</span> <span class="re0">$FolderName</span><span class="sy0">,</span> <span class="st0">&quot;Folder description&quot;</span><span class="br0">&#41;</span>
+<span class="re0">$folder</span>.Create<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Deploying &quot;</span> <span class="re0">$ProjectName</span> <span class="st0">&quot; project ...&quot;</span>
+&nbsp;
+<span class="co1"># Read the project file, and deploy it to the folder</span>
+<span class="br0">&#91;</span><span class="re3">byte</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#93;</span> <span class="re0">$projectFile</span> <span class="sy0">=</span> <span class="br0">&#91;</span>System.IO.File<span class="br0">&#93;</span>::ReadAllBytes<span class="br0">&#40;</span><span class="re0">$ProjectFilePath</span><span class="br0">&#41;</span>
+<span class="re0">$folder</span>.DeployProject<span class="br0">&#40;</span><span class="re0">$ProjectName</span><span class="sy0">,</span> <span class="re0">$projectFile</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Creating environment ...&quot;</span>
+&nbsp;
+<span class="re0">$environment</span> <span class="sy0">=</span> <span class="kw1">New-Object</span> $ISNamespace<span class="st0">&quot;.EnvironmentInfo&quot;</span> <span class="br0">&#40;</span><span class="re0">$folder</span><span class="sy0">,</span> <span class="re0">$EnvironmentName</span><span class="sy0">,</span> <span class="st0">&quot;Description&quot;</span><span class="br0">&#41;</span>
+<span class="re0">$environment</span>.Create<span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Adding server variables ...&quot;</span>
+&nbsp;
+<span class="co1"># Adding variable to our environment</span>
+<span class="co1"># Constructor args: variable name, type, default value, sensitivity, description</span>
+<span class="re0">$environment</span>.Variables.Add<span class="br0">&#40;</span><span class="st0">&quot;ServerName&quot;</span><span class="sy0">,</span> <span class="br0">&#91;</span>System.TypeCode<span class="br0">&#93;</span>::String<span class="sy0">,</span> <span class="re0">$SSIS_server</span><span class="sy0">,</span> <span class="re0">$false</span><span class="sy0">,</span> <span class="st0">&quot;ServerName&quot;</span><span class="br0">&#41;</span>
+<span class="re0">$environment</span>.Variables.Add<span class="br0">&#40;</span><span class="st0">&quot;DatabaseName&quot;</span><span class="sy0">,</span><span class="br0">&#91;</span>System.TypeCode<span class="br0">&#93;</span>::String<span class="sy0">,</span> <span class="st0">&quot;Test2&quot;</span><span class="sy0">,</span> <span class="re0">$false</span><span class="sy0">,</span><span class="st0">&quot;DatabaseName&quot;</span><span class="br0">&#41;</span>
+<span class="re0">$environment</span>.Alter<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Adding environment reference to project ...&quot;</span>
+&nbsp;
+<span class="co1"># making project refer to this environment</span>
+<span class="re0">$project</span> <span class="sy0">=</span> <span class="re0">$folder</span>.Projects<span class="br0">&#91;</span><span class="re0">$ProjectName</span><span class="br0">&#93;</span>
+<span class="re0">$project</span>.References.Add<span class="br0">&#40;</span><span class="re0">$EnvironmentName</span><span class="sy0">,</span> <span class="re0">$folder</span>.Name<span class="br0">&#41;</span>
+<span class="re0">$project</span>.Alter<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Setting environment variable on package connection string ...&quot;</span>
+<span class="re0">$ssisPackage</span> <span class="sy0">=</span> <span class="re0">$project</span>.Packages.Item<span class="br0">&#40;</span><span class="st0">&quot;PowerShellTest.dtsx&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="re0">$parServerName</span> <span class="sy0">=</span> <span class="st0">&quot;CM.OLE_Test.ServerName&quot;</span>
+<span class="re0">$ssisPackage</span>.Parameters<span class="br0">&#91;</span><span class="re0">$parServerName</span><span class="br0">&#93;</span>.<span class="kw2">Set</span><span class="br0">&#40;</span><span class="st0">&quot;Referenced&quot;</span><span class="sy0">,</span><span class="st0">&quot;ServerName&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="re0">$parDatabaseName</span> <span class="sy0">=</span> <span class="st0">&quot;CM.OLE_Test.InitialCatalog&quot;</span>
+<span class="re0">$ssisPackage</span>.Parameters<span class="br0">&#91;</span><span class="re0">$parDatabaseName</span><span class="br0">&#93;</span>.<span class="kw2">Set</span><span class="br0">&#40;</span><span class="st0">&quot;Referenced&quot;</span><span class="sy0">,</span><span class="st0">&quot;DatabaseName&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="re0">$ssisPackage</span>.Alter<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;All done.&quot;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"># Variables
+$SSIS_server ="localhost"
+$ProjectFilePath = "E:TestSSIS2012PowerShell_TestPowerShell_TestbinDevelopmentPowerShell_Test.ispac"
+
+$ProjectName = "PowerShell_Test"
+$FolderName = "PowerShellTest"
+$EnvironmentName = "Test2"
+ 
+# Load the IntegrationServices Assembly
+[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Management.IntegrationServices") | Out-Null;
+ 
+# Store the IntegrationServices Assembly namespace to avoid typing it every time
+$ISNamespace = "Microsoft.SqlServer.Management.IntegrationServices"
+ 
+Write-Host "Connecting to server ..."
+ 
+# Create a connection to the server
+$sqlConnectionString = "Data Source=" + $SSIS_server + ";Initial Catalog=master;Integrated Security=SSPI;"
+$sqlConnection = New-Object System.Data.SqlClient.SqlConnection $sqlConnectionString
+ 
+# Create the Integration Services object
+$integrationServices = New-Object $ISNamespace".IntegrationServices" $sqlConnection
+
+$catalog = $integrationServices.Catalogs["SSISDB"]
+ 
+Write-Host "Creating Folder " $FolderName " ..."
+ 
+# Create a new folder
+$folder = New-Object $ISNamespace".CatalogFolder" ($catalog, $FolderName, "Folder description")
+$folder.Create()
+ 
+Write-Host "Deploying " $ProjectName " project ..."
+ 
+# Read the project file, and deploy it to the folder
+[byte[]] $projectFile = [System.IO.File]::ReadAllBytes($ProjectFilePath)
+$folder.DeployProject($ProjectName, $projectFile)
+ 
+Write-Host "Creating environment ..."
+ 
+$environment = New-Object $ISNamespace".EnvironmentInfo" ($folder, $EnvironmentName, "Description")
+$environment.Create()            
+ 
+Write-Host "Adding server variables ..."
+ 
+# Adding variable to our environment
+# Constructor args: variable name, type, default value, sensitivity, description
+$environment.Variables.Add("ServerName", [System.TypeCode]::String, $SSIS_server, $false, "ServerName")
+$environment.Variables.Add("DatabaseName",[System.TypeCode]::String, "Test2", $false,"DatabaseName")
+$environment.Alter()
+ 
+Write-Host "Adding environment reference to project ..."
+ 
+# making project refer to this environment
+$project = $folder.Projects[$ProjectName]
+$project.References.Add($EnvironmentName, $folder.Name)
+$project.Alter() 
+ 
+Write-Host "Setting environment variable on package connection string ..."
+$ssisPackage = $project.Packages.Item("PowerShellTest.dtsx")
+
+$parServerName = "CM.OLE_Test.ServerName"
+$ssisPackage.Parameters[$parServerName].Set("Referenced","ServerName")
+
+$parDatabaseName = "CM.OLE_Test.InitialCatalog"
+$ssisPackage.Parameters[$parDatabaseName].Set("Referenced","DatabaseName")
+
+$ssisPackage.Alter()
+
+Write-Host "All done."</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/ssis-deployment-with-powershell-adding/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Deploying Database Changes with PowerShell</title>
+		<link>/index.php/datamgmt/dbprogramming/deploying-database-changes-with-powershell/</link>
+		<comments>/index.php/datamgmt/dbprogramming/deploying-database-changes-with-powershell/#comments</comments>
+		<pubDate>Fri, 17 May 2013 07:36:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[deployment]]></category>
+		<category><![CDATA[powershell]]></category>
+		<category><![CDATA[sql]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/05/deploying-database-changes-with-powershell/</guid>
+		<description><![CDATA[Recently, while working on a personal project, I found myself needing a lightweight way to deploy database changes to multiple environments. In the past I have used a wide range of methods, ranging from applying the changes manually to applying changes via a diff tool (SQL Compare), to automatically applying manually created change scripts, to automatically applying diff scripts that were automatically generated, to working directly in production..er, pretend you didn't see that one.]]></description>
+				<content:encoded><![CDATA[<p>Recently, while working on a personal project, I found myself needing a lightweight way to deploy database changes to multiple environments. In the past I have used a wide range of methods, ranging from applying the changes manually to applying changes via a diff tool (SQL Compare), to automatically applying manually created change scripts, to automatically applying diff scripts that were automatically generated, to working directly in production..er, pretend you didn&#8217;t see that one. </p>
+<h2>Why not _________ tool?</h2>
+<p>There are a lot of tools out there to handle database deployments, but this is a small project that I am building incrementally as a minimum viable product. Rather than tie up a bunch of time researching and experimenting with database deployment tools early on, I decided to do something simple that would work for the time being and free me up to work on the actual product. </p>
+<p>What I want from the deployment is to:</p>
+<ol>
+<li>Spend as little time on this as possible</li>
+<li>Work against SQL Azure and a local 2008 R2 Server</li>
+<li>Call it from TeamCity for a local server or a remote one</li>
+<li>Produce readable output for TeamCity logs</li>
+<li>Create the databases and users from the ground up</li>
+<li>Include randomly generated data</li>
+<li>Manage scripts for 2 independent databases in the same build</li>
+<li>Allow real SQL (I&#8217;m not scared of SQL and I don&#8217;t want to learn a code abstraction just to deploy changes)</li>
+<li>Not worry about rollbacks. I am deploying small changes and if something breaks I&#8217;ll be charging forward</li>
+<li>Not expose credentials, as the code will be visible to the public</li>
+<li>Be replaceable. I might replace it with a tool one day, so keep the deployment logic separate from the application</li>
+</ol>
+<p>Looking back at this list and what I eventually created, I probably could have used something like <a href="https://github.com/brunomlopes/dbdeploy.net" "dbdploy on github">DBDeploy</a>. The scripts I created ended up taking a very similar approach.</p>
+<h2>The Deployment Scripts</h2>
+<p>My deployment consists of 4 PowerShell scripts:</p>
+<ul>
+<li><strong>ApplyDatabaseUpdates.ps1</strong> &#8211; Responsible for generically applying changes from a folder to a specified database</li>
+<li><strong>UpdateCoreDatabase.ps1</strong> &#8211; Responsible for the application&#8217;s Core Database, calls ApplyDatabaseUpdates</li>
+<li><strong>UpdateSampleDatabase.ps1</strong> &#8211; Response for the application&#8217;s Sample Database, calls ApplyDatabaseUpdates</li>
+<li><strong>RunLocally.ps1</strong> &#8211; Executes the two Update scripts against the local database on my development machine(s)</li>
+</ul>
+<p>This project has been spread out over 6 months, intermixed with life, other projects, blog posts, etc. Along the way I also upgraded my local development machine to SQL Server 2012 but my main test database server is on 2008 still and my release environment is Azure Database/SQL Azure/(whatever the name is this week).</p>
+<h3>ApplyDatabaseUpdates.ps1</h3>
+<p>The purpose of the ApplyDatabaseUpdates script is to apply all of the scripts in a specified folder to the specified server. To do this it creates a tracking table on the target database, then iterates through the contents of the folder, building a script containing any files that were not previously logged in the tracking table.</p>
+<div style="text-align:center; color: #666666;">
+   <img src="http://tiernok.com/LTDBlog/DatabaseDeployment/SQLScripts.png" alt="Core DB Scripts folder" /><br />
+   Core Database Scripts Folder
+</div>
+<p>The deployment script wraps the contents of each script file in an EXECUTE statement, followed by an INSERT to add it to the tracking table for the database.</p>
+<p><b><a href="https://github.com/tarwn/SQLisHard/blob/master/Database/ApplyDatabaseUpdates.ps1" title="View on github">ApplyDatabaseUpdates.ps1</a></b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">function</span> ApplyDatabaseUpdates
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw3">param</span> <span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>parameter<span class="br0">&#40;</span>Mandatory<span class="sy0">=</span><span class="re0">$true</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$UpdatesFolder</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>parameter<span class="br0">&#40;</span>Mandatory<span class="sy0">=</span><span class="re0">$true</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$Server</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>parameter<span class="br0">&#40;</span>Mandatory<span class="sy0">=</span><span class="re0">$true</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$Database</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>parameter<span class="br0">&#40;</span>Mandatory<span class="sy0">=</span><span class="re0">$true</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$AdminUserName</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>parameter<span class="br0">&#40;</span>Mandatory<span class="sy0">=</span><span class="re0">$true</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$AdminPassword</span>
+&nbsp; &nbsp; <span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$path</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw1">Get-Location</span><span class="br0">&#41;</span>.Path
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># For SQL 2008 - load the modules</span>
+&nbsp; &nbsp; try<span class="br0">&#123;</span> &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">if</span> <span class="br0">&#40;</span> <span class="br0">&#40;</span><span class="kw1">Get-PSSnapin</span> <span class="kw5">-Name</span> SqlServerCmdletSnapin100 <span class="kw5">-ErrorAction</span> SilentlyContinue<span class="br0">&#41;</span> <span class="kw4">-eq</span> <span class="re0">$null</span> <span class="kw4">-and</span> <span class="br0">&#40;</span><span class="kw1">Get-PSSnapin</span> <span class="kw5">-Registered</span> <span class="kw5">-Name</span> SqlServerCmdletSnapin100 <span class="kw5">-ErrorAction</span> SilentlyContinue<span class="br0">&#41;</span> <span class="kw4">-ne</span> <span class="re0">$null</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Add-PSSnapin</span> SqlServerCmdletSnapin100 <span class="kw5">-ErrorAction</span> SilentlyContinue
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Add-PSSnapin</span> SqlServerProviderSnapin100 <span class="kw5">-ErrorAction</span> SilentlyContinue
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; catch<span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Error</span> <span class="st0">&quot;Powershell Script error: $_&quot;</span> <span class="sy0">-</span>EA Stop
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#updates tracking</span>
+&nbsp; &nbsp; try<span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Creating Update Tracking Table If Not Exists&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Invoke<span class="sy0">-</span>Sqlcmd <span class="kw5">-Query</span> <span class="st0">&quot;IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'UpdateTracking') CREATE TABLE UpdateTracking (UpdateTrackingKey int IDENTITY(1,1) PRIMARY KEY, Name varchar(255) NOT NULL, Applied DateTime NOT NULL);&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;$Database&quot;</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Done&quot;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; catch<span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Error</span> <span class="st0">&quot;Powershell Script error: $_&quot;</span> <span class="sy0">-</span>EA Stop
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#database updates</span>
+&nbsp; &nbsp; <span class="re0">$outputPath</span> <span class="sy0">=</span> <span class="st0">&quot;$pathUpdatesBatch.sql&quot;</span>
+&nbsp; &nbsp; <span class="re0">$stream</span> <span class="sy0">=</span> <span class="br0">&#91;</span>System.IO.StreamWriter<span class="br0">&#93;</span> <span class="st0">&quot;$outputPath&quot;</span>
+&nbsp; &nbsp; <span class="re0">$fileUpdates</span> <span class="sy0">=</span> <span class="kw1">Get-ChildItem</span> <span class="st0">&quot;$UpdatesFolder&quot;</span>
+&nbsp; &nbsp; <span class="re0">$datestamp</span> <span class="sy0">=</span> $<span class="br0">&#40;</span><span class="kw1">get-date</span> <span class="kw4">-f</span> <span class="st0">&quot;yyyy-MM-dd HH:mm&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;/* SQL Core Updates - Updated $datestamp */&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;BEGIN TRANSACTION&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">foreach</span><span class="br0">&#40;</span><span class="re0">$file</span> <span class="kw3">in</span> <span class="re0">$fileUpdates</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$name</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="re0">$file</span>.Name<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$namewe</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="br0">&#91;</span>System.IO.Path<span class="br0">&#93;</span>::GetFileNameWithoutExtension<span class="br0">&#40;</span><span class="re0">$name</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;/* File: $name */&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;IF NOT EXISTS (SELECT 1 FROM UpdateTracking WHERE Name = '$namewe')&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;BEGIN&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;<span class="es0">`t</span>Print 'Applying Update: $namewe'&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;<span class="es0">`t</span>EXEC('&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span><span class="kw1">Get-Content</span> <span class="st0">&quot;$UpdatesFolder$name&quot;</span><span class="br0">&#41;</span> <span class="sy0">|</span> <span class="sy0">%</span> <span class="br0">&#123;</span><span class="kw6">$_</span> <span class="kw4">-replace</span> <span class="st0">&quot;'&quot;</span><span class="sy0">,</span> <span class="st0">&quot;''&quot;</span><span class="br0">&#125;</span> <span class="sy0">|</span> <span class="sy0">%</span> <span class="br0">&#123;</span><span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;<span class="es0">`t</span><span class="es0">`t</span>$_&quot;</span><span class="br0">&#41;</span><span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;<span class="es0">`t</span>');&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;<span class="es0">`t</span>INSERT INTO UpdateTracking(Name, Applied) SELECT '$namewe', GETUTCDATE();&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;END&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$stream</span>.WriteLine<span class="br0">&#40;</span><span class="st0">&quot;COMMIT TRANSACTION&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="re0">$stream</span>.Close<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Update Script Created.&quot;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Running updates...&quot;</span>
+&nbsp;
+&nbsp; &nbsp; Invoke<span class="sy0">-</span>SqlCmd <span class="sy0">-</span>InputFile <span class="st0">&quot;$outputPath&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;$Database&quot;</span> <span class="kw5">-Verbose</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">Remove-Item</span> <span class="st0">&quot;$outputPath&quot;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Updates completed.&quot;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">function ApplyDatabaseUpdates
+{
+    param (
+        [parameter(Mandatory=$true)]
+        [string]
+        $UpdatesFolder,
+        [parameter(Mandatory=$true)]
+        [string]
+        $Server,
+        [parameter(Mandatory=$true)]
+        [string]
+        $Database,
+        [parameter(Mandatory=$true)]
+        [string]
+        $AdminUserName,
+        [parameter(Mandatory=$true)]
+        [string]
+        $AdminPassword
+    )
+
+    $path = (Get-Location).Path
+
+    # For SQL 2008 - load the modules
+    try{    
+        if ( (Get-PSSnapin -Name SqlServerCmdletSnapin100 -ErrorAction SilentlyContinue) -eq $null -and (Get-PSSnapin -Registered -Name SqlServerCmdletSnapin100 -ErrorAction SilentlyContinue) -ne $null){
+            Add-PSSnapin SqlServerCmdletSnapin100 -ErrorAction SilentlyContinue
+            Add-PSSnapin SqlServerProviderSnapin100 -ErrorAction SilentlyContinue
+        }
+    }
+    catch{
+        Write-Error "Powershell Script error: $_" -EA Stop
+    }
+
+    #updates tracking
+    try{
+        Write-Host "Creating Update Tracking Table If Not Exists"
+        Invoke-Sqlcmd -Query "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'UpdateTracking') CREATE TABLE UpdateTracking (UpdateTrackingKey int IDENTITY(1,1) PRIMARY KEY, Name varchar(255) NOT NULL, Applied DateTime NOT NULL);" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "$Database" -ErrorAction Stop
+        Write-Host "Done"
+    }
+    catch{
+        Write-Error "Powershell Script error: $_" -EA Stop
+    }
+
+    #database updates
+    $outputPath = "$pathUpdatesBatch.sql"
+    $stream = [System.IO.StreamWriter] "$outputPath"
+    $fileUpdates = Get-ChildItem "$UpdatesFolder"
+    $datestamp = $(get-date -f "yyyy-MM-dd HH:mm")
+
+    $stream.WriteLine("/* SQL Core Updates - Updated $datestamp */")
+    $stream.WriteLine("BEGIN TRANSACTION")
+
+    foreach($file in $fileUpdates)
+    {
+        $name = ($file.Name)
+        $namewe = ([System.IO.Path]::GetFileNameWithoutExtension($name))
+
+        $stream.WriteLine("")
+        $stream.WriteLine("/* File: $name */")
+        $stream.WriteLine("IF NOT EXISTS (SELECT 1 FROM UpdateTracking WHERE Name = '$namewe')")
+        $stream.WriteLine("BEGIN")
+
+        $stream.WriteLine("`tPrint 'Applying Update: $namewe'")
+        $stream.WriteLine("`tEXEC('")
+        (Get-Content "$UpdatesFolder$name") | % {$_ -replace "'", "''"} | % {$stream.WriteLine("`t`t$_")}
+        $stream.WriteLine("`t');")
+
+        $stream.WriteLine("`tINSERT INTO UpdateTracking(Name, Applied) SELECT '$namewe', GETUTCDATE();")
+        $stream.WriteLine("END")
+    }
+
+    $stream.WriteLine("COMMIT TRANSACTION")
+    $stream.Close()
+    Write-Host "Update Script Created."
+
+    Write-Host "Running updates..."
+
+    Invoke-SqlCmd -InputFile "$outputPath" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "$Database" -Verbose -ErrorAction Stop
+
+    Remove-Item "$outputPath"
+
+    Write-Host "Updates completed."
+}</pre></div></div>
+
+<p><i style="display: block; padding: 1em; margin: 1em; background-color: #eeeeee">Note: this has only been run in the context of my personal project. That means don&#8217;t copy, paste, and run it immediately against your production environment. Running stuff blindly from the internet is known as both a bad idea and a career limiting maneuver.</i></p>
+<h3>Update____Database.ps1</h3>
+<p>My application has two databases which it will access via different accounts. I want the ability to rebuild these databases from scratch as well as manage their credentials from an external system (in this case, TeamCity). If the worst should happen and these databases are compromised or overwritten in some fashion, I want to be able to recreate them with new credentials, account names, the works. </p>
+<p>To make life more difficult, many of these commands have to be executed individually in order to work with Azure Databases.</p>
+<p>Both scripts detect if their specified database exists and, if not, create them. The UpdateSampleDatabase is capable of recreating the database in Azure, provided some extra options are passed in to it (the Core Database script is missing this bit, unfortunately):</p>
+<p><b>Excerpt from <a href="https://github.com/tarwn/SQLisHard/blob/master/Database/UpdateSampleDatabase.ps1" title="View on github">UpdateSampleDatabase.ps1</a>:</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="co1"># ...</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#database</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Checking database exists...&quot;</span>;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$result</span> <span class="sy0">=</span> Invoke<span class="sy0">-</span>Sqlcmd <span class="kw5">-Query</span> <span class="st0">&quot;SELECT [name] FROM [sys].[databases] WHERE [name] = N'$database'&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;master&quot;</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">if</span><span class="br0">&#40;</span><span class="re0">$result</span>.name<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Database already exists&quot;</span>;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">else</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Creating Database: $database&quot;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Invoke<span class="sy0">-</span>Sqlcmd <span class="kw5">-Query</span> <span class="st0">&quot;CREATE DATABASE $database&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;master&quot;</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Invoke<span class="sy0">-</span>Sqlcmd <span class="kw5">-Query</span> <span class="st0">&quot;ALTER DATABASE $database SET RECOVERY SIMPLE&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;master&quot;</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Created.&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># ...</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    # ...
+
+    #database
+        Write-Host "Checking database exists...";
+        $result = Invoke-Sqlcmd -Query "SELECT [name] FROM [sys].[databases] WHERE [name] = N'$database'" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "master" -ErrorAction Stop
+        if($result.name){
+            Write-Host "Database already exists";
+        }
+        else{
+            Write-Host "Creating Database: $database"
+
+            Invoke-Sqlcmd -Query "CREATE DATABASE $database" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "master" -ErrorAction Stop
+            Invoke-Sqlcmd -Query "ALTER DATABASE $database SET RECOVERY SIMPLE" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "master" -ErrorAction Stop
+            Write-Host "Created."
+        }
+
+    # ...</pre></div></div>
+
+<p>They also generate the users specified by the build server (which will also be dynamically added into the relevant web.config files for the website):</p>
+<p><b>Excerpt from <a href="https://github.com/tarwn/SQLisHard/blob/master/Database/UpdateCoreDatabase.ps1" title="View on github">UpdateCoreDatabase.ps1</a>:</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="co1"># ...</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#user</span>
+&nbsp; &nbsp; try<span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Creating User: $NewUserName&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$result</span> <span class="sy0">=</span> Invoke<span class="sy0">-</span>Sqlcmd <span class="kw5">-Query</span> <span class="st0">&quot;SELECT [name] FROM sys.sql_logins WHERE name = '$NewUserName'&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;master&quot;</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">if</span><span class="br0">&#40;</span><span class="re0">$result</span>.name<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Login already exists&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">else</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Creating login...&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Invoke<span class="sy0">-</span>Sqlcmd <span class="kw5">-Query</span> <span class="st0">&quot;CREATE LOGIN $NewUserName WITH PASSWORD = '$NewPassword'&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;master&quot;</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Login Created.&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$result</span> <span class="sy0">=</span> Invoke<span class="sy0">-</span>Sqlcmd <span class="kw5">-Query</span> <span class="st0">&quot;SELECT [name] FROM sys.sysusers WHERE name = '$NewUserName'&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;$Database&quot;</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">if</span><span class="br0">&#40;</span><span class="re0">$result</span>.name<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;User already exists&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">else</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Creating user...&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Invoke<span class="sy0">-</span>Sqlcmd <span class="kw5">-Query</span> <span class="st0">&quot;CREATE USER $NewUserName FOR LOGIN $NewUserName WITH DEFAULT_SCHEMA = dbo&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;$Database&quot;</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Invoke<span class="sy0">-</span>Sqlcmd <span class="kw5">-Query</span> <span class="st0">&quot;EXEC sp_addrolemember 'db_datareader','$NewUserName'; EXEC sp_addrolemember 'db_datawriter','$NewUserName'&quot;</span> <span class="sy0">-</span>ServerInstance <span class="st0">&quot;$Server&quot;</span> <span class="sy0">-</span>Username <span class="st0">&quot;$AdminUserName&quot;</span> <span class="sy0">-</span>Password <span class="st0">&quot;$AdminPassword&quot;</span> <span class="sy0">-</span>Database <span class="st0">&quot;$Database&quot;</span> <span class="kw5">-ErrorAction</span> Stop
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;User Created.&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; catch<span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Error</span> <span class="st0">&quot;Powershell Script error: $_&quot;</span> <span class="sy0">-</span>EA Stop
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># ...</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    # ...
+
+    #user
+    try{
+        Write-Host "Creating User: $NewUserName"
+        $result = Invoke-Sqlcmd -Query "SELECT [name] FROM sys.sql_logins WHERE name = '$NewUserName'" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "master" -ErrorAction Stop
+        if($result.name){
+            Write-Host "Login already exists"
+        }
+        else{
+            Write-Host "Creating login..."
+            Invoke-Sqlcmd -Query "CREATE LOGIN $NewUserName WITH PASSWORD = '$NewPassword'" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "master" -ErrorAction Stop
+            Write-Host "Login Created."
+        }
+
+        $result = Invoke-Sqlcmd -Query "SELECT [name] FROM sys.sysusers WHERE name = '$NewUserName'" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "$Database" -ErrorAction Stop
+        if($result.name){
+            Write-Host "User already exists"
+        }
+        else{
+            Write-Host "Creating user..."
+            Invoke-Sqlcmd -Query "CREATE USER $NewUserName FOR LOGIN $NewUserName WITH DEFAULT_SCHEMA = dbo" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "$Database" -ErrorAction Stop
+            Invoke-Sqlcmd -Query "EXEC sp_addrolemember 'db_datareader','$NewUserName'; EXEC sp_addrolemember 'db_datawriter','$NewUserName'" -ServerInstance "$Server" -Username "$AdminUserName" -Password "$AdminPassword" -Database "$Database" -ErrorAction Stop
+            Write-Host "User Created."
+        }
+    }
+    catch{
+        Write-Error "Powershell Script error: $_" -EA Stop
+    }
+
+    # ...</pre></div></div>
+
+<p>Once the database and users are created, the SampleDatabase script produces a replacement for one of it&#8217;s script files that will contain some randomized data. The original file is a placeholder and produces an error if it hasn&#8217;t been replaced.</p>
+<p><b>Excerpt from <a href="https://github.com/tarwn/SQLisHard/blob/master/Database/UpdateSampleDatabase.ps1" title="View on github">UpdateSampleDatabase.ps1</a>:</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="co1"># ...</span>
+&nbsp;
+<span class="co1"># ---------------------------------- Content Generation ---------------------------------------------</span>
+<span class="co1"># Scripts to generate content dynamically and update the appropriate update script</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#generate customers table content</span>
+&nbsp; &nbsp; <span class="re0">$CustomersContentPath</span> <span class="sy0">=</span> <span class="st0">&quot;$UpdatesFolder 002_CustomersData.sql&quot;</span>
+&nbsp; &nbsp; try<span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Generating content script for dbo.Customers&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$girlsnames</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="st0">&quot;&lt;ns&gt;&lt;n&gt;&quot;</span> <span class="sy0">+</span> <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>::Join<span class="br0">&#40;</span><span class="st0">&quot;&lt;/n&gt;&lt;n&gt;&quot;</span><span class="sy0">,</span><span class="br0">&#40;</span><span class="kw1">Get-Content</span> <span class="st0">&quot;$pathDatagirlsforenames.txt&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">&quot;&lt;/n&gt;&lt;/ns&gt;&quot;</span><span class="br0">&#41;</span>.Replace<span class="br0">&#40;</span><span class="st0">&quot;'&quot;</span><span class="sy0">,</span><span class="st0">&quot;''&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$boysnames</span> <span class="sy0">=</span> &nbsp;<span class="br0">&#40;</span><span class="st0">&quot;&lt;ns&gt;&lt;n&gt;&quot;</span> <span class="sy0">+</span> <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>::Join<span class="br0">&#40;</span><span class="st0">&quot;&lt;/n&gt;&lt;n&gt;&quot;</span><span class="sy0">,</span><span class="br0">&#40;</span><span class="kw1">Get-Content</span> <span class="st0">&quot;$pathDataboysforenames.txt&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">&quot;&lt;/n&gt;&lt;/ns&gt;&quot;</span><span class="br0">&#41;</span>.Replace<span class="br0">&#40;</span><span class="st0">&quot;'&quot;</span><span class="sy0">,</span><span class="st0">&quot;''&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$lastnames</span> <span class="sy0">=</span> &nbsp;<span class="br0">&#40;</span><span class="st0">&quot;&lt;ns&gt;&lt;n&gt;&quot;</span> <span class="sy0">+</span> <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span>::Join<span class="br0">&#40;</span><span class="st0">&quot;&lt;/n&gt;&lt;n&gt;&quot;</span><span class="sy0">,</span><span class="br0">&#40;</span><span class="kw1">Get-Content</span> <span class="st0">&quot;$pathDatasurnames.txt&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">&quot;&lt;/n&gt;&lt;/ns&gt;&quot;</span><span class="br0">&#41;</span>.Replace<span class="br0">&#40;</span><span class="st0">&quot;'&quot;</span><span class="sy0">,</span><span class="st0">&quot;''&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span><span class="kw1">Get-Content</span> <span class="st0">&quot;$pathDataBulkImportNames.AzureFriendly.sql&quot;</span><span class="br0">&#41;</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">|</span> <span class="sy0">%</span> <span class="br0">&#123;</span><span class="kw6">$_</span> <span class="kw4">-replace</span> <span class="st0">&quot;{{GIRLSNAMES}}&quot;</span><span class="sy0">,</span> <span class="re0">$girlsnames</span><span class="br0">&#125;</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">|</span> <span class="sy0">%</span> <span class="br0">&#123;</span><span class="kw6">$_</span> <span class="kw4">-replace</span> <span class="st0">&quot;{{BOYSNAMES}}&quot;</span><span class="sy0">,</span> <span class="re0">$boysnames</span><span class="br0">&#125;</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">|</span> <span class="sy0">%</span> <span class="br0">&#123;</span><span class="kw6">$_</span> <span class="kw4">-replace</span> <span class="st0">&quot;{{LASTNAMES}}&quot;</span><span class="sy0">,</span> <span class="re0">$lastnames</span><span class="br0">&#125;</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">|</span> <span class="kw1">Set-Content</span> <span class="kw5">-path</span> <span class="st0">&quot;$CustomersContentPath&quot;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; catch<span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Error</span> <span class="st0">&quot;Powershell Script error: $_&quot;</span> <span class="sy0">-</span>EA Stop
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># ...</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    # ...
+
+# ---------------------------------- Content Generation ---------------------------------------------
+# Scripts to generate content dynamically and update the appropriate update script
+
+    #generate customers table content
+    $CustomersContentPath = "$UpdatesFolder 002_CustomersData.sql"
+    try{
+        Write-Host "Generating content script for dbo.Customers"
+        $girlsnames = ("&lt;ns&gt;&lt;n&gt;" + [string]::Join("&lt;/n&gt;&lt;n&gt;",(Get-Content "$pathDatagirlsforenames.txt")) + "&lt;/n&gt;&lt;/ns&gt;").Replace("'","''")
+        $boysnames =  ("&lt;ns&gt;&lt;n&gt;" + [string]::Join("&lt;/n&gt;&lt;n&gt;",(Get-Content "$pathDataboysforenames.txt")) + "&lt;/n&gt;&lt;/ns&gt;").Replace("'","''")
+        $lastnames =  ("&lt;ns&gt;&lt;n&gt;" + [string]::Join("&lt;/n&gt;&lt;n&gt;",(Get-Content "$pathDatasurnames.txt")) + "&lt;/n&gt;&lt;/ns&gt;").Replace("'","''")
+    
+        (Get-Content "$pathDataBulkImportNames.AzureFriendly.sql") `
+                        | % {$_ -replace "{{GIRLSNAMES}}", $girlsnames} `
+                        | % {$_ -replace "{{BOYSNAMES}}", $boysnames} `
+                        | % {$_ -replace "{{LASTNAMES}}", $lastnames} `
+                        | Set-Content -path "$CustomersContentPath"
+    }
+    catch{
+        Write-Error "Powershell Script error: $_" -EA Stop
+    }
+
+    # ...</pre></div></div>
+
+<p>This generated data is a necessary part of the application that I initially replaced on each deployment, but now only use on new database deployments. Keeping it random and replaceable prevents the application code from making any assumptions about the data in this table.</p>
+<p>The final step for both scripts is to run the ApplyDatabaseUpdates function on their respective folders and databases.</p>
+<h3>RunLocally.sample.ps1</h3>
+<p>The RunLocally.sample.ps1 script will bring a local development environment all the way up to the latest version without requiring me to type out a long series of arguments and credentials. It is basically just a list of hardcoded variables and then calls to the two Update______Database.ps1 scripts. </p>
+<p><b>RunLocally.sample.ps1:</b></p>
+<pre># 1) Copy this file to RunLocally.ps1
+# 2) Open RunLocally.ps1 + substitute meaningful values for the variables below (update web.config connection strings also)
+# 3) [Cross your fingers and] Run it 
+
+$DbServer = "localhost"
+$DbAdminUsername = "admin"
+$DbAdminPassword = "password"
+
+$DbSampleDatabase = "SampleDB"
+$DbSampleReadUsername = "readuser"
+$DbSampleReadPassword = "password"
+
+$DbCoreDatabase = "CoreDB"
+$DbCoreUsername = "coreuser"
+$DbCorePassword = "password"
+
+.UpdateSampleDatabase.ps1 -s $DbServer -d $DbSampleDatabase -nu $DbSampleReadUsername -np $DbSampleReadPassword -au $DbAdminUsername -ap $DbAdminPassword -DeleteGeneratedContentAfter $true
+
+.UpdateCoreDatabase.ps1 -s $DbServer -d $DbCoreDatabase -nu $DbCoreUsername -np $DbCorePassword -au $DbAdminUsername -ap $DbAdminPassword</pre>
+<p>The reason it is a sample file is because the real one is going to be different for my desktop and laptop and I knew if they were under source control I would constantly be accidentally committing them and having to change back and forth as I switched systems. To use it, I create a copy of the sample file, rename it to RunLocally.ps1 (which is ignored via the .gitignore for the project) and fill in the real values.</p>
+<h2>Future Plans</h2>
+<p>I&#8217;m not a fan of the libraries that try to abstract away the SQL in SQL deployments. I know SQL and don&#8217;t need to spend the time learning a library abstraction that, at best, can offer me no better control and ease of use then raw SQL. Many developers feel less than confident in their SQL skills and an abstracted library seems to reduce the need to learn SQL, but in reality the less you know about SQL the harder it will be to determine if the abstraction is doing what you think it is doing, and doing it in a safe and performant manner (and frequently the answer is &#8220;it&#8217;s not&#8221;).</p>
+<p>This set of scripts evolved as a I built the project. In the future I&#8217;ll probably switch over to something like DbDeploy, as I mentioned earlier. Having the scripts in file system folders makes it easy to glance over the list to see what has changed, makes them easily accessible in my git repositories, can be copied and pasted (or opened and saved) directly from SSMS, and requires no extra tooling.</p>
+<p><i>The scripts above are part of the deployment process for a personal project I have been working on called  <a href="http://SQLisHard.com/">SQLisHard.com</a>. Launching in the next few weeks (quietly), the site is designed to help people interactively learn or improve their SQL skills and help build the knowledge and confidence that comes from writing and solving real SQL problems.</i></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/deploying-database-changes-with-powershell/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Getting remote Mount Point information with PowerShell</title>
+		<link>/index.php/sysadmins/os/windows/getting-remote-mount-point-information/</link>
+		<comments>/index.php/sysadmins/os/windows/getting-remote-mount-point-information/#comments</comments>
+		<pubDate>Thu, 29 Nov 2012 11:27:00 +0000</pubDate>
+		<dc:creator><![CDATA[Axel Achten (axel8s)]]></dc:creator>
+				<category><![CDATA[2003 Server]]></category>
+		<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[2012 Server]]></category>
+		<category><![CDATA[Windows]]></category>
+		<category><![CDATA[diskspace]]></category>
+		<category><![CDATA[mount point]]></category>
+		<category><![CDATA[powershell]]></category>
+		<category><![CDATA[remote]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/11/getting-remote-mount-point-information/</guid>
+		<description><![CDATA[In a previous post I showed how to get remote disk information with PowerShell. The script works nice untill you execute it on a server with Mount Points. When executing the following script on a server with Mount Points:
+
+Get-WmiObject win32_logicald&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In a previous post I showed how to <a href="/index.php/SysAdmins/OS/Windows/getting-remote-disk-information-with">get remote disk information with PowerShell</a>. The script works nice until you execute it on a server with Mount Points. When executing the following script on a server with Mount Points:</p>
+<pre>Get-WmiObject win32_logicaldisk -computer &lt;computername&gt; | 
+select-object DeviceID, VolumeName, @{Name="Size";Expression={$_.Size/1GB}},@{Name="FreeSpace";Expression={$_.FreeSpace/1GB}},
+@{Name="PCTFreeSpace";Expression={
+$_.FreeSpace/$_.Size*100}}|Sort-Object -descending PCTfreespace|format-table</pre>
+<p>I get the following result:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/SysAdmins/FSMP1.JPG?mtime=1354195164"><img alt="" src="/wp-content/uploads/blogs/SysAdmins/FSMP1.JPG?mtime=1354195164" width="977" height="144" /></a></div>
+<p>Knowing the sizes of my databases, I knew the numbers were wrong. So I opened a RDP session to the server and found this picture in Disk Management:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/SysAdmins/FSMP2.JPG?mtime=1354195179"><img alt="" src="/wp-content/uploads/blogs/SysAdmins/FSMP2.JPG?mtime=1354195179" width="810" height="530" /></a></div>
+<p>At that moment I realized I wasn&#8217;t getting the information from the Mount Points, just from the Disks that had a drive letter assigned to them.<br />
+So let&#8217;s find out how we can get that information with Windows PowerShell. I still need the wmiobject but instead of the win32_logicaldisk I&#8217;m going to use the win32_volume. I also replace the DeviceID and VolumeName objects with Name and Label:</p>
+<pre>get-wmiobject win32_volume -computer &lt;computername|
+select name, label, driveletter</pre>
+<p>The result looks like this:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/SysAdmins/FSMP3.JPG?mtime=1354195191"><img alt="" src="/wp-content/uploads/blogs/SysAdmins/FSMP3.JPG?mtime=1354195191" width="733" height="200" /></a></div>
+<p>As you can see, the drive letter properties are empty for my Mount Points and in the name column I can find the file and folder where they are mounted.<br />
+So let&#8217;s find the space, free space and percentage free space of the volumes. I can use the calculations from my previous script only Size needs to be replaced with Capacity:</p>
+<pre>get-wmiobject win32_volume -computer &lt;computername|
+select name, label, @{Name="Capacity (GB)";Expression={$_.Capacity/1GB}},@{Name="FreeSpace (GB)";Expression={$_.FreeSpace/1GB}},
+@{Name="FreeSpace (PCT)";Expression={$_.FreeSpace/$_.Capacity*100}} |
+format-table</pre>
+<p>The result now shows the drives and Mount Points with all the requested information:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/SysAdmins/FSMP4.JPG?mtime=1354195223"><img alt="" src="/wp-content/uploads/blogs/SysAdmins/FSMP4.JPG?mtime=1354195223" width="964" height="186" /></a></div>
+<p>To be able to reuse the script I do what I did in the other two PowerShell post:</p>
+<pre>param(
+	[string] $compname = $(Throw "Provide a Server name as first parameter")
+)
+Get-WmiObject win32_volume -computer $compname |
+select name, label, @{Name="Capacity (GB)";Expression={$_.Capacity/1GB}},
+@{Name="FreeSpace (GB)";Expression={$_.FreeSpace/1GB}},
+@{Name="FreeSpace (PCT)";Expression={$_.FreeSpace/$_.Capacity*100}} |
+format-table</pre>
+<p>End that&#8217;s it, the next request for free disk space is a matter of seconds again.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/getting-remote-mount-point-information/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+		<item>
+		<title>Getting remote SQL Service information with Windows Powershell</title>
+		<link>/index.php/sysadmins/os/windows/getting-remote-sql-service-information/</link>
+		<comments>/index.php/sysadmins/os/windows/getting-remote-sql-service-information/#comments</comments>
+		<pubDate>Thu, 11 Oct 2012 07:37:00 +0000</pubDate>
+		<dc:creator><![CDATA[Axel Achten (axel8s)]]></dc:creator>
+				<category><![CDATA[Windows]]></category>
+		<category><![CDATA[powershell]]></category>
+		<category><![CDATA[service]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/10/getting-remote-sql-service-information/</guid>
+		<description><![CDATA[Every DBA managing multiple SQl Servers with multiple instances will know the issues with developpers, project managers and others that don't know the importance of the instancename when they request you to take some action.
+So you can start some e-mai&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Every DBA managing multiple SQL Servers with multiple instances will know the issues with developers, project managers and others that don&#8217;t know the importance of the instance name when they request you to take some action.<br />
+So you can start some e-mail ping pong to get the instance name, open the server documentation or RDP to the server to find the installed instances. But in the time you would need to do this you can write yourself a PowerShell script to get the remote service information.<br />
+First step getting remote services information:</p>
+<pre>Get-Service -ComputerName &lt;SQLServerHostName&gt;</pre>
+<p>This gives you all the information you need:</p>
+<div class="image_block"><a href="/wp-content/uploads/users/axel8s/PSSQLService1.PNG?mtime=1349948019"><img alt="" src="/wp-content/uploads/users/axel8s/PSSQLService1.PNG?mtime=1349948019" width="646" height="278" /></a></div>
+<p>But since I only need SQL Server information I will filter out all the other services using the Where-Object and the like operator:</p>
+<pre>Get-Service -ComputerName &lt;SQLServerHostName&gt; -name "MSSQL*"</pre>
+<p>As you can see we can now see the installed instances of SQL Server on our remote server. Only if the Instance name is too long you will see &#8230; at some point:</p>
+<div class="image_block"><a href="/wp-content/uploads/users/axel8s/PSSQLService2.PNG?mtime=1349948026"><img alt="" src="/wp-content/uploads/users/axel8s/PSSQLService2.PNG?mtime=1349948026" width="575" height="138" /></a></div>
+<p>Since we only need the Name and ass a surplus the Status of our SQL Server Services we can format the output:</p>
+<pre> Get-Service -ComputerName &lt;SQLServerHostName&gt; -name "MSSQL*"|Format-Table -Property Name, Status</pre>
+<p>And now we have only the information we need:</p>
+<div class="image_block"><a href="/wp-content/uploads/users/axel8s/PSSQLService3.PNG?mtime=1349948035"><img alt="" src="/wp-content/uploads/users/axel8s/PSSQLService3.PNG?mtime=1349948035" width="983" height="136" /></a></div>
+<p>Like in my <a href="/index.php/SysAdmins/OS/Windows/getting-remote-disk-information-with">previous post</a> I will put the command in a PS1 script using a parameter and a Throw to be able to reuse the script:</p>
+<pre>param(
+	[string] $compname = $(Throw "Provide a SQL Server name as first parameter")
+)
+Get-Service -ComputerName $compname -name "MSSQL*"|Format-Table -Property Name, Status, DisplayName</pre>
+<p>Executing the script will look like this:</p>
+<div class="image_block"><a href="/wp-content/uploads/users/axel8s/PSSQLService4.PNG?mtime=1349948043"><img alt="" src="/wp-content/uploads/users/axel8s/PSSQLService4.PNG?mtime=1349948043" width="983" height="253" /></a></div>
+<p>Et voila, another point I can take of my list of items I can&#8217;t do on a Server Core&#8230;</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/getting-remote-sql-service-information/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

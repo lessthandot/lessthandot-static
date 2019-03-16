@@ -1,0 +1,1033 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>datetime &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/datetime/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2011 Day 1: Date and time</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-1/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-1/#comments</comments>
+		<pubDate>Thu, 01 Dec 2011 09:30:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[dates]]></category>
+		<category><![CDATA[datetime]]></category>
+		<category><![CDATA[datetime2]]></category>
+		<category><![CDATA[gotcha]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[time]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-1/</guid>
+		<description><![CDATA[In my Are you ready for SQL Server 2012 or are you still partying like it is 1999? post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code tha&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>In day 1 of our 25 days of SQL improvements/upgrades we will talk about dates and time. I remember my first day at a job, I looked at some of the biggest tables and all the dates were stored as integers. My first though was WTF? Then I learned that they couldn&#8217;t use smalldates because they needed dates before 1900-01-01 and in order to save 4 bytes per row it was decided to use integers instead of the datetime datatype. Using integers instead of dates opens a nice big can of worms, first you can&#8217;t use date arithmetic, and if you do arithmetic you might get invalid dates, second anyone can insert invalid dates.</p>
+<p>Lucky for you SQL Server 2008 introduced 4 new date related data types, these are date, datetime2, time and datetimeoffset. In this post I will only look at date, datetime2 and time.</p>
+<h2>Date</h2>
+<hr />
+The date data type only stores the date portion of a regular datetime. If you run the following on November 30th 2011</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d <span class="kw1">date</span> <span class="sy0">=</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @d</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d date = getdate()
+select @d</pre></div></div>
+
+<p>You get back the following<br />
+2011-11-30</p>
+<p>The nice thing about the date datatype is that the range spans from January 1, 1 A.D. through December 31, 9999 A.D.<br />
+No problem running this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d <span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'1600-01-01'</span>
+<span class="kw1">select</span> @d</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d date = '1600-01-01'
+select @d</pre></div></div>
+
+<p>If you tried that with a datetime, you will get the following friendly message<br />
+<em>Msg 242, Level 16, State 3, Line 1<br />
+The conversion of a varchar data type to a datetime data type resulted in an out-of-range value.</em></p>
+<p>It takes only 3 bytes to store a date, so if you only need to store the date portion you will save 5 bytes compared to a datetime, you will even save space if you switch from integers</p>
+<p>If you are used to add or subtract dates by using +1 or -1, be warned</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d <span class="kw1">datetime</span> <span class="sy0">=</span> <span class="st0">'2011-11-30'</span>
+<span class="kw1">select</span> @d <span class="sy0">+</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d datetime = '2011-11-30'
+select @d + 1</pre></div></div>
+
+<p>2011-12-01 00:00:00.000</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d <span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2011-11-30'</span>
+<span class="kw1">select</span> @d <span class="sy0">+</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d date = '2011-11-30'
+select @d + 1</pre></div></div>
+
+<p><em>Msg 206, Level 16, State 2, Line 2<br />
+Operand type clash: date is incompatible with int</em></p>
+<p>You should be using DATEADD instead, like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d <span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2011-11-30'</span>
+<span class="kw1">select</span> <span class="kw2">DATEADD</span> <span class="br0">&#40;</span>dd,<span class="nu0">1</span>,@d<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d date = '2011-11-30'
+select DATEADD (dd,1,@d)</pre></div></div>
+
+<p>See also this post which has some more detail <a href="/index.php/DataMgmt/DataDesign/operand-type-clash-date-is-incompatible--2008">Operand type clash: date is incompatible with int error when trying to do +1 on a date data type in SQL Server 2008</a></p>
+<h2>Time</h2>
+<hr />
+The time data type will only hold the time portion of a datetime2, the range goes from 00:00:00.0000000 through 23:59:59.9999999. This was a very needed data type, now you can store the date and the time separate and if you index both columns, you will get much better performance than if you used just a datetime column</p>
+<p>You can specify precision for the time data type, in the code below you can see the output for all precisions between 0 and 7</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d <span class="kw1">time</span> <span class="sy0">=</span><span class="st0">'2011-11-30 19:23:52.1234567'</span>
+&nbsp;
+<span class="kw1">select</span> <span class="st0">'(0)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span><span class="br0">&#40;</span><span class="nu0">0</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(1)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(2)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span><span class="br0">&#40;</span><span class="nu0">2</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(3)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span><span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(4)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span><span class="br0">&#40;</span><span class="nu0">4</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all 
+<span class="kw1">select</span> <span class="st0">'(5)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span><span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(6)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span><span class="br0">&#40;</span><span class="nu0">6</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(7)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span><span class="br0">&#40;</span><span class="nu0">7</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'@d'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'--'</span>, &nbsp; @d</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d time ='2011-11-30 19:23:52.1234567'
+
+select '(0)', convert(time(0),@d) union all
+select '(1)', convert(time(1),@d) union all
+select '(2)', convert(time(2),@d) union all
+select '(3)', convert(time(3),@d) union all
+select '(4)', convert(time(4),@d) union all 
+select '(5)', convert(time(5),@d) union all
+select '(6)', convert(time(6),@d) union all
+select '(7)', convert(time(7),@d) union all
+select '@d', convert(time,@d) union all
+select '--',   @d</pre></div></div>
+
+<p>Output</p>
+<pre>(0)	19:23:52.0000000
+(1)	19:23:52.1000000
+(2)	19:23:52.1200000
+(3)	19:23:52.1230000
+(4)	19:23:52.1235000
+(5)	19:23:52.1234600
+(6)	19:23:52.1234570
+(7)	19:23:52.1234567
+@d	19:23:52.1234567
+--	19:23:52.1234567</pre>
+<p>
+If you combine time and datetime by way of a UNION then you will get datetime2 for both</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d datetime2 <span class="sy0">=</span><span class="st0">'2011-11-30 19:23:52.5433840'</span>
+<span class="kw1">select</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">time</span>,@d<span class="br0">&#41;</span> 
+<span class="kw1">union</span> all
+<span class="kw1">select</span> @d</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d datetime2 ='2011-11-30 19:23:52.5433840'
+select convert(time,@d) 
+union all
+select @d</pre></div></div>
+
+<p>Output</p>
+<p>1900-01-01 19:23:52.5433840<br />
+2011-11-30 19:23:52.5433840</p>
+<h2>Datetime2</h2>
+<hr />
+The datetime2 data type has a range of January 1,1 AD through December 31, 9999 AD for the date and 00:00:00 through 23:59:59.9999999 for the time.<br />
+Just like with the time data type, you can specify the precision, if you don&#8217;t specify anything then the 7 is assumed. Let&#8217;s take a look, run the following code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d datetime2 <span class="sy0">=</span><span class="st0">'2011-11-30 19:23:52.1234567'</span>
+&nbsp;
+<span class="kw1">select</span> <span class="st0">'(0)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span>datetime2<span class="br0">&#40;</span><span class="nu0">0</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(1)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span>datetime2<span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(2)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span>datetime2<span class="br0">&#40;</span><span class="nu0">2</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(3)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span>datetime2<span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(4)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span>datetime2<span class="br0">&#40;</span><span class="nu0">4</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all 
+<span class="kw1">select</span> <span class="st0">'(5)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span>datetime2<span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(6)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span>datetime2<span class="br0">&#40;</span><span class="nu0">6</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'(7)'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span>datetime2<span class="br0">&#40;</span><span class="nu0">7</span><span class="br0">&#41;</span>,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'@d'</span>, <span class="kw1">convert</span><span class="br0">&#40;</span>datetime2,@d<span class="br0">&#41;</span> <span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'--'</span>, &nbsp; @d</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d datetime2 ='2011-11-30 19:23:52.1234567'
+
+select '(0)', convert(datetime2(0),@d) union all
+select '(1)', convert(datetime2(1),@d) union all
+select '(2)', convert(datetime2(2),@d) union all
+select '(3)', convert(datetime2(3),@d) union all
+select '(4)', convert(datetime2(4),@d) union all 
+select '(5)', convert(datetime2(5),@d) union all
+select '(6)', convert(datetime2(6),@d) union all
+select '(7)', convert(datetime2(7),@d) union all
+select '@d', convert(datetime2,@d) union all
+select '--',   @d</pre></div></div>
+
+<p>Output</p>
+<pre>(0)	2011-11-30 19:23:52.0000000
+(1)	2011-11-30 19:23:52.1000000
+(2)	2011-11-30 19:23:52.1200000
+(3)	2011-11-30 19:23:52.1230000
+(4)	2011-11-30 19:23:52.1235000
+(5)	2011-11-30 19:23:52.1234600
+(6)	2011-11-30 19:23:52.1234570
+(7)	2011-11-30 19:23:52.1234567
+@d	2011-11-30 19:23:52.1234567
+--	2011-11-30 19:23:52.1234567</pre>
+<p>Just as with dates, you can&#8217;t do something like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d datetime2 <span class="sy0">=</span> <span class="st0">'2011-11-30'</span>
+<span class="kw1">select</span> @d <span class="sy0">+</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d datetime2 = '2011-11-30'
+select @d + 1</pre></div></div>
+
+<p>You need to use the DATEADD function instead</p>
+<p>If you want to use the current date and time and store that in a datetime variable then make sure not to use GETDATE, use SYSDATETIME instead</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @d2 datetime2 <span class="sy0">=</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @d2,<span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">declare</span> @d2 datetime2 <span class="sy0">=</span> SYSDATETIME<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @d2,SYSDATETIME<span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @d2 datetime2 = getdate()
+select @d2,getdate()
+GO
+
+declare @d2 datetime2 = SYSDATETIME()
+select @d2,SYSDATETIME()</pre></div></div>
+
+<p>Output</p>
+<pre>2011-11-30 21:14:07.0430000	2011-11-30 21:14:07.043
+2011-11-30 21:14:07.1277166	2011-11-30 21:14:07.1277166</pre>
+<p>As you can see, when using GETDATE, the full precision is not captured.<br />
+If you want to use UTC date and time then use SYSUTCDATETIME instead of GETUTCDATE</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> SYSUTCDATETIME<span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="kw2">GETUTCDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select SYSUTCDATETIME(), GETUTCDATE()</pre></div></div>
+
+<p>Output</p>
+<pre>2011-12-01 02:17:05.7909356	2011-12-01 02:17:05.790</pre>
+<p>
+If you have any code like this </p>
+<pre>select DATEADD(ms,-3,'20111201')</pre>
+<p>2011-11-30 23:59:59.997</p>
+<p>That code is used to specify the end boundary of a range so that between can be used. You will be missing some rows if you use the higher precision</p>
+<p>Always use >= @date1 AND < @date2, where @date2 in this case would be 2011-12-01, this is safe for all the date data types
+
+
+
+That is it for day 1, hopefully you have picked up a tip or two, come back tomorrow for post number two
+</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-1/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>When changing column data types use ALTER TABLE TableName ALTER Column syntax, don&#8217;t drop and recreate column</title>
+		<link>/index.php/datamgmt/datadesign/when-changing-column-data-types/</link>
+		<comments>/index.php/datamgmt/datadesign/when-changing-column-data-types/#comments</comments>
+		<pubDate>Sun, 10 Apr 2011 22:27:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[dates]]></category>
+		<category><![CDATA[datetime]]></category>
+		<category><![CDATA[datetime2]]></category>
+		<category><![CDATA[gotcha]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/04/when-changing-column-data-types/</guid>
+		<description><![CDATA[Someone asked how to change the data type from datetime to datetime2
+
+Someone else answered the following
+
+You could add the new column.
+
+UPDATE Table SET NewColumn = OldColumn
+
+delete the old column
+
+then rename the new column.
+
+This of cou&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Someone asked how to <a href="http://stackoverflow.com/questions/5581639/convert-datetime-column-to-datetime2-column-in-sql-server/5581702#5581702">change the data type from datetime to datetime2</a></p>
+<p>Here is the question</p>
+<blockquote><p>I have a SQL Server 2005 database with a datetime column. There is already data in the table but now the customer needs dates before 1753. So I decided to migrate the database to a SQL Server 2008 to use the datetime2 type.</p>
+<p>However I can&#8217;t just switch the type of the column from datetime to datetime2. Is there a way to do this conversion or do I have to reimport the data?<br />
+Someone else answered the following</p></blockquote>
+<p>Here is an answer that this person got from someone</p>
+<blockquote><p>You could add the new column.</p>
+<p>UPDATE Table SET NewColumn = OldColumn</p>
+<p>delete the old column</p>
+<p>then rename the new column.</p></blockquote>
+<p>This of course is highly inefficient. Just imagine running that suggestion on a table with millions or billions of rows.</p>
+<p>My approach would be to do this instead: <em>ALTER TABLE TableName ALTER COLUMN ColumnName datetime2</em></p>
+<p>Let&#8217;s take a closer look at the T-SQL needed for this</p>
+<p>First create the following table and insert one row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> tempdb
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test<span class="br0">&#40;</span>SomeDate <span class="kw1">DATETIME</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Test <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'20110410'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE tempdb
+GO
+
+CREATE TABLE Test(SomeDate DATETIME)
+INSERT Test values ('20110410')
+
+SELECT * FROM Test
+GO</pre></div></div>
+
+<p>Output<br />
+&#8212;&#8212;&#8212;&#8212;&#8212;&#8211;<br />
+2011-04-10 00:00:00.000</p>
+<p>Datetime accepts dates in the range from January 1, 1753, through December 31, 9999. If you try to insert a value before January 1, 1753, it will fail<br />
+Run the code below which will try to insert January 1, 1600, to see the error</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Test <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'16000101'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Test values ('16000101')</pre></div></div>
+
+<p><em>Msg 242, Level 16, State 3, Line 1<br />
+The conversion of a varchar data type to a datetime data type resulted in an out-of-range value.</em></p>
+<p>Now we will change the column from datetime to datetime2.<br />
+The syntax looks like this</p>
+<p><em>ALTER TABLE &lt;TableName&gt; ALTER column &lt;ColumnName&gt; &lt;New date type&gt;</em></p>
+<p>For our table the syntax will be the following: <em>ALTER TABLE Test ALTER column SomeDate datetime2</em><br />
+Run the code below to make that happen</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> Test <span class="kw1">ALTER</span> <span class="kw1">column</span> SomeDate datetime2
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE Test ALTER column SomeDate datetime2
+GO</pre></div></div>
+
+<p>So now, if we try to insert January 1, 1600, it should succeeed</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Test <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'16000101'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Test values ('16000101')</pre></div></div>
+
+<p>Now, you can look what is in the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM Test
+GO</pre></div></div>
+
+<p>Output<br />
+&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;<br />
+2011-04-10 00:00:00.0000000<br />
+1600-01-01 00:00:00.0000000</p>
+<p>Just be aware that if you are changing data types, make sure that what you change to can hold the current values. If you are changing from varchar to integer, make sure you only have values that can be converted to integers, the operation will fail if they can&#8217;t be converted to integers.</p>
+<h2>Conclusion</h2>
+<p>Learn the product and learn it well. Don&#8217;t overly depend on the wizards in SSMS, and if you use SSMS, hit the Script button to see what kind of T-SQL SSMS generates.</p>
+<p>The wizards are nice but sometimes they get it wrong. Here is the code that the wizard generates to change the column</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+</pre></td><td class="de1"><pre class="de1"><span class="coMULTI">/* To prevent any potential data loss issues, you should review this script in detail before running it outside the context of the database designer.*/</span>
+<span class="kw1">BEGIN</span> <span class="kw1">TRANSACTION</span>
+<span class="kw1">SET</span> QUOTED_IDENTIFIER <span class="kw1">ON</span>
+<span class="kw1">SET</span> ARITHAB<span class="sy0">OR</span>T <span class="kw1">ON</span>
+<span class="kw1">SET</span> NUMERIC_ROUNDAB<span class="sy0">OR</span>T <span class="kw1">OFF</span>
+<span class="kw1">SET</span> CONCAT_<span class="sy0">NULL</span>_YIELDS_<span class="sy0">NULL</span> <span class="kw1">ON</span>
+<span class="kw1">SET</span> ANSI_<span class="sy0">NULL</span>S <span class="kw1">ON</span>
+<span class="kw1">SET</span> ANSI_PADD<span class="sy0">IN</span>G <span class="kw1">ON</span>
+<span class="kw1">SET</span> ANSI_WARN<span class="sy0">IN</span>GS <span class="kw1">ON</span>
+<span class="kw1">COMMIT</span>
+<span class="kw1">BEGIN</span> <span class="kw1">TRANSACTION</span>
+GO
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Tmp_Test</span>
+&nbsp; &nbsp; <span class="br0">&#40;</span>
+&nbsp; &nbsp; SomeDate datetime2<span class="br0">&#40;</span><span class="nu0">7</span><span class="br0">&#41;</span> <span class="sy0">NULL</span>
+&nbsp; &nbsp; <span class="br0">&#41;</span> &nbsp;<span class="kw1">ON</span> <span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span>
+GO
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Tmp_Test</span> <span class="kw1">SET</span> <span class="br0">&#40;</span>LOCK_ESCALATION <span class="sy0">=</span> <span class="kw1">TABLE</span><span class="br0">&#41;</span>
+GO
+<span class="kw1">IF</span> <span class="sy0">EXISTS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> dbo.<span class="me1">Test</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp;<span class="kw1">EXEC</span><span class="br0">&#40;</span><span class="st0">'INSERT INTO dbo.Tmp_Test (SomeDate)</span>
+<span class="st0">&nbsp; &nbsp; &nbsp; &nbsp; SELECT CONVERT(datetime2(7), SomeDate) FROM dbo.Test WITH (HOLDLOCK TABLOCKX)'</span><span class="br0">&#41;</span>
+GO
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Test</span>
+GO
+<span class="kw1">EXECUTE</span> <span class="kw3">sp_rename</span> N<span class="st0">'dbo.Tmp_Test'</span>, N<span class="st0">'Test'</span>, <span class="st0">'OBJECT'</span> 
+GO
+<span class="kw1">COMMIT</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">/* To prevent any potential data loss issues, you should review this script in detail before running it outside the context of the database designer.*/
+BEGIN TRANSACTION
+SET QUOTED_IDENTIFIER ON
+SET ARITHABORT ON
+SET NUMERIC_ROUNDABORT OFF
+SET CONCAT_NULL_YIELDS_NULL ON
+SET ANSI_NULLS ON
+SET ANSI_PADDING ON
+SET ANSI_WARNINGS ON
+COMMIT
+BEGIN TRANSACTION
+GO
+CREATE TABLE dbo.Tmp_Test
+	(
+	SomeDate datetime2(7) NULL
+	)  ON [PRIMARY]
+GO
+ALTER TABLE dbo.Tmp_Test SET (LOCK_ESCALATION = TABLE)
+GO
+IF EXISTS(SELECT * FROM dbo.Test)
+	 EXEC('INSERT INTO dbo.Tmp_Test (SomeDate)
+		SELECT CONVERT(datetime2(7), SomeDate) FROM dbo.Test WITH (HOLDLOCK TABLOCKX)')
+GO
+DROP TABLE dbo.Test
+GO
+EXECUTE sp_rename N'dbo.Tmp_Test', N'Test', 'OBJECT' 
+GO
+COMMIT</pre></div></div>
+
+<p>I definitely don&#8217;t want that either, that creates a whole new table..yikes</p>
+<p>Spend some time in Books On Line, maybe every day at lunch open a random topic and read it for half and hour and run the code examples. If you commute, download the topic to your local device or hit the online version and study it. Another good way to learn is of course hitting the newsgroups where you will see top notch advice from SQL Server experts</p>
+<p>The more you know, the better it will be for you and your employer, if suddenly you can prove that yes, we can do this and here is a better way I found, you will be rewarded sooner or later.</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/when-changing-column-data-types/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>Adding time offsets passed in to a datetime to generate localized datetime</title>
+		<link>/index.php/datamgmt/datadesign/adding-time-offsets-passed-in-to-a-datet/</link>
+		<comments>/index.php/datamgmt/datadesign/adding-time-offsets-passed-in-to-a-datet/#comments</comments>
+		<pubDate>Fri, 26 Jun 2009 16:44:46 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[dates]]></category>
+		<category><![CDATA[datetime]]></category>
+		<category><![CDATA[parsing]]></category>
+		<category><![CDATA[time]]></category>
+		<category><![CDATA[utc time]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/06/adding-time-offsets-passed-in-to-a-datet/</guid>
+		<description><![CDATA[I answered this question today and thought it would be useful to create a little post If you have a varchar value like this &#8216;2009-06-26 14:30:00.000Z+4:30&#8217; you want to take 4 hours and 30 minutes and then subtract that from the date itself so in this case you will get 2009-06-26 11:00:00.000. The reason you [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I answered this question today and thought it would be useful to create a little post</p>
+<p>If you have a varchar value like this &#8216;2009-06-26 14:30:00.000Z+4:30&#8217; you want to take 4 hours and 30 minutes and then subtract that from the date itself so in this case you will get 2009-06-26 11:00:00.000. The reason you subtract is because the +4:30 means that this was generated in a zone that is 4:30 ahead of utc</p>
+<p>So first we need to figure out a couple of things<br />
+1) where are the minutes?<br />
+2) where is the hour?<br />
+3) is it positive or negative?</p>
+<p>Here are the answers<br />
+<strong>1) where are the minutes?</strong><br />
+The minutes are the last 2 characters</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @<span class="kw1">date</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2009-06-26 14:30:00.000Z+4:30'</span>
+&nbsp;
+<span class="kw1">select</span> <span class="kw1">right</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="nu0">2</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @date varchar(100)
+select @date = '2009-06-26 14:30:00.000Z+4:30'
+
+select right(@date,2)</pre></div></div>
+
+<p><strong>2) where is the hour?</strong><br />
+The hour starts after the Z and last for 2 or 3 characters including the sign, we will just grab 3 and replace : with an empty string</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @<span class="kw1">date</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2009-06-26 14:30:00.000Z+4:30'</span>
+<span class="kw1">select</span> <span class="kw2">replace</span><span class="br0">&#40;</span><span class="kw2">substring</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="kw2">patindex</span><span class="br0">&#40;</span><span class="st0">'%z%'</span>,@<span class="kw1">date</span><span class="br0">&#41;</span><span class="sy0">+</span> <span class="nu0">1</span>,<span class="nu0">3</span><span class="br0">&#41;</span>,<span class="st0">':'</span>,<span class="st0">''</span><span class="br0">&#41;</span>
+go</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @date varchar(100)
+select @date = '2009-06-26 14:30:00.000Z+4:30'
+select replace(substring(@date,patindex('%z%',@date)+ 1,3),':','')
+go</pre></div></div>
+
+<p>+4</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @<span class="kw1">date</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2009-06-26 14:30:00.000Z-4:30'</span>
+<span class="kw1">select</span> <span class="kw2">replace</span><span class="br0">&#40;</span><span class="kw2">substring</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="kw2">patindex</span><span class="br0">&#40;</span><span class="st0">'%z%'</span>,@<span class="kw1">date</span><span class="br0">&#41;</span><span class="sy0">+</span> <span class="nu0">1</span>,<span class="nu0">3</span><span class="br0">&#41;</span>,<span class="st0">':'</span>,<span class="st0">''</span><span class="br0">&#41;</span>
+go</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @date varchar(100)
+select @date = '2009-06-26 14:30:00.000Z-4:30'
+select replace(substring(@date,patindex('%z%',@date)+ 1,3),':','')
+go</pre></div></div>
+
+<p>-4</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @<span class="kw1">date</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2009-06-26 14:30:00.000Z+14:30'</span>
+<span class="kw1">select</span> <span class="kw2">replace</span><span class="br0">&#40;</span><span class="kw2">substring</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="kw2">patindex</span><span class="br0">&#40;</span><span class="st0">'%z%'</span>,@<span class="kw1">date</span><span class="br0">&#41;</span><span class="sy0">+</span> <span class="nu0">1</span>,<span class="nu0">3</span><span class="br0">&#41;</span>,<span class="st0">':'</span>,<span class="st0">''</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @date varchar(100)
+select @date = '2009-06-26 14:30:00.000Z+14:30'
+select replace(substring(@date,patindex('%z%',@date)+ 1,3),':','')</pre></div></div>
+
+<p>+14</p>
+<p><strong>3) is it positive or negative?</strong><br />
+That we already grabbed above for the hour, for the minute we need to do something like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @<span class="kw1">date</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,@multiplier <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2009-06-26 14:30:00.000Z+4:30'</span>
+<span class="kw1">select</span> &nbsp;<span class="kw1">case</span> <span class="kw1">when</span> @<span class="kw1">date</span> like <span class="st0">'%+%'</span> <span class="kw1">then</span> <span class="sy0">-</span><span class="nu0">1</span> <span class="kw1">else</span> <span class="nu0">1</span> <span class="kw1">end</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @date varchar(100),@multiplier int
+
+select @date = '2009-06-26 14:30:00.000Z+4:30'
+select  case when @date like '%+%' then -1 else 1 end</pre></div></div>
+
+<p>We also need to convert the stuff we did above to integers in order to add</p>
+<p>So here is the complete code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @<span class="kw1">date</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,@multiplier <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2009-06-26 14:30:00.000Z+4:30'</span>
+<span class="kw1">select</span> @multiplier <span class="sy0">=</span> <span class="kw1">case</span> <span class="kw1">when</span> @<span class="kw1">date</span> like <span class="st0">'%+%'</span> <span class="kw1">then</span> <span class="sy0">-</span><span class="nu0">1</span> <span class="kw1">else</span> <span class="nu0">1</span> <span class="kw1">end</span>
+&nbsp;
+&nbsp;
+<span class="kw1">select</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi, @multiplier <span class="sy0">*</span><span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">int</span>,<span class="kw1">right</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh
+&nbsp; &nbsp; ,<span class="sy0">-</span><span class="nu0">1</span> <span class="sy0">*</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">int</span>,<span class="kw2">replace</span><span class="br0">&#40;</span><span class="kw2">substring</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="kw2">patindex</span><span class="br0">&#40;</span><span class="st0">'%z%'</span>,@<span class="kw1">date</span><span class="br0">&#41;</span><span class="sy0">+</span> <span class="nu0">1</span>,<span class="nu0">3</span><span class="br0">&#41;</span>,<span class="st0">':'</span>,<span class="st0">''</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; ,<span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="nu0">23</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+go
+&nbsp;
+&nbsp;
+<span class="co1">--2009-06-26 10:00:00.000</span>
+&nbsp;
+<span class="kw1">declare</span> @<span class="kw1">date</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,@multiplier <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2009-06-26 14:30:00.000Z-4:30'</span>
+<span class="kw1">select</span> @multiplier <span class="sy0">=</span> <span class="kw1">case</span> <span class="kw1">when</span> @<span class="kw1">date</span> like <span class="st0">'%+%'</span> <span class="kw1">then</span> <span class="sy0">-</span><span class="nu0">1</span> <span class="kw1">else</span> <span class="nu0">1</span> <span class="kw1">end</span>
+&nbsp;
+<span class="kw1">select</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi, @multiplier <span class="sy0">*</span><span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">int</span>,<span class="kw1">right</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh
+&nbsp; &nbsp; ,<span class="sy0">-</span><span class="nu0">1</span> <span class="sy0">*</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">int</span>,<span class="kw2">replace</span><span class="br0">&#40;</span><span class="kw2">substring</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="kw2">patindex</span><span class="br0">&#40;</span><span class="st0">'%z%'</span>,@<span class="kw1">date</span><span class="br0">&#41;</span><span class="sy0">+</span> <span class="nu0">1</span>,<span class="nu0">3</span><span class="br0">&#41;</span>,<span class="st0">':'</span>,<span class="st0">''</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; ,<span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="nu0">23</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+go
+&nbsp;
+<span class="co1">--2009-06-26 19:00:00.000</span>
+&nbsp;
+<span class="kw1">declare</span> @<span class="kw1">date</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,@multiplier <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2009-06-26 14:30:00.000Z+14:30'</span>
+<span class="kw1">select</span> @multiplier <span class="sy0">=</span> <span class="kw1">case</span> <span class="kw1">when</span> @<span class="kw1">date</span> like <span class="st0">'%+%'</span> <span class="kw1">then</span> <span class="sy0">-</span><span class="nu0">1</span> <span class="kw1">else</span> <span class="nu0">1</span> <span class="kw1">end</span>
+&nbsp;
+<span class="kw1">select</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi, @multiplier <span class="sy0">*</span><span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">int</span>,<span class="kw1">right</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh
+&nbsp; &nbsp; ,<span class="sy0">-</span><span class="nu0">1</span> <span class="sy0">*</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">int</span>,<span class="kw2">replace</span><span class="br0">&#40;</span><span class="kw2">substring</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="kw2">patindex</span><span class="br0">&#40;</span><span class="st0">'%z%'</span>,@<span class="kw1">date</span><span class="br0">&#41;</span><span class="sy0">+</span> <span class="nu0">1</span>,<span class="nu0">3</span><span class="br0">&#41;</span>,<span class="st0">':'</span>,<span class="st0">''</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; ,<span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="nu0">23</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+go
+&nbsp;
+<span class="co1">--2009-06-26 01:00:00.000</span>
+&nbsp;
+&nbsp;
+<span class="kw1">declare</span> @<span class="kw1">date</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,@multiplier <span class="kw1">int</span>
+<span class="kw1">select</span> @<span class="kw1">date</span> <span class="sy0">=</span> <span class="st0">'2009-06-26 14:30:00.000Z-14:30'</span>
+<span class="kw1">select</span> @multiplier <span class="sy0">=</span> <span class="kw1">case</span> <span class="kw1">when</span> @<span class="kw1">date</span> like <span class="st0">'%+%'</span> <span class="kw1">then</span> <span class="sy0">-</span><span class="nu0">1</span> <span class="kw1">else</span> <span class="nu0">1</span> <span class="kw1">end</span>
+&nbsp;
+<span class="kw1">select</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi, @multiplier <span class="sy0">*</span><span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">int</span>,<span class="kw1">right</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh
+&nbsp; &nbsp; ,<span class="sy0">-</span><span class="nu0">1</span> <span class="sy0">*</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">int</span>,<span class="kw2">replace</span><span class="br0">&#40;</span><span class="kw2">substring</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="kw2">patindex</span><span class="br0">&#40;</span><span class="st0">'%z%'</span>,@<span class="kw1">date</span><span class="br0">&#41;</span><span class="sy0">+</span> <span class="nu0">1</span>,<span class="nu0">3</span><span class="br0">&#41;</span>,<span class="st0">':'</span>,<span class="st0">''</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; ,<span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">date</span>,<span class="nu0">23</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+go
+&nbsp;
+<span class="co1">--2009-06-27 05:00:00.000</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @date varchar(100),@multiplier int
+
+select @date = '2009-06-26 14:30:00.000Z+4:30'
+select @multiplier = case when @date like '%+%' then -1 else 1 end
+
+
+select dateadd(mi, @multiplier *convert(int,right(@date,2)),dateadd(hh
+    ,-1 * convert(int,replace(substring(@date,patindex('%z%',@date)+ 1,3),':',''))
+    ,left(@date,23)))
+go
+
+
+--2009-06-26 10:00:00.000
+
+declare @date varchar(100),@multiplier int
+
+select @date = '2009-06-26 14:30:00.000Z-4:30'
+select @multiplier = case when @date like '%+%' then -1 else 1 end
+
+select dateadd(mi, @multiplier *convert(int,right(@date,2)),dateadd(hh
+    ,-1 * convert(int,replace(substring(@date,patindex('%z%',@date)+ 1,3),':',''))
+    ,left(@date,23)))
+go
+
+--2009-06-26 19:00:00.000
+
+declare @date varchar(100),@multiplier int
+
+select @date = '2009-06-26 14:30:00.000Z+14:30'
+select @multiplier = case when @date like '%+%' then -1 else 1 end
+
+select dateadd(mi, @multiplier *convert(int,right(@date,2)),dateadd(hh
+    ,-1 * convert(int,replace(substring(@date,patindex('%z%',@date)+ 1,3),':',''))
+    ,left(@date,23)))
+go
+
+--2009-06-26 01:00:00.000
+
+
+declare @date varchar(100),@multiplier int
+select @date = '2009-06-26 14:30:00.000Z-14:30'
+select @multiplier = case when @date like '%+%' then -1 else 1 end
+
+select dateadd(mi, @multiplier *convert(int,right(@date,2)),dateadd(hh
+    ,-1 * convert(int,replace(substring(@date,patindex('%z%',@date)+ 1,3),':',''))
+    ,left(@date,23)))
+go
+
+--2009-06-27 05:00:00.000</pre></div></div>
+
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/adding-time-offsets-passed-in-to-a-datet/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Grouping datetime values in half hour blocks in SQL Server</title>
+		<link>/index.php/datamgmt/datadesign/grouping-datetime-values-in-half-hour-bl/</link>
+		<comments>/index.php/datamgmt/datadesign/grouping-datetime-values-in-half-hour-bl/#comments</comments>
+		<pubDate>Fri, 29 May 2009 14:38:49 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[dates]]></category>
+		<category><![CDATA[datetime]]></category>
+		<category><![CDATA[grouping]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[time]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/05/grouping-datetime-values-in-half-hour-bl/</guid>
+		<description><![CDATA[I answered this question a while back and decided to create a little blogpost. Let&#8217;s say you have the following datetime values 2009-05-12 11:13:19.667 2009-05-12 11:12:19.667 2009-05-12 11:33:19.667 2009-05-12 11:43:19.667 2009-05-12 11:03:19.667 2009-05-12 11:53:19.667 2009-05-12 11:53:19.667 2009-05-12 11:23:19.667 2009-05-12 12:13:19.667 2009-05-12 12:12:19.667 2009-05-12 13:33:19.667 2009-05-12 13:43:19.667 2009-05-12 14:03:19.667 2009-05-12 14:53:19.667 2009-05-12 15:53:19.667 2009-05-12 15:23:19.667 What [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I answered this question a while back and decided to create a little blogpost.</p>
+<p>Let&#8217;s say you have the following datetime values</p>
+<p>2009-05-12 11:13:19.667<br />
+2009-05-12 11:12:19.667<br />
+2009-05-12 11:33:19.667<br />
+2009-05-12 11:43:19.667<br />
+2009-05-12 11:03:19.667<br />
+2009-05-12 11:53:19.667<br />
+2009-05-12 11:53:19.667<br />
+2009-05-12 11:23:19.667<br />
+2009-05-12 12:13:19.667<br />
+2009-05-12 12:12:19.667<br />
+2009-05-12 13:33:19.667<br />
+2009-05-12 13:43:19.667<br />
+2009-05-12 14:03:19.667<br />
+2009-05-12 14:53:19.667<br />
+2009-05-12 15:53:19.667<br />
+2009-05-12 15:23:19.667</p>
+<p>What you want to do is break them into half hour blocks and count them, your output should look like this</p>
+<p>vCount	time<br />
+4	2009-05-12 11:00:00.000<br />
+4	2009-05-12 11:30:00.000<br />
+2	2009-05-12 12:00:00.000<br />
+2	2009-05-12 13:30:00.000<br />
+1	2009-05-12 14:00:00.000<br />
+1	2009-05-12 14:30:00.000<br />
+1	2009-05-12 15:00:00.000<br />
+1	2009-05-12 15:30:00.000</p>
+<p>This is simple to do with a CASE statement in SQL Server. First create the following table with sample data</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">table</span> #temp <span class="br0">&#40;</span>SomeDate <span class="kw1">datetime</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 11:13:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 11:12:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 11:33:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 11:43:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 11:03:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 11:53:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 11:53:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 11:23:19.667'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 12:13:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 12:12:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 13:33:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 13:43:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 14:03:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 14:53:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 15:53:19.667'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">values</span> <span class="br0">&#40;</span> <span class="st0">'2009-05-12 15:23:19.667'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create table #temp (SomeDate datetime)
+insert #temp values ( '2009-05-12 11:13:19.667')
+insert #temp values ( '2009-05-12 11:12:19.667')
+insert #temp values ( '2009-05-12 11:33:19.667')
+insert #temp values ( '2009-05-12 11:43:19.667')
+insert #temp values ( '2009-05-12 11:03:19.667')
+insert #temp values ( '2009-05-12 11:53:19.667')
+insert #temp values ( '2009-05-12 11:53:19.667')
+insert #temp values ( '2009-05-12 11:23:19.667')
+
+insert #temp values ( '2009-05-12 12:13:19.667')
+insert #temp values ( '2009-05-12 12:12:19.667')
+insert #temp values ( '2009-05-12 13:33:19.667')
+insert #temp values ( '2009-05-12 13:43:19.667')
+insert #temp values ( '2009-05-12 14:03:19.667')
+insert #temp values ( '2009-05-12 14:53:19.667')
+insert #temp values ( '2009-05-12 15:53:19.667')
+insert #temp values ( '2009-05-12 15:23:19.667')</pre></div></div>
+
+<p>Here is what the select statement looks like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="kw2">count</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">as</span> vCount,<span class="kw1">case</span> <span class="kw1">when</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>mi,Somedate<span class="br0">&#41;</span> <span class="sy0">&lt;</span> <span class="nu0">30</span> 
+<span class="kw1">then</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span>
+<span class="kw1">else</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi,<span class="nu0">30</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">end</span> <span class="kw1">as</span> <span class="kw1">time</span>
+<span class="kw1">from</span> #temp
+<span class="kw1">group</span> <span class="kw1">by</span> <span class="kw1">case</span> <span class="kw1">when</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>mi,Somedate<span class="br0">&#41;</span> <span class="sy0">&lt;</span> <span class="nu0">30</span> <span class="kw1">then</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span>
+&nbsp;<span class="kw1">else</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi,<span class="nu0">30</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">end</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select count(*) as vCount,case when datepart(mi,Somedate) &lt; 30 
+then dateadd(hh, datediff(hh, 0, Somedate)+0, 0)
+else dateadd(mi,30,dateadd(hh, datediff(hh, 0, Somedate)+0, 0)) end as time
+from #temp
+group by case when datepart(mi,Somedate) &lt; 30 then dateadd(hh, datediff(hh, 0, Somedate)+0, 0)
+ else dateadd(mi,30,dateadd(hh, datediff(hh, 0, Somedate)+0, 0)) end</pre></div></div>
+
+<p>As you can see we look at the minutes, if it is below 30 we make it 0 otherwise we make it 30.</p>
+<p>Here is the output again</p>
+<p>vCount	time<br />
+4	2009-05-12 11:00:00.000<br />
+4	2009-05-12 11:30:00.000<br />
+2	2009-05-12 12:00:00.000<br />
+2	2009-05-12 13:30:00.000<br />
+1	2009-05-12 14:00:00.000<br />
+1	2009-05-12 14:30:00.000<br />
+1	2009-05-12 15:00:00.000<br />
+1	2009-05-12 15:30:00.000</p>
+<p>Here is what the data looks side by side if you run the following query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> Somedate,<span class="kw1">case</span> <span class="kw1">when</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>mi,Somedate<span class="br0">&#41;</span> <span class="sy0">&lt;</span> <span class="nu0">30</span> <span class="kw1">then</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span>
+&nbsp;<span class="kw1">else</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi,<span class="nu0">30</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">end</span>
+<span class="kw1">from</span> #temp</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select Somedate,case when datepart(mi,Somedate) &lt; 30 then dateadd(hh, datediff(hh, 0, Somedate)+0, 0)
+ else dateadd(mi,30,dateadd(hh, datediff(hh, 0, Somedate)+0, 0)) end
+from #temp</pre></div></div>
+
+<p>Somedate<br />
+2009-05-12 11:13:19.667	2009-05-12 11:00:00.000<br />
+2009-05-12 11:12:19.667	2009-05-12 11:00:00.000<br />
+2009-05-12 11:33:19.667	2009-05-12 11:30:00.000<br />
+2009-05-12 11:43:19.667	2009-05-12 11:30:00.000<br />
+2009-05-12 11:03:19.667	2009-05-12 11:00:00.000<br />
+2009-05-12 11:53:19.667	2009-05-12 11:30:00.000<br />
+2009-05-12 11:53:19.667	2009-05-12 11:30:00.000<br />
+2009-05-12 11:23:19.667	2009-05-12 11:00:00.000<br />
+2009-05-12 12:13:19.667	2009-05-12 12:00:00.000<br />
+2009-05-12 12:12:19.667	2009-05-12 12:00:00.000<br />
+2009-05-12 13:33:19.667	2009-05-12 13:30:00.000<br />
+2009-05-12 13:43:19.667	2009-05-12 13:30:00.000<br />
+2009-05-12 14:03:19.667	2009-05-12 14:00:00.000<br />
+2009-05-12 14:53:19.667	2009-05-12 14:30:00.000<br />
+2009-05-12 15:53:19.667	2009-05-12 15:30:00.000<br />
+2009-05-12 15:23:19.667	2009-05-12 15:00:00.000</p>
+<p>To do the same for 15 minute blocks is just adding 2 more CASE statements</p>
+<p>Here is what that looks like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="kw2">count</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">as</span> vCount,<span class="kw1">case</span> <span class="kw1">when</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>mi,Somedate<span class="br0">&#41;</span> <span class="sy0">&lt;</span> <span class="nu0">15</span> 
+<span class="kw1">then</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span>
+<span class="kw1">when</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>mi,Somedate<span class="br0">&#41;</span> between <span class="nu0">15</span> and <span class="nu0">29</span>
+<span class="kw1">then</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi,<span class="nu0">15</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">when</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>mi,Somedate<span class="br0">&#41;</span> between <span class="nu0">30</span> and <span class="nu0">44</span>
+<span class="kw1">then</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi,<span class="nu0">30</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">else</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi,<span class="nu0">45</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">end</span> <span class="kw1">as</span> <span class="kw1">time</span>
+<span class="kw1">from</span> #temp
+<span class="kw1">group</span> <span class="kw1">by</span> <span class="kw1">case</span> <span class="kw1">when</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>mi,Somedate<span class="br0">&#41;</span> <span class="sy0">&lt;</span> <span class="nu0">15</span> 
+<span class="kw1">then</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span>
+<span class="kw1">when</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>mi,Somedate<span class="br0">&#41;</span> between <span class="nu0">15</span> and <span class="nu0">29</span>
+<span class="kw1">then</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi,<span class="nu0">15</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">when</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>mi,Somedate<span class="br0">&#41;</span> between <span class="nu0">30</span> and <span class="nu0">44</span>
+<span class="kw1">then</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi,<span class="nu0">30</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">else</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>mi,<span class="nu0">45</span>,<span class="kw2">dateadd</span><span class="br0">&#40;</span>hh, <span class="kw2">datediff</span><span class="br0">&#40;</span>hh, <span class="nu0">0</span>, Somedate<span class="br0">&#41;</span><span class="sy0">+</span><span class="nu0">0</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">end</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select count(*) as vCount,case when datepart(mi,Somedate) &lt; 15 
+then dateadd(hh, datediff(hh, 0, Somedate)+0, 0)
+when datepart(mi,Somedate) between 15 and 29
+then dateadd(mi,15,dateadd(hh, datediff(hh, 0, Somedate)+0, 0))
+when datepart(mi,Somedate) between 30 and 44
+then dateadd(mi,30,dateadd(hh, datediff(hh, 0, Somedate)+0, 0))
+else dateadd(mi,45,dateadd(hh, datediff(hh, 0, Somedate)+0, 0)) end as time
+from #temp
+group by case when datepart(mi,Somedate) &lt; 15 
+then dateadd(hh, datediff(hh, 0, Somedate)+0, 0)
+when datepart(mi,Somedate) between 15 and 29
+then dateadd(mi,15,dateadd(hh, datediff(hh, 0, Somedate)+0, 0))
+when datepart(mi,Somedate) between 30 and 44
+then dateadd(mi,30,dateadd(hh, datediff(hh, 0, Somedate)+0, 0))
+else dateadd(mi,45,dateadd(hh, datediff(hh, 0, Somedate)+0, 0)) end</pre></div></div>
+
+<p>vCount	time<br />
+3	2009-05-12 11:00:00.000<br />
+1	2009-05-12 11:15:00.000<br />
+2	2009-05-12 11:30:00.000<br />
+2	2009-05-12 11:45:00.000<br />
+2	2009-05-12 12:00:00.000<br />
+2	2009-05-12 13:30:00.000<br />
+1	2009-05-12 14:00:00.000<br />
+1	2009-05-12 14:45:00.000<br />
+1	2009-05-12 15:15:00.000<br />
+1	2009-05-12 15:45:00.000</p>
+<p>There are other ways to skin this cat and maybe I will follow up on this next week</p>
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/grouping-datetime-values-in-half-hour-bl/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+	</channel>
+</rss>

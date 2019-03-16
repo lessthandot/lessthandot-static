@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>reporting &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/reporting/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Using Razor as an Embedded Report Engine</title>
+		<link>/index.php/desktopdev/mstech/csharp/using-razor-as-an-embedded/</link>
+		<comments>/index.php/desktopdev/mstech/csharp/using-razor-as-an-embedded/#comments</comments>
+		<pubDate>Tue, 21 Jun 2011 20:30:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[C#]]></category>
+		<category><![CDATA[c#]]></category>
+		<category><![CDATA[razor]]></category>
+		<category><![CDATA[reporting]]></category>
+		<category><![CDATA[winforms]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/06/using-razor-as-an-embedded/</guid>
+		<description><![CDATA[When the Razor view engine for ASP.net MVC 3 was announced, I was not all that excited.  It is nice, and a bit more compact, but didn't seem to offer anything that special, especially compared to some of the other view engines that are out there.  Fast-&#8230;]]></description>
+				<content:encoded><![CDATA[<p>When the Razor view engine for ASP.net MVC 3 was announced, I was not all that excited.  It is nice, and a bit more compact, but didn&#8217;t seem to offer anything that special, especially compared to some of the other view engines that are out there.  Fast-forward a few months and our frustration with the SSRS-derived client reports available in .NET has come to a head.  For our needs (basic &#8216;fact sheet&#8217; type reports about entities) they are absurdly slow and support for them within Visual Studio is awful due to the lag between RDL and RDLC dialects.  Coming from more of a web development background, I naturally gravitated towards something HTML based.  I&#8217;ve had pretty good success with NHaml and Spark in ASP.net MVC before, so I looked at them, but found a need to reference System.Web along with both, which is a deal breaker (we&#8217;re looking to use these in a WinForms client application).</p>
+<h4>Enter Razor</h4>
+<p>All this searching led me back to <a href="http://razorengine.codeplex.com/">Razor</a>, the same view engine I&#8217;d said &#8216;meh&#8217; to when it was first released.  What immediately jumped out at me was a feature that I&#8217;d missed the first time around, namely that it can run <em>outside an asp.net app domain</em> for testability.  It can be invoked rather easily from code too:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw4">string</span> template <span class="sy0">=</span> <span class="st0">&quot;Hello @Model.Name! Welcome to Razor!&quot;</span><span class="sy0">;</span>
+<span class="kw4">string</span> result <span class="sy0">=</span> Razor<span class="sy0">.</span><span class="me1">Parse</span><span class="br0">&#40;</span>template, <span class="kw3">new</span> <span class="br0">&#123;</span> Name <span class="sy0">=</span> <span class="st0">&quot;World&quot;</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">string template = "Hello @Model.Name! Welcome to Razor!";
+string result = Razor.Parse(template, new { Name = "World" });</pre></div></div>
+
+<p>This certainly looked promising, so I set up a WinForms project to try it out.  Sure enough, it worked against the client profile, and about as easily as I could have hoped.  The key seems to be that it brings all of the web components it needs along for the ride in the included System.Web.Razor assembly.  </p>
+<p>The main calls to the static &#8220;Razor&#8221; class that we&#8217;re concerned with are:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw4">string</span> Parse<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="br0">&#40;</span>template, model<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw4">void</span> Compile <span class="br0">&#40;</span>template, type, name<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw4">string</span> Run<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="br0">&#40;</span>model, name<span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">string Parse&lt;T&gt; (template, model);
+void Compile (template, type, name);
+string Run&lt;T&gt; (model, name);</pre></div></div>
+
+<p>These methods don&#8217;t include everything available (such as the non-generic parse method used above) but everything we&#8217;ll need.  As I think the quoted example above shows, Razor.Parse compiles the supplied template and processes it using the model supplied.  The generic version does the same thing, only with a strongly-typed model.  Compile and Run are provided for more complex views, where it makes sense to compile once and run several times.  As easy as this all is, we can&#8217;t have static calls to Razor throughout our codebase.  This post will mainly cover a bit of infrastructure I put around the Razor engine to make it a bit more user friendly.</p>
+<h4>Encapsulating the Engine</h4>
+<p>I wanted this code to be at least a bit testable, so I put an interface comprised of the three methods listed above around the static engine.  Implementation is as you&#8217;d expect:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">RazorEngine</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> RazorReport <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> Engine<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="sy0">:</span> IEngine<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Compile <span class="br0">&#40;</span><span class="kw4">string</span> preparedTemplate, <span class="kw4">string</span> name<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Razor<span class="sy0">.</span><span class="me1">Compile</span> <span class="br0">&#40;</span>preparedTemplate, <span class="kw3">typeof</span> <span class="br0">&#40;</span>T<span class="br0">&#41;</span>, name<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">string</span> Run <span class="br0">&#40;</span>T model, <span class="kw4">string</span> name<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> Razor<span class="sy0">.</span><span class="me1">Run</span><span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="br0">&#40;</span>model, name<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">string</span> Parse <span class="br0">&#40;</span><span class="kw4">string</span> template, T model<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> Razor<span class="sy0">.</span><span class="me1">Parse</span><span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="br0">&#40;</span>template, model<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using RazorEngine;
+
+namespace RazorReport {
+    public class Engine&lt;T&gt; : IEngine&lt;T&gt; {
+        public void Compile (string preparedTemplate, string name) {
+            Razor.Compile (preparedTemplate, typeof (T), name);
+        }
+
+        public string Run (T model, string name) {
+            return Razor.Run&lt;T&gt; (model, name);
+        }
+
+        public string Parse (string template, T model) {
+            return Razor.Parse&lt;T&gt; (template, model);
+        }
+    }
+}</pre></div></div>
+
+<p>This makes it easy to confirm that the report building classes we&#8217;ll implement are interacting with the engine as expected later, ie:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> Recompiles_If_Stylesheet_Changed <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> mockery <span class="sy0">=</span> <span class="kw3">new</span> MockRepository <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> engine <span class="sy0">=</span> mockery<span class="sy0">.</span><span class="me1">StrictMock</span><span class="sy0">&lt;</span>IEngine<span class="sy0">&lt;</span>Example<span class="sy0">&gt;&gt;</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> templateName <span class="sy0">=</span> <span class="st0">&quot;recompileIfChange&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> template <span class="sy0">=</span> <span class="st0">&quot;template&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> css <span class="sy0">=</span> <span class="st0">&quot;STYLES&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> model <span class="sy0">=</span> <span class="kw3">new</span> Example <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">using</span> <span class="br0">&#40;</span>mockery<span class="sy0">.</span><span class="me1">Record</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; engine<span class="sy0">.</span><span class="me1">Compile</span> <span class="br0">&#40;</span>template, templateName<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; LastCall<span class="sy0">.</span><span class="me1">Repeat</span><span class="sy0">.</span><span class="me1">Twice</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; Expect<span class="sy0">.</span><span class="me1">Call</span> <span class="br0">&#40;</span>engine<span class="sy0">.</span><span class="me1">Run</span> <span class="br0">&#40;</span>model, templateName<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Repeat</span><span class="sy0">.</span><span class="me1">Twice</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="kw1">Return</span> <span class="br0">&#40;</span><span class="st0">&quot;return&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">using</span> <span class="br0">&#40;</span>mockery<span class="sy0">.</span><span class="me1">Playback</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> builder <span class="sy0">=</span> ReportBuilder<span class="sy0">&lt;</span>Example<span class="sy0">&gt;.</span><span class="me1">CreateWithEngineInstance</span> <span class="br0">&#40;</span>templateName, engine<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithTemplate</span> <span class="br0">&#40;</span>template<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithPrecompilation</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; builder<span class="sy0">.</span><span class="me1">BuildReport</span> <span class="br0">&#40;</span>model<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; builder <span class="sy0">=</span> builder<span class="sy0">.</span><span class="me1">WithCss</span> <span class="br0">&#40;</span>css<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; builder<span class="sy0">.</span><span class="me1">BuildReport</span> <span class="br0">&#40;</span>model<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void Recompiles_If_Stylesheet_Changed () {
+    var mockery = new MockRepository ();
+    var engine = mockery.StrictMock&lt;IEngine&lt;Example&gt;&gt; ();
+
+    var templateName = "recompileIfChange";
+    var template = "template";
+    var css = "STYLES";
+    var model = new Example ();
+
+    using (mockery.Record ()) {
+        engine.Compile (template, templateName);
+        LastCall.Repeat.Twice ();
+
+        Expect.Call (engine.Run (model, templateName)).Repeat.Twice ().Return ("return");
+    }
+
+    using (mockery.Playback ()) {
+        var builder = ReportBuilder&lt;Example&gt;.CreateWithEngineInstance (templateName, engine)
+            .WithTemplate (template)
+            .WithPrecompilation ();
+
+        builder.BuildReport (model);
+
+        builder = builder.WithCss (css);
+
+        builder.BuildReport (model);
+    }
+}</pre></div></div>
+
+<p>At first I kind of lamented the fact that this stuff is offered through a static class (primarily for testability reasons) but kind of came around after a while.  I&#8217;m sure having the engine static helps keep performance acceptable, and I&#8217;d rather be able to easily define a simple interface like this than be stuck with an interface that doesn&#8217;t quite do what I&#8217;d like.</p>
+<h4>Finding Templates</h4>
+<p>The other bit of code we need before getting started is a means of finding templates, both those included as embedded resources and those on the file system:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System.IO</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Reflection</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> RazorReport <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw4">class</span> TemplateFinder <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> GetTemplateFromResource <span class="br0">&#40;</span><span class="kw4">string</span> resourceName, Assembly assembly<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">using</span> <span class="br0">&#40;</span><span class="kw1">var</span> stream <span class="sy0">=</span> assembly<span class="sy0">.</span><span class="me1">GetManifestResourceStream</span> <span class="br0">&#40;</span>resourceName<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">using</span> <span class="br0">&#40;</span>TextReader reader <span class="sy0">=</span> <span class="kw3">new</span> StreamReader <span class="br0">&#40;</span>stream<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> reader<span class="sy0">.</span><span class="me1">ReadToEnd</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> GetTemplateFromFileSystem <span class="br0">&#40;</span><span class="kw4">string</span> templatePath<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> File<span class="sy0">.</span><span class="me1">ReadAllText</span> <span class="br0">&#40;</span>templatePath<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System.IO;
+using System.Reflection;
+
+namespace RazorReport {
+    class TemplateFinder {
+
+        public static string GetTemplateFromResource (string resourceName, Assembly assembly) {
+            using (var stream = assembly.GetManifestResourceStream (resourceName))
+            using (TextReader reader = new StreamReader (stream)) {
+                return reader.ReadToEnd ();
+            }
+        }
+
+        public static string GetTemplateFromFileSystem (string templatePath) {
+            return File.ReadAllText (templatePath);
+        }
+    }
+}</pre></div></div>
+
+<p>I guess you could argue that this needs to be a non-static class with an interface for testability.  And you&#8217;d be right.  But I am not sure I&#8217;d be convinced that it&#8217;s needed.</p>
+<h4>Building Reports</h4>
+<p>I think the idea of using a fluent interface for report builder configuration came up in a conversation with my usual <a href="/index.php/All/?disp=authdir&amp;author=225">remote pairing partner</a>.  The idea is that you would set up a report builder like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> builder <span class="sy0">=</span> ReportBuilder<span class="sy0">.</span><span class="me1">Create</span><span class="sy0">&lt;</span>Foo<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithTemplate</span><span class="br0">&#40;</span><span class="st0">&quot;template&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithStylesheet</span><span class="br0">&#40;</span><span class="st0">&quot;stylesheet&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithPrecompilation</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var builder = ReportBuilder.Create&lt;Foo&gt;()
+                  .WithTemplate("template")
+                  .WithStylesheet("stylesheet")
+                  .WithPrecompilation();</pre></div></div>
+
+<p>Or something along those lines.  It seemed to work well enough so I rolled with it.  The complete interface looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System.Reflection</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> RazorReport <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">interface</span> IReportBuilder<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IReportBuilder<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> WithTemplate <span class="br0">&#40;</span><span class="kw4">string</span> template<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IReportBuilder<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> WithCss <span class="br0">&#40;</span><span class="kw4">string</span> css<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IReportBuilder<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> WithTemplateFromFileSystem <span class="br0">&#40;</span><span class="kw4">string</span> templatePath<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IReportBuilder<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> WithCssFromFileSystem <span class="br0">&#40;</span><span class="kw4">string</span> cssPath<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IReportBuilder<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> WithTemplateFromResource <span class="br0">&#40;</span><span class="kw4">string</span> resourceName, Assembly assembly<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IReportBuilder<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> WithCssFromResource <span class="br0">&#40;</span><span class="kw4">string</span> resourceName, Assembly assembly<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IReportBuilder<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> WithPrecompilation <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> BuildReport <span class="br0">&#40;</span>T model<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System.Reflection;
+
+namespace RazorReport {
+    public interface IReportBuilder&lt;T&gt; {
+        IReportBuilder&lt;T&gt; WithTemplate (string template);
+        IReportBuilder&lt;T&gt; WithCss (string css);
+        IReportBuilder&lt;T&gt; WithTemplateFromFileSystem (string templatePath);
+        IReportBuilder&lt;T&gt; WithCssFromFileSystem (string cssPath);
+        IReportBuilder&lt;T&gt; WithTemplateFromResource (string resourceName, Assembly assembly);
+        IReportBuilder&lt;T&gt; WithCssFromResource (string resourceName, Assembly assembly);
+        IReportBuilder&lt;T&gt; WithPrecompilation ();
+
+        string BuildReport (T model);
+    }
+}</pre></div></div>
+
+<p>The only thing added was some methods to get templates / stylesheets from the file system or embedded resources if needed.  I thought about (and continue to think about) adding some kind of base template functionality, but I haven&#8217;t quite settled on how it should work so I&#8217;ve left it out for now.  There is definitely some interesting stuff in Razor that could help with this though.</p>
+<p>There isn&#8217;t time to cover everything, but calling BuildReport sends you through the following methods:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">string</span> BuildReport <span class="br0">&#40;</span>T model<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> precompile <span class="sy0">?</span> CompiledReport <span class="br0">&#40;</span>model<span class="br0">&#41;</span> <span class="sy0">:</span> Report <span class="br0">&#40;</span>model<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw4">string</span> CompiledReport <span class="br0">&#40;</span>T model<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>needsCompilation<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; engine<span class="sy0">.</span><span class="me1">Compile</span> <span class="br0">&#40;</span>PrepareTemplate <span class="br0">&#40;</span><span class="br0">&#41;</span>, name<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; needsCompilation <span class="sy0">=</span> <span class="kw1">false</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> engine<span class="sy0">.</span><span class="me1">Run</span> <span class="br0">&#40;</span>model, name<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw4">string</span> Report <span class="br0">&#40;</span>T model<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> engine<span class="sy0">.</span><span class="me1">Parse</span> <span class="br0">&#40;</span>PrepareTemplate <span class="br0">&#40;</span><span class="br0">&#41;</span>, model<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public string BuildReport (T model) {
+    return precompile ? CompiledReport (model) : Report (model);
+}
+
+string CompiledReport (T model) {
+    if (needsCompilation) {
+        engine.Compile (PrepareTemplate (), name);
+        needsCompilation = false;
+    }
+    return engine.Run (model, name);
+}
+
+string Report (T model) {
+    return engine.Parse (PrepareTemplate (), model);
+}</pre></div></div>
+
+<p>The needsCompilation flag gets flipped whenever the template or stylesheet gets changed, to ensure that any template modifications are picked up when using precompilation.</p>
+<h4>Enough Already, Where&#8217;s the Code?</h4>
+<p>If you&#8217;re interested in taking a look what I&#8217;ve got so far is over at <a href="https://github.com/AlexCuse/RazorReport/tree/initial-blogpost">github</a>.  It&#8217;s still a work in progress, and may undergo significant change.  I tagged the current state just so it will reflect what&#8217;s discussed here, but the trunk may be more interesting.  Feel free to offer suggestions that would make it more useful to you.  They will always be considered (especially if submitted as pull requests <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /> )</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/csharp/using-razor-as-an-embedded/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #13: What the Business Says Is Not What the Business Wants</title>
+		<link>/index.php/datamgmt/datadesign/tsql-tuesday-13/</link>
+		<comments>/index.php/datamgmt/datadesign/tsql-tuesday-13/#comments</comments>
+		<pubDate>Tue, 14 Dec 2010 10:09:43 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[cubes]]></category>
+		<category><![CDATA[olap]]></category>
+		<category><![CDATA[reporting]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[t-sql tuesday]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/12/tsql-tuesday-13/</guid>
+		<description><![CDATA[Steve Jones (Twitter &#124; Blog), The Voice of the DBA, is hosting the T-SQL Tuesday blogging fest over on SQLServerCentral.com this month.  The topic is one that has been a battle between DBAs, Developers and even managers since the creation of computing in the business itself.  It causes heated arguments, career changes, and trips to your psychiatrist and worst of all, more work and over-thinking that is ever needed for some projects.  What the Business Says Is Not What the Business Wants.]]></description>
+				<content:encoded><![CDATA[<p><a href="http://www.sqlservercentral.com/blogs/steve_jones/archive/2010/12/07/t_2D00_sql-tuesday-_2300_13-_2D00_-what-the-business-says-is-not-what-the-business-wants.aspx">
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/olap_1.gif" alt="" title="" width="154" height="154" align="left" /></div>
+<p></a></p>
+<p>Steve Jones (<a href="http://twitter.com/way0utwest">Twitter</a> | <a href="http://www.sqlservercentral.com/blogs/steve_jones/default.aspx">Blog</a>), The Voice of the DBA, is hosting the T-SQL Tuesday blogging fest over on <a href="http://www.sqlservercentral.com/blogs/steve_jones/archive/2010/12/07/t_2D00_sql-tuesday-_2300_13-_2D00_-what-the-business-says-is-not-what-the-business-wants.aspx">SQLServerCentral.com</a> this month.  The topic is one that has been a battle between DBAs, Developers and even managers since the creation of computing in the business itself.  It causes heated arguments, career changes, trips to your psychiatrist and worst of all, more work and over-thinking that is ever needed for some projects.  <i>What the Business Says Is Not What the Business Wants</i>.</p>
+<p><strong>The common theme</strong></p>
+<p>Business is growing, data is growing and your reporting solutions are suffering.  The Business comes to your hard working, Grade A Senior DBA and asks, &#8220;We need cubes and cool software to fix this slow and lame reporting issue we have&#8221;.</p>
+<p>The next steps in your reply to this question are the most critical to your OLTP database servers and countless sleepless nights trying to maintain endless database server problems.</p>
+<p><strong>The Business</strong></p>
+<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/olap_2.gif" alt="" title="" width="67" height="91" align="right" /></div>
+<p>Let’s get something out of the way: Business doesn’t care what you need to do, they want it now and they want exactly what they want.  I’m not against third party reporting solutions, cube generators and so on.  In fact, some of them are brilliant, intuitive and functional tools that are extremely efficient.  I’ve been involved in  decisions to purchase some of them and implement them.  They were all good experiences and successful for the most part.</p>
+<p><strong>Not what they want</strong></p>
+<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/olap_3.gif" alt="" title="" width="160" height="126" align="left" /></div>
+<p>What the business is venturing into here is OLAP (Online Analytical Processing).  OLAP sits on a warehouse (or multiple warehouses).  A warehouse in general is a data source in which one or more OLTP (Online Transaction Processing) data sources have been taken and collected into the centralized data source.  In most cases these OLTP data sources are denormalized for enhanced performance.  Denormalization is the method in which tables that have been normalized to some degree are taken and combined into one larger table.  This is all done while still retaining some integrity in keeping the data free of corruption (or making it dirty).  In all, denormalizing creates a great deal of redundancy.  Redundancy in reporting is normal though.  OLAP database servers are meant to handle this type of design with different configurations and hardware to ensure processing is as fast as possible given the designs.</p>
+<p>Recall the business request of throwing the vendor product into the existing database landscape in order to resolve the reporting issues.  The key that is missing is the need for a warehouse to sit behind that reporting solution.  Without this critical planning and implementation stage, reporting tools will not become a solution but only worsen the already troubled situation.  Now instead of reports that were created and reading from the OLTP sources, there will be cubes processing on-demand, users pulling directly from the OLTP sources with much higher level calculations and resource consumption will start to occur at much greater levels.  </p>
+<p><strong>Give them what they want</strong></p>
+<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/olap_4.gif" alt="" title="" width="109" height="109" align="left" /></div>
+<p>Even if you are one voice in a large data team, it is your job to speak up, knowing the problems that will endure from not properly putting the data source in place that the reporting solutions should be utilizing.  Yes, implementing a warehouse will take months and a large amount of planning and work.  The fact remains, though, that without the proper planning and implementation, your nights will be longer.  As hard as it is to sometimes to remember, business looks to you as a database professional to make the right choices to better the business.  These types of implementations are a large part of that.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/tsql-tuesday-13/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>The Lazy DBA Series: Monitoring</title>
+		<link>/index.php/datamgmt/datadesign/lazy-dba-monitoring-sql-server/</link>
+		<comments>/index.php/datamgmt/datadesign/lazy-dba-monitoring-sql-server/#respond</comments>
+		<pubDate>Sun, 22 Aug 2010 22:33:11 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[baseline]]></category>
+		<category><![CDATA[monitoring]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[red gate]]></category>
+		<category><![CDATA[reporting]]></category>
+		<category><![CDATA[sql response]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/08/lazy-dba-monitoring-sql-server/</guid>
+		<description><![CDATA[There are hundreds if not thousands of T-SQL Scripts, Powershell Cmdlets, .NET programs and even old vbscript scripts and on out there to monitor SQL Server and Operating System level performance.  I’ve written hundreds of them myself over the years.  All of that time and work absolutely paid off.  I know a lot about monitoring, going after the right information when something specific is wrong.  It also gives me a bag of tricks that mostly causes laptops to run out of disk space often.  Disk is cheap though, these days.]]></description>
+				<content:encoded><![CDATA[<p>There are hundreds if not thousands of T-SQL Scripts, Powershell Cmdlets, .NET programs and even old vbscript scripts out there to monitor SQL Server and Operating System level performance.  I&#8217;ve written hundreds of them myself over the years.  Without a doubt, all of that time and work absolutely paid off.  It helped me learn even more about monitoring the right things and going after the right information when something specific is wrong.  It also gives me a bag of tricks (folder named, BagOfTricks) that mostly causes laptops to run out of disk space often.  Disk is cheap these days, right?!</p>
+<p>Years ago I realized that writing all those scripts and running them in SSIS, SQL Agent and such was good, but was I being efficient?  Yes, I found that being lazy was far out of reach with these methods. Even making those scripts and programs as dynamic and mobile as they could be, there was always the fact that I had to write and update them along with implement them with in some cases, the same amount of work.  Not the most efficient way to spend time as a DBA.  I mean, business wants you to work for them, not for you.  As sad as that is, it often is the fact.  In all, writing scripts is a must and you need to in order to learn internals and become more familiar with the architecture of SQL Server and the Operating Systems they are running on.  I will always recommend that and real time troubleshooting with all of indicators we retrieve in these ways can never be replaced with anything else.  What about the return of investment to the company for overall monitoring?  Beyond real time troubleshooting when a problem is found?</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/lazydba.gif" alt="" title="" width="378" height="378" /></div>
+<p><strong>Monitoring by Next, Next, Finish</strong></p>
+<p>Recently I was honored to be accepted into the <a href="http://www.red-gate.com/about/community_relations/friends_of_RG.htm">Friends of Red Gate Program</a>.   Red Gate has always been known for being part in the community and giving a lot (and I mean, a lot!) back to us.  Having the opportunity to work with them is truly exciting.  While being a member of this program, I’ve had the chance to run some Red Gate tools that I previously had not been able to.  One of them was, SQL Response.   For this Lazy DBA topic, we are going to use <a href="http://www.red-gate.com/products/SQL_Response/index.htm">SQL Response</a> to discuss monitoring and using your time more efficiently.  First, let’s go over SQL Response briefly to set the stage for why it provides us with more efficient monitoring.</p>
+<p>I put SQL Response under the microscope and looked at everything it was doing, reading, using to do so and the impact had on my test database server.  The impact was very low (my word) and installation quick and painless.  In fact, SQL Response seems to use nothing more but what it has at its fingertips to use from SQL Server.  That being normal traces, DMVs and system tables/views.  These all are used to gather what it needs to successfully tell you, &#8220;There is a problem&#8221;.  As with any great monitoring tool, notifications by email are available in SQL Response.</p>
+<p>Most of the batches that SQL Response sent to the DB Server were clean and contained statements I think all of us rely on daily.   Things such as the normal check for Agent status, Query Plan Cache and OS performance from the dm_os list of DMV’s.  Very well formed as well.  </p>
+<p>The meat of SQL Response is there and is just enough to get the job done.  I’m the type of DBA that likes thin, easy to read and give me what I want, tools.  Leaving as little to no impact on the database servers while it does what I need.  This one does that by not adding a lot of &#8220;fluff&#8221; for the graphics and simply does the task is was handed.   Of course, everyone wants their reports and there needs some help in that area.  When it comes down to it, my worry is telling me when a problem exists before I have to deal with screaming users.  All of that without spending a half hour determining which animated gif is telling me know I have a CPU problem.</p>
+<p>The following is a snapshot of SQL Response showing my horribly starving disk on my laptop.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/lazydba_monitor.gif" alt="" title="" width="628" height="240" /></div>
+<p>There really isn’t much more to it than a clean and straight forward interface.  I like the fact that there is a recommendations section also.  This appears to be recommendations that are clear and precise. Most that I forced errors on the test database server showed recommendations that I would recommend as well.  That alone shows great thought was put into this good feature.</p>
+<p>So where is all of this going?  Being efficient in monitoring is as important as the last <a href="/index.php/DataMgmt/DBAdmin/lazy-dba-sql-trace">topic</a> we discussed.  Setting up custom monitoring on your own takes a lot of time and work and while that work is being done, your database server may be in trouble.  Enlisting the vendors that supply these monitoring tools and put extreme effort towards making them work for your needs is a way to put automation, real-time notifications and limited impacting tools in place quickly and safely.</p>
+<p><strong>Final Note</strong></p>
+<p>There never really is a last note about monitoring tools.  You still have to put work into deciding which one is best for you database servers and your unique methods of confronting the day as a DBA.  Choose them wisely and don’t throw something on top of a production database server without knowing exactly what it does, how it does it and if it itself, will cause unwanted problems with performance.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/lazy-dba-monitoring-sql-server/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Baseline, Performance Reporting and being a proactive DBA</title>
+		<link>/index.php/datamgmt/datadesign/sql-server-baseline/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-server-baseline/#comments</comments>
+		<pubDate>Thu, 05 Aug 2010 22:42:54 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[baseline]]></category>
+		<category><![CDATA[monitoring]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[reporting]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/08/sql-server-baseline/</guid>
+		<description><![CDATA[As database professionals, our intent is to be as proactive as possible when it comes to delivering data with security, stability and speed in mind. Being proactive means active monitoring, reporting performance variations and most important, baseline capture. Adding to these three objectives, we can add Performance Notes to also provide key points of long [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>As database professionals, our intent is to be as proactive as possible when it comes to delivering data with security, stability and speed in mind.  Being proactive means active monitoring, reporting performance variations and most important, baseline capture.  Adding to these three objectives, we can add Performance Notes to also provide key points of long term and short term performance problems. </p>
+<p>Let&#8217;s take a minute to discuss the three key points (Baselines, Active Monitoring and Reporting Performance)</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sbTightRope.jpg" alt="" title="" width="455" height="320" /></div>
+<p><strong>Baselines</strong></p>
+<p>Every system is unique.  We can say that even knowing databases can be the same across systems that are common per vendor installations because every business is unique.  Adding to business differences, users are another variable in the equation.  Bringing those together, we can come to an overall equation that will typically end in a varying result.</p>
+<p>Beyond normal performance tuning guidelines, capturing the unique impact on the database server is critical to know where performance during normal operations stands.  This allows managing of predictable performance changes and more importantly, monitoring of unpredictable performance variations.  Without baselines, we can tune database performance, but are not able to tune database performance to the fullest extent for the unique business and user impacts.</p>
+<p><strong>Active Monitoring</strong></p>
+<p>Active monitoring probably isn’t something unfamiliar.  There are several third party tools available to provide real-time monitoring of database servers.  With work, active monitoring can be achieved from within the feature set that SQL Server provides.  SQL Server Integration Services provides great value in monitoring operating system key performance indicators in next to real-time.  Power Shell can efficiently gather the same operating system level data and several other methods can apply.  (Five ways to do everything: pick the most efficient) Internally, Dynamic Management Views (DMV) and Dynamic Management Functions (DMF) provide a vast amount of information regarding performance.  These can be read, measured and notifications sent when thresholds are reached. </p>
+<p>Active monitoring means next to real-time notifications of severe and critical problems affecting the users.  This comes down to the seconds and minutes game.  In order to gather information in these intervals, the performance impact that we make on the servers must be taken into consideration itself.  The development and management that goes into third party monitoring tools is vast and focused.  This makes these tools friendlier in implementations and portability.  It allows us to achieve efficiency in performing our tasks as administrators.  However, each third party monitoring tool should be chosen and matched to the particular database landscape and internal guidelines.  A good example of this is, allowing system object to be installed on instances or security level access.  Some reporting options can even make the difference in decisions.  Chose them wisely and take advantage of trial editions to beat them up so there are no surprises or neighbor envy later on.</p>
+<p><strong>Reporting Performance</strong></p>
+<p>Reporting performance can be confused with real-time monitoring but it is very different.  Over time, databases change and their needs change along with them.  In some cases this change is drastic and others can take months to happen.  Reporting on overall performance over time periods will show these changes.  Gradual progressive changes can show either performance problems or growth itself requiring action to prepare for the future.</p>
+<p>Database growth for example is captured over long periods of time.  This falls into reporting performance for the reason we can plan to handle the growth in the future.  We can also perform tasks such as expanding the size of the database when required.  This can prevent unwanted growth during peak operating times and essentially high resource consumption and directly affecting the users.<br />
+Below in the graph, we see the green points as actual growth.  With this we can forecast the growth into the future.  Without this data we may not know that in Month 11 we will need to either expand disk or replace the entire subsystem itself to handle the growth.  With that growth, resources will be consumed more so hardware upgrades to the server itself may be required.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/baseline_1.gif" alt="" title="" width="396" height="291" /></div>
+<p>Reporting performance is where the term, Performance Note is introduced.  </p>
+<p><strong>Performance Notes</strong></p>
+<p>These events can occur over months, days and even hours.  They are subtle and large spikes from the baseline performance we captured from normal performance impacts.  These events are typically not performance problems that directly affect the users but neglected over time, can become severe problems.</p>
+<p>Take the graph below for an example where CPU usage over a day is represented.  In the graph we see in the beginning of the day, utilization is very low.  Then at a certain time, CPU starts showing normal activity.  In the middle of the day a large spike in CPU occurs.  This spike should be noted and in the following days monitoring of the performance notations should be done if it is unknown to the baseline.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/baseline_2.gif" alt="" title="" width="628" height="178" /></div>
+<p>Below is a graph of CPU usage over the two days after making the observation of the spike in CPU.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/baseline_3.gif" alt="" title="" width="628" height="119" /></div>
+<p>We can see that the spikes occur in both days and similar times.<br />
+These performance notes should be looked into closely to determine what is impacting the CPU usage during the time of the spikes.  Often the spikes are found to be normal business operations but in some cases they are found to be performance problems that should be resolved.</p>
+<p>With this we can put perfmon/profiler and other tools at our disposal to work by collecting more detailed information during and around the spike in resource consumption.  For example, if we see Processor Time counter high and correlate that to other common CPU counters and SQL counters, we can determine if we have common CPU bottlenecks like compilations, recompilation, parameterization etc&#8230; issues or simply a query that was introduced to the database server without our knowledge.  Then we can act quickly on it by optimization of resources or the query(s) taking part in the spikes.</p>
+<p><strong>Conclusion</strong></p>
+<p>Given the methods you can take to be proactive on SQL Server to ensure problems are limited to your knowledge is a stable of being successful in delivering data to the business.  With the steps and types of monitoring and reporting described, most situations can be caught, analyzed and resolved swiftly.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-server-baseline/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

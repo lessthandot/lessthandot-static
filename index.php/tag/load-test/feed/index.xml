@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>load test &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/load-test/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Upgrading from MVC3 to MVC4 and MVC4 Async</title>
+		<link>/index.php/webdev/serverprogramming/aspnet/upgrading-from-mvc3-to-mvc4/</link>
+		<comments>/index.php/webdev/serverprogramming/aspnet/upgrading-from-mvc3-to-mvc4/#comments</comments>
+		<pubDate>Tue, 16 Jul 2013 18:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[load test]]></category>
+		<category><![CDATA[mvc 4]]></category>
+		<category><![CDATA[mvc music store]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/07/upgrading-from-mvc3-to-mvc4/</guid>
+		<description><![CDATA[The other day I succumbed to the urge to upgrade my customized version of MVC Music store from ASP.Net MVC3 to MVC4. I had just finished watching Steve Sanderson's excellent TechDays 2012 session, C#5, ASP.NET MVC 4, and asynchronous Web applications (if you're doing ASP.Net MVC and haven't watched it, queue it up, awesome presentation).]]></description>
+				<content:encoded><![CDATA[<p>The other day I succumbed to the urge to upgrade my customized version of <a href="/index.php/All/mvc+music+store:" title="All LTD blog posts on MVC Music Store">MVC Music store</a> from ASP.Net MVC3 to MVC4. I had just finished watching Steve Sanderson&#8217;s excellent TechDays 2012 session, <a href="http://channel9.msdn.com/Events/TechDays/Techdays-2012-the-Netherlands/2287" title="C#5, ASP.NET MVC 4, and asynchronous Web applications on Channel9">C#5, ASP.NET MVC 4, and asynchronous Web applications</a> (if you&#8217;re doing ASP.Net MVC and haven&#8217;t watched it, queue it up, awesome presentation). During the presentation, Steve used Apache Bench to show the improvements as he upgraded his small project from synchronous MVC4 to asynchronous MVC4, which got me wondering what effect MVC4 and Asynchronous MVC4 would show during the <a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-the-load" title="Continuous Delivery - Adding the Load testing Stage">wcat load test step</a> in my MVC Music Store build process.</p>
+<h2>The Upgrade to MVC4</h2>
+<p>Upgrading from MVC3 to MVC4 was easy. I followed the instructions from the <a href="http://www.asp.net/whitepapers/mvc4-release-notes#_Toc303253806">MVC4 release notes</a> and committed my changes. </p>
+<p>I installed Visual Studio 2012 on my build server (including .Net 4.5) so the build would run. Installing a copy on build servers is allowed under visual studio licensing models and while some people try to create a &#8216;pure&#8217; non-VS build experience, I think the only advantage one gets from this model is ensuring the production application is compiled in a different manner from the one the developers built and tested under.</p>
+<p>VS upgraded, .Net upgraded, MVC upgraded, time to commit and push.</p>
+<p>Build running, deploying for smoke test, failed. Page Won&#8217;t Load.</p>
+<h3>Still Copying MVC3 DLLs to Build Output</h3>
+<p>The CI build step runs the build and creates a publishable package that will be archived for all later build stages and final deployment. The last step of the CI stage deploys the package to a VM and does an HTTP GET on the front page, just to ensure it&#8217;s deployable. Turns out the site deployed fine, but the front page refused to display.</p>
+<p><img src="http://tiernok.com/LTDBlog/MVC4/folders.png" alt="Project folders" style="margin: .5em .5em .5em 0; float: left;" />Deploying MVC3 early on took advantage of a special folder named _bin_deployableAssemblies, so MSBuild was overwriting the MVC4 assemblies with the contents of this folder (MVC3) and then giving me errors on the razor stack when I tried to actually load the page. The build server didn&#8217;t mind because it was using either GAC&#8217;d or Reference Assemblies instead of the local DLLs.</p>
+<p>I initially delete the folder to fix this, which turned out to be overkill because I also had SQL Server CE assemblies in there. The final result was to clear out just the MVC3 assemblies from the folder, leaving the SQL Server CE ones.</p>
+<p>I ran several builds through the load test step, with interesting results that I&#8217;ll show at the bottom.</p>
+<h2>The Upgrade to Asynchronous</h2>
+<p>I&#8217;ll be the first to call my changes hacky. In a prior post, I <a href="/index.php/DesktopDev/MSTech/CSharp/pick-the-right-storage-all" title="Pick the Right Storage: All SQL is Not Equal">switched SQL CE for full SQL Server</a> to fix a performance bottleneck. With the known bottleneck removed, I wasn&#8217;t sure what the current one was or if  Asynchronous MVC would improve things further, but I had high hopes.</p>
+<p>You can see the final result on <a href="https://bitbucket.org/tarwn/mvcmusicstore.main/src" title="MVCMusicStore.Main on BitBucket">BitBucket</a>, but here&#8217;s a sample of the quick and dirty surgery:</p>
+<p><b>MVCMusicStore.Main / MvcMusicStore / Controllers / HomeController.cs</b> (<a href="https://bitbucket.org/tarwn/mvcmusicstore.main/src/a3f3c943c685906a8986c2ce94c79db8bc04a577/MvcMusicStore/Controllers/HomeController.cs?at=default" title="File on BitBucket">see file</a>)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+</pre></td><td class="de1"><pre class="de1">using System.Collections.Generic;
+using System.Linq;
+using System.Web.Mvc;
+using MvcMusicStore.Models;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
+&nbsp;
+namespace MvcMusicStore.Controllers {
+&nbsp; &nbsp; &nbsp; &nbsp; [SuppressMessage(&quot;Gendarme.Rules.Exceptions&quot;, &quot;UseObjectDisposedExceptionRule&quot;, Justification = &quot;If the controller is disposed mid-call we have bigger issues&quot;)]
+&nbsp; &nbsp; &nbsp; &nbsp; public class HomeController : ControllerBase {
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; public HomeController() { }
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; public HomeController(IMusicStoreEntities storeDb) : base(storeDb) { }
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // GET: /Home/
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; public async Task&lt;ActionResult&gt; IndexAsync() {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // Get most popular albums
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var albums = await GetTopSellingAlbumsAsync(5);
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return View(albums);
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; private async Task&lt;List&lt;Album&gt;&gt; GetTopSellingAlbumsAsync(int count) {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // Group the order details by album and return
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // the albums with the highest count
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return await Task.Factory.StartNew&lt;List&lt;Album&gt;&gt;(() =&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return StoreDB.Albums
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .OrderByDescending(a =&gt; a.OrderDetails.Count())
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .Take(count)
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .ToList();
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; });
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; &nbsp; &nbsp; }
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System.Collections.Generic;
+using System.Linq;
+using System.Web.Mvc;
+using MvcMusicStore.Models;
+using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
+
+namespace MvcMusicStore.Controllers {
+        [SuppressMessage("Gendarme.Rules.Exceptions", "UseObjectDisposedExceptionRule", Justification = "If the controller is disposed mid-call we have bigger issues")]
+        public class HomeController : ControllerBase {
+
+                public HomeController() { }
+                public HomeController(IMusicStoreEntities storeDb) : base(storeDb) { }
+
+                //
+                // GET: /Home/
+                public async Task&lt;ActionResult&gt; IndexAsync() {
+                        // Get most popular albums
+                        var albums = await GetTopSellingAlbumsAsync(5);
+                        
+                        return View(albums);
+                }
+
+                private async Task&lt;List&lt;Album&gt;&gt; GetTopSellingAlbumsAsync(int count) {
+                        // Group the order details by album and return
+                        // the albums with the highest count
+                        return await Task.Factory.StartNew&lt;List&lt;Album&gt;&gt;(() =&gt;
+                        {
+                                return StoreDB.Albums
+                                                                .OrderByDescending(a =&gt; a.OrderDetails.Count())
+                                                                .Take(count)
+                                                                .ToList();
+                        });
+                }
+        }
+}</pre></div></div>
+
+<p>Each action has been converted to an async method returning a Task&lt;ActionResult&gt; and my ControllerBase object now inherits from AsyncController instead of Controller.</p>
+<p>Because the query logic for this application is spread all over the place (which is common for entity framework in my experience), in some places I have tidy await calls to Async methods (like in the IndexAsync method above), and in some cases I have an inline await Task.Factory call (GetTopSellingAlbumsAsync action). <a href="http://entityframework.codeplex.com/wikipage?title=Roadmap" title="Entity Framework Roadmap">Entity Framework 6</a> will have asynchronous Query and Save capabilities, but I personally don&#8217;t care much for Entity Framework, so it&#8217;s unlikely I&#8217;ll go through the effort of upgrading this project from EF4 to EF6. In the meantime, I have added my own SaveAsync call to the IMusicStoreEntities interface and DbContext implementation and have added some dirty await/async calls throughout the codebase.</p>
+<p>Final result? </p>
+<h2>Graphs and Numbers, woohoo!</h2>
+<p>So what happened when I upgrade to MVC4? faster, slower, &#8230; ? And how much faster did Asynchronous actions make it? 1 order of magnitude? 2 orders?</p>
+<p>What happened was object lessons in why having load measurements are useful and why identifying your performance bottlenecks is critical, instead of treating asynchronous actions as magic pixie dust.</p>
+<div style="text-align:center;">
+   <img src="http://tiernok.com/LTDBlog/MVC4/rate.png" alt="Load test - Request Rates" />
+</div>
+<p>On the left side of this graph you can see that the MVC 3 rate has averaged 75 requests/second with a pretty high level of variability. Switching to MVC4 moved us to a much more consistent 95-100 requests/second average, then throwing async in the mix reduced the rate to the 80&#8217;s. In each case, the requests are all of the files our browser would request when we browse the index page, select a genre to the genre page, select an album to the album page, and then check out, so some of this is dynamic content and some is static image and script files.</p>
+<div style="text-align:center;">
+   <img src="http://tiernok.com/LTDBlog/MVC4/responseTime.png" alt="Load test - Response Times" />
+</div>
+<p>The other interesting number is the lack of difference in Response Times. Somehow MVC4 unlocked more throughput for the system without impacting the Response Time for those requests. There was also no change at all in Response Times at all after adding Async actions, something that underlines and bolds the fact that the database calls were not the performance bottleneck for these test VMs.</p>
+<h2>I Should Upgrade to MVC4 Now!</h2>
+<p>Well, yes, you should, but don&#8217;t expect a matching 30% performance improvement. This improvement was in my test systems which are all VMs residing on the same Hyper-V server, running simulated loads that don&#8217;t match what real traffic would look like on a real site with real networks and real servers. That being said, the point of the load test step is to let me know when something significant occurs and there was definitely a measurable, positive performance improvement when I performed the upgrade. Given the fact that I don&#8217;t have a pouch of magic pixie dust, I have to assume that either MVC 4 or .Net 4.5 made some improvements.</p>
+<p>The moral of the async upgrade is to be aware of your assumptions. In the real world, had I made async-ified my codebase to get a performance improvement, I would have just added a great deal of extra code complexity for a net loss in performance. There was no science to my guess that async would make things faster, it was pure guesswork.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/aspnet/upgrading-from-mvc3-to-mvc4/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Pick the Right Storage: All SQL is Not Equal</title>
+		<link>/index.php/desktopdev/mstech/csharp/pick-the-right-storage-all/</link>
+		<comments>/index.php/desktopdev/mstech/csharp/pick-the-right-storage-all/#respond</comments>
+		<pubDate>Tue, 26 Jun 2012 10:38:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[C#]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[load test]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/06/pick-the-right-storage-all/</guid>
+		<description><![CDATA[As part of a long series of posts, I implemented a version of the MVC Music Store tutorial application on top of a pair of SQL Server CE databases. SQL Server CE is great for small apps, being a portable file-based database that can easily be moved to a full SQL Server instance. Last week I migrated my application to use full SQL Server instances instead of the SDF file and picked up a 3x performance improvement. It was interesting enough that I decided to share :)]]></description>
+				<content:encoded><![CDATA[<p>As part of a long series of posts, I implemented a version of the MVC Music Store tutorial application on top of a pair of SQL Server CE databases. SQL Server CE is great for small apps, being a portable file-based database that can easily be moved to a full SQL Server instance. Last week I migrated my application to use full SQL Server instances instead of the SDF file and picked up a 3x performance improvement. It was interesting enough that I decided to share <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p><i>Note: I wasn&#8217;t purposefully performance tuning my sample site. This move was a necessary step to prep for doing some other SQL Server related things with the project and the performance improvement was just a neat side effect.</i></p>
+<h2>The Results</h2>
+<p>The graph below shows the results of the load test stage of my build over several builds. </p>
+<p><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/SqlServerLoadTestRates.png" alt="Graph of Requests/Second and Transactions/Second" /></p>
+<p>We start with the Rate graph. On the left we see a rate of about 30 requests/second from when the system was still on the SQL Server CE file and the build and beta VMs resided on their original home (i7 920, VMWare, using Hyper-V equivalent of 2 logical CPUs). In the middle we have the move to their new home (i7 3770K, Hyper-V 2012) still on the SQL Server CE file and switching from one to two virtual CPUs assigned to the beta web server. The last third is the results of moving the primary database to a SQL Server VM, which improved the performance by roughly 3x and appears to have found a new performance constraint.</p>
+<p>The transaction rate has gone from about 1.8 to about 4.8 per second.</p>
+<p><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/SqlServerLoadTestResponses.png" alt="Graph of time to last response for minimum, average, 95%, 99%, and maximum" /></p>
+<p>We can see the response times have been fairly stable, up to the 99% mark, with the max being a little wonky. The 95% and average marks have gone from averaging 650ms and 250ms on the original server with CE to 450ms and 80ms respectively on SQL Server.</p>
+<h2>The Details</h2>
+<p>The data for these results are generated automatically as part of the <a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="See more information in the Continuous Delivery wiki entry">build process</a> for my application. I have 3 dedicated VMs for the build server, a web server, and a database server and they are all currently housed on a 2012 Hyper-V server. Each is assigned about 2GB of RAM and 2, 1, 1 CPUs for the web, build, and DB server respectively. The host has nothing else running on it and is an i7 3770K w/ 16GB of high speed RAM behind it and mirrored standard drives on SATA III.</p>
+<p>The data was collected as part of the <a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-the-load" title="Implementing the Automated Load test blog post">automated Load Test</a> step of the build process. During this step, the build server deploys a copy of the application to a website on the web VM and then spins up WCAT to <a href="/index.php/EnterpriseDev/application-lifecycle-management/implementing-wcat-for-load-testing" title="Implementing WCAT to test a website">load test the site</a>. There is an incremental spin up period that warms up the site and connection pool, followed by a 2.5 minute sustained test where WCAT runs as fast as it can against the site. </p>
+<p>The load test is a full transaction that makes the same requests a real world browser makes as it selects an album, adds it to a cart, and then checks out, including static content and dynamic content. Each transaction is in a unique session and reports the appropriate headers with each HTTP request. The increase from 1.8 to 4.8 transactions per second can be restated as an increase from 1.8 to 4.8 individual purchases per second.</p>
+<p>The site is still on SQL CE for the membership database, which is used during the checkout, and it is using Entity Framework 4 for data access to SQL Server (so more headroom for improvement if I was actually tuning for performance).</p>
+<p>After seeing the increase I thought it would be interesting to share the numbers as well as how useful it is to have a short load test as part of the delivery pipeline.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/csharp/pick-the-right-storage-all/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

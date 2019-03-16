@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>ajax &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/ajax-2/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Handling Unauthenticated AJAX Requests</title>
+		<link>/index.php/webdev/uidevelopment/handling-unauthenticated-ajax-requests/</link>
+		<comments>/index.php/webdev/uidevelopment/handling-unauthenticated-ajax-requests/#respond</comments>
+		<pubDate>Wed, 15 Feb 2012 11:12:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[UI Development]]></category>
+		<category><![CDATA[ajax]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[jquery]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/02/handling-unauthenticated-ajax-requests/</guid>
+		<description><![CDATA[A common pattern that I use in creating ajaxy applications is to return a small HTML fragment from the request, and then inject this fragment into the DOM in the callback executed after a successful request.  This tends to be a bit simpler than returnin&#8230;]]></description>
+				<content:encoded><![CDATA[<p>A common pattern that I use in creating ajaxy applications is to return a small HTML fragment from the request, and then inject this fragment into the DOM in the callback executed after a successful request.  This tends to be a bit simpler than returning JSON and picking it apart to update the page, but it has one major problem, at least when using normal forms authentication.  If the user gets logged out (either by logging out from another tab or an expiring session), the AJAX request gets redirected to the login page, which is then returned and inserted into the page.  You can see how hideous this can become in the picture below.</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/WebDev/handling-unauthenticated-ajax-requests/bad-logon.PNG?mtime=1328983889"><img alt="" src="/wp-content/uploads/blogs/WebDev/handling-unauthenticated-ajax-requests/bad-logon.PNG?mtime=1328983889" width="941" height="644" /></a></div>
+<p>In this case, when you sign up for a task it is supposed to return the updated task, and use this task to replace the notecard into the DOM on the right hand side.  It can actually get uglier, as we support signing up for multiple tasks at a time.  However, if the session expires we get a big, ugly login page displayed in the midst of all our pretty notecards.  What I&#8217;d like to find is a way to retain the convenience of using forms authentication, but handle scenarios like this more gracefully.</p>
+<p>Adding a piece of metadata to the login page seemed like a good way to get this done without making things any harder on the user.  I initially wanted to get the login page classified as an error, so that redirection could be accomplished on the client side using the error callback available when using jQuery for AJAX requests.  This would be nice, but in jQuery 1.5 and above a &#8220;statusCode&#8221; callback has been added that is even nicer.  You can use the callback like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">$.<span class="me1">ajax</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; statusCode<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="nu0">404</span><span class="sy0">:</span> <span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; alert<span class="br0">&#40;</span><span class="st0">'page not found'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$.ajax({
+  statusCode: {
+    404: function() {
+      alert('page not found');
+    }
+  }
+});</pre></div></div>
+
+<p>The ease with which this allows you to define behavior for different status codes is fantastic.  As I set off down this path, the most obvious choice seemed to be adding a 401 (unauthorized) status code to the login page, but this got us into a weird redirect loop because forms authentication redirects all 401&#8217;s to the login page &#8211; causing you lose the return URL, and redirect users back to the login page once they are authenticated.  Not exactly a paragon of usability.</p>
+<p>Having found this out the hard way, I decided a custom status code might be better.  It&#8217;s easy enough to add the custom status code to the login page with a single line of C#:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Response<span class="sy0">.</span><span class="me1">StatusCode</span> <span class="sy0">=</span> <span class="nu0">999</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Response.StatusCode = 999;</pre></div></div>
+
+<p>We can then make our requests using something along these lines:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1">$.<span class="me1">ajax</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; type<span class="sy0">:</span> <span class="st0">'POST'</span><span class="sy0">,</span>
+&nbsp; &nbsp; url<span class="sy0">:</span> <span class="st0">'/Task/SignUp'</span><span class="sy0">,</span>
+&nbsp; &nbsp; data<span class="sy0">:</span> <span class="st0">'projectId='</span> <span class="sy0">+</span> pid <span class="sy0">+</span> <span class="st0">'&amp;storyId='</span> <span class="sy0">+</span> sid <span class="sy0">+</span> <span class="st0">'&amp;id='</span> <span class="sy0">+</span> id <span class="sy0">+</span> <span class="st0">'&amp;initials='</span> <span class="sy0">+</span> initials<span class="sy0">,</span>
+&nbsp; &nbsp; success<span class="sy0">:</span> <span class="kw1">function</span> <span class="br0">&#40;</span>html<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; $<span class="br0">&#40;</span><span class="st0">'#'</span> <span class="sy0">+</span> id<span class="br0">&#41;</span>.<span class="me1">replaceWith</span><span class="br0">&#40;</span>html<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp; &nbsp; statusCode<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="nu0">999</span><span class="sy0">:</span> <span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; location.<span class="me1">href</span> <span class="sy0">=</span> <span class="st0">'/Account/LogOn?returnUrl='</span> <span class="sy0">+</span> location.<span class="me1">href</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$.ajax({
+    type: 'POST',
+    url: '/Task/SignUp',
+    data: 'projectId=' + pid + '&amp;storyId=' + sid + '&amp;id=' + id + '&amp;initials=' + initials,
+    success: function (html) {
+        $('#' + id).replaceWith(html);
+    },
+    statusCode: {
+        999: function() {
+            location.href = '/Account/LogOn?returnUrl=' + location.href;
+        }
+    }
+});</pre></div></div>
+
+<p>This works well enough, at least from cassini.  When deployed to an IIS server however, we noticed that the 999 status code was getting picked up by the error handling modules, and of course we did not have an error page set up for that code.  To get around that we had to add the following to the code to display our login view:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Response<span class="sy0">.</span><span class="me1">TrySkipIisCustomErrors</span> <span class="sy0">=</span> <span class="kw1">true</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Response.TrySkipIisCustomErrors = true;</pre></div></div>
+
+<p>That&#8217;s kind of nasty, but it seems to allow us to accomplish our goal.  I think I can stomach it on this one page in the name of improving the user&#8217;s experience on the site.  </p>
+<p>There&#8217;s one more thing we can do to make our lives easier.  There is no special behavior in our statusCode handler, so it would be nice define it only once.  Luckily, the folks at jQuery are a step ahead of us.  We can define our statusCode handler using the ajaxSetup method in our master page:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">$.<span class="me1">ajaxSetup</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; statusCode<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="nu0">999</span><span class="sy0">:</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; location.<span class="me1">href</span> <span class="sy0">=</span> <span class="st0">'/Account/LogOn?returnUrl='</span> <span class="sy0">+</span> location.<span class="me1">href</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$.ajaxSetup({
+    statusCode: {
+        999: function () {
+            location.href = '/Account/LogOn?returnUrl=' + location.href;
+        }
+    }
+});</pre></div></div>
+
+<p>Now that everything is set up, we are properly redirected to the login page:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/WebDev/handling-unauthenticated-ajax-requests/good-logon.PNG?mtime=1328987447"><img alt="" src="/wp-content/uploads/blogs/WebDev/handling-unauthenticated-ajax-requests/good-logon.PNG?mtime=1328987447" width="557" height="435" /></a></div>
+<p>I&#8217;m not sure this is the best solution to our problem, but it is certainly a solution.  It allows us to keep leveraging ASP.net&#8217;s built in error handling and authentication (I know they aren&#8217;t perfect, but they are good enough for us in this scenario) while making the user&#8217;s life a bit easier in the event something goes wrong.  In this case, my team is the primary user of the application so it makes our lives easier <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p>Complete source code for the application in question is available on <a href="https://github.com/jawsthegame/PivotalExtension">github</a>.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/uidevelopment/handling-unauthenticated-ajax-requests/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>ASP.NET MVC 2 RTM for Visual Studio 2008 SP1 Released</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-rtm-for-visual-studio-2008/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-rtm-for-visual-studio-2008/#respond</comments>
+		<pubDate>Thu, 11 Mar 2010 13:11:26 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[ajax]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[iis]]></category>
+		<category><![CDATA[mvc]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/03/asp-net-mvc-2-rtm-for-visual-studio-2008/</guid>
+		<description><![CDATA[Microsoft has released ASP.NET MVC 2 RTM for Visual Studio 2008 SP1. Note Because Visual Studio 2008 and Visual Studio 2010 RC share a component of ASP.NET MVC 2, installing the ASP.NET MVC 2 RTM release on a computer where Visual Studio 2010 RC is also installed is not supported. New Features in ASP.NET MVC [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Microsoft has released ASP.NET MVC 2 RTM for Visual Studio 2008 SP1.</p>
+<p><em>Note   Because Visual Studio 2008 and Visual Studio 2010 RC share a component of ASP.NET MVC 2, installing the ASP.NET MVC 2 RTM release on a computer where Visual Studio 2010 RC is also installed is not supported.</em></p>
+<p><strong>New Features in ASP.NET MVC 2 RTM</strong><br />
+The following features are new since the RC release of ASP.NET MVC 2.<br />
+Templated Helpers Allow You to Specify Extra View Data<br />
+ASP.NET MVC 2 now includes new overloads of the EditorFor and DisplayFor methods. These overloads contain a parameter that accepts an anonymous object that can be used to provide extra view data. The view data provided in this parameter is merged with any existing view data that is passed to the template.</p>
+<p>ASP.NET MVC 2 RTM for Visual Studio 2008 SP1 can be downloaded from the following page: http://go.microsoft.com/fwlink/?LinkID=157074</p>
+<p>Make sure to also download and read ASP.NET-MVC-2-RTM-Release-Notes.doc. This document has the release notes and the know issues.</p>
+<p>To learn how to upgrade an ASP.NET MVC 1.0 application to ASP.NET MVC 2 in Visual Studio 2008 SP1 visit this link: http://www.asp.net/learn/whitepapers/aspnet-mvc2-upgrade-notes/</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-rtm-for-visual-studio-2008/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>jQuery will ship with ASP.NET MVC and Visual Studio!</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/jquery-will-ship-with-asp-net-mvc-and-vi/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/jquery-will-ship-with-asp-net-mvc-and-vi/#respond</comments>
+		<pubDate>Mon, 29 Sep 2008 11:06:08 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[ajax]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[intellisense]]></category>
+		<category><![CDATA[javascript]]></category>
+		<category><![CDATA[jquery]]></category>
+		<category><![CDATA[mvc]]></category>
+		<category><![CDATA[visual studio]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/09/jquery-will-ship-with-asp-net-mvc-and-vi/</guid>
+		<description><![CDATA[Now here is some exciting news if you are a web developer in a MSFT shop. Microsoft will ship jQuery with ASP.NET MVC and Visual Studio. John Resig writes: Microsoft is looking to make jQuery part of their official development platform. Their JavaScript offering today includes the ASP.NET Ajax Framework and they’re looking to expand [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Now here is some exciting news if you are a web developer in a MSFT shop. Microsoft will ship jQuery with ASP.NET MVC and Visual Studio.<br />
+John Resig writes:<br />
+<blockquote>Microsoft is looking to make jQuery part of their official development platform. Their JavaScript offering today includes the ASP.NET Ajax Framework and they’re looking to expand it with the use of jQuery. This means that jQuery will be distributed with Visual Studio (which will include jQuery intellisense, snippets, examples, and documentation).</p>
+<p>Additionally Microsoft will be developing additional controls, or widgets, to run on top of jQuery that will be easily deployable within your .NET applications. jQuery helpers will also be included in the server-side portion of .NET development (in addition to the existing helpers) providing complementary functions to existing ASP.NET AJAX capabilities.</p></blockquote>
+<p>Sweet, you will get jQuery intellisense <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p>Read Jogn Resig&#8217;s announcement here: http://jquery.com/blog/2008/09/28/jquery-microsoft-nokia/</p>
+<p>Read Scott Guthrie&#8217;s post here: http://weblogs.asp.net/scottgu/archive/2008/09/28/jquery-and-microsoft.aspx</p>
+<p>Bertrand Le Roy has also a post here: http://weblogs.asp.net/bleroy/archive/2008/09/28/jquery-now-officially-part-of-the-net-developer-s-toolbox.aspx</p>
+<p>Finally Scott Hanselman has also a post about this here: http://www.hanselman.com/blog/jQueryToShipWithASPNETMVCAndVisualStudio.aspx</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/jquery-will-ship-with-asp-net-mvc-and-vi/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

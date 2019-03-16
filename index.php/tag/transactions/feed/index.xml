@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>transactions &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/transactions/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Wrap inserts in a transaction for faster performance</title>
+		<link>/index.php/datamgmt/dbprogramming/wrap-inserts-in-a-transaction/</link>
+		<comments>/index.php/datamgmt/dbprogramming/wrap-inserts-in-a-transaction/#comments</comments>
+		<pubDate>Wed, 13 Mar 2013 13:54:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[testing]]></category>
+		<category><![CDATA[transactions]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/wrap-inserts-in-a-transaction/</guid>
+		<description><![CDATA[Sometimes you have to insert a bunch of data and you can't use BCP or another bulk load method. When you do single row inserts, SQL Server wraps these inserts inside an implicit transaction. Did you know that if you use an explicit transaction that the&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Sometimes you have to insert a bunch of data and you can&#8217;t use BCP or another bulk load method. When you do single row inserts, SQL Server wraps these inserts inside an implicit transaction. Did you know that if you use an explicit transaction that the inserts will be much faster? I touched upon this earlier in this post <a href="/index.php/DataMgmt/DBProgramming/mongodb-vs-sql-server-insert-comparison">MongoDB vs. SQL Server &#8211; INSERT comparison part deux</a> but since someone asked about this today, I decided to take another look with different run sizes as well</p>
+<p>Let&#8217;s take a look. first create the following table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Sometest<span class="br0">&#40;</span>id <span class="kw1">INT</span> <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span>, SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">200</span><span class="br0">&#41;</span>, SomeDate <span class="kw1">DATETIME</span>,SomeCol2 <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">200</span><span class="br0">&#41;</span>, SomeDate2 <span class="kw1">DATETIME</span>,
+SomeCol3 <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">200</span><span class="br0">&#41;</span>, SomeDate3 <span class="kw1">DATETIME</span>,SomeCol4 <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">200</span><span class="br0">&#41;</span>, SomeDate4 <span class="kw1">DATETIME</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Sometest(id INT PRIMARY KEY, SomeCol VARCHAR(200), SomeDate DATETIME,SomeCol2 VARCHAR(200), SomeDate2 DATETIME,
+SomeCol3 VARCHAR(200), SomeDate3 DATETIME,SomeCol4 VARCHAR(200), SomeDate4 DATETIME)
+GO</pre></div></div>
+
+<p>Now run the following code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> Sometest
+<span class="kw1">DECLARE</span> @<span class="kw1">start</span> <span class="kw1">DATETIME</span> <span class="sy0">=</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">SET</span> <span class="kw1">NOCOUNT</span> <span class="kw1">ON</span>
+<span class="co1">--BEGIN TRAN</span>
+<span class="kw1">DECLARE</span> @id <span class="kw1">INT</span> <span class="sy0">=</span><span class="nu0">0</span>
+<span class="kw1">WHILE</span> @id <span class="sy0">&lt;</span> <span class="nu0">50000</span>
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; <span class="kw1">INSERT</span> Sometest
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @id ,<span class="st0">'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla111111'</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="st0">'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla2222'</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="st0">'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla3333'</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="st0">'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla4444'</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">SET</span> @id<span class="sy0">+=</span><span class="nu0">1</span>
+<span class="kw1">END</span>
+<span class="co1">--COMMIT</span>
+<span class="kw1">SELECT</span> <span class="kw2">DATEDIFF</span><span class="br0">&#40;</span>ms,@<span class="kw1">start</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> Sometest</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">TRUNCATE TABLE Sometest
+DECLARE @start DATETIME = GETDATE()
+SET NOCOUNT ON
+--BEGIN TRAN
+DECLARE @id INT =0
+WHILE @id &lt; 50000
+BEGIN
+	INSERT Sometest
+	SELECT @id ,'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla111111',GETDATE(),
+	'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla2222',GETDATE(),
+	'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla3333',GETDATE(),
+	'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla4444',GETDATE()
+SET @id+=1
+END
+--COMMIT
+SELECT DATEDIFF(ms,@start,GETDATE())
+SELECT COUNT(*) FROM Sometest</pre></div></div>
+
+<p>That takes 1153 milliseconds on my machine</p>
+<p>Run the same code but now uncomment the transaction</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> Sometest
+<span class="kw1">DECLARE</span> @<span class="kw1">start</span> <span class="kw1">DATETIME</span> <span class="sy0">=</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">SET</span> <span class="kw1">NOCOUNT</span> <span class="kw1">ON</span>
+<span class="kw1">BEGIN</span> <span class="kw1">TRAN</span>
+<span class="kw1">DECLARE</span> @id <span class="kw1">INT</span> <span class="sy0">=</span><span class="nu0">0</span>
+<span class="kw1">WHILE</span> @id <span class="sy0">&lt;</span> <span class="nu0">50000</span>
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; <span class="kw1">INSERT</span> Sometest
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @id ,<span class="st0">'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla111111'</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="st0">'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla2222'</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="st0">'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla3333'</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="st0">'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla4444'</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">SET</span> @id<span class="sy0">+=</span><span class="nu0">1</span>
+<span class="kw1">END</span>
+<span class="kw1">COMMIT</span>
+<span class="kw1">SELECT</span> <span class="kw2">DATEDIFF</span><span class="br0">&#40;</span>ms,@<span class="kw1">start</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> Sometest</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">TRUNCATE TABLE Sometest
+DECLARE @start DATETIME = GETDATE()
+SET NOCOUNT ON
+BEGIN TRAN
+DECLARE @id INT =0
+WHILE @id &lt; 50000
+BEGIN
+	INSERT Sometest
+	SELECT @id ,'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla111111',GETDATE(),
+	'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla2222',GETDATE(),
+	'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla3333',GETDATE(),
+	'BlaBlaBlaBlaBlaBlaBlaBlaBlaBla4444',GETDATE()
+SET @id+=1
+END
+COMMIT
+SELECT DATEDIFF(ms,@start,GETDATE())
+SELECT COUNT(*) FROM Sometest</pre></div></div>
+
+<p>That is almost twice as fast (or almost half as slow), it takes 673 milliseconds</p>
+<p>Here is what the numbers look like on my machine for different insert sizes</p>
+<pre>Inserts	no tran	explicit transaction
+100000  18030   10800
+50000	 9363	 5516
+5000	 1130	  760
+5000	 190	  103
+1000	  40       23</pre>
+<p>As you can see, when you have an explicit transaction it is much faster than when you don&#8217;t specify a transaction</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/wrap-inserts-in-a-transaction/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

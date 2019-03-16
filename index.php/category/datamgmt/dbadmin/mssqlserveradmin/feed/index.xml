@@ -1,0 +1,983 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Microsoft SQL Server Admin &#8211; LessthanDot</title>
+	<atom:link href="/index.php/category/datamgmt/dbadmin/mssqlserveradmin/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Replacing Trace Flags 1204 and 1222 with the Extended Events system_health Session</title>
+		<link>/index.php/datamgmt/dbprogramming/replacing-trace-flags-1204-and-1222-with-the-extended-events-system_health-session/</link>
+		<comments>/index.php/datamgmt/dbprogramming/replacing-trace-flags-1204-and-1222-with-the-extended-events-system_health-session/#respond</comments>
+		<pubDate>Tue, 24 Apr 2018 16:51:47 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=9226</guid>
+		<description><![CDATA[Deadlocks in a SQL Server instance are problematic. They can cause application errors, slow performance, and unhappy users. As a DBA or developer, it’s very helpful to be able to find deadlocks, review what caused them, and fix it permanently, if possible. How do you find deadlocks? Over the years, there have been various methods, [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Deadlocks in a SQL Server instance are problematic. They can cause application errors, slow performance, and unhappy users. As a DBA or developer, it’s very helpful to be able to find deadlocks, review what caused them, and fix it permanently, if possible.</p>
+<p>How do you find deadlocks? Over the years, there have been various methods, depending on what tools were available in SQL Server. Many of us used to run a Profiler or server trace to capture the Deadlock Graph event – useful if we knew when they were occurring (or they occurred all the time). We could also enable trace flags 1204 and/or 1222 to write the information to the event log – better if we knew there were issues, but they weren’t predictable.</p>
+<p>However, I don’t like a messy event log. I like it neat and clean, so I can see errors easily. For example, I enable TF 3226 to suppress “Log was backed up” messages. With SQL Server 2012+, I also prefer to use the Extended Events default system_health session to view deadlock graphs – with no extra work required!</p>
+<p>Let me walk through what a deadlock looks like with TF 1222 and compare that to the XE session.</p>
+<p>In my instance, I have TF 1222 enabled.</p>
+<p><a href="/wp-content/uploads/2018/04/config-mgr.png"><img class="aligncenter size-full wp-image-9227" src="/wp-content/uploads/2018/04/config-mgr.png" alt="config-mgr" width="414" height="496" srcset="/wp-content/uploads/2018/04/config-mgr.png 414w, /wp-content/uploads/2018/04/config-mgr-250x300.png 250w" sizes="(max-width: 414px) 100vw, 414px" /></a></p>
+<p>I have simple code to create a deadlock. You can use this as an example in a test environment to replicate it.</p>
+<pre style="padding-left: 30px">/* Create deadlock - query 1 */
+
+USE tempdb;
+GO
+
+CREATE TABLE tbl1 (id INT NOT NULL PRIMARY KEY CLUSTERED,
+       col INT)
+CREATE TABLE tbl2 (id INT NOT NULL PRIMARY KEY CLUSTERED,
+       col INT REFERENCES tbl1(id))
+
+BEGIN TRANSACTION
+INSERT INTO tbl1 VALUES (2, 999);
+
+/* Now, open a second query and paste this */
+USE tempdb;
+GO
+BEGIN TRAN
+INSERT INTO tbl2 VALUES (111, 2); 
+
+/* Come back here and execute this */
+INSERT INTO tbl2 VALUES (111, 555);
+COMMIT TRAN</pre>
+<p>When I run the last statement, I receive an error that one of the processes was the deadlock victim.</p>
+<p><a href="/wp-content/uploads/2018/04/deadlock-error.png"><img class="aligncenter size-full wp-image-9228" src="/wp-content/uploads/2018/04/deadlock-error.png" alt="deadlock-error" width="609" height="100" srcset="/wp-content/uploads/2018/04/deadlock-error.png 609w, /wp-content/uploads/2018/04/deadlock-error-300x49.png 300w, /wp-content/uploads/2018/04/deadlock-error-600x99.png 600w" sizes="(max-width: 609px) 100vw, 609px" /></a></p>
+<p>If I open the error log, I can see the details of the deadlock. Every bit of information is on a separate line.</p>
+<p><a href="/wp-content/uploads/2018/04/deadlock-error-log.png"><img class="aligncenter size-full wp-image-9229" src="/wp-content/uploads/2018/04/deadlock-error-log.png" alt="deadlock-error-log" width="726" height="636" srcset="/wp-content/uploads/2018/04/deadlock-error-log.png 726w, /wp-content/uploads/2018/04/deadlock-error-log-300x263.png 300w, /wp-content/uploads/2018/04/deadlock-error-log-600x526.png 600w, /wp-content/uploads/2018/04/deadlock-error-log-342x300.png 342w" sizes="(max-width: 726px) 100vw, 726px" /></a></p>
+<p>This one isn’t bad, but imagine a multi-statement deadlock, or a server with several deadlocks in an hour – how do you easily see if there were other errors on the server at the same time?</p>
+<p>With SQL Server 2012+, we have a better tool to see when deadlocks occur – and the deadlock graphs are saved by default, so we don’t have to read the text version to figure it out, or run a separate trace to capture them.</p>
+<p>In SSMS, open Object Explorer and navigate to Extended Events &gt; Sessions &gt; system_health &gt; package0.event_file. Double-click to view the data.</p>
+<p><a href="/wp-content/uploads/2018/04/xe-sessions.png"><img class="aligncenter size-full wp-image-9230" src="/wp-content/uploads/2018/04/xe-sessions.png" alt="xe-sessions" width="239" height="129" /></a></p>
+<p>I go right to Filters to find the xml_deadlock_report events.</p>
+<p><a href="/wp-content/uploads/2018/04/xe-filter.png"><img class="aligncenter size-full wp-image-9231" src="/wp-content/uploads/2018/04/xe-filter.png" alt="xe-filter" width="627" height="236" srcset="/wp-content/uploads/2018/04/xe-filter.png 627w, /wp-content/uploads/2018/04/xe-filter-300x113.png 300w, /wp-content/uploads/2018/04/xe-filter-600x226.png 600w" sizes="(max-width: 627px) 100vw, 627px" /></a></p>
+<p><a href="/wp-content/uploads/2018/04/xe-filter-screen.png"><img class="aligncenter size-full wp-image-9232" src="/wp-content/uploads/2018/04/xe-filter-screen.png" alt="xe-filter-screen" width="637" height="411" srcset="/wp-content/uploads/2018/04/xe-filter-screen.png 637w, /wp-content/uploads/2018/04/xe-filter-screen-300x194.png 300w, /wp-content/uploads/2018/04/xe-filter-screen-600x387.png 600w, /wp-content/uploads/2018/04/xe-filter-screen-465x300.png 465w" sizes="(max-width: 637px) 100vw, 637px" /></a></p>
+<p>Here you’ll see deadlocks that have occurred. The Value field will show the XML values that you also see in the log. You can double-click on the Value field to bring up the XML.</p>
+<p><a href="/wp-content/uploads/2018/04/details.png"><img class="aligncenter size-full wp-image-9233" src="/wp-content/uploads/2018/04/details.png" alt="details" width="515" height="238" srcset="/wp-content/uploads/2018/04/details.png 515w, /wp-content/uploads/2018/04/details-300x139.png 300w" sizes="(max-width: 515px) 100vw, 515px" /></a></p>
+<p>Don’t ignore that sneaky “Deadlock” tab, however – that’s where you’ll find the easier-to-read deadlock graph!</p>
+<p><a href="/wp-content/uploads/2018/04/deadlock.png"><img class="aligncenter size-large wp-image-9234" src="/wp-content/uploads/2018/04/deadlock-1024x433.png" alt="deadlock" width="1024" height="433" srcset="/wp-content/uploads/2018/04/deadlock-1024x433.png 1024w, /wp-content/uploads/2018/04/deadlock-300x127.png 300w, /wp-content/uploads/2018/04/deadlock-768x324.png 768w, /wp-content/uploads/2018/04/deadlock-600x253.png 600w, /wp-content/uploads/2018/04/deadlock-710x300.png 710w, /wp-content/uploads/2018/04/deadlock.png 1044w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p>
+<p>A good description of deadlock graphs, and how to interpret them, can be found at <a href="https://www.sqlshack.com/understanding-graphical-representation-sql-server-deadlock-graph/">https://www.sqlshack.com/understanding-graphical-representation-sql-server-deadlock-graph/</a>.</p>
+<p>As you modernize your data platform, you should update your troubleshooting methods and tools as well. This is an easy example of taking advantage of Extended Events to solve an old problem!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/replacing-trace-flags-1204-and-1222-with-the-extended-events-system_health-session/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Use ostress to load test a SQL database</title>
+		<link>/index.php/datamgmt/dbprogramming/use-ostress-to-load-test-a-sql-database/</link>
+		<comments>/index.php/datamgmt/dbprogramming/use-ostress-to-load-test-a-sql-database/#comments</comments>
+		<pubDate>Thu, 26 Oct 2017 14:49:36 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=8831</guid>
+		<description><![CDATA[Have you ever wondered how you could take one or more .sql files you captured as a workload and run them against a SQL Server or Azure SQL Database to test performance or impact? Microsoft has a free tool to do just that &#8211; ostress. Ostress.exe is part of the RML utilities. The first step [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Have you ever wondered how you could take one or more .sql files you captured as a workload and run them against a SQL Server or Azure SQL Database to test performance or impact? Microsoft has a free tool to do just that &#8211; ostress.</p>
+<p>Ostress.exe is part of the RML utilities. The first step is to download it from <a href="https://www.microsoft.com/en-us/download/details.aspx?id=4511">https://www.microsoft.com/en-us/download/details.aspx?id=4511</a>. Along with the command-line tools, there is also a helpful help document!</p>
+<p>Ostress allows you to specify one file, or a folder that contains multiple files, to run. You can also specify a number of connections to be made to the database, to simulate multiple users or applications running the same query. Each connection can then run the file one or more times.</p>
+<p>The next thing you’ll need is one or more .sql files that the tool will run.</p>
+<p>To run a load test, you’ll open RML cmd prompt and enter your command. A few common parameters, which you’ll be using:</p>
+<p style="padding-left: 30px">-S – server name &#8211; this works for a SQL Server or an Azure SQL Database.<br />
+-E – Windows authentication. The other option is -U and -P for SQL authentication.<br />
+-d – database name.<br />
+-i – Path to batch file(s), such as C:\ostress\ostress_batch_file.sql.<br />
+-n – Number of connections to create.<br />
+-r – Number of iterations through the file each connection will make.<br />
+-q – Quiet mode – no result display.<br />
+-o – Output file directory.</p>
+<p>A sample command which will take one file I created (ostress_batch_file.sql), create 5 connections, and run it twice on each:<br />
+ostress -SJesSb -E -dAdventureWorks2016 -iC:\ostress\ostress_batch_file.sql -n5 -r2 -oC:\ostress</p>
+<p>In the cmd window:</p>
+<p><a href="/wp-content/uploads/2017/10/ostress-cmd.png"><img class="aligncenter size-full wp-image-8832" src="/wp-content/uploads/2017/10/ostress-cmd.png" alt="ostress-cmd" width="793" height="434" srcset="/wp-content/uploads/2017/10/ostress-cmd.png 793w, /wp-content/uploads/2017/10/ostress-cmd-300x164.png 300w, /wp-content/uploads/2017/10/ostress-cmd-768x420.png 768w" sizes="(max-width: 793px) 100vw, 793px" /></a><br />
+The output folder contains one log file, and one output file for each connection.</p>
+<p><a href="/wp-content/uploads/2017/10/ostress-output.png"><img class="aligncenter size-full wp-image-8833" src="/wp-content/uploads/2017/10/ostress-output.png" alt="ostress-output" width="487" height="199" srcset="/wp-content/uploads/2017/10/ostress-output.png 487w, /wp-content/uploads/2017/10/ostress-output-300x123.png 300w" sizes="(max-width: 487px) 100vw, 487px" /></a></p>
+<p>One question I&#8217;ve been asked was how to build delays into the batch. My suggestion is to edit the T-SQL script, using WAITFOR DELAY, to accomplish that.</p>
+<p>Give ostress a try when you want a simple load testing tool for SQL Server!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/use-ostress-to-load-test-a-sql-database/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Transactional Replication from Availability Groups to Azure SQL Database: Part 1 &#8211; Planning</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/transactional-replication-in-availability-groups-to-azure-sql-database-part-1-planning/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/transactional-replication-in-availability-groups-to-azure-sql-database-part-1-planning/#respond</comments>
+		<pubDate>Mon, 26 Dec 2016 15:00:35 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=4896</guid>
+		<description><![CDATA[Throughout the last few years, I&#8217;ve worked with SQL Server Availability Groups, Transactional Replication, and Azure SQL Databases. Recently, I had the challenge and opportunity to work on a project that involved all three at the same time. The goal was to take six databases that were in a SQL Server 2012 Availability Group and [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Throughout the last few years, I&#8217;ve worked with SQL Server Availability Groups, Transactional Replication, and Azure SQL Databases. Recently, I had the challenge and opportunity to work on a project that involved all three at the same time. The goal was to take six databases that were in a SQL Server 2012 Availability Group and replicate them to Azure SQL Databases.</p>
+<p>Both replication of a database in an AG and replication from SQL Server to SQL Database come with several caveats, limitations, and challenges. In this five-post blog series, I hope to share with you the lessons I&#8217;ve learned so you can do this correctly from the beginning.</p>
+<ul>
+<li><a href="/?p=4896" target="_blank">Part 1 &#8211; Planning</a></li>
+<li><a href="/?p=4906" target="_blank">Part 2 &#8211; The Distributor</a></li>
+<li><a href="/?p=4923" target="_blank">Part 3 &#8211; The Publisher</a></li>
+<li><a href="/?p=4945" target="_blank">Part 4 &#8211; The Subscriber</a></li>
+<li><a href="/?p=4960" target="_blank">Part 5 &#8211; Testing</a></li>
+</ul>
+<p>&nbsp;</p>
+<h3>Getting Started</h3>
+<p>Determine what you need to accomplish and if there is a simpler way to do it. This is a complicated solution with a lot of moving parts. Many things can go wrong or break. In this situation, we needed to have on-premises data in Azure to be consumed by other Azure services and for analytics. It also had to stay on-premises for transactional applications. The other option for moving the data on a regular basis was <a href="https://docs.microsoft.com/en-us/azure/sql-database/sql-database-get-started-sql-data-sync" target="_blank">Azure SQL Data Sync</a>, which has been in preview for five (long) years &#8211; I didn&#8217;t want to use a preview technology, especially one that&#8217;s been in preview mode for so long.</p>
+<p>You should have some familiarity with each of these features before combining them. Write up an architecture document ahead of time that will include all the relevant information you need as you&#8217;re setting this up &#8211; replica names, publication properties, distributor properties, subscriber information, SQL DB information. Download my <a href="/?p=4899" target="_blank">Replication Setup Checklist</a> to be prepared.</p>
+<p>Read through this series, and these other blog posts, to be prepared. I&#8217;ve referenced these blogs many time:</p>
+<ul>
+<li><a href="https://msdn.microsoft.com/en-us/library/hh710046.aspx" target="_blank">Configure Replication for Always On Availability Groups</a> (MSDN)</li>
+<li><a href="https://blogs.msdn.microsoft.com/alwaysonpro/2014/01/30/setting-up-replication-on-a-database-that-is-part-of-an-alwayson-availability-group/" target="_blank">Setting up Replication on a database that is part of an AlwaysOn Availability Group</a> (AlwaysOn Support Team)</li>
+<li><a href="https://msdn.microsoft.com/en-us/library/mt589530.aspx" target="_blank">Replication to SQL Database</a> (MSDN)</li>
+<li><a href="http://johnsterrett.com/2016/07/26/azure-sql-database-live-migrations/" target="_blank">Azure SQL Database Live Migrations</a> (John Sterrett)</li>
+</ul>
+<p>Lastly, reach out for help if needed. The SQL Server community helped me many, many times while I set this up. Special thanks to Kendal Van Dyke (<a href="http://www.kendalvandyke.com/" target="_blank">blog </a>| <a href="https://twitter.com/SQLDBA" target="_blank">Twitter</a>), Drew Furgiuele (<a href="http://port1433.com/" target="_blank">blog </a>| <a href="https://twitter.com/Pittfurg" target="_blank">Twitter</a>), and Andy Mallon (<a href="https://www.am2.co/" target="_blank">blog </a>| <a href="https://twitter.com/AMtwo" target="_blank">Twitter</a>) for their help.</p>
+<h3>Prep Work</h3>
+<p>There are tasks you&#8217;ll need to take care of in SQL Server, the AG, and the SQL DB before you can begin.</p>
+<p>This blog series assumes you already have an AG set up &#8211; it won&#8217;t go through the setup of that. It also assumes you have an Azure SQL server and a SQL Database created &#8211; it won&#8217;t go through that setup either.</p>
+<p>Ideally, the publishers, distributor, and subscribers will all be the same version and edition of SQL Server. If not, you have to configure from the highest-version server, or you will get errors.</p>
+<p>There are minimum version and service pack requirements for replicating to a SQL DB, as noted in the article <a href="https://msdn.microsoft.com/en-us/library/mt589530.aspx" target="_blank">Replication to SQL Database</a>. Make sure all SQL Servers are patched to the correct version.</p>
+<p>Make sure replication components are installed on all SQL Server instances before beginning. You can verify by running this query. The desired result is 1.</p>
+<pre style="padding-left: 30px">USE master;
+GO</pre>
+<pre style="padding-left: 30px">DECLARE @installed int;
+EXEC @installed = sys.sp_MS_replication_installed;
+SELECT @installed;</pre>
+<p>In the AG, all the replicas must be readable. If they aren’t, the distributor can’t read them, and the setup won’t work.</p>
+<p>The distribution database should not be on a replica server. If that server is lost and the HA of the AG kicks in, you’ve lost a huge part of your replication strategy. Your distribution database needs to reside on a SQL Server that is outside of your AG.</p>
+<p>The service accounts for the engine and Agent on all publishers, distributor, and subscribers must be Windows accounts. Don’t do this with NT Service accounts. Also, make sure the accounts have minimum permissions or you may get SSPI errors. (Described at <a href="https://cmatskas.com/fixing-error-cannot-generate-sspi-context-after-changing-sql-service-account/">https://cmatskas.com/fixing-error-cannot-generate-sspi-context-after-changing-sql-service-account/</a>.)</p>
+<p>The service account of the Log Reader Agent must be a db_owner in the publication database. As a matter of fact, there are a whole lot of rules about service accounts and permissions. Read <a href="https://msdn.microsoft.com/en-us/library/ms151227.aspx" target="_blank">Replication Agent Security Model</a> and apply all these rules. Do not just automatically make accounts sysadmin and local admins. It will be hard and frustrating &#8211; but your setup needs to be secure.</p>
+<p>On SQL Servers, make sure port 1433 is open on firewalls.</p>
+<p>When replicating to an Azure SQL Database:</p>
+<p>You must have a user set up in that database that is member of the db_owner role.</p>
+<p>Make sure the IP address of every publisher and distributor is allowed through the firewall.</p>
+<p>Using SSMS, verify you can connect from each publisher and distributor to the SQL DB. Resolve any errors before continuing.</p>
+<p>Use the “Deploy Database to Microsoft Azure SQL Database” wizard to find any incompatibilities within the database. If there are stored procedures that cross-reference another database, for example, that isn’t supported in SQL Database and those objects can’t be replicated.</p>
+<p>With all those pieces in place, let&#8217;s get started!</p>
+<h3>Scenario</h3>
+<p>Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest</p>
+<p>Distributor: stand-alone server, SQL2014demo</p>
+<p>Subscriber: Azure SQL Database, server jessqldb2, database ReplicationTest</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/transactional-replication-in-availability-groups-to-azure-sql-database-part-1-planning/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #67 &#8211; What Extended Events is Missing</title>
+		<link>/index.php/datamgmt/dbprogramming/t-sql-tuesday-67-what-extended-events-is-missing/</link>
+		<comments>/index.php/datamgmt/dbprogramming/t-sql-tuesday-67-what-extended-events-is-missing/#comments</comments>
+		<pubDate>Tue, 09 Jun 2015 00:00:27 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=3403</guid>
+		<description><![CDATA[It’s my T-SQL Tuesday! I’ve spent the last year learning and teaching Extended Events – because if you really want to learn something, teach. XE can be used for everything from very simple tasks, such as counting the number of query executions, to very complicated tasks, such as anything Jonathan Kehayias writes about! I’m encouraging [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><a href="/index.php/uncategorized/youre-invited-to-t-sql-tuesday-67-extended-events/"><img class="alignnone" src="/wp-content/uploads/blogs/DataMgmt/olap_1.gif" alt="" width="154" height="154" /></a><a href="/index.php/uncategorized/youre-invited-to-t-sql-tuesday-67-extended-events/" target="_blank">It’s my T-SQL Tuesday!</a> I’ve spent the last year learning and teaching Extended Events – because if you really want to learn something, teach. XE can be used for everything from very simple tasks, such as counting the number of query executions, to very complicated tasks, such as <a href="https://www.sqlskills.com/blogs/jonathan/category/extended-events/">anything Jonathan Kehayias writes about</a>! I’m encouraging other bloggers to write about XE today in hopes that I’ll learn some new stuff – and if people have questions, that we’ll be able to teach them.</p>
+<h3>It’s great, but it’s not complete</h3>
+<p>XE is supposed to be the replacement for Profiler. But, Profiler had two great features that XE doesn’t. I’ve found a workaround for one, but not the other – maybe someone will be able to solve that mystery for me.</p>
+<h3>Stopping a session</h3>
+<p>When I created a Profiler trace, I could “Enable trace stop time”, and the trace would end at that particular time. I used this for many reasons – when I started a trace and knew I’d get caught up in something else, and didn’t want it to run until I (hopefully) remembered to stop it; when the server would always get slow between, say, 10:00 am and 11:00 am, but no one knew why; or when looking for things that happened in the middle of my night – I didn’t want to get up at 2:00 am for Profiler.</p>
+<p>XE doesn’t have this capability. It’s not in the New Session Wizard, it’s not in the New Session un-wizard, and it’s not in the T-SQL. However, this is easy to work around. After creating a session, create a SQL Server Agent Job that stops the session, then schedule it.</p>
+<p>Here’s my session – I’m tracking database and object creation.</p>
+<p><a href="/wp-content/uploads/2015/06/CreateEventSession.png"><img class="aligncenter wp-image-3404 size-full" src="/wp-content/uploads/2015/06/CreateEventSession.png" alt="CreateEventSession" width="587" height="259" srcset="/wp-content/uploads/2015/06/CreateEventSession.png 587w, /wp-content/uploads/2015/06/CreateEventSession-300x132.png 300w" sizes="(max-width: 587px) 100vw, 587px" /></a></p>
+<p>I create a Job that has one step – this is to set the STATE = STOP.</p>
+<p><a href="/wp-content/uploads/2015/06/CreateJobStep.png"><img class="size-full wp-image-3406 aligncenter" src="/wp-content/uploads/2015/06/CreateJobStep.png" alt="CreateJobStep" width="820" height="668" srcset="/wp-content/uploads/2015/06/CreateJobStep.png 820w, /wp-content/uploads/2015/06/CreateJobStep-300x244.png 300w" sizes="(max-width: 820px) 100vw, 820px" /></a></p>
+<p>Then, I schedule the job to run once.</p>
+<p><a href="/wp-content/uploads/2015/06/JobSchedule.png"><img class="size-full wp-image-3405 aligncenter" src="/wp-content/uploads/2015/06/JobSchedule.png" alt="JobSchedule" width="706" height="634" srcset="/wp-content/uploads/2015/06/JobSchedule.png 706w, /wp-content/uploads/2015/06/JobSchedule-300x269.png 300w" sizes="(max-width: 706px) 100vw, 706px" /></a></p>
+<p>I check Event Viewer and confirm the job ran. In SSMS, I can see the session is stopped.</p>
+<p>This works, but it isn’t as easy or convenient as having the option right in the session creation.</p>
+<h3>Correlating a Session with Perfmon</h3>
+<p>Once upon a time, I learned that if I set up a Perfmon collection and a Profiler trace, then stopped them both, <a href="http://www.mssqltips.com/sqlservertip/1212/correlating-performance-monitor-and-sql-server-profiler-data/">I could view the results at the same time in Profiler</a>, thus allowing me to see if CPU usage spiked or page life expectancy dropped, what executed at that time. I solved a lot of problems with this over the years.</p>
+<p>Much to my dismay, there is no tool like this for Extended Events. I’ve wished so hard for this, I thought about writing it myself – but my programming skills are so rusty, I’d probably be working on it until XE is deprecated. Perhaps someone will read this and be inspired? I can hope!</p>
+<h3>But I Still Love Extended Events</h3>
+<p>Despite these two flaws, I love Extended Events. The ease of setup, the breadth of events to track, the advanced filtering, the minor impact on performance – all of these add up to a better tool. I can’t wait to hear what you have to write about for T-SQL Tuesday!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/t-sql-tuesday-67-what-extended-events-is-missing/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>You&#8217;re Invited to T-SQL Tuesday #67: Extended Events</title>
+		<link>/index.php/uncategorized/youre-invited-to-t-sql-tuesday-67-extended-events/</link>
+		<comments>/index.php/uncategorized/youre-invited-to-t-sql-tuesday-67-extended-events/#comments</comments>
+		<pubDate>Tue, 02 Jun 2015 14:36:44 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=3398</guid>
+		<description><![CDATA[We meet again for another edition of T-SQL Tuesday! On Tuesday, June 9, 2015, you&#8217;re invited to blog about a chosen topic. Link back to this blog post, read what others have written, and post about it on Twitter. We share knowledge and get to know other bloggers! The June 2015 topic is Extended Events. [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><img class="alignleft" src="/wp-content/uploads/blogs/DataMgmt/olap_1.gif" alt="T-SQL Tuesday #67" width="154" height="154" />We meet again for another edition of T-SQL Tuesday! On Tuesday, June 9, 2015, you&#8217;re invited to blog about a chosen topic. Link back to this blog post, read what others have written, and post about it on Twitter. We share knowledge and get to know other bloggers!</p>
+<p>The June 2015 topic is Extended Events. I want to know (and others do, too) how you&#8217;ve solved problems with Extended Events. What sessions have you created? What unique way have you used predicates or targets? What challenges have you overcome?</p>
+<p>If you&#8217;re thinking, &#8220;I haven&#8217;t used Extended Events!&#8221; or &#8220;I don&#8217;t know enough about Extended Events to write a blog about it!&#8221;, perfect! I want you to write a blog that lists the questions you have. That way, other contributors can leave comments with suggestions, or link to their blogs that give you answers. Don&#8217;t be shy! We all started out knowing nothing about this new feature.</p>
+<h3>The Rules</h3>
+<p>The first rule of T-SQL Tuesday is: talk about T-SQL Tuesday!</p>
+<p>Post your blog between 00:00 GMT Tuesday, June 9 and 00:00 GMT Wednesday, June 10. (This is equivalent to 8:00 PM EDT Monday, June 8 and 8:00 PM EDT Tuesday, June 9. <a href="http://www.timeanddate.com/worldclock/converter.html" target="_blank">Check your time zone here</a>.)<br />
+Come back here and leave a comment or a pingback to your post.<br />
+In the body of the blog, you must include the T-SQL Tuesday logo, with a link back to this blog.</p>
+<h3>Bonus Points</h3>
+<p>In the post title, include “T-SQL Tuesday #67″.<br />
+Tweet your blog post with the hash tag #tsql2sday.<br />
+Consider hosting in the future, and contact Adam if you’re interested.</p>
+<p>I’ll be reading through all the blog posts and posting a round-up. I can’t wait to read your experiences with and your questions about Extended Events!</p>
+<p>(Want to know what past topics have been? Huge thanks to Steve Jones for keeping the list <a href="https://voiceofthedba.wordpress.com/2014/11/10/t-sql-tuesday-topics-december-2012-update/" target="_blank">here</a>!)</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/youre-invited-to-t-sql-tuesday-67-extended-events/feed/</wfw:commentRss>
+		<slash:comments>11</slash:comments>
+		</item>
+		<item>
+		<title>Availability Groups Setup and Configuration from A to Z</title>
+		<link>/index.php/architect/availability-groups-setup-and-configuration-from-a-to-z/</link>
+		<comments>/index.php/architect/availability-groups-setup-and-configuration-from-a-to-z/#comments</comments>
+		<pubDate>Wed, 04 Jun 2014 01:56:40 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Architecture, Design and Strategy]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Enterprise Architecture]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=2434</guid>
+		<description><![CDATA[Availability Groups were introduced in SQL Server 2012 and have quickly become the forefront of high availability for the SQL Server Database Engine Services.  In prior versions of SQL Server, true high availability was not a complete solution packaged with the native installation and feature set.  While mirroring was introduced in SQL Server 2005 and [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Availability Groups were introduced in SQL Server 2012 and have quickly become the forefront of high availability for the SQL Server Database Engine Services.  In prior versions of SQL Server, true high availability was not a complete solution packaged with the native installation and feature set.  While mirroring was introduced in SQL Server 2005 and provided a much-needed advance towards achieving highly available data services, mirroring still required much customization to effectively provide a true high availability solution.</p>
+<p>It’s important to define high availability as it pertains to database level services – database high availability requires the means of retaining data services to users, applications and services within a defined allowable interruption of data services.  This equates simply as, are data services available to <i>any</i> connection within a given tolerance.  The <i>nines </i>has always been the flavor of measuring availability in the way of uptime.  “<i>My database server achieved four nines availability last year!” </i> This achievement is essentially stating the database services were not available for an estimated .01% of the total operating hours in a year or, 52 minutes.  Remember, this achievement is based on service level agreements that can have vast variations.  While even Full Clustered Instances of SQL Server implement a level of high availability, there is still the single point of failure that is of highest importance to the data services – the database.  Points of failure and focusing on where they may occur, begins allowing a visual representation of how availability achievements can be achieved.</p>
+<p>Points of Failure</p>
+<ul>
+<ul>
+<li>Hardware</li>
+<li>Operating System</li>
+<li>Data Corruption</li>
+<li>Data Loss</li>
+<li>Network</li>
+</ul>
+</ul>
+<p>These five possible points of failure are specific to almost all data services.  As discussed, Full Clustered Instances is a protection against hardware and operating system failures, mirroring is protection against data loss and corruption events, and geo-clustering can be utilized to prevent network failure events.  However, even combining all of these technologies or features, the concept of data connectivity is still of concern as customization is needed if a single point of connection is not available to an application or user.</p>
+<p>As stated already, pre-SQL Server 2012, even a four nines achievement was difficult.  This was due to the customization that was needed to maintain a mirror failover event.  Given that SQL Server is mirroring from instance name to instance name, and there is no single entry point for applications, some manual or programmatic intervention would be needed to handle the fact that a data server name could change.  While connection strings built in certain frameworks could allow for a failover partner attribute, not all connectivity types and providers supported them.  This forced coding changes, monitoring needs and much effort to manage a complete, seamless failover of one designated primary database server.</p>
+<p>Availability Groups in SQL Server 2012 combats these issues directly by joining clustering and mirroring technologies and associating them into a group that coexist and all rely on each other in order to maintain availability.  The concept of applying a cluster design and including single instances acting on their own, begins to remove failure points in all areas of availability.</p>
+<p>With Availability Groups and Windows Server Failover Clustering, we can look at the same failure points differently, asking how they allow for availability to be retained at any point of failure.</p>
+<ul>
+<ul>
+<li>Hardware
+<ul>
+<li>Prevention be implementing the same level of protection in FCI but with WSFC</li>
+</ul>
+</li>
+<li>Operating System
+<ul>
+<li>Prevention be implementing the same level of protection in FCI but with WSFC</li>
+</ul>
+</li>
+<li>Data Corruption
+<ul>
+<li>Prevention with mirrored databases between each instance in the group</li>
+</ul>
+</li>
+<li>Data Loss
+<ul>
+<li>Prevention with mirrored databases standing on unique disk subsystems</li>
+</ul>
+</li>
+<li>Network
+<ul>
+<li>Allowance of multi-subnet clustering for added protection of network loss</li>
+</ul>
+</li>
+</ul>
+</ul>
+<p>The following step-by-step illustration has been composed for a general setup and configuration need of Availability Groups in SQL Server 2012.  This is essential to becoming familiar with Availability Groups and determining how they fit into specific high availability needs and how data services are being used.  The specific setup and configuration for the Availability Group, SQLAG located on the network, has been utilized to document the needed setup and configurations.  Use this document for setup and configuration of new Availability Groups or the model in place on the network for the Availability Group SQLAG.</p>
+<p>Availability Groups are being utilized for three primary objectives:</p>
+<ol>
+<ol>
+<li>Achieve High Availability</li>
+<li>Offload read-only queries (or requests)</li>
+<li>Achieve a Disaster and Recovery solution</li>
+</ol>
+</ol>
+<p>In order to meet all three objectives, a 4-Node Availability Group has been designed, based on a node and share majority solution.</p>
+<p><a href="/wp-content/uploads/2014/06/ag1.png"><img class="aligncenter wp-image-2688 size-full" src="/wp-content/uploads/2014/06/ag1.png" alt="ag1" width="624" height="267" srcset="/wp-content/uploads/2014/06/ag1.png 624w, /wp-content/uploads/2014/06/ag1-300x128.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>In the Availability Group solution pictured above, the following scenarios Availability Group can be achieved:</p>
+<ol>
+<ol>
+<ol>
+<li>Loss of primary database or physical hardware
+<ul>
+<li>Automatic failover to synchronous node 2</li>
+</ul>
+</li>
+<li>Loss of primary database or physical hardware and loss of secondary automatic synchronous node 2
+<ul>
+<li>Manual failover to node 3 secondary or node 4 secondary</li>
+</ul>
+</li>
+<li>Loss of primary database or physical hardware
+<ul>
+<li>Manual failover to node 3 secondary or node 4 secondary</li>
+</ul>
+</li>
+<li>Loss of primary database or physical hardware and loss of file share
+<ul>
+<li>Automatic failover to synchronous node 2</li>
+<li>Manual failover to any other node provided 3 nodes maintain connectivity</li>
+</ul>
+</li>
+</ol>
+</ol>
+</ol>
+<p>Note: Failover scenarios are extended to any node and cluster services maintained provided file share resources are online.  This failure scenario will maintain the cluster and listener resources of up to 2 nodes.  File share loss lowers a maximum node failure loss of one node.  If file share loss occurs and 2 nodes are lost, the cluster cannot be maintained.</p>
+<p>&nbsp;</p>
+<h1>Windows Server Failover Clustering and Availability Group Information</h1>
+<p>Setup of the Availability Groups in the structure covers one or more databases.  The naming conventions utilized are listed below along with each setting that has been configured in this setup per node.</p>
+<h2>Windows Server Failover Cluster (WSFC)</h2>
+<h3 style="padding-left: 30px">Lab Server Build &#8211; Ensure to search for new hotfixes</h3>
+<ul>
+<ul>
+<li>Windows Server 2008 R2 Enterprise Service Pack 1
+<ul>
+<li>Physical Memory – 4.00 GB</li>
+<li>64-bit Operating System</li>
+<li>Processor – Intel Xeon X5660 @ 2.80Ghx
+<ul>
+<li>1 CPU allocation (Logical count = 1)</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Hotfix patches applied
+<ul>
+<li>KB2494036
+<ul>
+<li>A hotfix is available to let you configure a cluster node that does not have quorum votes in Windows Server 2008 and in Windows Server 2008 R2</li>
+</ul>
+</li>
+<li>KB2687741
+<ul>
+<li>A hotfix that improves the performance of the &#8220;AlwaysOn Availability Group&#8221; feature in SQL Server 2012 is available for Windows Server 2008 R2</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</ul>
+<h3 style="padding-left: 30px">Server names</h3>
+<ul style="padding-left: 30px">
+<ul>
+<li>NODE1</li>
+<li>NODE2</li>
+<li>NODE3</li>
+<li>NODE4</li>
+</ul>
+</ul>
+<h3 style="padding-left: 30px">Cluster Name</h3>
+<ul>
+<ul>
+<li>SQLCLSTR</li>
+</ul>
+</ul>
+<h3 style="padding-left: 30px">Quorum configuration for WSFC</h3>
+<ul>
+<ul>
+<li>Node Majority File Share</li>
+</ul>
+</ul>
+<h3 style="padding-left: 30px">Network Configuration</h3>
+<ul>
+<ul>
+<li>Cluster Network 1<b></b></li>
+<li>Cluster Access IP – 10.2.4.71
+<ul>
+<li>Subnet 10.2.4.0/24
+<ul>
+<li>NODE1
+<ul>
+<li>10.2.4.31</li>
+</ul>
+</li>
+<li>NODE2
+<ul>
+<li>10.2.4.34</li>
+</ul>
+</li>
+<li>NODE3
+<ul>
+<li>10.2.4.50</li>
+</ul>
+</li>
+<li>NODE4
+<ul>
+<li>10.2.4.55</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</ul>
+<h2>SQL Server Availability Groups</h2>
+<h3 style="padding-left: 30px">SQL Server Instances</h3>
+<ul>
+<ul>
+<li>Microsoft SQL Server Enterprise (64-bit)</li>
+<li>Build 11.0.2100.0</li>
+<li>Named Instances</li>
+</ul>
+</ul>
+<ul>
+<ul>
+<ul>
+<li>NODE1\SHAREPOINT2013</li>
+<li>NODE2\SHAREPOINT2013</li>
+<li>NODE3\SHAREPOINT2013</li>
+<li>NODE4\SHAREPOINT2013</li>
+</ul>
+</ul>
+</ul>
+<p>&nbsp;</p>
+<h2>Availability Group (AG)</h2>
+<ul>
+<ul>
+<li>AG Name
+<ul style="padding-left: 60px">
+<li>SQLAG</li>
+<li>Timeout configuration for all replicas – 10 seconds</li>
+<li>Endpoint port utilized – 5022</li>
+</ul>
+</li>
+<li>AG Listener Name
+<ul style="padding-left: 60px">
+<li>SQLAGLISTENER</li>
+<li>10.2.4.72</li>
+</ul>
+</li>
+<li>AG Replicas
+<ul>
+<li>NODE1
+<ul style="padding-left: 60px">
+<li>Primary</li>
+<li>Synchronous Role</li>
+<li>Automatic Failover</li>
+</ul>
+</li>
+<li>NODE2
+<ul style="padding-left: 60px">
+<li>Secondary</li>
+<li>Synchronous Role</li>
+<li>Automatic Failover</li>
+</ul>
+</li>
+<li>NODE3
+<ul style="padding-left: 60px">
+<li>Secondary</li>
+<li>Synchronous Role</li>
+<li>Read Only</li>
+<li>Read-intent only</li>
+<li>Manual Failover</li>
+</ul>
+</li>
+<li>NODE4
+<ul style="padding-left: 60px">
+<li>Secondary</li>
+<li>Asynchronous Role</li>
+<li>Manual Failover</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</ul>
+<h1>WSFC Setup and Configuration</h1>
+<h2>Cluster Setup</h2>
+<p>Four servers are acting as nodes in the Windows Server Failover Cluster (WSFC).  The servers are all located on the subnet 10.2.4.x.  Each server has the failover clustering full feature installation.</p>
+<p>Configuring the WSFC cluster first requires each server to have the Failover Clustering feature installed.  To perform this installation, follow these steps.</p>
+<p>Connect to each server or open Server Manager for remote access to each server. In Server Manager, go to the Features node and click the Add Features link.</p>
+<p><a href="/wp-content/uploads/2014/06/ag2.png"><img class="size-full wp-image-2689 aligncenter" src="/wp-content/uploads/2014/06/ag2.png" alt="ag2" width="624" height="156" srcset="/wp-content/uploads/2014/06/ag2.png 624w, /wp-content/uploads/2014/06/ag2-300x75.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p style="text-align: center">In the Select Features wizard, check “Failover Clustering” and click Install.</p>
+<p><a href="/wp-content/uploads/2014/06/ag3.png"><img class="size-full wp-image-2690 aligncenter" src="/wp-content/uploads/2014/06/ag3.png" alt="ag3" width="519" height="377" srcset="/wp-content/uploads/2014/06/ag3.png 519w, /wp-content/uploads/2014/06/ag3-300x217.png 300w" sizes="(max-width: 519px) 100vw, 519px" /></a></p>
+<p style="text-align: center">Once the installation is completed, a restart of the server is not required but highly recommended.</p>
+<p style="text-align: center">Perform these steps for every server that will be enlisted in the WSFC.</p>
+<h2>Configure the Cluster</h2>
+<p>The following steps are used to configure the cluster containing the four logical servers that have the failover clustering features installed.</p>
+<p>On a local computer with Failover Manager installed, or one of the servers that will be in the cluster, click Start&#8211;&gt;Administrative Tools&#8211;&gt;Failover Cluster Manager.</p>
+<p>(The Failover Cluster Manager can also be opened by using the MMC snap-in.)</p>
+<p><a href="/wp-content/uploads/2014/06/ag4.png"><img class="alignnone size-full wp-image-2691" src="/wp-content/uploads/2014/06/ag4.png" alt="ag4" width="402" height="459" srcset="/wp-content/uploads/2014/06/ag4.png 402w, /wp-content/uploads/2014/06/ag4-262x300.png 262w" sizes="(max-width: 402px) 100vw, 402px" /></a></p>
+<p><a href="/wp-content/uploads/2014/06/ag5.png"><img class="alignnone size-full wp-image-2692" src="/wp-content/uploads/2014/06/ag5.png" alt="ag5" width="326" height="263" srcset="/wp-content/uploads/2014/06/ag5.png 326w, /wp-content/uploads/2014/06/ag5-300x242.png 300w" sizes="(max-width: 326px) 100vw, 326px" /></a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>(If the welcome screen is shown, click Next.)</p>
+<p>Enter in each server’s name that will be part of the cluster.  Click Add after typing in the server name or utilize the Browse button to search the domain for registered server names.</p>
+<p><a href="/wp-content/uploads/2014/06/ag6.png"><img class="size-full wp-image-2693 aligncenter" src="/wp-content/uploads/2014/06/ag6.png" alt="ag6" width="624" height="374" srcset="/wp-content/uploads/2014/06/ag6.png 624w, /wp-content/uploads/2014/06/ag6-300x179.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Click Next to review the Validation Warning options.</p>
+<p>In the Validation Warning screen, if validation tests have not been executed yut, select Yes and click Next to run the validation tests.  This will review the servers for all configurations and options, as they pertain to the server being set up correctly for participation in a cluster.</p>
+<p><a href="/wp-content/uploads/2014/06/ag7.png"><img class="size-full wp-image-2694 aligncenter" src="/wp-content/uploads/2014/06/ag7.png" alt="ag7" width="624" height="360" srcset="/wp-content/uploads/2014/06/ag7.png 624w, /wp-content/uploads/2014/06/ag7-300x173.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Select No to bypass the validation warning review</p>
+<p>In the Access Point for Administering the Cluster, enter the name of the cluster and the network information needed.  If multiple subnets will be utilized, add both in this screen.</p>
+<p><a href="/wp-content/uploads/2014/06/ag8.png"><img class="size-full wp-image-2695 aligncenter" src="/wp-content/uploads/2014/06/ag8.png" alt="ag8" width="581" height="331" srcset="/wp-content/uploads/2014/06/ag8.png 581w, /wp-content/uploads/2014/06/ag8-300x170.png 300w" sizes="(max-width: 581px) 100vw, 581px" /></a></p>
+<p>Click Next and confirm the settings are accurate. If any changes are required, click Back to make adjustments.</p>
+<p>Click Next to create the cluster.</p>
+<p><a href="/wp-content/uploads/2014/06/ag9.png"><img class="size-full wp-image-2696 aligncenter" src="/wp-content/uploads/2014/06/ag9.png" alt="ag9" width="582" height="315" srcset="/wp-content/uploads/2014/06/ag9.png 582w, /wp-content/uploads/2014/06/ag9-300x162.png 300w" sizes="(max-width: 582px) 100vw, 582px" /></a></p>
+<p>Once completed, click Finish.</p>
+<h2>Configuring the Quorum</h2>
+<p>&nbsp;</p>
+<p>To configure the quorum settings for the new cluster, right click the cluster name in Cluster Manager. Scroll to More Actions and select Configure Cluster Quorum Settings.  Click Next to the Before You Begin screen if it is shown.</p>
+<p><a href="/wp-content/uploads/2014/06/ag10.png"><img class="alignnone size-full wp-image-2697" src="/wp-content/uploads/2014/06/ag10.png" alt="ag10" width="624" height="332" srcset="/wp-content/uploads/2014/06/ag10.png 624w, /wp-content/uploads/2014/06/ag10-300x159.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>In the Select Quorum Configuration screen, chose which type of quorum should be utilized.  If a disk or file share resource has not been added, the only selection available will be Node Majority.  Note: to create a share resource, the share must be located outside of the servers in the cluster.  For this configuration, we want a file share as a fifth node to retain a healthy quorum in the event of node losses.</p>
+<p><a href="/wp-content/uploads/2014/06/ag11.png"><img class="alignnone size-full wp-image-2698" src="/wp-content/uploads/2014/06/ag11.png" alt="ag11" width="491" height="337" srcset="/wp-content/uploads/2014/06/ag11.png 491w, /wp-content/uploads/2014/06/ag11-300x205.png 300w" sizes="(max-width: 491px) 100vw, 491px" /></a></p>
+<p>Select Node and File Share Majority (for clusters with special configurations)</p>
+<p><a href="/wp-content/uploads/2014/06/ag12.png"><img class="alignnone size-full wp-image-2699" src="/wp-content/uploads/2014/06/ag12.png" alt="ag12" width="493" height="341" srcset="/wp-content/uploads/2014/06/ag12.png 493w, /wp-content/uploads/2014/06/ag12-300x207.png 300w" sizes="(max-width: 493px) 100vw, 493px" /></a></p>
+<p>Click Next to confirm settings and click Next again to configure the settings.</p>
+<p><a href="/wp-content/uploads/2014/06/ag13.png"><img class="alignnone size-full wp-image-2700" src="/wp-content/uploads/2014/06/ag13.png" alt="ag13" width="289" height="200" /></a>      <a href="/wp-content/uploads/2014/06/ag14.png"><img class="alignnone size-full wp-image-2701" src="/wp-content/uploads/2014/06/ag14.png" alt="ag14" width="287" height="200" /></a></p>
+<h1>SQL Server 2012 Availability Group Setup and Configuration</h1>
+<h2>Configure the SQL Server Availability Group</h2>
+<p>In order to configure an Availability Group, the following steps are required in this sequence.</p>
+<p>Each server that will take part as a replica must be in a WSFC.</p>
+<ol>
+<ol>
+<li>A network name should be created to act as the listener (the name by which applications and users will connect to SQL Server and the databases in the Availability Group).  A listener can be created from the wizard if the listener is not created beforehand.</li>
+<li>Security should be set up for the administrator that will be executing the AG setup.  This account must be in the sysadmin server role on all SQL Server instances that are acting as replicas and have access to read the domain Active Directory services.  If a listener is not prepared before creating the AG, the account is required to be a domain admin.</li>
+<li>Each server that will act as a replica must have AlwaysOn features enabled in SQL Server.</li>
+<li> The database(s) that will be in the Availability Group should be restored or created on the replica that will act as the primary.  These database(s) should be in RECOVERY mode and set to a recovery model of Full.</li>
+<li>Each database on the primary requires a full backup to be executed.</li>
+<li>A share should be created to retain the full backup of the primary replica’s database(s).  This share can be located on any of the replica servers or an external share resource.</li>
+</ol>
+</ol>
+<p>Once the above security and required resources are available, continue with the steps below to create the AG.</p>
+<p>Remote into each server that will act as a replica in the Availability Group and configure SQL Server for AlwaysOn features to be enabled. (Warning: This setting requires SQL Server to be restarted.)</p>
+<p>Open SQL Server Configuration Manager.</p>
+<p>Select SQL Server Services in the tree view.  Right click the SQL Server instance to be configured and select Properties.</p>
+<p><a href="/wp-content/uploads/2014/06/ag15.png"><img class="alignnone size-full wp-image-2702" src="/wp-content/uploads/2014/06/ag15.png" alt="ag15" width="527" height="272" srcset="/wp-content/uploads/2014/06/ag15.png 527w, /wp-content/uploads/2014/06/ag15-300x154.png 300w" sizes="(max-width: 527px) 100vw, 527px" /></a></p>
+<p>In the SQL Server Properties window, select the AlwaysOn High Availability tab. Check Enable AlwaysOn Availability Groups.  The Windows failover cluster name should default to the cluster that the server is part of.  If this does not auto-populate, the server is not in a WSFC and is required to be added before this step is performed.</p>
+<p><a href="/wp-content/uploads/2014/06/ag16.png"><img class="alignnone size-full wp-image-2703" src="/wp-content/uploads/2014/06/ag16.png" alt="ag16" width="413" height="483" srcset="/wp-content/uploads/2014/06/ag16.png 413w, /wp-content/uploads/2014/06/ag16-256x300.png 256w" sizes="(max-width: 413px) 100vw, 413px" /></a></p>
+<p>Click OK and restart the SQL Server services.</p>
+<p>(Perform the above steps for each SQL Server that will be in the Availability Group.)</p>
+<p>Connect to SQL Server via SQL Server Management Studio (SSMS) on the server that will act as the primary replica in the Availability Group.  Restore or create the database(s) that are required to be in the Availability Group.  Perform a full back up on each database.  (Note: ensure each database is in Full Recovery Model)</p>
+<p>Expand the AlwaysOn High Availability node.  Right click the Availability Groups node and select New Availability Group Wizard</p>
+<p><a href="/wp-content/uploads/2014/06/ag17.png"><img class="alignnone size-full wp-image-2704" src="/wp-content/uploads/2014/06/ag17.png" alt="ag17" width="378" height="296" srcset="/wp-content/uploads/2014/06/ag17.png 378w, /wp-content/uploads/2014/06/ag17-300x234.png 300w" sizes="(max-width: 378px) 100vw, 378px" /></a></p>
+<p>Click Next if shown the Introduction window.</p>
+<p><a href="/wp-content/uploads/2014/06/ag18.png"><img class="alignnone size-full wp-image-2705" src="/wp-content/uploads/2014/06/ag18.png" alt="ag18" width="346" height="321" srcset="/wp-content/uploads/2014/06/ag18.png 346w, /wp-content/uploads/2014/06/ag18-300x278.png 300w" sizes="(max-width: 346px) 100vw, 346px" /></a></p>
+<p>Enter the name chosen for the Availability Groups and click Next.</p>
+<p><a href="/wp-content/uploads/2014/06/ag19.png"><img class="alignnone size-full wp-image-2706" src="/wp-content/uploads/2014/06/ag19.png" alt="ag19" width="624" height="287" srcset="/wp-content/uploads/2014/06/ag19.png 624w, /wp-content/uploads/2014/06/ag19-300x137.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Ensure each database that will take part in the Availability Group passes validations.  If a database does not pass the validation process that is required to be added to an Availability Group, the list to the right of each database will show what is required.  For example: if a full backup was not performed, the link will read, “Full backup is required”.</p>
+<p><a href="/wp-content/uploads/2014/06/ag20.png"><img class="alignnone size-full wp-image-2707" src="/wp-content/uploads/2014/06/ag20.png" alt="ag20" width="624" height="92" srcset="/wp-content/uploads/2014/06/ag20.png 624w, /wp-content/uploads/2014/06/ag20-300x44.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>After performing the required prerequisites, click Refresh to re-validate the databases.  Once the validation process states, “Meets prerequisites”, check each database that is required and click Next.</p>
+<p><a href="/wp-content/uploads/2014/06/ag21.png"><img class="alignnone size-full wp-image-2708" src="/wp-content/uploads/2014/06/ag21.png" alt="ag21" width="567" height="361" srcset="/wp-content/uploads/2014/06/ag21.png 567w, /wp-content/uploads/2014/06/ag21-300x191.png 300w" sizes="(max-width: 567px) 100vw, 567px" /></a></p>
+<p>In the Specify Replicas screen, click the Add Replica…button to add the replicas that will be part of the Availability Group.</p>
+<p>Make the configuration changes as shown below</p>
+<ol>
+<ol>
+<li>Primary 01 – check Automatic failover, Synchronous Commit</li>
+<li>Secondary 02 – check Automatic failover, Synchronous Commit</li>
+<li>Secondary 03 – check synchronous Commit and select Readable Secondary option “Read-intent only”</li>
+<li>Secondary 04 – Leave all options as default</li>
+</ol>
+</ol>
+<p><a href="/wp-content/uploads/2014/06/ag22.png"><img class="alignnone size-full wp-image-2709" src="/wp-content/uploads/2014/06/ag22.png" alt="ag22" width="624" height="179" srcset="/wp-content/uploads/2014/06/ag22.png 624w, /wp-content/uploads/2014/06/ag22-300x86.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Click the Endpoints tab to ensure all settings are populated</p>
+<p><a href="/wp-content/uploads/2014/06/ag23.png"><img class="alignnone size-full wp-image-2710" src="/wp-content/uploads/2014/06/ag23.png" alt="ag23" width="624" height="155" srcset="/wp-content/uploads/2014/06/ag23.png 624w, /wp-content/uploads/2014/06/ag23-300x74.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>If changes are required due to network needs or port configurations, make them in this window.  For example: if port 5022 is used for other communications, adjust to port 5023 or another free port.</p>
+<p>Click the Backup preferences tab.</p>
+<p>Check Secondary only option for backup preferences and check the checkbox for Replica NODE3.</p>
+<p><a href="/wp-content/uploads/2014/06/ag24.png"><img class="alignnone size-full wp-image-2711" src="/wp-content/uploads/2014/06/ag24.png" alt="ag24" width="624" height="361" srcset="/wp-content/uploads/2014/06/ag24.png 624w, /wp-content/uploads/2014/06/ag24-300x173.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Click the Listener tab.  If the listener was created prior to configuring the Availability Group, leave “Do not create an Availability Group listener now”.  If a listen should be created, check the “Create an Availability Group listener” and enter the required information.  Note: domain admin privileges are required to create the domain name if choosing to create the listener at this time.</p>
+<p><a href="/wp-content/uploads/2014/06/ag25.png"><img class="alignnone size-full wp-image-2712" src="/wp-content/uploads/2014/06/ag25.png" alt="ag25" width="624" height="283" srcset="/wp-content/uploads/2014/06/ag25.png 624w, /wp-content/uploads/2014/06/ag25-300x136.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Click Next to save the replica settings.</p>
+<p>In the Select Initial Data Synchronization window, enter a location for the full backup and log backup to be stored to initialize the other replicas in the Availability Group.  This location can be a drive or share on any of the replicas or an external share.  In the example below, replica 04 is used with the admin share to the T Drive.</p>
+<p><a href="/wp-content/uploads/2014/06/ag26.png"><img class="alignnone size-full wp-image-2713" src="/wp-content/uploads/2014/06/ag26.png" alt="ag26" width="624" height="203" srcset="/wp-content/uploads/2014/06/ag26.png 624w, /wp-content/uploads/2014/06/ag26-300x97.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Click Next to run the validation process from the settings saved so far.  The only warning should be if the listener was chosen not to be created at the time of the setup.</p>
+<p><a href="/wp-content/uploads/2014/06/ag27.png"><img class="alignnone size-full wp-image-2714" src="/wp-content/uploads/2014/06/ag27.png" alt="ag27" width="624" height="404" srcset="/wp-content/uploads/2014/06/ag27.png 624w, /wp-content/uploads/2014/06/ag27-300x194.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>If a warning or error has been found, click the link to review the message and act accordingly.</p>
+<p>Click Next to review the choices that will be executed upon clicking Finish to create the Availability Group and initialize the replicas.</p>
+<p><a href="/wp-content/uploads/2014/06/ag28.png"><img class="alignnone size-full wp-image-2715" src="/wp-content/uploads/2014/06/ag28.png" alt="ag28" width="624" height="405" srcset="/wp-content/uploads/2014/06/ag28.png 624w, /wp-content/uploads/2014/06/ag28-300x194.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Note: it is recommended to click the Script button at this time and save the script generated by the wizard to a secure location for future recovery.</p>
+<p><a href="/wp-content/uploads/2014/06/ag29.png"><img class="alignnone size-full wp-image-2716" src="/wp-content/uploads/2014/06/ag29.png" alt="ag29" width="392" height="103" srcset="/wp-content/uploads/2014/06/ag29.png 392w, /wp-content/uploads/2014/06/ag29-300x78.png 300w" sizes="(max-width: 392px) 100vw, 392px" /></a></p>
+<p>Once Finish is clicked, the Availability Group and all replicas will be initialized and created.  This process can take some time depending on the size of each database in the Availability Group.</p>
+<p>The process will execute in this order</p>
+<ol>
+<ol>
+<li>Endpoints will be configured/created</li>
+<li>Extended Events for monitoring an AG will be created</li>
+<li>The Availability Group will be created</li>
+<li>The Availability Group will be brought online</li>
+<li>Secondary replicas will be added to the Availability Group</li>
+<li>The WSFC quorum will be validated for votes of each replica server</li>
+<li>A full backup of the database in the Availability Group will be taken</li>
+<li>Steps repeated in this order for each replica</li>
+</ol>
+</ol>
+<ul>
+<ul>
+<ul>
+<li>A backup will be restored to the secondary replica</li>
+<li>The tail-end log backup will be taken from the primary</li>
+<li>The tail-end log backup will be restored to the secondary replica</li>
+<li>Database will be joined to the Availability Group</li>
+</ul>
+</ul>
+</ul>
+<p><a href="/wp-content/uploads/2014/06/ag30.png"><img class="alignnone size-full wp-image-2717" src="/wp-content/uploads/2014/06/ag30.png" alt="ag30" width="624" height="269" srcset="/wp-content/uploads/2014/06/ag30.png 624w, /wp-content/uploads/2014/06/ag30-300x129.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Given the even number of node votes in this wizard driven setup, we will need to configure the voting weight of the nodes at a later point.  With the even number the warning is shown as “Validating WSFC quorum vote configuration”.</p>
+<h2>Configure the Listener</h2>
+<p>If the listener was not created in the initial wizard setup, perform these steps to assign the listener to the Availability Group.</p>
+<ol>
+<ol>
+<ol>
+<li>Open SSMS 2012</li>
+<li>Execute the statement below to assign the listener name and IP to the Availability Group</li>
+</ol>
+</ol>
+</ol>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>master<span class="br0">&#93;</span>
+GO
+<span class="kw1">ALTER</span> AVAILABILITY <span class="kw1">GROUP</span> <span class="br0">&#91;</span>SQLAG<span class="br0">&#93;</span>
+<span class="kw1">ADD</span> LISTENER N<span class="st0">'SQLAGLISTENER'</span> <span class="br0">&#40;</span>
+<span class="kw1">WITH</span> IP
+<span class="br0">&#40;</span><span class="br0">&#40;</span>N<span class="st0">'10.2.4.72'</span>, N<span class="st0">'255.255.255.0'</span><span class="br0">&#41;</span>
+<span class="br0">&#41;</span>
+, P<span class="sy0">OR</span>T<span class="sy0">=</span><span class="nu0">1433</span><span class="br0">&#41;</span>;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [master]
+GO
+ALTER AVAILABILITY GROUP [SQLAG]
+ADD LISTENER N'SQLAGLISTENER' (
+WITH IP
+((N'10.2.4.72', N'255.255.255.0')
+)
+, PORT=1433);
+GO</pre></div></div>
+
+<p>Note: Assign the IP as needed in this step.  This is the IP that will translate for any connection being made to the Availability Group containing all databases.</p>
+<h2>Configure Read Routing for Read-Intent Connections</h2>
+<p>Multiple replicas can be configured for read-intent only connections.  This configuration is used to route connections that specify in the connection string the “read-intent” setting.  For example: the following connection string is set for read-intent and will be routed to a read-only secondary replica.</p>
+<div>
+<p>Server=SQLAGLISTENER;Database=_Cache;IntegratedSecurity=SSPI;<b>ApplicationIntent=ReadOnly</b></p>
+</div>
+<p>&nbsp;</p>
+<p>To configure a replica for read-intent only connections, a primary and secondary role must be set.  Each replica in an Availability Group has both a primary and secondary role.  By default, the primary role for all replicas is All Connections.  This allows for every secondary or primary to be utilized in the event of a disaster as a primary connection with full read/write capabilities.  For read-only with read-intent configurations, there are two or more replicas that are configured for the role of primary with all connections and then a secondary role as a read routing for read-intent purposes.</p>
+<p><a href="/wp-content/uploads/2014/06/ag31.png"><img class="size-full wp-image-2718 aligncenter" src="/wp-content/uploads/2014/06/ag31.png" alt="ag31" width="440" height="671" srcset="/wp-content/uploads/2014/06/ag31.png 440w, /wp-content/uploads/2014/06/ag31-196x300.png 196w" sizes="(max-width: 440px) 100vw, 440px" /></a></p>
+<p>In the following configuration, the diagram illustrates the 2-node read routing configuration.</p>
+<p>Note: Each replica requires the secondary role to be configured in a read-intent configuration.  In this configuration, the primary replica has a secondary role of read-intent.  In the case of the automatic failover to the secondary node, read-intent connections would be routed back to the secondary node.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> AVAILABILITY <span class="kw1">GROUP</span> SQLAG
+<span class="kw1">MODIFY</span> REPLICA <span class="kw1">ON</span>
+N<span class="st0">'NODE1\SHAREPOINT2013'</span> <span class="kw1">WITH</span>
+<span class="br0">&#40;</span>SECONDARY_ROLE <span class="br0">&#40;</span><span class="sy0">ALL</span>OW_CONNECTIONS <span class="sy0">=</span> READ_ONLY<span class="br0">&#41;</span><span class="br0">&#41;</span>;
+<span class="kw1">ALTER</span> AVAILABILITY <span class="kw1">GROUP</span> SQLAG
+<span class="kw1">MODIFY</span> REPLICA <span class="kw1">ON</span>
+N<span class="st0">'NODE1\SHAREPOINT2013'</span> <span class="kw1">WITH</span>
+<span class="br0">&#40;</span>SECONDARY_ROLE <span class="br0">&#40;</span>READ_ONLY_ROUT<span class="sy0">IN</span>G_URL <span class="sy0">=</span> N<span class="st0">'TCP://NODE1.ONPNT.TedsDomain.com:1433'</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;<span class="sy0">&lt;/</span>code<span class="sy0">&gt;</span>
+&nbsp;
+<span class="kw1">ALTER</span> AVAILABILITY <span class="kw1">GROUP</span> SQLAG
+<span class="kw1">MODIFY</span> REPLICA <span class="kw1">ON</span>
+N<span class="st0">'NODE3\SHAREPOINT2013'</span> <span class="kw1">WITH</span>
+<span class="br0">&#40;</span>SECONDARY_ROLE <span class="br0">&#40;</span><span class="sy0">ALL</span>OW_CONNECTIONS <span class="sy0">=</span> READ_ONLY<span class="br0">&#41;</span><span class="br0">&#41;</span>;
+<span class="kw1">ALTER</span> AVAILABILITY <span class="kw1">GROUP</span> SQLAG
+<span class="kw1">MODIFY</span> REPLICA <span class="kw1">ON</span>
+N<span class="st0">'NODE3\SHAREPOINT2013'</span> <span class="kw1">WITH</span>
+<span class="br0">&#40;</span>SECONDARY_ROLE <span class="br0">&#40;</span>READ_ONLY_ROUT<span class="sy0">IN</span>G_URL <span class="sy0">=</span> N<span class="st0">'TCP://NODE3.ONPNT.TedsDomain.com:1433'</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">ALTER</span> AVAILABILITY <span class="kw1">GROUP</span> SQLAG
+<span class="kw1">MODIFY</span> REPLICA <span class="kw1">ON</span>
+N<span class="st0">'NODE1\SHAREPOINT2013'</span> <span class="kw1">WITH</span>
+<span class="br0">&#40;</span>PRIMARY_ROLE <span class="br0">&#40;</span>READ_ONLY_ROUT<span class="sy0">IN</span>G_LIST<span class="sy0">=</span><span class="br0">&#40;</span><span class="st0">'NODE3\SHAREPOINT2013'</span>,<span class="st0">'NODE1\SHAREPOINT2013'</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">ALTER</span> AVAILABILITY <span class="kw1">GROUP</span> SQLAG
+<span class="kw1">MODIFY</span> REPLICA <span class="kw1">ON</span>
+N<span class="st0">'NODE3\SHAREPOINT2013'</span> <span class="kw1">WITH</span>
+<span class="br0">&#40;</span>PRIMARY_ROLE <span class="br0">&#40;</span>READ_ONLY_ROUT<span class="sy0">IN</span>G_LIST<span class="sy0">=</span><span class="br0">&#40;</span><span class="st0">'NODE1\SHAREPOINT2013'</span>,<span class="st0">'NODE3\SHAREPOINT2013'</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER AVAILABILITY GROUP SQLAG
+MODIFY REPLICA ON
+N'NODE1\SHAREPOINT2013' WITH
+(SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY));
+ALTER AVAILABILITY GROUP SQLAG
+MODIFY REPLICA ON
+N'NODE1\SHAREPOINT2013' WITH
+(SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N'TCP://NODE1.ONPNT.TedsDomain.com:1433'));&lt;/code&gt;
+
+ALTER AVAILABILITY GROUP SQLAG
+MODIFY REPLICA ON
+N'NODE3\SHAREPOINT2013' WITH
+(SECONDARY_ROLE (ALLOW_CONNECTIONS = READ_ONLY));
+ALTER AVAILABILITY GROUP SQLAG
+MODIFY REPLICA ON
+N'NODE3\SHAREPOINT2013' WITH
+(SECONDARY_ROLE (READ_ONLY_ROUTING_URL = N'TCP://NODE3.ONPNT.TedsDomain.com:1433'));
+
+ALTER AVAILABILITY GROUP SQLAG
+MODIFY REPLICA ON
+N'NODE1\SHAREPOINT2013' WITH
+(PRIMARY_ROLE (READ_ONLY_ROUTING_LIST=('NODE3\SHAREPOINT2013','NODE1\SHAREPOINT2013')));
+
+ALTER AVAILABILITY GROUP SQLAG
+MODIFY REPLICA ON
+N'NODE3\SHAREPOINT2013' WITH
+(PRIMARY_ROLE (READ_ONLY_ROUTING_LIST=('NODE1\SHAREPOINT2013','NODE3\SHAREPOINT2013')));
+GO</pre></div></div>
+
+<p>&nbsp;</p>
+<h2>Connecting to SQL Server and the Availability Group</h2>
+<p>Every Availability Group utilizes the listener for connectivity between an external source and the actual database(s) enrolled in the Availability Group.  It is possible, for administrative purposes only, to connect directly to each replica’s SQL Server instance directly.  These direct connections should be performed for instance level configurations such as MAXDOP, memory and so on.  Configuring or making changes to the Availability Group should also be performed on the primary replica by directly connecting to it.  For example: the primary in the configuration is NODE1 and this would be the instance to connect to for configuration of the Availability Group.</p>
+<p>For database level changes such as security, connect to the database through the listener name.</p>
+<p>For application or service connections, no other changes are needed beyond the normal connection strings utilized for connecting directly to either a named instanced, default instance or clustered instances of SQL Server.  However, if a read-intent connection is desired, the ApplicationIntent=ReadOnly, attribute is required in the connection string for read routing to take place. <b></b></p>
+<p>&nbsp;</p>
+<h2>Modifying the Availability Group</h2>
+<h4>Add a database to an existing Availability Group</h4>
+<p>To add or remove a database from a pre-existing Availability Group, connect to the SQL Server instance acting as the primary replica via SSMS.</p>
+<p>Expand the AlwaysOn High Availability node and expand the Availability Group that you wish change.</p>
+<p><a href="/wp-content/uploads/2014/06/ag32.png"><img class="alignnone size-full wp-image-2719" src="/wp-content/uploads/2014/06/ag32.png" alt="ag32" width="361" height="307" srcset="/wp-content/uploads/2014/06/ag32.png 361w, /wp-content/uploads/2014/06/ag32-300x255.png 300w" sizes="(max-width: 361px) 100vw, 361px" /></a></p>
+<p>Right click Availability Databases and click Add Database.</p>
+<p><a href="/wp-content/uploads/2014/06/ag33.png"><img class="alignnone size-full wp-image-2720" src="/wp-content/uploads/2014/06/ag33.png" alt="ag33" width="370" height="360" srcset="/wp-content/uploads/2014/06/ag33.png 370w, /wp-content/uploads/2014/06/ag33-300x291.png 300w" sizes="(max-width: 370px) 100vw, 370px" /></a></p>
+<p>The Add Database to Availability Group wizard will be shown.  This wizard is the same as the initial Availability Group setup.  Each database must follow the same requirements of being in full recovery model and having a full backup taken.</p>
+<p>Follow the screens and fill in each required piece of information that is specific to the database(s) you wish to add to the Availability Group</p>
+<p><a href="/wp-content/uploads/2014/06/ag34.png"><img class="alignnone size-full wp-image-2721" src="/wp-content/uploads/2014/06/ag34.png" alt="ag34" width="624" height="275" srcset="/wp-content/uploads/2014/06/ag34.png 624w, /wp-content/uploads/2014/06/ag34-300x132.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>When the wizard has completed, the database will have a full backup taken and restored to all replicas, and a tail-end log backup will be taken, before it is added to the Availability Group.  During this time the other databases and the Availability Group will be available to all connections.  There are no requirements beyond these steps to add a database to the Availability Group.</p>
+<p>To remove a database, right click the database in the listing and select Remove Database from Availability Group.  Note: this will remove the database from the Availability Group only.  This will not delete the physical database located on all replicas.  The primary database will persist allowing direct connections and all replica databases will be in a NORECOVERY state (restoring…).</p>
+<p><a href="/wp-content/uploads/2014/06/ag35.png"><img class="alignnone size-full wp-image-2676" src="/wp-content/uploads/2014/06/ag35.png" alt="ag35" width="506" height="311" srcset="/wp-content/uploads/2014/06/ag35.png 506w, /wp-content/uploads/2014/06/ag35-300x184.png 300w" sizes="(max-width: 506px) 100vw, 506px" /></a></p>
+<h3>Modifying Availability Group Settings</h3>
+<p>All modifications to the Availability Group should be performed on the primary replica.   To modify settings for a specific Availability Group, connect to the primary replica via SSMS 2012, expand the AlwaysOn High Availability list and expand the Availability Groups node.</p>
+<p>Right click the Availability Group requiring modifications and click Properties.</p>
+<p><a href="/wp-content/uploads/2014/06/ag36.png"><img class="alignnone size-full wp-image-2677" src="/wp-content/uploads/2014/06/ag36.png" alt="ag36" width="370" height="422" srcset="/wp-content/uploads/2014/06/ag36.png 370w, /wp-content/uploads/2014/06/ag36-263x300.png 263w" sizes="(max-width: 370px) 100vw, 370px" /></a></p>
+<p>All changes should be performed in the Availability Group properties window.</p>
+<p><a href="/wp-content/uploads/2014/06/ag37.png"><img class="alignnone size-full wp-image-2678" src="/wp-content/uploads/2014/06/ag37.png" alt="ag37" width="624" height="320" srcset="/wp-content/uploads/2014/06/ag37.png 624w, /wp-content/uploads/2014/06/ag37-300x153.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Changes that can be performed</p>
+<p style="padding-left: 60px">1)      Add or remove replicas</p>
+<p style="padding-left: 60px">2)      Enable read-only or read-intent replicas</p>
+<p style="padding-left: 60px">3)      Switch between synchronous and asynchronous committing between replicas</p>
+<p style="padding-left: 60px">4)      Modify endpoint utilization (Note: endpoints cannot be altered in this window. To modify an endpoint, go to server objectsàendpoints in SSMS.)</p>
+<p style="padding-left: 60px">5)      Backup Preferences</p>
+<p style="padding-left: 60px">6)      Primary and Secondary roles</p>
+<p style="padding-left: 60px">7)      Permissions</p>
+<h2>Failover Testing and Monitoring</h2>
+<h3>Initiate a Failover</h3>
+<p>To simulate and test a failover scenario, connect to the primary or listener via SSMS 2012.  Expand the AlawaysOn High Availability list and Availability Groups’ node.  Right click the Availability Group to be tested and select Failover.</p>
+<p><a href="/wp-content/uploads/2014/06/ag38.png"><img class="alignnone size-full wp-image-2679" src="/wp-content/uploads/2014/06/ag38.png" alt="ag38" width="423" height="466" srcset="/wp-content/uploads/2014/06/ag38.png 423w, /wp-content/uploads/2014/06/ag38-272x300.png 272w" sizes="(max-width: 423px) 100vw, 423px" /></a></p>
+<p>The failover wizard will be displayed.</p>
+<p>Select the replica to failover to and complete the wizard.</p>
+<p><a href="/wp-content/uploads/2014/06/ag39.png"><img class="alignnone size-full wp-image-2680" src="/wp-content/uploads/2014/06/ag39.png" alt="ag39" width="624" height="266" srcset="/wp-content/uploads/2014/06/ag39.png 624w, /wp-content/uploads/2014/06/ag39-300x127.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<h3>Monitoring Availability Groups</h3>
+<p>When Availability Groups are enabled on SQL Server 2012, Extended Events are implemented for monitoring the state and health of the mirroring sessions and other session states.  To review the information that is being collected, connect to the listener name through SSMS and right click AlwaysOn High Availability and click Show Dashboard.</p>
+<p><a href="/wp-content/uploads/2014/06/ag40.png"><img class="alignnone size-full wp-image-2681" src="/wp-content/uploads/2014/06/ag40.png" alt="ag40" width="423" height="266" srcset="/wp-content/uploads/2014/06/ag40.png 423w, /wp-content/uploads/2014/06/ag40-300x188.png 300w" sizes="(max-width: 423px) 100vw, 423px" /></a></p>
+<p>A list of Availability Groups available to monitor will be shown.</p>
+<p>Warning: The dashboard works on a refresh rate.  The queries pulling information may have an impact on performance if too many dashboards are active.  I do not recommend leaving any one dashboard open for a long period of time.</p>
+<p><a href="/wp-content/uploads/2014/06/ag41.png"><img class="alignnone size-full wp-image-2682" src="/wp-content/uploads/2014/06/ag41.png" alt="ag41" width="624" height="139" srcset="/wp-content/uploads/2014/06/ag41.png 624w, /wp-content/uploads/2014/06/ag41-300x66.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>Click the Availability Group to review the health and status.</p>
+<p>The overall health of the Availability Group, databases and replicas will be shown.</p>
+<p><a href="/wp-content/uploads/2014/06/ag42.png"><img class="alignnone size-full wp-image-2683" src="/wp-content/uploads/2014/06/ag42.png" alt="ag42" width="624" height="336" srcset="/wp-content/uploads/2014/06/ag42.png 624w, /wp-content/uploads/2014/06/ag42-300x161.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>To review the extended health events, click the “View AlwaysOn Health Events” link.</p>
+<p><a href="/wp-content/uploads/2014/06/ag43.png"><img class="alignnone size-full wp-image-2684" src="/wp-content/uploads/2014/06/ag43.png" alt="ag43" width="250" height="123" /></a></p>
+<p>Review the events being captured by selecting each one to show the details.</p>
+<p><a href="/wp-content/uploads/2014/06/ag44.png"><img class="alignnone size-full wp-image-2685" src="/wp-content/uploads/2014/06/ag44.png" alt="ag44" width="624" height="601" srcset="/wp-content/uploads/2014/06/ag44.png 624w, /wp-content/uploads/2014/06/ag44-300x288.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>To review the quorum configuration and votes per replica in the cluster, click the View Cluster Quorum Information link.</p>
+<p><a href="/wp-content/uploads/2014/06/ag45.png"><img class="alignnone size-full wp-image-2686" src="/wp-content/uploads/2014/06/ag45.png" alt="ag45" width="624" height="415" srcset="/wp-content/uploads/2014/06/ag45.png 624w, /wp-content/uploads/2014/06/ag45-300x199.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+<p>To make modifications to the quorum or votes (NodeWeight), use the Failover Cluster Manager or PowerShell.  For example: the following PowerShell statement is used to configure the votes shown above for NODE4 to have no votes in the health of the cluster.  This is a common configuration for a disaster and recovery replica node in the cluster and Availability Group setup.</p>
+<p><a href="/wp-content/uploads/2014/06/ag46.png"><img class="alignnone size-full wp-image-2687" src="/wp-content/uploads/2014/06/ag46.png" alt="ag46" width="624" height="99" srcset="/wp-content/uploads/2014/06/ag46.png 624w, /wp-content/uploads/2014/06/ag46-300x47.png 300w" sizes="(max-width: 624px) 100vw, 624px" /></a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">Import<span class="sy0">-</span>Module FailoverClusters
+<span class="br0">&#40;</span>Get<span class="sy0">-</span>ClusterNode NODE4<span class="br0">&#41;</span>.NodeWeight<span class="sy0">=</span><span class="nu0">0</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Import-Module FailoverClusters
+(Get-ClusterNode NODE4).NodeWeight=0</pre></div></div>
+
+<h2 style="margin: 2pt 0in 0pt"><span style="color: #000000;font-family: Calibri Light;font-size: large">What&#8217;s next?</span></h2>
+<p style="margin: 0in 0in 8pt"><span style="color: #000000;font-family: Calibri;font-size: medium">Following this example of setting up a lab to test on with Availability groups, we’ll show how to script this entire solution with PoSh and T-SQL to ensure the setup, configuration and additional databases placed on the group, are not as long-winded of a process.</span></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/architect/availability-groups-setup-and-configuration-from-a-to-z/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>MDS: A Database Error Has Occurred</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/mds-a-database-error-has-occurred/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/mds-a-database-error-has-occurred/#comments</comments>
+		<pubDate>Fri, 18 Apr 2014 09:20:36 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Master Data Services (MDS)]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[batch]]></category>
+		<category><![CDATA[error]]></category>
+		<category><![CDATA[mds]]></category>
+		<category><![CDATA[syndicated]]></category>
+
+		<guid isPermaLink="false">/?p=2583</guid>
+		<description><![CDATA[I recently came across the following error message when I tried to look at the batches in the Integration Management section of MDS: 515: A database error has occurred. Please contact your system administrator Too bad I am the system administrator on that machine&#8230; Anyway, after some searching it came out the MDS stored procedure udpEntityStagingAllBatchesByModelGet throws [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I recently came across the following error message when I tried to look at the batches in the Integration Management section of MDS:</p>
+<pre>515: A database error has occurred. Please contact your system administrator</pre>
+<p><a href="/wp-content/uploads/2014/04/koen_mdserror.png"><img class="alignnone size-full wp-image-2585" alt="koen_mdserror" src="/wp-content/uploads/2014/04/koen_mdserror.png" width="299" height="120" /></a></p>
+<p>Too bad I am the system administrator on that machine&#8230;</p>
+<p>Anyway, after some searching it came out the MDS stored procedure <em>udpEntityStagingAllBatchesByModelGet</em> throws a bit of a temper tantrum if one of the batch tags used in the staging process of a leaf member is NULL. You can check this in the table <strong>mdm.tblStgBatch</strong>.</p>
+<p>Simple delete the offending batches and you&#8217;re good to go!</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DELETE</span> <span class="kw1">FROM</span> mdm.<span class="me1">tblStgBatch</span>
+<span class="kw1">WHERE</span> BatchTag <span class="kw1">IS</span> <span class="sy0">NULL</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DELETE FROM mdm.tblStgBatch
+WHERE BatchTag IS NULL;</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/mds-a-database-error-has-occurred/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #052 &#8211; Why Back Up System Databases?</title>
+		<link>/index.php/uncategorized/t-sql-tuesday-052-why-back-up-system-databases/</link>
+		<comments>/index.php/uncategorized/t-sql-tuesday-052-why-back-up-system-databases/#respond</comments>
+		<pubDate>Tue, 11 Mar 2014 21:29:54 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=2498</guid>
+		<description><![CDATA[It&#8217;s T-SQL Tuesday! This month, Michael Swart has challenged us to argue against a popularly-held opinion about SQL Server. “Arguing Against Popular Opinion” sounds like the title of my autobiography. You’ve been told time and again to back up your SQL Server system databases – master, msdb, and model. I’m here to tell you it’s not [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><a href="http://michaeljswart.com/2014/03/argue_against_a_popular_opinion/"><img class="alignleft size-full wp-image-2241" alt="TSQL2sday" src="/wp-content/uploads/2014/01/TSQL2sday.png" width="133" height="134" /></a>It&#8217;s T-SQL Tuesday! This month, <a href="http://michaeljswart.com/2014/03/argue_against_a_popular_opinion/" target="_blank">Michael Swart has challenged us to argue against a popularly-held opinion about SQL Server</a>. “Arguing Against Popular Opinion” sounds like the title of my autobiography.</p>
+<p>You’ve been told time and again to back up your SQL Server system databases – master, msdb, and model. I’m here to tell you it’s not that important, especially if you have a large number of SQL Server instances. The information in those databases should be documented, scripted, and available in other locations, not just contained here.</p>
+<p><strong>TL;DR:</strong> Make sure all information contained in the system databases is documented and/or scripted in another location. Before you are forced to restore system databases in an emergency, practice doing it in a test system <em>just because</em> &#8211; there are some important steps to take and lessons to be leared.</p>
+<h3>master</h3>
+<p><a href="http://technet.microsoft.com/en-us/library/ms187837.aspx" target="_blank">Master</a> is a very important database for every instance of SQL Server. It contains such valuable information as configuration options, the names and locations of all database files, logins, and endpoints.</p>
+<p>The information contained here should be documented in other places. All your logins should be Windows groups, if possible. Very, very few logins should be granted sa rights. Your system configuration options should be in your instance documentation. If you have mirroring set up, this too should be documented. The information contained in master should be documented and scripted somewhere.</p>
+<p>Given the choice between restoring a copy of the master database on a new server and creating a new master database and applying settings, I would generally choose to create a new database, then apply my settings and configuration changes.</p>
+<h3>msdb</h3>
+<p><a href="http://technet.microsoft.com/en-us/library/ms187112.aspx" target="_blank">Msdb </a>holds information about backup locations and history, Database Mail, SQL Server Agent, Policy Based Management, Service Broker, and more. This is also really important information, and it should never be left to one location.</p>
+<p>The information you’re storing here should be scripted out and in source control. Database Mail should have a standard configuration across servers. You should be able to recreate your Jobs by running a saved script. Reporting Services subscriptions are stored in the Report Server database, which should be backed up on a regular basis (along with the SSRS Encryption Key). None of the information in msdb should be solely in msdb.</p>
+<h3>model</h3>
+<p><a href="http://technet.microsoft.com/en-us/library/ms186388.aspx" target="_blank">Model </a>holds the settings that will be applied to new databases if all settings aren’t explicitly declared upon creation – for example, the recovery model, file locations, and file growth settings. You don’t need to back this up. Why?</p>
+<p>When you or your developers are creating a database, you should have the relevant properties defined. There should be company-wide standards as to what should be used. If you’re working with a vendor, make sure you know what settings their database will use. And if someone forgets an important setting? You should be defining the settings for the model database in your basic SQL Server setup/deployment scripts, and they shouldn’t change from instance to instance.</p>
+<h3>When Disaster Strikes</h3>
+<p>You need to consider the process of <a href="http://technet.microsoft.com/en-us/library/dd207003.aspx">restoring these system databases</a>. Have you tried it? Did you know you can’t just issue a RESTORE command and continue on with your day? What if you have a clustered SQL Server instance? In my experience, I find it is easier to script out or document all information contained in the system databases, and if there is a server failure, build a fresh new server and start from scratch.</p>
+<p>This is a situation you should test at least once – before you need to do it in an emergency. In your sandbox environment, take backups of those databases and try to restore them. Run through the steps in the article listed above. How long does it take? Do you have all the information you need? Is it easier to stand up a new server and apply settings and scripts?</p>
+<p>Like many things in SQL Server, there is more than one way to approach this problem. Make sure you&#8217;ve looked at all of them, so you know what is appropriate for your environment!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/t-sql-tuesday-052-why-back-up-system-databases/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Master Data Services (Second Edition) – Review</title>
+		<link>/index.php/datamgmt/master-data-services-second-edition-review/</link>
+		<comments>/index.php/datamgmt/master-data-services-second-edition-review/#comments</comments>
+		<pubDate>Fri, 31 Jan 2014 13:45:14 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Book Review]]></category>
+		<category><![CDATA[Data Management]]></category>
+		<category><![CDATA[Master Data Services (MDS)]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[master data management]]></category>
+		<category><![CDATA[master data services]]></category>
+		<category><![CDATA[mds]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[syndicated]]></category>
+
+		<guid isPermaLink="false">/?p=2329</guid>
+		<description><![CDATA[For the preparation of my upcoming talk about SQL Server 2012 Master Data Services on the Microsoft Business Analytics Day (hosted by my company element61), I read the book Master Data Services 2nd edition by Tyler Graham. I had almost no prior experience with MDS up to this point (I very quickly glanced over it [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify">For the preparation of my upcoming talk about SQL Server 2012 Master Data Services on the <a href="http://www.element61.be/e/newsevt-detail.asp?ResourceId=721">Microsoft Business Analytics Day</a> (hosted by my company <a href="http://www.element61.be/">element61</a>), I read the book <a href="http://amzn.to/1Oeichj">Master Data Services 2<sup>nd</sup> edition</a> by Tyler Graham.</p>
+<p style="text-align: justify">I had almost no prior experience with MDS up to this point (I very quickly glanced over it in preparation for the 70-463 exam and I guess I didn’t answer a lot of questions about MDS correctly), so I needed a book that could introduce me to the concepts of MDS and how I can effectively manage master data using this tool.</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/01/MDS_book2_banner.png"><img class="alignleft  wp-image-2331" src="/wp-content/uploads/2014/01/MDS_book2_banner.png" alt="MDS_book2_banner" width="207" height="228" /></a></p>
+<p style="text-align: justify">Tyler Graham was part of the development team of SQL Server Master Data Services right from the start, so if anyone is qualified about writing a book about MDS it’s probably him. You can notice his profound knowledge throughout the book, as he frequently delves deeper in the MDS web service (I didn’t even know there was one) and references hidden stored procedures and views to make MDS do your bidding. The book accomplishes its goal: I know have a good working knowledge of the tool and if I have to use it in a project tomorrow, I know where to start.</p>
+<p style="text-align: justify">The book starts with an introduction to manager master data in general, which is very welcome for someone new to the field, just like me. The book then thoroughly explains how to install and configure MDS. In the next chapter, the business use case used throughout the book is introduces and in the following chapter you learn about creating models.</p>
+<p style="text-align: justify">Chapter 5 explains how you can import data into MDS, using the various staging tables. I would have put this chapter later in the book, because the examples show you how to populate objects you have never even heard of and you don’t exactly know what they represent or how you can use them. A bit confusing. The author talks how you can automate the import process using stored procedures – very useful when you plan on using SSIS to load MDS – and he says he will explain them in the next section. However, the next section is about web services and he never mentions the stored procedures again. A missed opportunity…</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/01/WhereAreTheStoredProcedures.png"><img class="alignleft size-medium wp-image-2332" src="/wp-content/uploads/2014/01/WhereAreTheStoredProcedures-300x237.png" alt="WhereAreTheStoredProcedures" width="300" height="237" srcset="/wp-content/uploads/2014/01/WhereAreTheStoredProcedures-300x237.png 300w, /wp-content/uploads/2014/01/WhereAreTheStoredProcedures.png 724w" sizes="(max-width: 300px) 100vw, 300px" /></a></p>
+<p style="text-align: justify">The next chapters explain how to create hierarchies, collections, business rules and so on. The whole time the same business case is used for the examples: a clothing company managing financial and product data with MDS. The examples are real-life and they help you to understand how to work with the product.</p>
+<p style="text-align: justify">Then there’s a whole chapter on using Excel as the front-end for MDS. This is great, as this really opens up MDS for the business user, which gives MDS an advantage over its competitors. However, the book uses a sample workbook you can supposedly download from <a href="http://www.mdsuser.com/">mdsuser.com</a>. But the Excel is nowhere to be found in this site. The book also mentions another site you can download samples from, but that site doesn’t even exist anymore.</p>
+<p style="text-align: justify">At that point we’re at chapter 11, which is a long chapter on how to implement security. The author goes into great detail to explain how it works in MDS. This chapter is certainly useful as a reference when you are implementing permissions in MDS. Chapter 12 shortly explains how to create subscription views so that you can extract data from the system (which is basically the point of a master data implementation, otherwise it wouldn’t be a much use). The next chapter is all about web services, so I gladly skipped that one. The last chapter talks about advanced modelling, but is just a few pages with a few tips and a few reminders of what not to do with MDS. Very interesting though was the authors take on MDS and slowly changing dimensions.</p>
+<p style="text-align: justify">All in all this was a very decent book that showed me how to work with Master Data Services and how to get the most out of it. The author always explains the differences between the previous version and also warns you about what will not work (well) in MDS and how you can possibly circumvent it by fiddling around in the database.</p>
+<p style="text-align: justify">The biggest downside – for me personally – is something that is probably out of control of the author: the format of the eBook. The book was purchased on ebooks.com in PDF format, but the PDF look like some poorly converted eBook format (epub or mobi or something like that). There were no page numbers, no headings or footers and every page just went to the next one, leading to awkward section endings. There were also no margins, which makes it difficult to decently print a page. The book is supposed to be 416 pages long, but the PDF has only 337 pages. Quite a difference. Maybe ebooks.com throw the section about stored procedures away with their lousy conversion. Bad ebooks.com.</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/01/WorstFormatEver.png"><img class="alignleft size-medium wp-image-2333" src="/wp-content/uploads/2014/01/WorstFormatEver-300x124.png" alt="WorstFormatEver" width="300" height="124" srcset="/wp-content/uploads/2014/01/WorstFormatEver-300x124.png 300w, /wp-content/uploads/2014/01/WorstFormatEver.png 755w" sizes="(max-width: 300px) 100vw, 300px" /></a></p>
+<p style="text-align: justify">This might be normal for an actual eBook for reading on a Kindle or a tablet (I have no idea, I own neither of both), but when I buy a PDF I expect it to look like the actual book. Again, this has nothing to do with the efforts of the author: he wrote an excellent book on Master Data Services. The samples are OK with this book, but a few more effort could be put into them. All in all I recommend this book to everyone who wants to learn more about SQL Server 2012 Master Data Services. Just don’t buy it from ebooks.com.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/master-data-services-second-edition-review/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #50 &#8211; Automating Your Installs</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/t-sql-tuesday-50-automating-your-installs/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/t-sql-tuesday-50-automating-your-installs/#respond</comments>
+		<pubDate>Tue, 14 Jan 2014 20:54:32 +0000</pubDate>
+		<dc:creator><![CDATA[Brian Davis]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[automation]]></category>
+		<category><![CDATA[tsql2sday]]></category>
+
+		<guid isPermaLink="false">/?p=2255</guid>
+		<description><![CDATA[This month’s T-SQL Tuesday is being hosted by SQLChow (b &#124; t) and the topic is “Automation, how much of it is the same?”.  As SQLChow noted, automation was a topic a few years ago and now it is being revisited to see if and how it has changed over the years. I know for [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><a href="http://sqlchow.wordpress.com/2014/01/07/t-sql-tuesday-050-automation-how-much-of-it-is-the-same/" target="_blank"><img class="alignnone size-full wp-image-2241" alt="TSQL2sday" src="/wp-content/uploads/2014/01/TSQL2sday.png" width="133" height="134" /></a></p>
+<p>This month’s T-SQL Tuesday is being hosted by SQLChow (<a href="http://sqlchow.wordpress.com/" target="_blank">b</a> | <a href="https://twitter.com/sqlchow" target="_blank">t</a>) and the topic is “Automation, how much of it is the same?”.  As SQLChow noted, automation was a topic a few years ago and now it is being revisited to see if and how it has changed over the years.</p>
+<p>I know for me, over the last few years, automation has taken a larger role in many of the things I do.  I’ve automated many processes over the years using various tools such as SSIS and PowerShell and doing so has not only saved me time but my sanity as well  One of the biggest areas of automation for me over the past couple of years has been the automation my installs of SQL Server.  Everything from test and production server installs to automating the installation of the SQL Server Client Tools on developers machines and even cluster installs.</p>
+<p>I know there are a couple tools out there to help with the automation of SQL Server installs, but my tool of choice has been <a title="SQL Server FineBuild" href="http://sqlserverfinebuild.codeplex.com/" target="_blank">SQL Server FineBuild</a>.  SQL Server FineBuild is a CodePlex project that is freely available and provides a one-click install of SQL Server.  It supports all versions of SQL Server from 2005 through 2014 and is highly customizable.  Not only does it support the installation of SQL Server, it also supports service packs, cumulative updates and hotfixes as well as many 3rd party tools such as BIDS Helper.  SQL Server FinBuild gives you fine grain control over every aspect of your install from the database engine to reporting services, integration services, etc as well as configuration options such as ports, service accounts, database mail and even adding permissions for environment specific accounts or configuring the SQL Client Tools on a developers machine.  This is just a short list of what SQL Server FineBuild can automate.</p>
+<p>With SQL Server FineBuild I’ve been able to automate my installs but the benefits haven’t ended there.  If I’ve needed another server setup identical to a current server for testing, it’s very simple to take the configuration file from the original server and use it to build the test server and know that the install will be identical to the original install.  I’ve also used SQL Server FineBuild to update current installs at different patch levels to a consistent patch level across the board.</p>
+<p>Automating your installs, as with automating anything, takes some initial setup and testing time, but once complete the benefits out weigh the costs especially if you are doing a lot of installs.  Just automating the SQL Server Client Tools installation can be a large time saver as the install can then be run by almost anyone in support.  Not only that but every developer will be setup the same way and patched to the current level of your environment.</p>
+<p>If there is a repeatable process that I have to do over and over, I try my best to automate it and with this tool I’ve been able to not only automate my installs but save time as well.  If you do a lot of installs or simply want a way to quickly reinstall a server in the case of a disaster, I encourage you to look into automating your installs.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/t-sql-tuesday-50-automating-your-installs/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

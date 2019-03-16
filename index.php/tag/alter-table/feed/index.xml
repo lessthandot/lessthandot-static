@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>alter table &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/alter-table/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Use DDL Triggers To Track Table Changes</title>
+		<link>/index.php/datamgmt/datadesign/use-ddl-triggers-to-track/</link>
+		<comments>/index.php/datamgmt/datadesign/use-ddl-triggers-to-track/#comments</comments>
+		<pubDate>Thu, 21 Apr 2011 07:28:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[alter table]]></category>
+		<category><![CDATA[auditing]]></category>
+		<category><![CDATA[ddl]]></category>
+		<category><![CDATA[ddl triggers]]></category>
+		<category><![CDATA[triggers]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/04/use-ddl-triggers-to-track/</guid>
+		<description><![CDATA[Someone wanted to know when and by who a certain table was dropped, I told the person that you can do this with a DDL trigger.Wouldn't it be nice if you could track exactly all the DDL statements that were executed on a table in your database? Well, you can by using DDL Triggers]]></description>
+				<content:encoded><![CDATA[<p>Someone wanted to know when and by who a certain table was dropped, I told the person that you can do this with a DDL trigger.Wouldn&#8217;t it be nice if you could track exactly all the DDL statements that were executed on a table in your database? Well, you can by using DDL Triggers, DDL Triggers were added in SQL Server 2005. </p>
+<p>DDL triggers are a special kind of trigger that fire in response to Data Definition Language (DDL) statements. They can be used to perform administrative tasks in the database such as auditing and regulating database operations. A DDL trigger can be created on the database level or on the server level. In this post I will create a database level DDL trigger that will listen for the ALTER TABLE command.</p>
+<p>First I will create a sample database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> TestTrigger
+GO
+&nbsp;
+<span class="kw1">USE</span> TestTrigger
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE TestTrigger
+GO
+
+USE TestTrigger
+GO</pre></div></div>
+
+<p>Now I will create a table which will hold the DDL statement, the time and the login of the person who executed the statement</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TriggerLog<span class="br0">&#40;</span>DDL <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">300</span><span class="br0">&#41;</span>, ExecutedBy <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, EventDate <span class="kw1">datetime</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TriggerLog(DDL VARCHAR(300), ExecutedBy VARCHAR(100), EventDate datetime)
+GO</pre></div></div>
+
+<p>Here is what my DDL trigger will look like, more information about DDL triggers can be found here: http://msdn.microsoft.com/en-us/library/ms189799.aspx</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TRIGGER</span> trALterTable 
+<span class="kw1">ON</span> <span class="kw1">DATABASE</span> <span class="co1">-- A DB level trigger</span>
+<span class="kw1">FOR</span> ALTER_TABLE <span class="co1">--Event we want to capture</span>
+<span class="kw1">AS</span> 
+&nbsp; <span class="kw1">INSERT</span> TriggerLog
+&nbsp; <span class="kw1">SELECT</span> EVENTDATA<span class="br0">&#40;</span><span class="br0">&#41;</span>.<span class="kw1">value</span><span class="br0">&#40;</span><span class="st0">'(/EVENT_INSTANCE/TSQLCommand/CommandText)[1]'</span>,<span class="st0">'nvarchar(max)'</span><span class="br0">&#41;</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">COALESCE</span><span class="br0">&#40;</span><span class="kw2">SUSER_SNAME</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="kw2">USER_NAME</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TRIGGER trALterTable 
+ON DATABASE -- A DB level trigger
+FOR ALTER_TABLE --Event we want to capture
+AS 
+  INSERT TriggerLog
+  SELECT EVENTDATA().value('(/EVENT_INSTANCE/TSQLCommand/CommandText)[1]','nvarchar(max)'), 
+		COALESCE(SUSER_SNAME(),USER_NAME()), 
+		GETDATE();
+GO</pre></div></div>
+
+<p>The code in the trigger should be pretty simple to follow. The line <em>EVENTDATA().value(&#8216;(/EVENT_INSTANCE/TSQLCommand/CommandText)[1]&#8217;,&#8217;nvarchar(max)&#8217;)</em> is grabbing the DDL statement, more about EVENTDATA() can be found here: http://msdn.microsoft.com/en-us/library/ms173781.aspx</p>
+<p>Next up is the test table that we will use to play around with</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> test<span class="br0">&#40;</span>id <span class="kw1">INT</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE test(id INT)</pre></div></div>
+
+<p>The following block of code will add a column, change the data type of the column and will finally drop the column</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> test
+<span class="kw1">ADD</span> SomeDate <span class="kw1">date</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> test
+<span class="kw1">ALTER</span> <span class="kw1">COLUMN</span> SomeDate datetime2
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> test
+<span class="kw1">DROP</span> <span class="kw1">COLUMN</span> SomeDate 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE test
+ADD SomeDate date
+GO
+
+ALTER TABLE test
+ALTER COLUMN SomeDate datetime2
+GO
+
+
+ALTER TABLE test
+DROP COLUMN SomeDate 
+GO</pre></div></div>
+
+<p>Now let&#8217;s see what we have in our log table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TriggerLog
+<span class="kw1">order</span> <span class="kw1">by</span> EventDate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TriggerLog
+order by EventDate</pre></div></div>
+
+<p>
+Here is the output<br />
+</p>
+<div class="tables">
+<table>
+<tr>
+<th>DDL</th>
+<th>ExecutedBy</th>
+<th>	EventDate</th>
+</tr>
+<tr>
+<td>ALTER TABLE test ADD SomeDate date</td>
+<td>Denis-PCDenis</td>
+<td>2011-04-19 20:18:07.590</td>
+</tr>
+<tr>
+<td>ALTER TABLE test ALTER COLUMN SomeDate datetime2</td>
+<td>Denis-PCDenis</td>
+<td>2011-04-19 20:18:09.900</td>
+</tr>
+<tr>
+<td>ALTER TABLE test DROP COLUMN SomeDate </td>
+<td>Denis-PCDenis</td>
+<td>2011-04-19 20:18:11.610</td>
+</tr>
+<table>
+</table>
+</table>
+</div>
+<p>
+As you can see we have all the DDL statements captured in the table, the time it happened and the person who did it.<br />
+Let&#8217;s just drop and recreate the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">drop</span> <span class="kw1">table</span> Test
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">drop table Test
+GO</pre></div></div>
+
+<p>Now create the table again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> test<span class="br0">&#40;</span>id <span class="kw1">INT</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE test(id INT)
+GO</pre></div></div>
+
+<p>If you now execute this query, you will get back pretty much all the DDL statements that we executed before</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> DDL <span class="sy0">+</span> <span class="st0">'GO'</span>
+<span class="kw1">FROM</span> TriggerLog
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> EventDate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT DDL + 'GO'
+FROM TriggerLog
+ORDER BY EventDate</pre></div></div>
+
+<p>Here is what it looks like if you copied the results and pasted them into a query window.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> test
+<span class="kw1">ADD</span> SomeDate <span class="kw1">date</span>
+GO
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> test
+<span class="kw1">ALTER</span> <span class="kw1">COLUMN</span> SomeDate datetime2
+GO
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> test
+<span class="kw1">DROP</span> <span class="kw1">COLUMN</span> SomeDate 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE test
+ADD SomeDate date
+GO
+ALTER TABLE test
+ALTER COLUMN SomeDate datetime2
+GO
+ALTER TABLE test
+DROP COLUMN SomeDate 
+GO</pre></div></div>
+
+<p>This was just a small example of how a DDL trigger works, A DDL trigger enables you to also not allow ALTER TABLE statements during business hours or for certain user even though they are db owner.</p>
+<p>To see all the events that DDL triggers can listen for you can use the  sys.trigger_event_types Object Catalog View</p>
+<pre>select type_name from sys.trigger_event_types </pre>
+<p>Here is a partial result set</p>
+<p>&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8211;<br />
+CREATE_TABLE<br />
+ALTER_TABLE<br />
+DROP_TABLE<br />
+CREATE_INDEX<br />
+ALTER_INDEX<br />
+DROP_INDEX<br />
+CREATE_STATISTICS<br />
+UPDATE_STATISTICS<br />
+DROP_STATISTICS<br />
+CREATE_SYNONYM<br />
+DROP_SYNONYM<br />
+CREATE_VIEW<br />
+ALTER_VIEW<br />
+DROP_VIEW<br />
+CREATE_PROCEDURE</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/use-ddl-triggers-to-track/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Learn the platform differences to be more effective</title>
+		<link>/index.php/datamgmt/datadesign/learn-the-platform-differences-to/</link>
+		<comments>/index.php/datamgmt/datadesign/learn-the-platform-differences-to/#respond</comments>
+		<pubDate>Mon, 07 Mar 2011 21:03:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[alter table]]></category>
+		<category><![CDATA[columns]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[tip]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/03/learn-the-platform-differences-to/</guid>
+		<description><![CDATA[Something that you are used to doing on one platform is not always the best thing on another platform. Compacting databases might be good in Access, shrinking databases is not so good in SQL Server. Looping in SQL Server instead of using a SET based sol&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Something that you are used to doing on one platform is not always the best thing on another platform. Compacting databases might be good in Access, shrinking databases is not so good in SQL Server. Looping in SQL Server instead of using a SET based solution is another mistake that some procedural programmers make.</p>
+<p>  A couple of minutes ago I saw this question on StackOverflow: <a href="http://stackoverflow.com/questions/5225923/sql-server-equivalent-of-mysql-dump-to-produce-insert-statements-for-all-data-in">SQL Server equivalent of MySQL Dump to produce insert statements for all data in a table </a></p>
+<p>The person wanted the following</p>
+<blockquote><p>I have an application that uses a SQL Server database with several instances of the database&#8230;test, prod, etc&#8230; I am making some application changes and one of the changes involves changing a column from a nvarchar(max) to a nvarchar(200) so that I can add a unique constraint on it. SQL Server tells me that this requires dropping the table and recreating it.</p>
+<p>I want to put together a script that will do the table drop, recreate it with the new schema, and then reinsert the data that was there previously all in one go, if possible, just to keep things simple for use when I migrate this change to production.</p>
+<p>There is probably a good SQL Server way to do this but I&#8217;m just not aware of it. If I was using Mysql I would mysqldump the table and its contents, and use that as my script for applying that change to production. I can&#8217;t find any export functionality in SQL server that will give me a text file consisting of inserts for all data in a table.</p></blockquote>
+<p>Of course I could have told him/her to use the scripting functionality in SQL Server or even use the scripting functionality in SSMS Toolpack. But there is of course a better (my opinion) way</p>
+<p>Let&#8217;s take a look</p>
+<p>If I have this table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test<span class="br0">&#40;</span>SomeColumn <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="kw2">MAX</span><span class="br0">&#41;</span>, ID <span class="kw1">INT</span>, SomeDate <span class="kw1">DATETIME</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test(SomeColumn NVARCHAR(MAX), ID INT, SomeDate DATETIME)
+GO</pre></div></div>
+
+<p>I add 1 row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Test <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="kw2">REPLICATE</span><span class="br0">&#40;</span><span class="st0">'T'</span>,<span class="nu0">200</span><span class="br0">&#41;</span>,<span class="nu0">1</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Test VALUES(REPLICATE('T',200),1,GETDATE())</pre></div></div>
+
+<p>Now I want to create this index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">INDEX</span> ix_test <span class="kw1">ON</span> Test<span class="br0">&#40;</span>ID,SomeColumn<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE INDEX ix_test ON Test(ID,SomeColumn)</pre></div></div>
+
+<p>Here is the error that is raised</p>
+<div style="border:1px solid black;background-color:#444;color:white;margin:0 20px;padding:0 5px 0 5px;">Msg 1919, Level 16, State 1, Line 1<br />
+Column &#8216;SomeColumn&#8217; in table &#8216;Test&#8217; is of a type that is invalid for use as a key column in an index.</div>
+<p>Now, let&#8217;s change the column to nvarchar(200). You can do this by using the ALTER TABLE&#8230;ALTER COLUMN syntax. Here is what it looks like for this table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> Test <span class="kw1">ALTER</span> <span class="kw1">COLUMN</span> SomeColumn <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="nu0">200</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE Test ALTER COLUMN SomeColumn NVARCHAR(200)
+GO</pre></div></div>
+
+<p>Now we have no problem creating this index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">INDEX</span> ix_test <span class="kw1">ON</span> Test<span class="br0">&#40;</span>ID,SomeColumn<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE INDEX ix_test ON Test(ID,SomeColumn)</pre></div></div>
+
+<p>You can verify that the select works</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM Test</pre></div></div>
+
+<p>Now, let&#8217;s drop the table and take a look at what happens when the length of the data is more than the column size we want<br />
+Drop the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">TABLE</span> test</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP TABLE test</pre></div></div>
+
+<p>create the table again with one row, this time we have 300 bytes in the column</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test<span class="br0">&#40;</span>SomeColumn <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="kw2">MAX</span><span class="br0">&#41;</span>, ID <span class="kw1">INT</span>, SomeDate <span class="kw1">DATETIME</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> Test <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="kw2">REPLICATE</span><span class="br0">&#40;</span><span class="st0">'T'</span>,<span class="nu0">300</span><span class="br0">&#41;</span>,<span class="nu0">1</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test(SomeColumn NVARCHAR(MAX), ID INT, SomeDate DATETIME)
+GO
+
+INSERT Test VALUES(REPLICATE('T',300),1,GETDATE())</pre></div></div>
+
+<p>Now when we try to make in NVARCHAR(200)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> Test <span class="kw1">ALTER</span> <span class="kw1">COLUMN</span> SomeColumn <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="nu0">200</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE Test ALTER COLUMN SomeColumn NVARCHAR(200)
+GO</pre></div></div>
+
+<p>We get the infamous error <em>String or binary data would be truncated.</em></p>
+<div style="border:1px solid black;background-color:#444;color:white;margin:0 20px;padding:0 5px 0 5px;">Msg 8152, Level 16, State 10, Line 1<br />
+String or binary data would be truncated.<br />
+The statement has been terminated.
+</div>
+<p>So first you need to find out what the max length is of the column and adjust your new size that you want to change the column size to.</p>
+<p>On the stackoverflow question I gave an additional answer, you can also select into a new table, doing the conversion upon selection and then drop the old table and rename the table just created.</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/learn-the-platform-differences-to/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

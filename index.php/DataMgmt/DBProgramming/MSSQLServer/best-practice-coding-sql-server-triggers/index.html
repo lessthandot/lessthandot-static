@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
+		<link rel="shortcut icon" href="http://lessthandot.com/favicon.ico" type="image/vnd.microsoft.icon" />
+	<title>Less Than Dot - Blog -   Best Practice: Coding SQL Server triggers for multi-row operations</title>
+	<meta prefix="og: http://ogp.me/ns#" property="og:title" content="Less Than Dot - Blog -   Best Practice: Coding SQL Server triggers for multi-row operations" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:url" content="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/" />
+		<meta prefix="og: http://ogp.me/ns#" property="og:image" content="http://lessthandot.com/images/logo_prod.png" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:site_name" content="LessThanDot" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:description" content="Best Practice: coding SQL Server triggers for multi-row operationsThere are many forum posts where people code triggers but these triggers are coded incorrectly because they don't account for multi-row operations. A trigger fires per batch not per r&hellip;" />
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0" href="/index.php/feed/" />
+	<link rel="alternate" type="application/atom+xml" title="Atom" href="/index.php/feed/atom/" />
+
+	<link rel="canonical" href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/" />	
+	<link rel="stylesheet" href="/wp-content/themes/lessthandot2009/style.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsite.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsiteprint.css" media="print" type="text/css" />
+
+	<link rel='dns-prefetch' href='//ajax.googleapis.com' />
+<link rel='dns-prefetch' href='//s.w.org' />
+<link rel="alternate" type="application/rss+xml" title="LessthanDot &raquo; Best Practice: Coding SQL Server triggers for multi-row operations Comments Feed" href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/feed/" />
+		<script type="text/javascript">
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/svg\/","svgExt":".svg","source":{"concatemoji":"\/wp-includes\/js\/wp-emoji-release.min.js?ver=4.6.1"}};
+			!function(a,b,c){function d(a){var c,d,e,f,g,h=b.createElement("canvas"),i=h.getContext&&h.getContext("2d"),j=String.fromCharCode;if(!i||!i.fillText)return!1;switch(i.textBaseline="top",i.font="600 32px Arial",a){case"flag":return i.fillText(j(55356,56806,55356,56826),0,0),!(h.toDataURL().length<3e3)&&(i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,65039,8205,55356,57096),0,0),c=h.toDataURL(),i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,55356,57096),0,0),d=h.toDataURL(),c!==d);case"diversity":return i.fillText(j(55356,57221),0,0),e=i.getImageData(16,16,1,1).data,f=e[0]+","+e[1]+","+e[2]+","+e[3],i.fillText(j(55356,57221,55356,57343),0,0),e=i.getImageData(16,16,1,1).data,g=e[0]+","+e[1]+","+e[2]+","+e[3],f!==g;case"simple":return i.fillText(j(55357,56835),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode8":return i.fillText(j(55356,57135),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode9":return i.fillText(j(55358,56631),0,0),0!==i.getImageData(16,16,1,1).data[0]}return!1}function e(a){var c=b.createElement("script");c.src=a,c.type="text/javascript",b.getElementsByTagName("head")[0].appendChild(c)}var f,g,h,i;for(i=Array("simple","flag","unicode8","diversity","unicode9"),c.supports={everything:!0,everythingExceptFlag:!0},h=0;h<i.length;h++)c.supports[i[h]]=d(i[h]),c.supports.everything=c.supports.everything&&c.supports[i[h]],"flag"!==i[h]&&(c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&c.supports[i[h]]);c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&!c.supports.flag,c.DOMReady=!1,c.readyCallback=function(){c.DOMReady=!0},c.supports.everything||(g=function(){c.readyCallback()},b.addEventListener?(b.addEventListener("DOMContentLoaded",g,!1),a.addEventListener("load",g,!1)):(a.attachEvent("onload",g),b.attachEvent("onreadystatechange",function(){"complete"===b.readyState&&c.readyCallback()})),f=c.source||{},f.concatemoji?e(f.concatemoji):f.wpemoji&&f.twemoji&&(e(f.twemoji),e(f.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+<link rel='stylesheet' id='bwp-syntax-css'  href='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/css/bwp-syntax-global.css?ver=4.6.1' type='text/css' media='all' />
+<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js?ver=1.12.4'></script>
+<script type='text/javascript' src='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/js/bwp-syntax.js?ver=4.6.1'></script>
+<link rel='https://api.w.org/' href='/wp-json/' />
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="/wp-includes/wlwmanifest.xml" /> 
+<link rel='prev' title='Best Practice: Do not cluster on UniqueIdentifier when you use NewId' href='/index.php/datamgmt/dbprogramming/best-practice-don-t-not-cluster-on-uniqu/' />
+<link rel='next' title='SSRS 05 Passing Multi-Value Parameters Between Reports.' href='/index.php/datamgmt/datadesign/ssrs-05-passing-multi-value-parameters-b/' />
+<meta name="generator" content="WordPress 4.6.1" />
+<link rel="canonical" href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/" />
+<link rel='shortlink' href='/?p=625' />
+<link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdatadesign%2Fbest-practice-coding-sql-server-triggers%2F" />
+<link rel="alternate" type="text/xml+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdatadesign%2Fbest-practice-coding-sql-server-triggers%2F&#038;format=xml" />
+<style type='text/css'>.rp4wp-related-posts ul{width:100%;padding:0;margin:0;float:left;}
+.rp4wp-related-posts ul>li{list-style:none;padding:0;margin:0;padding-bottom:20px;clear:both;}
+.rp4wp-related-posts ul>li>p{margin:0;padding:0;}
+.rp4wp-related-post-image{width:35%;padding-right:25px;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;float:left;}</style>
+	<script src="http://lessthandot.com/includes/allsite.js" type="text/javascript" ></script>
+</head>
+<body>
+<div id="contain"><div id="subcontain"><div id="ttl"><div id="hdr"><div id="snav"><a href="http://lessthandot.com/login.php?backtrack=/index.php/DataMgmt/DBProgramming/MSSQLServer/best-practice-coding-sql-server-triggers/?">Member Login</a>
+</div><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="logoc"><img src="http://lessthandot.com/images/logo_prod.png" alt="LessThanDot Site Logo" border="0" /></a><h1>LessThanDot</h1><div class="pgsttl">A decade of helpful technical content</div></div><div id="nav">
+<ul>
+<li><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="h" ><span>Launchpad</span></a></li>
+<li class="cur"><a href="/" title="LessThanDot Blogs" id="b" ><span>Blogs</span></a></li>
+<li><a href="http://forum.lessthandot.com/" title="LessThanDot Community Forums" id="f" ><span>Forum</span></a></li>
+<li><a href="http://wiki.lessthandot.com/" title="LessThanDot Wiki Articles" id="w" ><span>Wiki</span></a></li>
+<li><a href="http://sqlcop.lessthandot.com/" title="LessThanDot SQLCop" id="a" ><span>SQLCop</span></a></li>
+<li><a href="http://lessthandot.com/account.php" title="Your Account Settings" id="r"  class="l_ie"><span>My Account</span></a></li></ul></div>
+</div><div id="content">
+<div id="fac"><div id="fa">
+		<p>Less Than Dot is a community of passionate IT professionals and enthusiasts dedicated to sharing technical knowledge, experience, and assistance. Inside you will find reference materials, interesting technical discussions, and expert tips and commentary.</p></div></div><div class="content-sidebar">
+	<div id="social" class="sdsec">
+		<h2>LTD Social Sitings</h2>
+		<div>
+		<a id="social_twitter" href="http://twitter.com/LessThanDot/" title="Follow us on Twitter" ><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Lessthandot twitter"/></a> 
+		<a href="http://www.linkedin.com/groups?home=&amp;gid=113440" title="Join us on LinkedIn" ><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="Lessthandot Linkedin" /></a> 
+		<a href="http://www.facebook.com/group.php?gid=19330511063" title="Join us on Facebook" ><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Lessthandot facebook"/></a> 
+		<a href="http://lessthandot.com/rss.php" title="LessThanDot News Feed" ><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="Lessthandot rss"/></a> 
+		</div>
+		<p><em>Note: Watch for social icons on posts by your favorite authors to follow their postings on these and other social sites.</em></p>
+	</div><div class="content-sidebar-section">
+<h2>Tag cloud</h2>
+	<p class="tag-cloud">
+		<a href='/index.php/tag/net/' class='tag-link-245 tag-link-position-1' title='21 topics' style='font-size: 8.9565217391304pt;'>.net</a> <a href='/index.php/tag/asp-net/' class='tag-link-168 tag-link-position-2' title='21 topics' style='font-size: 8.9565217391304pt;'>asp.net</a> <a href='/index.php/tag/azure-2/' class='tag-link-321 tag-link-position-3' title='29 topics' style='font-size: 10.173913043478pt;'>azure</a> <a href='/index.php/tag/book/' class='tag-link-130 tag-link-position-4' title='26 topics' style='font-size: 9.7391304347826pt;'>book</a> <a href='/index.php/tag/business-intelligence-2/' class='tag-link-256 tag-link-position-5' title='30 topics' style='font-size: 10.260869565217pt;'>business intelligence</a> <a href='/index.php/tag/c/' class='tag-link-138 tag-link-position-6' title='40 topics' style='font-size: 11.304347826087pt;'>c#</a> <a href='/index.php/tag/database/' class='tag-link-134 tag-link-position-7' title='31 topics' style='font-size: 10.434782608696pt;'>database</a> <a href='/index.php/tag/excel/' class='tag-link-155 tag-link-position-8' title='16 topics' style='font-size: 8pt;'>excel</a> <a href='/index.php/tag/gotcha/' class='tag-link-240 tag-link-position-9' title='19 topics' style='font-size: 8.6086956521739pt;'>gotcha</a> <a href='/index.php/tag/how-to/' class='tag-link-272 tag-link-position-10' title='44 topics' style='font-size: 11.652173913043pt;'>how to</a> <a href='/index.php/tag/mongodb/' class='tag-link-765 tag-link-position-11' title='17 topics' style='font-size: 8.2608695652174pt;'>mongodb</a> <a href='/index.php/tag/nosql/' class='tag-link-775 tag-link-position-12' title='18 topics' style='font-size: 8.4347826086957pt;'>nosql</a> <a href='/index.php/tag/performance/' class='tag-link-179 tag-link-position-13' title='26 topics' style='font-size: 9.7391304347826pt;'>performance</a> <a href='/index.php/tag/security-2/' class='tag-link-398 tag-link-position-14' title='25 topics' style='font-size: 9.5652173913043pt;'>security</a> <a href='/index.php/tag/sql/' class='tag-link-132 tag-link-position-15' title='42 topics' style='font-size: 11.478260869565pt;'>sql</a> <a href='/index.php/tag/sql-advent-2012/' class='tag-link-1416 tag-link-position-16' title='18 topics' style='font-size: 8.4347826086957pt;'>sql advent 2012</a> <a href='/index.php/tag/sql-friday/' class='tag-link-377 tag-link-position-17' title='18 topics' style='font-size: 8.4347826086957pt;'>sql friday</a> <a href='/index.php/tag/sql-server/' class='tag-link-154 tag-link-position-18' title='145 topics' style='font-size: 16.086956521739pt;'>sql server</a> <a href='/index.php/tag/sql-server-2000/' class='tag-link-366 tag-link-position-19' title='45 topics' style='font-size: 11.739130434783pt;'>sql server 2000</a> <a href='/index.php/tag/sql-server-2005/' class='tag-link-327 tag-link-position-20' title='118 topics' style='font-size: 15.391304347826pt;'>sql server 2005</a> <a href='/index.php/tag/sql-server-2008/' class='tag-link-152 tag-link-position-21' title='237 topics' style='font-size: 18pt;'>sql server 2008</a> <a href='/index.php/tag/sql-server-2008-r2/' class='tag-link-548 tag-link-position-22' title='38 topics' style='font-size: 11.130434782609pt;'>sql server 2008 r2</a> <a href='/index.php/tag/sql-server-2012/' class='tag-link-1161 tag-link-position-23' title='76 topics' style='font-size: 13.739130434783pt;'>sql server 2012</a> <a href='/index.php/tag/ssis-2/' class='tag-link-501 tag-link-position-24' title='52 topics' style='font-size: 12.260869565217pt;'>ssis</a> <a href='/index.php/tag/ssms/' class='tag-link-640 tag-link-position-25' title='18 topics' style='font-size: 8.4347826086957pt;'>ssms</a> <a href='/index.php/tag/ssrs-2/' class='tag-link-557 tag-link-position-26' title='27 topics' style='font-size: 9.9130434782609pt;'>ssrs</a> <a href='/index.php/tag/syndicated/' class='tag-link-1407 tag-link-position-27' title='67 topics' style='font-size: 13.217391304348pt;'>syndicated</a> <a href='/index.php/tag/t-sql/' class='tag-link-185 tag-link-position-28' title='26 topics' style='font-size: 9.7391304347826pt;'>t-sql</a> <a href='/index.php/tag/tip/' class='tag-link-194 tag-link-position-29' title='46 topics' style='font-size: 11.826086956522pt;'>tip</a> <a href='/index.php/tag/unit-testing/' class='tag-link-162 tag-link-position-30' title='17 topics' style='font-size: 8.2608695652174pt;'>unit testing</a>	</p>
+</div>		<div class="content-sidebar-section">
+		<h2>Authors</h2>
+			<ul class="author-list dimmed">
+				<li><a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis">SQLDenis</a> <a href="/index.php/author/SQLDenis/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (597)</li><li><a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)">Ted Krueger (onpnt)</a> <a href="/index.php/author/onpnt/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (355)</li><li><a href="/index.php/author/grrlgeek/" title="Posts by Jes Borland">Jes Borland</a> <a href="/index.php/author/grrlgeek/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (202)</li><li><a href="/index.php/author/tarwn/" title="Posts by Eli Weinstock-Herman (tarwn)">Eli Weinstock-Herman (tarwn)</a> <a href="/index.php/author/tarwn/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (190)</li><li><a href="/index.php/author/koenverbeeck/" title="Posts by Koen Verbeeck">Koen Verbeeck</a> <a href="/index.php/author/koenverbeeck/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (100)</li><li><a href="/index.php/author/alexcuse/" title="Posts by Alex Ullrich">Alex Ullrich</a> <a href="/index.php/author/alexcuse/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (55)</li><li><a href="/index.php/author/gmmastros/" title="Posts by George Mastros (gmmastros)">George Mastros (gmmastros)</a> <a href="/index.php/author/gmmastros/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (45)</li><li><a href="/index.php/author/axel8s/" title="Posts by Axel Achten (axel8s)">Axel Achten (axel8s)</a> <a href="/index.php/author/axel8s/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (28)</li><li><a href="/index.php/author/naomi/" title="Posts by Naomi Nosonovsky">Naomi Nosonovsky</a> <a href="/index.php/author/naomi/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (27)</li><li><a href="/index.php/author/thirster42/" title="Posts by David Forck (thirster42)">David Forck (thirster42)</a> <a href="/index.php/author/thirster42/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (24)</li><li><a href="/index.php/author/chopstik/" title="Posts by chopstik">chopstik</a> <a href="/index.php/author/chopstik/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (20)</li><li><a href="/index.php/author/kconan/" title="Posts by Kevin Conan">Kevin Conan</a> <a href="/index.php/author/kconan/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (18)</li><li><a href="/index.php/author/robearl/" title="Posts by Rob Earl">Rob Earl</a> <a href="/index.php/author/robearl/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (14)</li><li><a href="/index.php/author/thatrickguy/" title="Posts by ThatRickGuy">ThatRickGuy</a> <a href="/index.php/author/thatrickguy/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (12)</li><li><a href="/index.php/author/sqlarcher/" title="Posts by SQLArcher">SQLArcher</a> <a href="/index.php/author/sqlarcher/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (11)</li>                <li><a href="http://lessthandot.com/Stats/BlogAuthors.php">More...</a></li>
+			</ul>
+		</div>
+				<div class="content-sidebar-section">
+		<h2>Categories</h2>
+			<ul class="categories-list">
+					<li class="cat-item cat-item-10"><a href="/index.php/category/all/" >All Blogs</a>
+</li>
+	<li class="cat-item cat-item-5"><a href="/index.php/category/architect/" >Architecture, Design and Strategy</a>
+</li>
+	<li class="cat-item cat-item-1759"><a href="/index.php/category/artificial-intelligence/" >Artificial Intelligence</a>
+</li>
+	<li class="cat-item cat-item-6"><a href="/index.php/category/datamgmt/" >Data Management</a>
+</li>
+	<li class="cat-item cat-item-7"><a href="/index.php/category/desktopdev/" >Desktop Developer</a>
+</li>
+	<li class="cat-item cat-item-8"><a href="/index.php/category/enterprisedev/" >Enterprise Developer</a>
+</li>
+	<li class="cat-item cat-item-11"><a href="/index.php/category/itprofessionals/" >IT Professionals</a>
+</li>
+	<li class="cat-item cat-item-12"><a href="/index.php/category/itstudents/" >IT Students and Researchers</a>
+</li>
+	<li class="cat-item cat-item-1743"><a href="/index.php/category/management/" >Management</a>
+</li>
+	<li class="cat-item cat-item-9"><a href="/index.php/category/sysadmins/" >System Admins</a>
+</li>
+	<li class="cat-item cat-item-1"><a href="/index.php/category/uncategorized/" >Uncategorized</a>
+</li>
+	<li class="cat-item cat-item-4"><a href="/index.php/category/webdev/" >Web Developer</a>
+</li>
+			</ul>
+		</div>
+		</div><div class="content-main">
+				<div class="post-navigation">
+				<div class="post-navigation-forward"><a href="/index.php/datamgmt/datadesign/ssrs-05-passing-multi-value-parameters-b/" rel="next">SSRS 05 Passing Multi-Value Parameters Between Reports.</a> &raquo; </div>
+				<div class="post-navigation-back">&laquo; <a href="/index.php/datamgmt/dbprogramming/best-practice-don-t-not-cluster-on-uniqu/" rel="prev">Best Practice: Do not cluster on UniqueIdentifier when you use NewId</a></div>
+			</div>
+			<div class="post-area instapaper_body">
+				<div class="post-title-line">
+										<h1 class="instapaper_ignore"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/" class="post-title">Best Practice: Coding SQL Server triggers for multi-row operations</a></h1>
+					<div class="post-byline">by <a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis" rel="author">SQLDenis</a> on November 12, 2009 in category <a href="/index.php/category/datamgmt/datadesign/" rel="category tag">Data Modelling and Design</a> <a href="/index.php/category/datamgmt/dbprogramming/mssqlserver/" rel="category tag">Microsoft SQL Server</a> <a href="/index.php/category/datamgmt/dbadmin/mssqlserveradmin/" rel="category tag">Microsoft SQL Server Admin</a>. Article views: 45,832 </div>
+				</div>
+				<div class="post-tagline"><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&text=RT @LessThanDot Blog - Best Practice: Coding SQL Server triggers for multi-row operations by @denisgobo" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&title=Best Practice: Coding SQL Server triggers for multi-row operations&source=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&title=Best Practice: Coding SQL Server triggers for multi-row operations" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&quote=Best Practice: Coding SQL Server triggers for multi-row operations" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&title=Best Practice: Coding SQL Server triggers for multi-row operations" class="instapaper_button">Instapaper</a></div>
+
+				<div class="post-content"><p>Best Practice: coding SQL Server triggers for multi-row operations</p>
+<p>There are many forum posts where people code triggers but these triggers are coded incorrectly because they don&#8217;t account for multi-row operations. A trigger fires per batch not per row, if you are lucky you will get an error&#8230;if you are not lucky you will not get an error but it might take a while before you notice that you are missing a whole bunch of data<br />
+Let&#8217;s take a look, first create these two tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">table</span> Test<span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> not null <span class="kw1">primary</span> <span class="kw1">key</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SomeDate <span class="kw1">datetime</span> not null<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">create</span> <span class="kw1">table</span> TestHistory<span class="br0">&#40;</span>id <span class="kw1">int</span> &nbsp;not null, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; InsertedDate <span class="kw1">datetime</span> not null<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create table Test(id int identity not null primary key, 
+			SomeDate datetime not null)
+GO
+
+create table TestHistory(id int  not null, 
+			InsertedDate datetime not null)
+GO</pre></div></div>
+
+<p>Now create this trigger, this trigger is very simple, it basically inserts a row into the history table every time an insert happens in the test table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> &nbsp;<span class="kw1">TRIGGER</span> trTest
+&nbsp; &nbsp; <span class="kw1">ON</span> Test
+&nbsp; &nbsp; <span class="kw1">FOR</span> <span class="kw1">INSERT</span>
+&nbsp; &nbsp; <span class="kw1">AS</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">IF</span> <span class="kw2">@@ROWCOUNT</span> <span class="sy0">=</span><span class="nu0">0</span>
+&nbsp; &nbsp; <span class="kw1">RETURN</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">DECLARE</span> @id <span class="kw1">int</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @id <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> id 
+&nbsp; &nbsp; <span class="kw1">FROM</span> inserted<span class="br0">&#41;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">INSERT</span> TestHistory <span class="br0">&#40;</span>id,InsertedDate<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @id, <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE  TRIGGER trTest
+    ON Test
+    FOR INSERT
+    AS
+     
+    IF @@ROWCOUNT =0
+    RETURN
+     
+    DECLARE @id int
+    SET @id = (SELECT id 
+    FROM inserted)
+    
+    INSERT TestHistory (id,InsertedDate)
+    SELECT @id, getdate()
+    
+    GO</pre></div></div>
+
+<p>Run this insert statement which only inserts one row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> Test<span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span> <span class="kw1">values</span><span class="br0">&#40;</span><span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert Test(SomeDate) values(getdate())</pre></div></div>
+
+<p>Now run this to see what is in the history table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestHistory</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from TestHistory</pre></div></div>
+
+<pre>1	2009-11-12 14:51:21.103</pre>
+<p>That all works fine, what happens when we try to insert 2 rows?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> Test<span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>
+<span class="kw1">select</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert Test(SomeDate)
+select getdate()
+union all
+select getdate() + 1</pre></div></div>
+
+<p>Here is the error.</p>
+<p><em>Server: Msg 512, Level 16, State 1, Procedure trTest, Line 11<br />
+Subquery returned more than 1 value. This is not permitted when the subquery follows =, !=, <, <= , >, >= or when the subquery is used as an expression.<br />
+The statement has been terminated.</em></p>
+<p>What would happen if you coded the trigger in this way</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TRIGGER</span> trTest
+&nbsp; &nbsp; <span class="kw1">ON</span> Test
+&nbsp; &nbsp; <span class="kw1">FOR</span> <span class="kw1">INSERT</span>
+&nbsp; &nbsp; <span class="kw1">AS</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">IF</span> <span class="kw2">@@ROWCOUNT</span> <span class="sy0">=</span><span class="nu0">0</span>
+&nbsp; &nbsp; <span class="kw1">RETURN</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">DECLARE</span> @id <span class="kw1">int</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @id <span class="sy0">=</span> id 
+&nbsp; &nbsp; <span class="kw1">FROM</span> inserted
+&nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">INSERT</span> TestHistory <span class="br0">&#40;</span>id,InsertedDate<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @id, <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TRIGGER trTest
+    ON Test
+    FOR INSERT
+    AS
+     
+    IF @@ROWCOUNT =0
+    RETURN
+     
+    DECLARE @id int
+    SELECT @id = id 
+    FROM inserted
+    
+    INSERT TestHistory (id,InsertedDate)
+    SELECT @id, getdate()
+    
+    GO</pre></div></div>
+
+<p>Now insert one row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> Test<span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span> <span class="kw1">values</span><span class="br0">&#40;</span><span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert Test(SomeDate) values(getdate())</pre></div></div>
+
+<p>We look again what is in the history table, as you can see we have id 1 and 4, this is because id 2 and 3 failed and were rolled back</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestHistory</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from TestHistory</pre></div></div>
+
+<pre>1	2009-11-12 14:51:21.103
+4	2009-11-12 14:52:08.370</pre>
+<p>Here is where it gets interesting, run this code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> Test<span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>
+<span class="kw1">select</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert Test(SomeDate)
+select getdate()
+union all
+select getdate() + 1</pre></div></div>
+
+<p>That runs fine but when we look now we are missing row 5 in the history table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestHistory</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from TestHistory</pre></div></div>
+
+<pre>1	2009-11-12 14:51:21.103
+4	2009-11-12 14:52:08.370
+6	2009-11-12 14:52:20.167</pre>
+<p>let&#8217;s try that again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> Test<span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>
+<span class="kw1">select</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert Test(SomeDate)
+select getdate()
+union all
+select getdate() + 1</pre></div></div>
+
+<p>Now we are missing row 7 in the history table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestHistory</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from TestHistory</pre></div></div>
+
+<pre>1	2009-11-12 14:51:21.103
+4	2009-11-12 14:52:08.370
+6	2009-11-12 14:52:20.167
+8	2009-11-12 14:52:38.917</pre>
+<p>The problem is with this line of code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> @id <span class="sy0">=</span> id <span class="kw1">FROM</span> inserted</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT @id = id FROM inserted</pre></div></div>
+
+<p>@id will only hold the value for the row that was returned last in the result set</p>
+<p>Here is how you would change the trigger to work correctly</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TRIGGER</span> trTest
+&nbsp; &nbsp; <span class="kw1">ON</span> Test
+&nbsp; &nbsp; <span class="kw1">FOR</span> <span class="kw1">INSERT</span>
+&nbsp; &nbsp; <span class="kw1">AS</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">IF</span> <span class="kw2">@@ROWCOUNT</span> <span class="sy0">=</span><span class="nu0">0</span>
+&nbsp; &nbsp; <span class="kw1">RETURN</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">INSERT</span> TestHistory <span class="br0">&#40;</span>id,InsertedDate<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> id, <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">FROM</span> inserted
+&nbsp; &nbsp; 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TRIGGER trTest
+    ON Test
+    FOR INSERT
+    AS
+     
+    IF @@ROWCOUNT =0
+    RETURN
+     
+        
+    INSERT TestHistory (id,InsertedDate)
+    SELECT id, getdate()
+    FROM inserted
+    
+GO</pre></div></div>
+
+<p>Now run this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> Test<span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span> <span class="kw1">values</span><span class="br0">&#40;</span><span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert Test(SomeDate) values(getdate())</pre></div></div>
+
+<p>We can now verify that it works correctly</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestHistory</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from TestHistory</pre></div></div>
+
+<pre>1	2009-11-12 14:51:21.103
+4	2009-11-12 14:52:08.370
+6	2009-11-12 14:52:20.167
+8	2009-11-12 14:52:38.917
+9	2009-11-12 14:53:44.433</pre>
+<p>Now run this for 2 rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> Test<span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>
+<span class="kw1">select</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert Test(SomeDate)
+select getdate()
+union all
+select getdate() + 1</pre></div></div>
+
+<p>And as you can see both rows were inserted into the history table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestHistory</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from TestHistory</pre></div></div>
+
+<pre>1	2009-11-12 14:51:21.103
+4	2009-11-12 14:52:08.370
+6	2009-11-12 14:52:20.167
+8	2009-11-12 14:52:38.917
+9	2009-11-12 14:53:44.433
+10	2009-11-12 14:53:51.870
+11	2009-11-12 14:53:51.870</pre>
+<p>So what is worse in this case? The error message or the fact that the code didn&#8217;t blow up but that the insert wasn&#8217;t working correctly? I&#8217;ll take an error message any time over the other problem.</p>
+<p>I am putting together a <a href="http://wiki.lessthandot.com/index.php/SQL_Server_Programming_Best_Practices">SQL Server Best Programming Practices</a> wiki page, this blog post is part of it as are other posts and articles either from this site as well as from other sites. I am still working on the <a href="http://wiki.lessthandot.com/index.php/SQL_Server_Programming_Best_Practices">SQL Server Best Programming Practices</a> wiki page but I encourage you to bookmark it and come back every now and then because I will be adding more content</p>
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+<div class='rp4wp-related-posts'>
+<h3>Related Posts</h3>
+<ul>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/datadesign/sql-server-2008-logo/'>SQL Server 2008 Logo</a><p>Here is the new logo for SQL Server 2008. Looks pretty clean, what do you&hellip;</p></div>
+</li>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/dbadmin/mssqlserveradmin/sql-server-2008-sp1-download/'>SQL Server 2008 sp1 Download</a><p>SQL Server 2008, Service Pack 1 has been released. download it here: http://www.microsoft.com/downloads/details.aspx?displaylang=en&amp;FamilyID=66ab3dbb-bf3e-4f46-9559-ccc6a4f9dc19 *** If&hellip;</p></div>
+</li>
+</ul>
+</div>
+</div>
+				<div class="post-author">
+					<div class="userInfo"><h2>About the Author</h2><img class="bioPic" src="http://www.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d.png" alt="User bio image"/>Denis has been working with SQL Server since version 6.5. Although he worked as an ASP/JSP/ColdFusion developer before the dot com bust, he has been working exclusively as a database developer/architect since 2002. In addition to English, Denis is also fluent in Croatian and Dutch, but he can curse in many other languages and dialects (just ask the SQL optimizer) He lives in Princeton, NJ with his wife and three kids.<br style="clear: left" /><div class="bioSoc"><span class="bioSocTitle">Social Sitings</span><a href="http://twitter.com/denisgobo" title="SQLDenis at Twitter" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Twitter" /></a><a href="http://www.facebook.com/profile.php?id=http://www.facebook.com/denis.gobo" title="SQLDenis at Facebook" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Facebook" /></a><a href="http://www.linkedin.com/in/denisgobo" title="SQLDenis at LinkedIn" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="LinkedIn" /></a><a href="http://denisgobo.blogspot.com/" title="SQLDenis at HomePage" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_homepage.png" alt="HomePage" /></a><a href="http://www.flickr.com/photos/denisgobo//" title="SQLDenis at Flickr" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_flickr.png" alt="Flickr" /></a><a href="/index.php/author/SQLDenis/feed/" title="Blog RSS feed for SQLDenis" class="bioSocLink"><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="LTD RSS Feed" /></a></div></div>				</div>
+				<div class="post-foot instapaper_ignore">
+					<div class="post-tagline">
+						<div class="post-foot-views"><label>Article views:</label> 45,832 </div>
+						<div class="post-foot-more-posts">
+                            <a href="/index.php/author/SQLDenis/">Read More Posts by SQLDenis</a>
+						</div>
+					</div>
+					<div>
+						<label>Tags:</label> <a href="/index.php/tag/how-to/" rel="tag">how to</a>, <a href="/index.php/tag/sql-server-2000/" rel="tag">sql server 2000</a>, <a href="/index.php/tag/sql-server-2005/" rel="tag">sql server 2005</a>, <a href="/index.php/tag/sql-server-2008/" rel="tag">sql server 2008</a>, <a href="/index.php/tag/tip/" rel="tag">tip</a>, <a href="/index.php/tag/triggers/" rel="tag">triggers</a> 
+					</div>
+					<div class="post-tagline" style="height: auto">
+						<span class="social-button-label">Share:</span><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&text=RT @LessThanDot Blog - Best Practice: Coding SQL Server triggers for multi-row operations by @denisgobo" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&title=Best Practice: Coding SQL Server triggers for multi-row operations&source=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&title=Best Practice: Coding SQL Server triggers for multi-row operations" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&quote=Best Practice: Coding SQL Server triggers for multi-row operations" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/&title=Best Practice: Coding SQL Server triggers for multi-row operations" class="instapaper_button">Instapaper</a>					</div>			
+				</div>
+				<div class="comments-area instapaper_ignore">
+	<h4 class="comments-title">
+		11 Comments	</h4>
+			<ol class="comments-list">
+					<li class="comment even thread-even depth-1" id="comment-2173">
+				<div id="div-comment-2173" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/0a4995b15800844a5c6dee8e56765af8?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/0a4995b15800844a5c6dee8e56765af8?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">vanman</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-2173">
+			November 17, 2009 at 1:35 am</a>		</div>
+
+		<p>I also found that placing </p>
+<p>		INSERT TestHistory (id,InsertedDate)<br />
+		SELECT @id, GETDATE()</p>
+<p>inside a cursor also works.</p>
+<p>any comments on this method?</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=2173#respond' onclick='return addComment.moveForm( "div-comment-2173", "2173", "respond", "625" )' aria-label='Reply to vanman'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-SQLDenis bypostauthor odd alt thread-odd thread-alt depth-1" id="comment-2175">
+				<div id="div-comment-2175" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">SQLDenis</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-2175">
+			November 17, 2009 at 10:19 am</a>		</div>
+
+		<p>vanman code in a trigger should execute as fast as possible..in general a set based operation will always be faster than a cursor that loops over a bunch of rows</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=2175#respond' onclick='return addComment.moveForm( "div-comment-2175", "2175", "respond", "625" )' aria-label='Reply to SQLDenis'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-2176">
+				<div id="div-comment-2176" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/0a4995b15800844a5c6dee8e56765af8?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/0a4995b15800844a5c6dee8e56765af8?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">vanman</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-2176">
+			November 23, 2009 at 6:32 am</a>		</div>
+
+		<p>thx 4 feedback. yes i agree, although i have to do row by row validations before allowing transaction to commit.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=2176#respond' onclick='return addComment.moveForm( "div-comment-2176", "2176", "respond", "625" )' aria-label='Reply to vanman'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-2178">
+				<div id="div-comment-2178" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://2.gravatar.com/avatar/8f3f7b9c2df0e38716081b78abace601?s=64&#038;d=mm&#038;r=g' srcset='http://2.gravatar.com/avatar/8f3f7b9c2df0e38716081b78abace601?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Pete</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-2178">
+			April 28, 2010 at 10:22 pm</a>		</div>
+
+		<p>can you example can call a store procedure to do the insert? if so can you show how? </p>
+<p>
+thanks</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=2178#respond' onclick='return addComment.moveForm( "div-comment-2178", "2178", "respond", "625" )' aria-label='Reply to Pete'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-2179">
+				<div id="div-comment-2179" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/db74016afd7698a89490ca2041969520?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/db74016afd7698a89490ca2041969520?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Alex Feng</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-2179">
+			June 7, 2010 at 6:29 pm</a>		</div>
+
+		<p>Hi,</p>
+<p>I found something very strange &#8211; the sequence of the records in the TestHistory is DESC, and in your test it seems to be ASC. I am using SQL Server 2008 RTM Developer.</p>
+<p>This is my test below:</p>
+<p>&#8212; Alter the trigger as this<br />
+alter trigger trTest<br />
+                on Test<br />
+                for insert<br />
+                as</p>
+<p>                if @@ROWCOUNT = 0<br />
+                return</p>
+<p>                insert TestHistory (id, InsertedDate)<br />
+                select id, GETDATE()<br />
+                from inserted</p>
+<p>                select * from inserted  &#8212; this is the statement i added<br />
+go</p>
+<p>insert Test (SomeDate)<br />
+select GETDATE()<br />
+union all<br />
+select GETDATE() + 1<br />
+go</p>
+<p>run the above 2 statements and i get:<br />
+14            2010-06-08 23:08:28.347<br />
+13            2010-06-07 23:08:28.347</p>
+<p>which i think should be in your scenario:<br />
+13            2010-06-07 23:08:28.347<br />
+14            2010-06-08 23:08:28.347</p>
+<p>Does this behavior correct? or something changed in the SQL Server 2008? I will test this on other version of SQL Server (2005/2008 R2) to see if it is different.</p>
+<p>Regards,<br />
+Alex Feng</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=2179#respond' onclick='return addComment.moveForm( "div-comment-2179", "2179", "respond", "625" )' aria-label='Reply to Alex Feng'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-SQLDenis bypostauthor odd alt thread-odd thread-alt depth-1" id="comment-2180">
+				<div id="div-comment-2180" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">SQLDenis</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-2180">
+			June 7, 2010 at 7:03 pm</a>		</div>
+
+		<p>Alex,</p>
+<p>I get on SQL Server 2008 sp1</p>
+<p>2	2010-06-08 21:04:57.480<br />
+1	2010-06-07 21:04:57.480</p>
+<p>on  SQL Server 2008 R2 I get</p>
+<p>2	2010-06-08 21:07:27.180<br />
+1	2010-06-07 21:07:27.180</p>
+<p>So in both case the last row is returned first, I would not worry about this, if you want a specific order then just do an ORDER BY</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=2180#respond' onclick='return addComment.moveForm( "div-comment-2180", "2180", "respond", "625" )' aria-label='Reply to SQLDenis'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-2181">
+				<div id="div-comment-2181" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/db74016afd7698a89490ca2041969520?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/db74016afd7698a89490ca2041969520?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Alex Feng</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-2181">
+			June 8, 2010 at 3:30 am</a>		</div>
+
+		<p>Thanks for your quick response. </p>
+<p>Now, i know that it is a normal behaivor in SQL Server 2008. </p>
+<p>Thanks again!</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=2181#respond' onclick='return addComment.moveForm( "div-comment-2181", "2181", "respond", "625" )' aria-label='Reply to Alex Feng'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-2174">
+				<div id="div-comment-2174" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/92c236da6d0c5f733938d8aca82c7d43?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/92c236da6d0c5f733938d8aca82c7d43?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Suhas</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-2174">
+			December 27, 2010 at 9:35 pm</a>		</div>
+
+		<p>Sending an email from within a trigger is recomended ? or is it the best way to invoke a job from trigger to send a mail ?</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=2174#respond' onclick='return addComment.moveForm( "div-comment-2174", "2174", "respond", "625" )' aria-label='Reply to Suhas'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-naomi even thread-even depth-1" id="comment-2177">
+				<div id="div-comment-2177" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/61e248e3f536e25c08658d205808b113?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/61e248e3f536e25c08658d205808b113?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Naomi Nosonovsky</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-2177">
+			March 22, 2011 at 5:55 pm</a>		</div>
+
+		<p>No, sending an e-mail from the trigger is not recommended. The recommended practice is to update a separate notifications table and let a SQL Job fire with needed frequency.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=2177#respond' onclick='return addComment.moveForm( "div-comment-2177", "2177", "respond", "625" )' aria-label='Reply to Naomi Nosonovsky'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-4944365">
+				<div id="div-comment-4944365" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://2.gravatar.com/avatar/e146376f8d5353de880a392c5e8a7a57?s=64&#038;d=mm&#038;r=g' srcset='http://2.gravatar.com/avatar/e146376f8d5353de880a392c5e8a7a57?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">laura</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-4944365">
+			March 8, 2016 at 12:45 am</a>		</div>
+
+		<p>Thank you for the post.  There is something I don&#8217;t understand though, in the last example, rows 10 and 11 are the same&#8230; it looks like only getdate() was inserted, and not getdate() + 1 ?<br />
+10	2009-11-12 14:53:51.870<br />
+11	2009-11-12 14:53:51.870</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=4944365#respond' onclick='return addComment.moveForm( "div-comment-4944365", "4944365", "respond", "625" )' aria-label='Reply to laura'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-5045075">
+				<div id="div-comment-5045075" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/1f71f8b2005c2a9f21edc8d604352718?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/1f71f8b2005c2a9f21edc8d604352718?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Richard Djupström</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/#comment-5045075">
+			May 16, 2016 at 4:22 am</a>		</div>
+
+		<p>I think you are thinking of the test table and not the testhistory table Laura.</p>
+<p>Those inputs that you describe are inserted into the test table but the trigger only inserts the date on which the trigger executes, into the testhistory table.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/best-practice-coding-sql-server-triggers/?replytocom=5045075#respond' onclick='return addComment.moveForm( "div-comment-5045075", "5045075", "respond", "625" )' aria-label='Reply to Richard Djupström'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		</ol>
+						<div id="respond" class="comment-respond">
+			<h3 id="reply-title" class="comment-reply-title">Leave a Reply <small><a rel="nofollow" id="cancel-comment-reply-link" href="/index.php/DataMgmt/DBProgramming/MSSQLServer/best-practice-coding-sql-server-triggers/#respond" style="display:none;">Cancel reply</a></small></h3>				<form action="/wp-comments-post.php" method="post" id="commentform" class="comment-form">
+					<p class="comment-notes"><span id="email-notes">Your email address will not be published.</span> Required fields are marked <span class="required">*</span></p><p class="comment-form-comment"><label for="comment">Comment</label> <textarea id="comment" name="comment" cols="45" rows="8" maxlength="65525" aria-required="true" required="required"></textarea></p><p class="comment-form-author"><label for="author">Name <span class="required">*</span></label> <input id="author" name="author" type="text" value="" size="30" maxlength="245" aria-required='true' required='required' /></p>
+<p class="comment-form-email"><label for="email">Email <span class="required">*</span></label> <input id="email" name="email" type="text" value="" size="30" maxlength="100" aria-describedby="email-notes" aria-required='true' required='required' /></p>
+<p class="comment-form-url"><label for="url">Website</label> <input id="url" name="url" type="text" value="" size="30" maxlength="200" /></p>
+<p class="form-submit"><input name="submit" type="submit" id="submit" class="submit" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='625' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='0' />
+</p><input type="hidden" id="killer_value" name="killer_value" value="cc1aa436277138f61cda703991069eaf"/><noscript>Sorry, but you are required to use a javascript enabled brower to comment here.</noscript>				</form>
+					</div><!-- #respond -->
+		</div>			</div>
+				<br style="clear: both;" />
+</div>
+		</div>
+		<div id="page-footer">
+			<div id="botnav"><a href="http://lessthandot.com/" title="LessThanDot Launchpad">Launchpad</a> | <a href="http://lessthandot.com/account.php" title="Your Account Settings">My Account</a> | <a href="http://lessthandot.com/statistics.php" title="Statistics">Statistics</a> | <a href="http://lessthandot.com/donate.php" title="Donate">Donate</a> | <a href="http://lessthandot.com/contactus.php" title="Contact Us">Contact Us</a> | <a href="http://lessthandot.com/aboutus.php" title="About the LessThanDot Team">&copy;2008 - 2019 LessThanDot, LLC</a></div>
+
+		<script type='text/javascript'>
+		var _gaq = _gaq || [];
+		_gaq.push(['_setAccount', 'UA-4471405-1']);
+		_gaq.push(['_trackPageview']);
+		_gaq.push(['_setCustomVar', 1, 'Environment', 'lessthandot.com', 3]);
+
+		(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		})();
+	  </script>			<div class="validator"><a href="http://validator.w3.org/check?uri=referer">Valid XHTML</a> | <a href="http://jigsaw.w3.org/css-validator/check/referer" title="Validate the CSS for this page at the W3C website">Valid CSS</a> | 2018-11-11 15:52</div>
+		</div>
+	</div>
+</div>
+<!-- <script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script> -->
+<script type='text/javascript' src='/wp-includes/js/wp-embed.min.js?ver=4.6.1'></script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var spam_destroyer = {"key":"159ff9dcc225580310c2de238cdd1f1a","lifetime":"3600","limit":"1552766956"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='/wp-content/plugins/spam-destroyer/kill.js?ver=1.2'></script>
+</body>
+</html>

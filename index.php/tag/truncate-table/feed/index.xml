@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>truncate table &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/truncate-table/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Why do you need additional privileges for truncate table compared to delete?</title>
+		<link>/index.php/datamgmt/datadesign/why-do-you-need-additional/</link>
+		<comments>/index.php/datamgmt/datadesign/why-do-you-need-additional/#comments</comments>
+		<pubDate>Sun, 07 Oct 2012 12:04:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[delete]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[permissions]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[truncate table]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/10/why-do-you-need-additional/</guid>
+		<description><![CDATA[One of the people on my team wants to have the ability to truncate tables on the staging database while this person is testing, why are special permissions required compared to a delete?]]></description>
+				<content:encoded><![CDATA[<p>One of the people on my team wants to have the ability to truncate tables on the staging database while this person is testing. Here is what Books On Line has about permissions for the TRUNCATED statement</p>
+<blockquote><p>The minimum permission required is ALTER on table_name. TRUNCATE TABLE permissions default to the table owner, members of the sysadmin fixed server role, and the db_owner and db_ddladmin fixed database roles, and are not transferable.</p></blockquote>
+<p>Before I answer why someone would need ALTER TABLE permissions when the person already has DELETE permissions, let&#8217;s run some code that will show the &#8216;problem&#8217;.</p>
+<p>First create a Test database, add one table and insert one row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> Test
+go
+&nbsp;
+<span class="kw1">USE</span> Test
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestTruncate<span class="br0">&#40;</span>Id <span class="kw1">int</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> TestTruncate <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE Test
+go
+
+USE Test
+GO
+
+CREATE TABLE TestTruncate(Id int)
+GO
+
+INSERT TestTruncate values(1)
+GO</pre></div></div>
+
+<p>Now create a new user and give the user datareader and datawriter permissions</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> master
+GO
+<span class="kw1">CREATE</span> LOG<span class="sy0">IN</span> TestLogin <span class="kw1">WITH</span> PASSW<span class="sy0">OR</span>D<span class="sy0">=</span>N<span class="st0">'Test'</span>, 
+DEFAULT_DATABASE<span class="sy0">=</span>master, CHECK_EXPIRATION<span class="sy0">=</span><span class="kw1">OFF</span>, CHECK_POLICY<span class="sy0">=</span><span class="kw1">OFF</span>
+GO
+<span class="kw1">USE</span> Test
+GO
+<span class="kw1">CREATE</span> <span class="kw1">USER</span> TestLogin <span class="kw1">FOR</span> LOG<span class="sy0">IN</span> TestLogin
+GO
+<span class="kw1">USE</span> Test
+GO
+<span class="kw1">ALTER</span> <span class="kw1">ROLE</span> db_datareader <span class="kw1">ADD</span> MEMBER TestLogin
+GO
+<span class="kw1">USE</span> Test
+GO
+<span class="kw1">ALTER</span> <span class="kw1">ROLE</span> db_datawriter <span class="kw1">ADD</span> MEMBER TestLogin
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE master
+GO
+CREATE LOGIN TestLogin WITH PASSWORD=N'Test', 
+DEFAULT_DATABASE=master, CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+GO
+USE Test
+GO
+CREATE USER TestLogin FOR LOGIN TestLogin
+GO
+USE Test
+GO
+ALTER ROLE db_datareader ADD MEMBER TestLogin
+GO
+USE Test
+GO
+ALTER ROLE db_datawriter ADD MEMBER TestLogin
+GO</pre></div></div>
+
+<p>Now that the user is created, login as that user and run the TRUNCATE TABLE command</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> TestTruncate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">TRUNCATE TABLE TestTruncate</pre></div></div>
+
+<p><em>Msg 1088, Level 16, State 7, Line 1<br />
+Cannot find the object &#8220;TestTruncate&#8221; because it does not exist or you do not have permissions.</em></p>
+<p>As you can see, you don&#8217;t have permission. A delete will work just fine</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DELETE</span> TestTruncate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DELETE TestTruncate</pre></div></div>
+
+<p>(1 row(s) affected)</p>
+<p>Before I give you a workaround, let&#8217;s try to figure out why the minimum requirement is ALTER TABLE. What is the difference between a DELETE and a TRUNCATE in terms of logging? When  a TRUNCATE occurs, the operation does not log individual row deletions, a DELETE operation does. The reason this is important is because if you have a trigger on the table, in needs to be disabled before the TRUNCATE occurs. <strong>Now you know why ALTER TABLE is required, triggers need to be disabled.</strong></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> SomeTable DISABLE <span class="kw1">TRIGGER</span> SomeTrigger</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE SomeTable DISABLE TRIGGER SomeTrigger</pre></div></div>
+
+<p>And in order to disable the trigger, ALTER TABLE permissions are required as a minimum.</p>
+<p>But I don&#8217;t want people altering tables on our staging and QA servers, so here is one way of giving the person the ability to TRUNCATE a table without giving them permissions explicitly. Create a stored procedure and use WITH EXECUTE AS, this will define the execution context of the stored procedure. In the example below, I picked a user that has sufficient privileges to perform the TRUNCATE.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">PROCEDURE</span> prTruncate
+<span class="kw1">WITH</span> <span class="kw1">EXECUTE</span> <span class="kw1">AS</span> <span class="st0">'SuperUser'</span>
+<span class="kw1">AS</span>
+<span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> TestTruncate
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PROCEDURE prTruncate
+WITH EXECUTE AS 'SuperUser'
+AS
+TRUNCATE TABLE TestTruncate
+GO</pre></div></div>
+
+<p>All you have to do is give your user execute permissions to the stored procedure you just created</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">GRANT</span> <span class="kw1">EXECUTE</span> <span class="kw1">ON</span> prTruncate <span class="kw1">TO</span> TestLogin
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">GRANT EXECUTE ON prTruncate TO TestLogin
+GO</pre></div></div>
+
+<p>Now if you execute the stored procedure as the TestLogin user, you will see it will run just fine</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> prTruncate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC prTruncate</pre></div></div>
+
+<p>Hope this helps someone in the future who is filling up his log these days</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/why-do-you-need-additional/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

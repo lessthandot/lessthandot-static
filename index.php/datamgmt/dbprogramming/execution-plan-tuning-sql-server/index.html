@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
+		<link rel="shortcut icon" href="http://lessthandot.com/favicon.ico" type="image/vnd.microsoft.icon" />
+	<title>Less Than Dot - Blog -   Execution Plans &#8211; Indexing to achieve optimal query plans</title>
+	<meta prefix="og: http://ogp.me/ns#" property="og:title" content="Less Than Dot - Blog -   Execution Plans &#8211; Indexing to achieve optimal query plans" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:url" content="/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/" />
+		<meta prefix="og: http://ogp.me/ns#" property="og:image" content="http://lessthandot.com/images/logo_prod.png" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:site_name" content="LessThanDot" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:description" content="Execution plan analysis is a critical aspect to keeping SQL Server running optimally.  With any amount of hardware, the risk factor of a poorly written or unsupported statement being executed in a production environment has the ability to bring service availability to a halt.  Testing on a futuristic sizing of tables and indexes is also a part of tuning that should be taken into account.  Data will grow and, with that growth, queries will react differently if not tuned to their full potential." />
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0" href="/index.php/feed/" />
+	<link rel="alternate" type="application/atom+xml" title="Atom" href="/index.php/feed/atom/" />
+
+	<!-- this page is the canonical URL -->	
+	<link rel="stylesheet" href="/wp-content/themes/lessthandot2009/style.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsite.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsiteprint.css" media="print" type="text/css" />
+
+	<link rel='dns-prefetch' href='//ajax.googleapis.com' />
+<link rel='dns-prefetch' href='//s.w.org' />
+<link rel="alternate" type="application/rss+xml" title="LessthanDot &raquo; Execution Plans &#8211; Indexing to achieve optimal query plans Comments Feed" href="/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/feed/" />
+		<script type="text/javascript">
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/svg\/","svgExt":".svg","source":{"concatemoji":"\/wp-includes\/js\/wp-emoji-release.min.js?ver=4.6.1"}};
+			!function(a,b,c){function d(a){var c,d,e,f,g,h=b.createElement("canvas"),i=h.getContext&&h.getContext("2d"),j=String.fromCharCode;if(!i||!i.fillText)return!1;switch(i.textBaseline="top",i.font="600 32px Arial",a){case"flag":return i.fillText(j(55356,56806,55356,56826),0,0),!(h.toDataURL().length<3e3)&&(i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,65039,8205,55356,57096),0,0),c=h.toDataURL(),i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,55356,57096),0,0),d=h.toDataURL(),c!==d);case"diversity":return i.fillText(j(55356,57221),0,0),e=i.getImageData(16,16,1,1).data,f=e[0]+","+e[1]+","+e[2]+","+e[3],i.fillText(j(55356,57221,55356,57343),0,0),e=i.getImageData(16,16,1,1).data,g=e[0]+","+e[1]+","+e[2]+","+e[3],f!==g;case"simple":return i.fillText(j(55357,56835),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode8":return i.fillText(j(55356,57135),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode9":return i.fillText(j(55358,56631),0,0),0!==i.getImageData(16,16,1,1).data[0]}return!1}function e(a){var c=b.createElement("script");c.src=a,c.type="text/javascript",b.getElementsByTagName("head")[0].appendChild(c)}var f,g,h,i;for(i=Array("simple","flag","unicode8","diversity","unicode9"),c.supports={everything:!0,everythingExceptFlag:!0},h=0;h<i.length;h++)c.supports[i[h]]=d(i[h]),c.supports.everything=c.supports.everything&&c.supports[i[h]],"flag"!==i[h]&&(c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&c.supports[i[h]]);c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&!c.supports.flag,c.DOMReady=!1,c.readyCallback=function(){c.DOMReady=!0},c.supports.everything||(g=function(){c.readyCallback()},b.addEventListener?(b.addEventListener("DOMContentLoaded",g,!1),a.addEventListener("load",g,!1)):(a.attachEvent("onload",g),b.attachEvent("onreadystatechange",function(){"complete"===b.readyState&&c.readyCallback()})),f=c.source||{},f.concatemoji?e(f.concatemoji):f.wpemoji&&f.twemoji&&(e(f.twemoji),e(f.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+<link rel='stylesheet' id='bwp-syntax-css'  href='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/css/bwp-syntax-global.css?ver=4.6.1' type='text/css' media='all' />
+<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js?ver=1.12.4'></script>
+<script type='text/javascript' src='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/js/bwp-syntax.js?ver=4.6.1'></script>
+<link rel='https://api.w.org/' href='/wp-json/' />
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="/wp-includes/wlwmanifest.xml" /> 
+<link rel='prev' title='Using Binding Redirects to Stay Out of DLL Hell' href='/index.php/webdev/serverprogramming/using-binding-redirects-to-stay-out-of-d/' />
+<link rel='next' title='Unit Testing Costs Too Much' href='/index.php/desktopdev/generalpurposelanguages/unit-testing-costs-too-much/' />
+<meta name="generator" content="WordPress 4.6.1" />
+<link rel="canonical" href="/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/" />
+<link rel='shortlink' href='/?p=930' />
+<link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdbprogramming%2Fexecution-plan-tuning-sql-server%2F" />
+<link rel="alternate" type="text/xml+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdbprogramming%2Fexecution-plan-tuning-sql-server%2F&#038;format=xml" />
+<style type='text/css'>.rp4wp-related-posts ul{width:100%;padding:0;margin:0;float:left;}
+.rp4wp-related-posts ul>li{list-style:none;padding:0;margin:0;padding-bottom:20px;clear:both;}
+.rp4wp-related-posts ul>li>p{margin:0;padding:0;}
+.rp4wp-related-post-image{width:35%;padding-right:25px;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;float:left;}</style>
+	<script src="http://lessthandot.com/includes/allsite.js" type="text/javascript" ></script>
+</head>
+<body>
+<div id="contain"><div id="subcontain"><div id="ttl"><div id="hdr"><div id="snav"><a href="http://lessthandot.com/login.php?backtrack=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/?">Member Login</a>
+</div><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="logoc"><img src="http://lessthandot.com/images/logo_prod.png" alt="LessThanDot Site Logo" border="0" /></a><h1>LessThanDot</h1><div class="pgsttl">A decade of helpful technical content</div></div><div id="nav">
+<ul>
+<li><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="h" ><span>Launchpad</span></a></li>
+<li class="cur"><a href="/" title="LessThanDot Blogs" id="b" ><span>Blogs</span></a></li>
+<li><a href="http://forum.lessthandot.com/" title="LessThanDot Community Forums" id="f" ><span>Forum</span></a></li>
+<li><a href="http://wiki.lessthandot.com/" title="LessThanDot Wiki Articles" id="w" ><span>Wiki</span></a></li>
+<li><a href="http://sqlcop.lessthandot.com/" title="LessThanDot SQLCop" id="a" ><span>SQLCop</span></a></li>
+<li><a href="http://lessthandot.com/account.php" title="Your Account Settings" id="r"  class="l_ie"><span>My Account</span></a></li></ul></div>
+</div><div id="content">
+<div id="fac"><div id="fa">
+		<p>Less Than Dot is a community of passionate IT professionals and enthusiasts dedicated to sharing technical knowledge, experience, and assistance. Inside you will find reference materials, interesting technical discussions, and expert tips and commentary.</p></div></div><div class="content-sidebar">
+	<div id="social" class="sdsec">
+		<h2>LTD Social Sitings</h2>
+		<div>
+		<a id="social_twitter" href="http://twitter.com/LessThanDot/" title="Follow us on Twitter" ><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Lessthandot twitter"/></a> 
+		<a href="http://www.linkedin.com/groups?home=&amp;gid=113440" title="Join us on LinkedIn" ><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="Lessthandot Linkedin" /></a> 
+		<a href="http://www.facebook.com/group.php?gid=19330511063" title="Join us on Facebook" ><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Lessthandot facebook"/></a> 
+		<a href="http://lessthandot.com/rss.php" title="LessThanDot News Feed" ><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="Lessthandot rss"/></a> 
+		</div>
+		<p><em>Note: Watch for social icons on posts by your favorite authors to follow their postings on these and other social sites.</em></p>
+	</div><div class="content-sidebar-section">
+<h2>Tag cloud</h2>
+	<p class="tag-cloud">
+		<a href='/index.php/tag/net/' class='tag-link-245 tag-link-position-1' title='21 topics' style='font-size: 8.9565217391304pt;'>.net</a> <a href='/index.php/tag/asp-net/' class='tag-link-168 tag-link-position-2' title='21 topics' style='font-size: 8.9565217391304pt;'>asp.net</a> <a href='/index.php/tag/azure-2/' class='tag-link-321 tag-link-position-3' title='29 topics' style='font-size: 10.173913043478pt;'>azure</a> <a href='/index.php/tag/book/' class='tag-link-130 tag-link-position-4' title='26 topics' style='font-size: 9.7391304347826pt;'>book</a> <a href='/index.php/tag/business-intelligence-2/' class='tag-link-256 tag-link-position-5' title='30 topics' style='font-size: 10.260869565217pt;'>business intelligence</a> <a href='/index.php/tag/c/' class='tag-link-138 tag-link-position-6' title='40 topics' style='font-size: 11.304347826087pt;'>c#</a> <a href='/index.php/tag/database/' class='tag-link-134 tag-link-position-7' title='31 topics' style='font-size: 10.434782608696pt;'>database</a> <a href='/index.php/tag/excel/' class='tag-link-155 tag-link-position-8' title='16 topics' style='font-size: 8pt;'>excel</a> <a href='/index.php/tag/gotcha/' class='tag-link-240 tag-link-position-9' title='19 topics' style='font-size: 8.6086956521739pt;'>gotcha</a> <a href='/index.php/tag/how-to/' class='tag-link-272 tag-link-position-10' title='44 topics' style='font-size: 11.652173913043pt;'>how to</a> <a href='/index.php/tag/mongodb/' class='tag-link-765 tag-link-position-11' title='17 topics' style='font-size: 8.2608695652174pt;'>mongodb</a> <a href='/index.php/tag/nosql/' class='tag-link-775 tag-link-position-12' title='18 topics' style='font-size: 8.4347826086957pt;'>nosql</a> <a href='/index.php/tag/performance/' class='tag-link-179 tag-link-position-13' title='26 topics' style='font-size: 9.7391304347826pt;'>performance</a> <a href='/index.php/tag/security-2/' class='tag-link-398 tag-link-position-14' title='25 topics' style='font-size: 9.5652173913043pt;'>security</a> <a href='/index.php/tag/sql/' class='tag-link-132 tag-link-position-15' title='42 topics' style='font-size: 11.478260869565pt;'>sql</a> <a href='/index.php/tag/sql-advent-2012/' class='tag-link-1416 tag-link-position-16' title='18 topics' style='font-size: 8.4347826086957pt;'>sql advent 2012</a> <a href='/index.php/tag/sql-friday/' class='tag-link-377 tag-link-position-17' title='18 topics' style='font-size: 8.4347826086957pt;'>sql friday</a> <a href='/index.php/tag/sql-server/' class='tag-link-154 tag-link-position-18' title='145 topics' style='font-size: 16.086956521739pt;'>sql server</a> <a href='/index.php/tag/sql-server-2000/' class='tag-link-366 tag-link-position-19' title='45 topics' style='font-size: 11.739130434783pt;'>sql server 2000</a> <a href='/index.php/tag/sql-server-2005/' class='tag-link-327 tag-link-position-20' title='118 topics' style='font-size: 15.391304347826pt;'>sql server 2005</a> <a href='/index.php/tag/sql-server-2008/' class='tag-link-152 tag-link-position-21' title='237 topics' style='font-size: 18pt;'>sql server 2008</a> <a href='/index.php/tag/sql-server-2008-r2/' class='tag-link-548 tag-link-position-22' title='38 topics' style='font-size: 11.130434782609pt;'>sql server 2008 r2</a> <a href='/index.php/tag/sql-server-2012/' class='tag-link-1161 tag-link-position-23' title='76 topics' style='font-size: 13.739130434783pt;'>sql server 2012</a> <a href='/index.php/tag/ssis-2/' class='tag-link-501 tag-link-position-24' title='52 topics' style='font-size: 12.260869565217pt;'>ssis</a> <a href='/index.php/tag/ssms/' class='tag-link-640 tag-link-position-25' title='18 topics' style='font-size: 8.4347826086957pt;'>ssms</a> <a href='/index.php/tag/ssrs-2/' class='tag-link-557 tag-link-position-26' title='27 topics' style='font-size: 9.9130434782609pt;'>ssrs</a> <a href='/index.php/tag/syndicated/' class='tag-link-1407 tag-link-position-27' title='67 topics' style='font-size: 13.217391304348pt;'>syndicated</a> <a href='/index.php/tag/t-sql/' class='tag-link-185 tag-link-position-28' title='26 topics' style='font-size: 9.7391304347826pt;'>t-sql</a> <a href='/index.php/tag/tip/' class='tag-link-194 tag-link-position-29' title='46 topics' style='font-size: 11.826086956522pt;'>tip</a> <a href='/index.php/tag/unit-testing/' class='tag-link-162 tag-link-position-30' title='17 topics' style='font-size: 8.2608695652174pt;'>unit testing</a>	</p>
+</div>		<div class="content-sidebar-section">
+		<h2>Authors</h2>
+			<ul class="author-list dimmed">
+				<li><a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis">SQLDenis</a> <a href="/index.php/author/SQLDenis/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (597)</li><li><a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)">Ted Krueger (onpnt)</a> <a href="/index.php/author/onpnt/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (355)</li><li><a href="/index.php/author/grrlgeek/" title="Posts by Jes Borland">Jes Borland</a> <a href="/index.php/author/grrlgeek/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (202)</li><li><a href="/index.php/author/tarwn/" title="Posts by Eli Weinstock-Herman (tarwn)">Eli Weinstock-Herman (tarwn)</a> <a href="/index.php/author/tarwn/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (190)</li><li><a href="/index.php/author/koenverbeeck/" title="Posts by Koen Verbeeck">Koen Verbeeck</a> <a href="/index.php/author/koenverbeeck/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (100)</li><li><a href="/index.php/author/alexcuse/" title="Posts by Alex Ullrich">Alex Ullrich</a> <a href="/index.php/author/alexcuse/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (55)</li><li><a href="/index.php/author/gmmastros/" title="Posts by George Mastros (gmmastros)">George Mastros (gmmastros)</a> <a href="/index.php/author/gmmastros/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (45)</li><li><a href="/index.php/author/axel8s/" title="Posts by Axel Achten (axel8s)">Axel Achten (axel8s)</a> <a href="/index.php/author/axel8s/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (28)</li><li><a href="/index.php/author/naomi/" title="Posts by Naomi Nosonovsky">Naomi Nosonovsky</a> <a href="/index.php/author/naomi/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (27)</li><li><a href="/index.php/author/thirster42/" title="Posts by David Forck (thirster42)">David Forck (thirster42)</a> <a href="/index.php/author/thirster42/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (24)</li><li><a href="/index.php/author/chopstik/" title="Posts by chopstik">chopstik</a> <a href="/index.php/author/chopstik/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (20)</li><li><a href="/index.php/author/kconan/" title="Posts by Kevin Conan">Kevin Conan</a> <a href="/index.php/author/kconan/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (18)</li><li><a href="/index.php/author/robearl/" title="Posts by Rob Earl">Rob Earl</a> <a href="/index.php/author/robearl/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (14)</li><li><a href="/index.php/author/thatrickguy/" title="Posts by ThatRickGuy">ThatRickGuy</a> <a href="/index.php/author/thatrickguy/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (12)</li><li><a href="/index.php/author/sqlarcher/" title="Posts by SQLArcher">SQLArcher</a> <a href="/index.php/author/sqlarcher/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (11)</li>                <li><a href="http://lessthandot.com/Stats/BlogAuthors.php">More...</a></li>
+			</ul>
+		</div>
+				<div class="content-sidebar-section">
+		<h2>Categories</h2>
+			<ul class="categories-list">
+					<li class="cat-item cat-item-10"><a href="/index.php/category/all/" >All Blogs</a>
+</li>
+	<li class="cat-item cat-item-5"><a href="/index.php/category/architect/" >Architecture, Design and Strategy</a>
+</li>
+	<li class="cat-item cat-item-1759"><a href="/index.php/category/artificial-intelligence/" >Artificial Intelligence</a>
+</li>
+	<li class="cat-item cat-item-6"><a href="/index.php/category/datamgmt/" >Data Management</a>
+</li>
+	<li class="cat-item cat-item-7"><a href="/index.php/category/desktopdev/" >Desktop Developer</a>
+</li>
+	<li class="cat-item cat-item-8"><a href="/index.php/category/enterprisedev/" >Enterprise Developer</a>
+</li>
+	<li class="cat-item cat-item-11"><a href="/index.php/category/itprofessionals/" >IT Professionals</a>
+</li>
+	<li class="cat-item cat-item-12"><a href="/index.php/category/itstudents/" >IT Students and Researchers</a>
+</li>
+	<li class="cat-item cat-item-1743"><a href="/index.php/category/management/" >Management</a>
+</li>
+	<li class="cat-item cat-item-9"><a href="/index.php/category/sysadmins/" >System Admins</a>
+</li>
+	<li class="cat-item cat-item-1"><a href="/index.php/category/uncategorized/" >Uncategorized</a>
+</li>
+	<li class="cat-item cat-item-4"><a href="/index.php/category/webdev/" >Web Developer</a>
+</li>
+			</ul>
+		</div>
+		</div><div class="content-main">
+				<div class="post-navigation">
+				<div class="post-navigation-forward"><a href="/index.php/desktopdev/generalpurposelanguages/unit-testing-costs-too-much/" rel="next">Unit Testing Costs Too Much</a> &raquo; </div>
+				<div class="post-navigation-back">&laquo; <a href="/index.php/webdev/serverprogramming/using-binding-redirects-to-stay-out-of-d/" rel="prev">Using Binding Redirects to Stay Out of DLL Hell</a></div>
+			</div>
+			<div class="post-area instapaper_body">
+				<div class="post-title-line">
+										<h1 class="instapaper_ignore"><a href="/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/" class="post-title">Execution Plans &#8211; Indexing to achieve optimal query plans</a></h1>
+					<div class="post-byline">by <a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)" rel="author">Ted Krueger (onpnt)</a> on October 25, 2010 in category <a href="/index.php/category/datamgmt/dbadmin/" rel="category tag">Database Administration</a> <a href="/index.php/category/datamgmt/dbprogramming/" rel="category tag">Database Programming</a> <a href="/index.php/category/datamgmt/dbprogramming/mssqlserver/" rel="category tag">Microsoft SQL Server</a> <a href="/index.php/category/datamgmt/dbadmin/mssqlserveradmin/" rel="category tag">Microsoft SQL Server Admin</a>. Article views: 10,808 </div>
+				</div>
+				<div class="post-tagline"><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&text=RT @LessThanDot Blog - Execution Plans &amp;#8211; Indexing to achieve optimal query plans by @onpnt" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&title=Execution Plans &amp;#8211; Indexing to achieve optimal query plans&source=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&title=Execution Plans &amp;#8211; Indexing to achieve optimal query plans" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&quote=Execution Plans &amp;#8211; Indexing to achieve optimal query plans" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&title=Execution Plans &amp;#8211; Indexing to achieve optimal query plans" class="instapaper_button">Instapaper</a></div>
+
+				<div class="post-content"><blockquote><p>(Given the size of this article, a download e-paper is also available <a href="/wp-content/uploads/blogs/DataMgmt/Execution_Plan_and_Tuning.pdf" title="">here</a>)</p></blockquote>
+<p><strong>The obstacle</strong></p>
+<p>SQL Server and data storage itself is only as good as the means in which we can read the data.  Very seldom are databases created only for the purpose of inserting and storing data without the intent of ever reading that data.  While the type of structure or design of the data storage will vary depending on the type and majority of transactions that will occur on the database, the fact remains that the mechanisms in place must return the data quickly and without directly affecting other transactions from committing their own primary objectives.  With SQL Server, execution plans are a foundation and starting point of the tuning process after the infrastructure phases of building a database server have been optimized.</p>
+<p>By utilizing execution plans in SQL Server, developers and administrators have the ability to prevent non-optimal statements from entering our production systems.  Implementing the steps of code reviews and initial tuning processes promotes this and removes the major risk that comes with not performing them.</p>
+<p><strong>Plan Cache</strong></p>
+<p>In order to tune a query, there is value in understanding how a query is processed and then stored for later reuse.  This section will briefly discuss the flow that a statement will take when it is passed to SQL Server.  For our reference, a statement will be directly related to any DML statement.  There are three major steps or processes that a statement goes through.  The first of these steps is called the parser.  The parser name says exactly what this process accomplishes.  The parser takes the statement and parses out all the steps that the statement has within it and creates these steps in what is called the parse tree.   This is also the process that will dictate if the statement is well formed or not and rejected or allowed to proceed.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_1.gif" alt="" title="" width="619" height="92" /></div>
+<p>Following the parser, the next step is to hand the parse tree off to the Algebrizer.  Within the Algebrizer, all name resolving is performed.  For example, if a table name is not fully qualified, the Algebrizer will handle determining the exact location.  The Algebrizer also determines data types such as, VARCHAR(10) and NUMERIC(2,2).  With the Algebrizer completing successfully, a query processor tree is created.  The query processor tree is the final product that is required in order for the finishing task to finally create the execution plan &#8211; The Optimizer.</p>
+<p>The optimizer has several tasks to accomplish in order to come to a valid execution plan.  During these tasks, the optimizer will determine the resources and objects available to use in order to create the most efficient execution possible.  Part of this is determined on statistics that are created in your database.  After everything has been calculated and the optimizer has found the most efficient execution plan possible, it is then compared to others in the plan cache. Plan cache is an allocated section in memory where SQL Server stores all of the execution plans that have been created.  These plans are not estimated but the actual execution plans that have been created from running statements in SQL Server.  If the optimizer finds a plan that matches the estimated plan it has created, it will use the plan that is already in plan cache.  This provides a few things for SQL Server in respect to speed.  It will prevent multiple plans from being cached that are identical and using memory that can be utilized for other plans.</p>
+<p>When using execution plans to tune any query, it is a best practice to ensure the cache is clear of plans that may interfere with the true performance of the query as it is developed.  This allows the processing of a statement from start to completion and the overall performance of the statement to be measured.</p>
+<p>To clear the cache, use DBCC FREEPROCCACHE</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/ms174283.aspx">FREEPROCCACHE</a> accepts either sql_handle or plan_handle as a parameter.  This allows for the clearing of only one cached plan over clearing the entire cache (calling FREEPROCCACHE with no parameter specified).  Clearing the entire plan cache will cause performance degradation due to the need for all statements being processed to be cached again.  This process involves more resources such as CPU and disk IO.  Best practice tells us that development should always occur on designated development and test database servers but this will still cause other development projects to be adversely affected in a negative way.</p>
+<blockquote><p><span class="MT_red">Note: Never develop, test or alter a statement in production or clear the cache as it will affect performance in a negative way.</span></p></blockquote>
+<p>Executing FREEPROCCACHE</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DBCC</span> FREEPROCCACHE
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DBCC FREEPROCCACHE
+GO</pre></div></div>
+
+<p>We can test removing a single plan by running the following query on the AdventureWorks database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;SalesOrderNumber
+<span class="kw1">FROM</span> &nbsp; &nbsp;AdventureWorks.<span class="me1">Sales</span>.<span class="me1">SalesOrderHeader</span> header
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> AdventureWorks.<span class="me1">Sales</span>.<span class="me1">SalesOrderDetail</span> details <span class="kw1">ON</span> header.<span class="me1">salesorderid</span> <span class="sy0">=</span> details.<span class="me1">salesorderid</span>
+<span class="kw1">WHERE</span> &nbsp; customerid <span class="sy0">=</span> <span class="nu0">11091</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  SalesOrderNumber
+FROM    AdventureWorks.Sales.SalesOrderHeader header
+        JOIN AdventureWorks.Sales.SalesOrderDetail details ON header.salesorderid = details.salesorderid
+WHERE   customerid = 11091</pre></div></div>
+
+<p>Once this Adhoc query has been cached we can search for it with a simplified join of the DMVs (sys) dm_exec_query_stats, dm_exec_cached_plans and DMFs dm_exec_sql_text and dm_exec_query_plan.  </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;<span class="br0">&#91;</span><span class="kw1">text</span><span class="br0">&#93;</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; cp.<span class="me1">plan_handle</span> ,
+&nbsp; &nbsp; &nbsp; &nbsp; sql_handle
+<span class="kw1">FROM</span> &nbsp; &nbsp;sys.<span class="me1">dm_exec_query_stats</span> qs
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> sys.<span class="me1">dm_exec_cached_plans</span> cp <span class="kw1">ON</span> qs.<span class="me1">plan_handle</span> <span class="sy0">=</span> cp.<span class="me1">plan_handle</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">CROSS</span> APPLY sys.<span class="me1">dm_exec_sql_text</span><span class="br0">&#40;</span>qs.<span class="me1">plan_handle</span><span class="br0">&#41;</span> <span class="kw1">AS</span> query
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">OUTER</span> APPLY sys.<span class="me1">dm_exec_query_plan</span><span class="br0">&#40;</span>qs.<span class="me1">plan_handle</span><span class="br0">&#41;</span> <span class="kw1">AS</span> executionplan
+<span class="kw1">WHERE</span> &nbsp; objtype <span class="sy0">=</span> <span class="st0">'Adhoc'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  [text] ,
+        cp.plan_handle ,
+        sql_handle
+FROM    sys.dm_exec_query_stats qs
+        JOIN sys.dm_exec_cached_plans cp ON qs.plan_handle = cp.plan_handle
+        CROSS APPLY sys.dm_exec_sql_text(qs.plan_handle) AS query
+        OUTER APPLY sys.dm_exec_query_plan(qs.plan_handle) AS executionplan
+WHERE   objtype = 'Adhoc'</pre></div></div>
+
+</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_2.gif" alt="" title="" width="868" height="19" /></div>
+<p>Once the plan has been identified and the decision has been made to remove it, FREEPROCCACHE can be executed with either the sql_handle or plan_handle.  </p>
+<p>Execute DBCC FREEPROCCACHE with the sql_handle as a parameter from our previous output</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DBCC</span> FREEPROCCACHE <span class="br0">&#40;</span>0x06000C00FCCD0D0FB8C0500B000000000000000000000000<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DBCC FREEPROCCACHE (0x06000C00FCCD0D0FB8C0500B000000000000000000000000)
+GO</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_3.gif" alt="" title="" width="747" height="110" /></div>
+</p>
+<p>If we then search for the plan by the sql_handle, we’ll see it has been removed</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_4.gif" alt="" title="" width="721" height="265" /></div>
+</p>
+<p><strong>Tuning Execution Plans</strong></p>
+<p>To show some more common operations and tuning methods utilizing execution plans, we will create a database to work in.  The database name will be PLANLAB and we will import data from AdventureWorks tables &#8211; Sales.SalesOrderHeader and Sales.SalesOrderDetails.</p>
+<p>To prepare the database, tables and import the data from an already existing AdventureWorks database local to the instance, run the following statements in the order they appear.  Modify the file paths to match your own development file system structure.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> Master
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>PLANLAB<span class="br0">&#93;</span> <span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'PLANLAB_DATA_1'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:Program FilesMicrosoft SQL ServerMSSQL10.MSSQLSERVERMSSQLDATAPLANLAB_DATA_1.mdf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 100MB , MAXSIZE <span class="sy0">=</span> UNLIMITED, FILEGROWTH <span class="sy0">=</span> 10MB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'PLANLAB_TRAN_1_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:Program FilesMicrosoft SQL ServerMSSQL10.MSSQLSERVERMSSQLDATAPLANLAB_TRAN_1_log.ldf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 100MB , MAXSIZE <span class="sy0">=</span> 2GB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">3</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO
+<span class="kw1">ALTER</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>PLANLAB<span class="br0">&#93;</span> <span class="kw1">SET</span> RECOVERY SIMPLE 
+GO
+<span class="kw1">USE</span> <span class="br0">&#91;</span>PLANLAB<span class="br0">&#93;</span>
+GO
+<span class="kw1">CREATE</span> <span class="kw1">SCHEMA</span> <span class="br0">&#91;</span>WISSUG<span class="br0">&#93;</span> <span class="kw1">AUTHORIZATION</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> WISSUG.<span class="br0">&#91;</span>SalesOrderHeader<span class="br0">&#93;</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>SalesOrderID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="kw1">FOR</span> <span class="kw1">REPLICATION</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>RevisionNumber<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">tinyint</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>OrderDate<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">datetime</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>DueDate<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">datetime</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ShipDate<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">datetime</span><span class="br0">&#93;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>Status<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">tinyint</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>OnlineOrderFlag<span class="br0">&#93;</span> <span class="kw1">smallint</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>SalesOrderNumber<span class="br0">&#93;</span> &nbsp;<span class="kw1">AS</span> <span class="br0">&#40;</span>isnull<span class="br0">&#40;</span>N<span class="st0">'SO'</span><span class="sy0">+</span><span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="br0">&#91;</span><span class="kw1">nvarchar</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="nu0">23</span><span class="br0">&#41;</span>,<span class="br0">&#91;</span>SalesOrderID<span class="br0">&#93;</span>,<span class="nu0">0</span><span class="br0">&#41;</span>,N<span class="st0">'*** ERROR ***'</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>PurchaseOrderNumber<span class="br0">&#93;</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">30</span><span class="br0">&#41;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>AccountNumber<span class="br0">&#93;</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">30</span><span class="br0">&#41;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>CustomerID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ContactID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>SalesPersonID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>TerritoryID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>BillToAddressID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ShipToAddressID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ShipMethodID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>CreditCardID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>CreditCardApprovalCode<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">varchar</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="nu0">15</span><span class="br0">&#41;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>CurrencyRateID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>SubTotal<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">money</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>TaxAmt<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">money</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>Freight<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">money</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>TotalDue<span class="br0">&#93;</span> &nbsp;<span class="kw1">AS</span> <span class="br0">&#40;</span>isnull<span class="br0">&#40;</span><span class="br0">&#40;</span><span class="br0">&#91;</span>SubTotal<span class="br0">&#93;</span><span class="sy0">+</span><span class="br0">&#91;</span>TaxAmt<span class="br0">&#93;</span><span class="br0">&#41;</span><span class="sy0">+</span><span class="br0">&#91;</span>Freight<span class="br0">&#93;</span>,<span class="br0">&#40;</span><span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>Comment<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">nvarchar</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="nu0">128</span><span class="br0">&#41;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>rowguid<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">uniqueidentifier</span><span class="br0">&#93;</span> <span class="kw1">ROWGUIDCOL</span> &nbsp;<span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ModifiedDate<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">datetime</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> WISSUG.<span class="br0">&#91;</span>SalesOrderDetail<span class="br0">&#93;</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>SalesOrderID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>SalesOrderDetailID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>CarrierTrackingNumber<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">nvarchar</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="nu0">25</span><span class="br0">&#41;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>OrderQty<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">smallint</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ProductID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>SpecialOfferID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>UnitPrice<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">money</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>UnitPriceDiscount<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">money</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>LineTotal<span class="br0">&#93;</span> &nbsp;<span class="kw1">AS</span> <span class="br0">&#40;</span>isnull<span class="br0">&#40;</span><span class="br0">&#40;</span><span class="br0">&#91;</span>UnitPrice<span class="br0">&#93;</span><span class="sy0">*</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="nu0">1.0</span><span class="br0">&#41;</span><span class="sy0">-</span><span class="br0">&#91;</span>UnitPriceDiscount<span class="br0">&#93;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">*</span><span class="br0">&#91;</span>OrderQty<span class="br0">&#93;</span>,<span class="br0">&#40;</span><span class="nu0">0.0</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>rowguid<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">uniqueidentifier</span><span class="br0">&#93;</span> <span class="kw1">ROWGUIDCOL</span> &nbsp;<span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ModifiedDate<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">datetime</span><span class="br0">&#93;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">USE</span> PLANLAB
+GO
+&nbsp;
+<span class="kw1">SET</span> <span class="kw1">IDENTITY_INSERT</span> WISSUG.<span class="me1">SalesOrderHeader</span> <span class="kw1">ON</span> 
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> WISSUG.<span class="me1">SalesOrderHeader</span> 
+<span class="br0">&#40;</span><span class="br0">&#91;</span>SalesOrderID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>RevisionNumber<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>OrderDate<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>DueDate<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ShipDate<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>Status<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>OnlineOrderFlag<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>PurchaseOrderNumber<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>AccountNumber<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CustomerID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ContactID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>SalesPersonID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>TerritoryID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>BillToAddressID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ShipToAddressID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ShipMethodID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CreditCardID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CreditCardApprovalCode<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CurrencyRateID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>SubTotal<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>TaxAmt<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>Freight<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>Comment<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>rowguid<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ModifiedDate<span class="br0">&#93;</span><span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> 
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="br0">&#91;</span>SalesOrderID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>RevisionNumber<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>OrderDate<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>DueDate<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ShipDate<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>Status<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>OnlineOrderFlag<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>PurchaseOrderNumber<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>AccountNumber<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CustomerID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ContactID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>SalesPersonID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>TerritoryID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>BillToAddressID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ShipToAddressID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ShipMethodID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CreditCardID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CreditCardApprovalCode<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CurrencyRateID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>SubTotal<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>TaxAmt<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>Freight<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>Comment<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>rowguid<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ModifiedDate<span class="br0">&#93;</span>
+<span class="kw1">FROM</span> AdventureWorks.<span class="me1">Sales</span>.<span class="me1">SalesOrderHeader</span>
+<span class="kw1">SET</span> <span class="kw1">IDENTITY_INSERT</span> WISSUG.<span class="me1">SalesOrderHeader</span> <span class="kw1">OFF</span> 
+&nbsp;
+<span class="kw1">SET</span> <span class="kw1">IDENTITY_INSERT</span> WISSUG.<span class="me1">SalesOrderDetail</span> <span class="kw1">ON</span> 
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> WISSUG.<span class="me1">SalesOrderDetail</span>
+<span class="br0">&#40;</span><span class="br0">&#91;</span>SalesOrderID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>SalesOrderDetailID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CarrierTrackingNumber<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>OrderQty<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ProductID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>SpecialOfferID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>UnitPrice<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>UnitPriceDiscount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>rowguid<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ModifiedDate<span class="br0">&#93;</span><span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> 
+<span class="br0">&#91;</span>SalesOrderID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>SalesOrderDetailID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>CarrierTrackingNumber<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>OrderQty<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ProductID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>SpecialOfferID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>UnitPrice<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>UnitPriceDiscount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>rowguid<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ModifiedDate<span class="br0">&#93;</span>
+<span class="kw1">FROM</span> AdventureWorks.<span class="me1">Sales</span>.<span class="me1">SalesOrderDetail</span>
+<span class="kw1">SET</span> <span class="kw1">IDENTITY_INSERT</span> WISSUG.<span class="me1">SalesOrderDetail</span> <span class="kw1">OFF</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE Master
+GO
+
+CREATE DATABASE [PLANLAB] ON  PRIMARY 
+( NAME = N'PLANLAB_DATA_1', FILENAME = N'C:Program FilesMicrosoft SQL ServerMSSQL10.MSSQLSERVERMSSQLDATAPLANLAB_DATA_1.mdf' , 
+SIZE = 100MB , MAXSIZE = UNLIMITED, FILEGROWTH = 10MB )
+ LOG ON 
+( NAME = N'PLANLAB_TRAN_1_log', FILENAME = N'C:Program FilesMicrosoft SQL ServerMSSQL10.MSSQLSERVERMSSQLDATAPLANLAB_TRAN_1_log.ldf' , 
+SIZE = 100MB , MAXSIZE = 2GB , FILEGROWTH = 3%)
+GO
+ALTER DATABASE [PLANLAB] SET RECOVERY SIMPLE 
+GO
+USE [PLANLAB]
+GO
+CREATE SCHEMA [WISSUG] AUTHORIZATION [dbo]
+GO
+
+
+CREATE TABLE WISSUG.[SalesOrderHeader](
+	[SalesOrderID] [int] IDENTITY(1,1) NOT FOR REPLICATION NOT NULL,
+	[RevisionNumber] [tinyint] NOT NULL,
+	[OrderDate] [datetime] NOT NULL,
+	[DueDate] [datetime] NOT NULL,
+	[ShipDate] [datetime] NULL,
+	[Status] [tinyint] NOT NULL,
+	[OnlineOrderFlag] smallint NOT NULL,
+	[SalesOrderNumber]  AS (isnull(N'SO'+CONVERT([nvarchar](23),[SalesOrderID],0),N'*** ERROR ***')),
+	[PurchaseOrderNumber] varchar(30) NULL,
+	[AccountNumber] varchar(30) NULL,
+	[CustomerID] [int] NOT NULL,
+	[ContactID] [int] NOT NULL,
+	[SalesPersonID] [int] NULL,
+	[TerritoryID] [int] NULL,
+	[BillToAddressID] [int] NOT NULL,
+	[ShipToAddressID] [int] NOT NULL,
+	[ShipMethodID] [int] NOT NULL,
+	[CreditCardID] [int] NULL,
+	[CreditCardApprovalCode] [varchar](15) NULL,
+	[CurrencyRateID] [int] NULL,
+	[SubTotal] [money] NOT NULL,
+	[TaxAmt] [money] NOT NULL,
+	[Freight] [money] NOT NULL,
+	[TotalDue]  AS (isnull(([SubTotal]+[TaxAmt])+[Freight],(0))),
+	[Comment] [nvarchar](128) NULL,
+	[rowguid] [uniqueidentifier] ROWGUIDCOL  NOT NULL,
+	[ModifiedDate] [datetime] NOT NULL)
+GO
+
+
+CREATE TABLE WISSUG.[SalesOrderDetail](
+	[SalesOrderID] [int] NOT NULL,
+	[SalesOrderDetailID] [int] IDENTITY(1,1) NOT NULL,
+	[CarrierTrackingNumber] [nvarchar](25) NULL,
+	[OrderQty] [smallint] NOT NULL,
+	[ProductID] [int] NOT NULL,
+	[SpecialOfferID] [int] NOT NULL,
+	[UnitPrice] [money] NOT NULL,
+	[UnitPriceDiscount] [money] NOT NULL,
+	[LineTotal]  AS (isnull(([UnitPrice]*((1.0)-[UnitPriceDiscount]))*[OrderQty],(0.0))),
+	[rowguid] [uniqueidentifier] ROWGUIDCOL  NOT NULL,
+	[ModifiedDate] [datetime] NOT NULL)
+
+GO
+
+USE PLANLAB
+GO
+
+SET IDENTITY_INSERT WISSUG.SalesOrderHeader ON 
+INSERT INTO WISSUG.SalesOrderHeader 
+([SalesOrderID]
+      ,[RevisionNumber]
+      ,[OrderDate]
+      ,[DueDate]
+      ,[ShipDate]
+      ,[Status]
+      ,[OnlineOrderFlag]
+      ,[PurchaseOrderNumber]
+      ,[AccountNumber]
+      ,[CustomerID]
+      ,[ContactID]
+      ,[SalesPersonID]
+      ,[TerritoryID]
+      ,[BillToAddressID]
+      ,[ShipToAddressID]
+      ,[ShipMethodID]
+      ,[CreditCardID]
+      ,[CreditCardApprovalCode]
+      ,[CurrencyRateID]
+      ,[SubTotal]
+      ,[TaxAmt]
+      ,[Freight]
+      ,[Comment]
+      ,[rowguid]
+      ,[ModifiedDate])
+SELECT 
+	   [SalesOrderID]
+      ,[RevisionNumber]
+      ,[OrderDate]
+      ,[DueDate]
+      ,[ShipDate]
+      ,[Status]
+      ,[OnlineOrderFlag]
+      ,[PurchaseOrderNumber]
+      ,[AccountNumber]
+      ,[CustomerID]
+      ,[ContactID]
+      ,[SalesPersonID]
+      ,[TerritoryID]
+      ,[BillToAddressID]
+      ,[ShipToAddressID]
+      ,[ShipMethodID]
+      ,[CreditCardID]
+      ,[CreditCardApprovalCode]
+      ,[CurrencyRateID]
+      ,[SubTotal]
+      ,[TaxAmt]
+      ,[Freight]
+      ,[Comment]
+      ,[rowguid]
+      ,[ModifiedDate]
+FROM AdventureWorks.Sales.SalesOrderHeader
+SET IDENTITY_INSERT WISSUG.SalesOrderHeader OFF 
+
+SET IDENTITY_INSERT WISSUG.SalesOrderDetail ON 
+INSERT INTO WISSUG.SalesOrderDetail
+([SalesOrderID]
+      ,[SalesOrderDetailID]
+      ,[CarrierTrackingNumber]
+      ,[OrderQty]
+      ,[ProductID]
+      ,[SpecialOfferID]
+      ,[UnitPrice]
+      ,[UnitPriceDiscount]
+      ,[rowguid]
+      ,[ModifiedDate])
+SELECT 
+[SalesOrderID]
+      ,[SalesOrderDetailID]
+      ,[CarrierTrackingNumber]
+      ,[OrderQty]
+      ,[ProductID]
+      ,[SpecialOfferID]
+      ,[UnitPrice]
+      ,[UnitPriceDiscount]
+      ,[rowguid]
+      ,[ModifiedDate]
+FROM AdventureWorks.Sales.SalesOrderDetail
+SET IDENTITY_INSERT WISSUG.SalesOrderDetail OFF</pre></div></div>
+
+<p><strong>Starting with a query to tune</strong></p>
+<p>The below query requests five columns from the tables we created.  Within the query, the SUM() function is used on the column, LineTotal.  Note that neither of these tables have any indexes as of yet.  There are also no statistics created due to nothing being captured in the selection from any statements being processed.</p>
+<p>We can see statistics by viewing them in SSMS by expanding the database/tables/table in question and then statistics node.  The system view, sys.stats, can also be queried to view statistics information on the tables.  The following query shows an example filtered on the tables we created</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;<span class="sy0">*</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;sys.<span class="me1">STATS</span>
+<span class="kw1">WHERE</span> &nbsp; <span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span>N<span class="st0">'WISSUG.SalesOrderDetail'</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">OR</span> <span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span>N<span class="st0">'WISSUG.SalesOrderHeader'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  *
+FROM    sys.STATS
+WHERE   OBJECT_ID = OBJECT_ID(N'WISSUG.SalesOrderDetail')
+        OR OBJECT_ID = OBJECT_ID(N'WISSUG.SalesOrderHeader')</pre></div></div>
+
+<p>At this time we do not need to run the query because our interest is in the estimated execution plan only.</p>
+<blockquote><p><span class="MT_red">Note: Statistics are created when processing statements on indexes and column.  This is also true for viewing estimated execution plans.</span></p></blockquote>
+<p>To view the estimated execution plan, click the button located in the menu strip in SSMS.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_5.gif" alt="" title="" width="311" height="108" /></div>
+<p>Place the query below into a new query window while under the context of the PLANLAB database and execute the estimated execution plan.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;SalesOrderNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; OrderDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; ShipDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; AccountNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; UnitPriceDiscount ,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw2">SUM</span><span class="br0">&#40;</span>LineTotal<span class="br0">&#41;</span> Total
+<span class="kw1">FROM</span> &nbsp; &nbsp;WISSUG.<span class="me1">SalesOrderHeader</span> header
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> WISSUG.<span class="me1">SalesOrderDetail</span> details <span class="kw1">ON</span> header.<span class="me1">salesorderid</span> <span class="sy0">=</span> details.<span class="me1">salesorderid</span>
+<span class="kw1">WHERE</span> &nbsp; customerid <span class="sy0">=</span> <span class="nu0">11091</span>
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> SalesOrderNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; OrderDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; ShipDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; UnitPriceDiscount ,
+&nbsp; &nbsp; &nbsp; &nbsp; AccountNumber </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  SalesOrderNumber ,
+        OrderDate ,
+        ShipDate ,
+        AccountNumber ,
+        UnitPriceDiscount ,
+        SUM(LineTotal) Total
+FROM    WISSUG.SalesOrderHeader header
+        JOIN WISSUG.SalesOrderDetail details ON header.salesorderid = details.salesorderid
+WHERE   customerid = 11091
+GROUP BY SalesOrderNumber ,
+        OrderDate ,
+        ShipDate ,
+        UnitPriceDiscount ,
+        AccountNumber </pre></div></div>
+
+<p>The plan below that was generated from the query shows two very distinct and problematic operations.  These operations are the table scans both on SalesOrderHeader and SalesOrderDetail.  Essentially, when a table scan is performed, all the records of a table are scanned for matches.  These operations tell us that our query will cause significant disk IO due to no supporting indexes to help easily find the location of the records we want returned or aggregated.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_6.gif" alt="" title="" width="710" height="127" /></div>
+<p>The process to start tuning a query like this can begin in many places.  The columns being requested, the filter values (WHERE clause) sorting operations such as ORDER BY or GROUP BY and JOIN values.</p>
+<blockquote><p><span class="MT_red">Note: Each step in tuning any operation may or may not have direct effects on the total plan itself.  When tuning, start with one operation while keeping the entire plan under consideration for these effects.  In many cases, one index created with the proper columns allows for the entire plan to be optimized.  This will be shown at the end of this article.</span></p></blockquote>
+<p>In the JOIN condition, SalesOrderID is being used in order to bring SalesOrderDetail into our results in order to fulfill the needs of the query.  This will require us to make sure that the join between SalesOrderHeader and SalesOrderDetail does not have an exstensive table scans to fulfill the JOIN. SalesOrderID is a unique value in our table so we have the ability to create a CLUSTERED INDEX on it.  A clustered index differs from other indexes by actually ordering the data physically.  This is also why only one clustered index is allowed per table.</p>
+<p>To create a clustered index on SalesOrderID in the SalesOrderHeader table, run the following CREATE INDEX statement.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IDX_UNIQUEKEY <span class="kw1">ON</span> WISSUG.<span class="me1">SalesOrderHeader</span><span class="br0">&#40;</span>SalesOrderID<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX IDX_UNIQUEKEY ON WISSUG.SalesOrderHeader(SalesOrderID)
+GO</pre></div></div>
+
+</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_7.gif" alt="" title="" width="738" height="148" /></div>
+<p>Once the clustered index is created successfully, execute the estimated execution plan again.  The table scan has been replaced by an index scan now for SalesOrderHeader.  An index scan is more optimal than a table scan. Index scans will only scan the entire contents of an index to determine the records to return. However, this operation is still not the most optimal operation to have in the plan.  An Index Seek operation would be optimal in both lower resource utilization and more selective abilities.</p>
+<p>Looking further at the query and SalesOrderHeader, we can see we are requesting SalesOrderNumber, OrderDate and AccountNumber. These columns must be returned from the SalesOrderHeader table as well as SalesOrderID.  We can now bring in a nonclustered index to fulfill these new requirements in order to further tune the plan.</p>
+<p>To create the nonclustered index on SalesOrderHeader, execute the following statement.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IDX_SalesNumOrderDate_Ship_ASC <span class="kw1">ON</span> WISSUG.<span class="me1">SalesOrderHeader</span><span class="br0">&#40;</span>SalesOrderNumber,OrderDate,AccountNumber<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX IDX_SalesNumOrderDate_Ship_ASC ON WISSUG.SalesOrderHeader(SalesOrderNumber,OrderDate,AccountNumber)
+GO</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_8.gif" alt="" title="" width="724" height="158" /></div>
+<p>As shown in the new estimated plan, the index scan on the clustered index remains even after covering the other columns we require from the table.  Covering index refers to an index that contains all of the required columns to fully cover all the paths a query is taking to utilize them.  This includes the columns that are being returned, the WHERE clause and JOIN conditions. </p>
+<p>A set of properties exists with with all operations.  These properties can be seen by hovering over the operation or right clicking the operation and selecting properties.  </p>
+<p>Hovering over the index scan with the mouse pointer shows that we are covering everything but CustomerID which is in our where clause and ShipDate.   ShipDate was left out previously when we thought we had covered the returned columns.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_9.gif" alt="" title="" width="300" height="345" /></div>
+<p>To tune further, we now need to change our indexing so that the two columns shown in the details are included in the index.  Using the CREATE INDEX statement, use the WITH(DROP_EXISTING=ON) to make this task easier.  The DROP_EXISTING still performs the same operations of dropping the index in place already and recreating it, but does it in one statement versus multiple statements.  In the new index, we introduce another option called INCLUDE.  INCLUDE adds columns to the leaf level of the index and does not require any sorting which makes them more efficient when we are only interested in covering the column in the index.  This benefits us by reducing overhead on the index itself.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IDX_SalesNumOrderDate_Ship_ASC <span class="kw1">ON</span> WISSUG.<span class="me1">SalesOrderHeader</span><span class="br0">&#40;</span>SalesOrderNumber,OrderDate,AccountNumber<span class="br0">&#41;</span>
+<span class="sy0">IN</span>CLUDE <span class="br0">&#40;</span>customerid,shipdate<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DROP_EXIST<span class="sy0">IN</span>G<span class="sy0">=</span><span class="kw1">ON</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX IDX_SalesNumOrderDate_Ship_ASC ON WISSUG.SalesOrderHeader(SalesOrderNumber,OrderDate,AccountNumber)
+INCLUDE (customerid,shipdate)
+WITH (DROP_EXISTING=ON)
+GO</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_10.gif" alt="" title="" width="731" height="185" /></div>
+<p>The plan that is created from the index change shows that an index scan persists on the SalesOrderHeader table.  This is the case even after covering all of the columns.  There is one more tuning task that is needed; structuring the index.  Recall that INCLUDE does not sort.  In terms of our query, this means CustomerID is forcing a scan due to the use in the WHERE clause.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_11.gif" alt="" title="" width="279" height="402" /></div>
+<p>To restructure the index to handle this specific query, there is a need to move the predicate of CustomerID to the column list.   The above image shows the predicate value listed in the tooltip properties.  This will force the covering index concept to the include as the ordering is not a requirement for returning those columns.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IDX_SalesNumOrderDate_Ship_ASC <span class="kw1">ON</span> WISSUG.<span class="me1">SalesOrderHeader</span><span class="br0">&#40;</span>CustomerID<span class="br0">&#41;</span>
+<span class="sy0">IN</span>CLUDE <span class="br0">&#40;</span>SalesOrderNumber,OrderDate,AccountNumber,shipdate<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DROP_EXIST<span class="sy0">IN</span>G<span class="sy0">=</span><span class="kw1">ON</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX IDX_SalesNumOrderDate_Ship_ASC ON WISSUG.SalesOrderHeader(CustomerID)
+INCLUDE (SalesOrderNumber,OrderDate,AccountNumber,shipdate)
+WITH (DROP_EXISTING=ON)
+GO</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_12.gif" alt="" title="" width="695" height="180" /></div>
+<p>The Index Seek is now present and performed on the SalesOrderHeader table.  This is the optimal operation to have here and the index structure accomplishes this.</p>
+<p>So far, we’ve learned about the need for covering indexes and also how the structure of the index is important to accomplishing the needed index seeks.  With this information we can move to the second table scan in our plan.  </p>
+<p>Hover over the table scan on SalesOrderDetail.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_13.gif" alt="" title="" width="261" height="332" /></div>
+<p>From the details of the table scan, the output of this operation results in the columns SalesOrderID, OrderQty, UnitPrice and UnitPriceDiscount.  Looking at the statement, the results required back are UnitPriceDiscount and LineTotal.  This tells us that we can use the INCLUDE to capture these columns.  In the JOIN condition, SalesOrderID is the next important column.  This column requires the index to be sorted so the JOIN can be accomplished without a scan.</p>
+<p>With this information we can write the following nonclustered index to cover the SalesOrderDetail table.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_14.gif" alt="" title="" width="719" height="176" /></div>
+<p><strong>Key Lookup</strong></p>
+<p>A Key Lookup operation is performed when a supporting index operation is utilized.  However, to fulfill the requirements of the statement, a bookmark lookup must be performed in order to return the remaining output required.  This operation can cause a statement’s performance to be very poor given the added need to retrieve what is needed to satisfy the requirements.</p>
+<p>To show a Key Lookup, alter the index previously created to restructure the columns in order SalesOrderNumber, OrderDate and AccountNumber.  Place the CustomerID column in the index by means of INCLUDE.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IDX_SalesNumOrderDate_Ship_ASC <span class="kw1">ON</span> WISSUG.<span class="me1">SalesOrderHeader</span><span class="br0">&#40;</span>SalesOrderNumber,OrderDate,AccountNumber<span class="br0">&#41;</span>
+<span class="sy0">IN</span>CLUDE <span class="br0">&#40;</span>customerid<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DROP_EXIST<span class="sy0">IN</span>G<span class="sy0">=</span><span class="kw1">ON</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX IDX_SalesNumOrderDate_Ship_ASC ON WISSUG.SalesOrderHeader(SalesOrderNumber,OrderDate,AccountNumber)
+INCLUDE (customerid)
+WITH (DROP_EXISTING=ON)
+GO</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_15.gif" alt="" title="" width="701" height="251" /></div>
+<p>Running the execution plan will show the new index is being used and the Key Lookup operation has been introduced.  The lookup in this case is going to return ShipDate.  ShipDate is missing from the index so there is missing support to cover this column.  Removing the Key Lookup requires the structure of the index we created earlier in order to seek on the index.</p>
+<p><strong>RID Lookup</strong></p>
+<p>Recall earlier that SalesOrderDetail did not have a clustered index created on it.  A table that does not have a clustered index is referred to as a HEAP.  HEAP tables play an important role in the performance of any query that is using them.  Without the physical ordering of the table from the creation of a clustered index, the table is not read optimally.  In some cases HEAP tables are beneficial and nonclustered indexes can be created on them in order to optimize statements that are running against them.  </p>
+<p>One of the side effects of a HEAP table is an operation called a RID Lookup.  Like a Key Lookup, an index scan or seek is not able to completely satisfy the request so it must do a lookup in order to retrieve the remaining records.  In most cases, creating clustered indexes is the best solution to resolve RID Lookup operations.  This allows for better plan generation and also helps with maintenance of the table itself in regards to fragmentation.  Below we will show how to resolve a RID Lookup by changing our query to additionally check SalesOrderDetail.UnitPriceDiscount where the data is greater than 0.00.  This will also be added to the output CarrierTrackingNumber</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;SalesOrderNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; OrderDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; ShipDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; AccountNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; UnitPriceDiscount ,
+&nbsp; &nbsp; &nbsp; &nbsp; CarrierTrackingNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw2">SUM</span><span class="br0">&#40;</span>LineTotal<span class="br0">&#41;</span> Total
+<span class="kw1">FROM</span> &nbsp; &nbsp;WISSUG.<span class="me1">SalesOrderHeader</span> header
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> WISSUG.<span class="me1">SalesOrderDetail</span> details <span class="kw1">ON</span> header.<span class="me1">salesorderid</span> <span class="sy0">=</span> details.<span class="me1">salesorderid</span>
+<span class="kw1">WHERE</span> &nbsp; customerid <span class="sy0">=</span> <span class="nu0">11091</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> UnitPriceDiscount <span class="sy0">&gt;</span> <span class="nu0">0.00</span>
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> SalesOrderNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; OrderDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; ShipDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; UnitPriceDiscount ,
+&nbsp; &nbsp; &nbsp; &nbsp; AccountNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; CarrierTrackingNumber</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  SalesOrderNumber ,
+        OrderDate ,
+        ShipDate ,
+        AccountNumber ,
+        UnitPriceDiscount ,
+        CarrierTrackingNumber ,
+        SUM(LineTotal) Total
+FROM    WISSUG.SalesOrderHeader header
+        JOIN WISSUG.SalesOrderDetail details ON header.salesorderid = details.salesorderid
+WHERE   customerid = 11091
+        AND UnitPriceDiscount &gt; 0.00
+GROUP BY SalesOrderNumber ,
+        OrderDate ,
+        ShipDate ,
+        UnitPriceDiscount ,
+        AccountNumber ,
+        CarrierTrackingNumber</pre></div></div>
+
+<p>Take a look at the execution plan generated from this query given the indexes we currently have in place.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_16.gif" alt="" title="" width="726" height="256" /></div>
+<p>If we look at the properties of the RID Lookup, we can see what the RID Lookup output list generates the following:</p>
+<p>[PLANLAB].[WISSUG].[SalesOrderDetail].CarrierTrackingNumber.  </p>
+<p>Also, looking at the nested loop operation, the output list results in the following:</p>
+<p>[PLANLAB].[WISSUG].[SalesOrderDetail].CarrierTrackingNumber<br />
+[PLANLAB].[WISSUG].[SalesOrderDetail].UnitPriceDiscount<br />
+[PLANLAB].[WISSUG].[SalesOrderDetail].LineTotal</p>
+<p>Moving to the index seek on SalesOrderDetail, the output list results in</p>
+<p>Bmk1003,<br />
+[PLANLAB].[WISSUG].[SalesOrderDetail].UnitPriceDiscount<br />
+[PLANLAB].[WISSUG].[SalesOrderDetail].LineTotal</p>
+<p>Between these three operations we can see that the nested loop is joining the seek output to the lookup output to obtain CarrierTrackingNumber.  This tells us that there is a covering index problem.  To fix the RID Lookup, we could alter the index IDX_SalesID_LineTotal_ASC or add a new index to support the query.  Adding new indexes may not be optimal either if the index still fulfills the needs of the other statements that it was created for.  In this case, altering the index to add CarrierTrackingNumber in the INCLUDE section makes more sense given the covering of all the statements we have tested so far.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IDX_SalesID_LineTotal_ASC <span class="kw1">ON</span> WISSUG.<span class="me1">SalesOrderDetail</span><span class="br0">&#40;</span>salesorderid<span class="br0">&#41;</span>
+<span class="sy0">IN</span>CLUDE <span class="br0">&#40;</span>LineTotal,UnitPriceDiscount,CarrierTrackingNumber<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DROP_EXIST<span class="sy0">IN</span>G<span class="sy0">=</span><span class="kw1">ON</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX IDX_SalesID_LineTotal_ASC ON WISSUG.SalesOrderDetail(salesorderid)
+INCLUDE (LineTotal,UnitPriceDiscount,CarrierTrackingNumber)
+WITH (DROP_EXISTING=ON)
+GO</pre></div></div>
+
+<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_17.gif" alt="" title="" width="682" height="179" /></div>
+<p>Reviewing the execution plan, the RID Lookup has been resolved.</p>
+<p><strong>Sorting</strong></p>
+<p>Sorting, in general, is an expensive operation as it relates to resources.  Order By and Group By forces a sort of the data.  Sorting can be ok in execution plans but can also cause a severe performance problem.  Since sorting is done in memory, the operation can be fast.  However, if memory is not available, the sorting operation can go to the tempdb to accomplish the task which would affect the performance greatly – in a negative way.</p>
+<p>In some cases, sorting may not be needed at all in statements.  Even in cases when data is required to be sorted, letting front end applications and reporting do this operation may be a better option.  With the queries that were used in this article, we can&#8217;t fix the sort operation because of the SUM() on LineTotal is required forcing us to use a GROUP BY.  </p>
+<p>Running the example below will show how we could return the results without the SUM(LineTotal) while utilizing something like SSRS functions and expressions to add the SUM(LineTotal) on a grouped result set directly to the dataset at the time the report is rendered.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;SalesOrderNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; OrderDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; ShipDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; AccountNumber
+<span class="kw1">FROM</span> &nbsp; &nbsp;WISSUG.<span class="me1">SalesOrderHeader</span> header
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> WISSUG.<span class="me1">SalesOrderDetail</span> details <span class="kw1">ON</span> header.<span class="me1">salesorderid</span> <span class="sy0">=</span> details.<span class="me1">salesorderid</span>
+<span class="kw1">WHERE</span> &nbsp; customerid <span class="sy0">=</span> <span class="nu0">11091</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> UnitPriceDiscount <span class="sy0">&gt;</span> <span class="nu0">1.00</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  SalesOrderNumber ,
+        OrderDate ,
+        ShipDate ,
+        AccountNumber
+FROM    WISSUG.SalesOrderHeader header
+        JOIN WISSUG.SalesOrderDetail details ON header.salesorderid = details.salesorderid
+WHERE   customerid = 11091
+        AND UnitPriceDiscount &gt; 1.00</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_18.gif" alt="" title="" width="705" height="172" /></div>
+<p><strong>Wrapping up</strong></p>
+<p>In the tuning exercises so far, we’ve created 3 indexes to tune the query.  However, we could accomplish this with two indexes.  The clustered index could be removed and create another HEAP table situation.  This situation is also common when the primary key (or clustered index) is another column on the table that isn&#8217;t part of the query and thus does not assist in improving performance of the statement.  </p>
+<p>To show this, drop the clustered index SalesOrderHeader.IDX_UNIQUEKEY</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">INDEX</span> WISSUG.<span class="me1">SalesOrderHeader</span>.<span class="me1">IDX_UNIQUEKEY</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP INDEX WISSUG.SalesOrderHeader.IDX_UNIQUEKEY
+GO</pre></div></div>
+
+<p>To fix this without a clsutered index on SalesOrderID, change the final nonclustered index to add SalesOrderID</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IDX_SalesNumOrderDate_Ship_ASC <span class="kw1">ON</span> WISSUG.<span class="me1">SalesOrderHeader</span><span class="br0">&#40;</span>CustomerID,SalesOrderID<span class="br0">&#41;</span>
+<span class="sy0">IN</span>CLUDE <span class="br0">&#40;</span>SalesOrderNumber,OrderDate,AccountNumber,shipdate<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DROP_EXIST<span class="sy0">IN</span>G<span class="sy0">=</span><span class="kw1">ON</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX IDX_SalesNumOrderDate_Ship_ASC ON WISSUG.SalesOrderHeader(CustomerID,SalesOrderID)
+INCLUDE (SalesOrderNumber,OrderDate,AccountNumber,shipdate)
+WITH (DROP_EXISTING=ON)
+GO</pre></div></div>
+
+<p>Running the plan again will output the same plan as we accomplished earlier with three separate indexes.</p>
+<p>Looking closer at the JOIN conditions, index scans may be seeks.  If our bottom join is returning a very limited number of rows, the optimizer will not need to scan on the top join in order to join the operations.  This would be relevant when a clustered index is joined from the top.  </p>
+<p>Example:  Prepare this condition by dropping the nonclustered index on SalesOrderHeader we created earlier. </p>
+<p>In our previous examples, this would force a scan on SalesOrderHeader if UnitPriceDiscount = 0.00 was filtered.  This is due to our estimated rows being 21 causing the results to be very small in size.  If we change to UnitPriceDiscount > 1.00 and rerun the estimated plan, the resulting scan turns into a seek and estimated number of rows of 1.</p>
+<blockquote><p><span class="MT_red">Note: This is for example purposes only and to show the resulting joins make a difference in the operations that are shown by the optmizer.  You should always tune by the concept that data grows in size and prepare for that in your indexing and development of T-SQL.</span></p></blockquote>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">INDEX</span> WISSUG.<span class="me1">SalesOrderHeader</span>.<span class="me1">IDX_SalesNumOrderDate_Ship_ASC</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP INDEX WISSUG.SalesOrderHeader.IDX_SalesNumOrderDate_Ship_ASC
+GO</pre></div></div>
+
+<p>And now rerun the execution plan with the change to UnitPriceDiscount</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;SalesOrderNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; OrderDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; ShipDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; AccountNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; UnitPriceDiscount ,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw2">SUM</span><span class="br0">&#40;</span>LineTotal<span class="br0">&#41;</span> Total
+<span class="kw1">FROM</span> &nbsp; &nbsp;WISSUG.<span class="me1">SalesOrderHeader</span> header
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> WISSUG.<span class="me1">SalesOrderDetail</span> details <span class="kw1">ON</span> header.<span class="me1">salesorderid</span> <span class="sy0">=</span> details.<span class="me1">salesorderid</span>
+<span class="kw1">WHERE</span> &nbsp; customerid <span class="sy0">=</span> <span class="nu0">11091</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> UnitPriceDiscount <span class="sy0">&gt;</span> <span class="nu0">1.00</span>
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> SalesOrderNumber ,
+&nbsp; &nbsp; &nbsp; &nbsp; OrderDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; ShipDate ,
+&nbsp; &nbsp; &nbsp; &nbsp; UnitPriceDiscount ,
+&nbsp; &nbsp; &nbsp; &nbsp; AccountNumber</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  SalesOrderNumber ,
+        OrderDate ,
+        ShipDate ,
+        AccountNumber ,
+        UnitPriceDiscount ,
+        SUM(LineTotal) Total
+FROM    WISSUG.SalesOrderHeader header
+        JOIN WISSUG.SalesOrderDetail details ON header.salesorderid = details.salesorderid
+WHERE   customerid = 11091
+        AND UnitPriceDiscount &gt; 1.00
+GROUP BY SalesOrderNumber ,
+        OrderDate ,
+        ShipDate ,
+        UnitPriceDiscount ,
+        AccountNumber</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/exec_plan_19.gif" alt="" title="" width="705" height="171" /></div>
+<p><strong>Take away</strong></p>
+<p>Execution plan analysis is a critical aspect to keeping SQL Server running optimally.  With any amount of hardware, the risk factor of a poorly written or unsupported statement being executed in a production environment has the ability to bring service availability to a halt.  Testing on a futuristic sizing of tables and indexes is also a part of tuning that should be taken into account.  Data will grow and, with that growth, queries will react differently if not tuned to their full potential.</p>
+<p>Special thanks to Janice Lee, George Mastros, Howard Churchill, Denis Gobo and Jes Borland for the reviews of this paper.  The SQL Community is simply amazing!</p>
+<div class='rp4wp-related-posts'>
+<h3>Related Posts</h3>
+<ul>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/datadesign/rid-lookup-sql-tuning/'>RID Lookup take me down</a><p>The scenario starts with a phone call from the support desk reporting failed integrations from&hellip;</p></div>
+</li>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/dbadmin/plan-cache-effects-when-dropping/'>Plan Cache effects when dropping columns</a><p>Recently the question was raised, “If you drop a column on a table, does it&hellip;</p></div>
+</li>
+</ul>
+</div>
+</div>
+				<div class="post-author">
+					<div class="userInfo"><h2>About the Author</h2>Ted Krueger is a SQL Server MVP and Author that has been working in development and database administration and the owner of a successful consulting business, DataMetrics Consulting.  Specialties range from High Availability and Disaster / Recovery setup and testing methods down to custom assembly development for SQL Server Reporting Services.  Ted blogs and is also one of the founders of LessThanDot.com technology community.  Some of the articles focused on are Backup / Recovery, Security, SSIS and working on SQL Server and using all of the SQL Server features available to create stable and scalable database services.  <br style="clear: left" /><div class="bioSoc"><span class="bioSocTitle">Social Sitings</span><a href="http://twitter.com/onpnt" title="onpnt at Twitter" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Twitter" /></a><a href="http://www.facebook.com/profile.php?id=https://www.facebook.com/onpntfirearms" title="onpnt at Facebook" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Facebook" /></a><a href="http://www.linkedin.com/pub/ted-krueger/2/183/b66" title="onpnt at LinkedIn" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="LinkedIn" /></a><a href="http://www.datametricsconsulting.com/" title="onpnt at HomePage" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_homepage.png" alt="HomePage" /></a><a href="/index.php/author/onpnt/feed/" title="Blog RSS feed for onpnt" class="bioSocLink"><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="LTD RSS Feed" /></a></div></div>				</div>
+				<div class="post-foot instapaper_ignore">
+					<div class="post-tagline">
+						<div class="post-foot-views"><label>Article views:</label> 10,808 </div>
+						<div class="post-foot-more-posts">
+                            <a href="/index.php/author/onpnt/">Read More Posts by Ted Krueger (onpnt)</a>
+						</div>
+					</div>
+					<div>
+						<label>Tags:</label> <a href="/index.php/tag/execution-plans/" rel="tag">execution plans</a>, <a href="/index.php/tag/pass/" rel="tag">pass</a>, <a href="/index.php/tag/sql-server-2008/" rel="tag">sql server 2008</a>, <a href="/index.php/tag/sql-server-community/" rel="tag">sql server community</a>, <a href="/index.php/tag/tuning/" rel="tag">tuning</a> 
+					</div>
+					<div class="post-tagline" style="height: auto">
+						<span class="social-button-label">Share:</span><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&text=RT @LessThanDot Blog - Execution Plans &amp;#8211; Indexing to achieve optimal query plans by @onpnt" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&title=Execution Plans &amp;#8211; Indexing to achieve optimal query plans&source=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&title=Execution Plans &amp;#8211; Indexing to achieve optimal query plans" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&quote=Execution Plans &amp;#8211; Indexing to achieve optimal query plans" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/&title=Execution Plans &amp;#8211; Indexing to achieve optimal query plans" class="instapaper_button">Instapaper</a>					</div>			
+				</div>
+				<div class="comments-area instapaper_ignore">
+	<h4 class="comments-title">
+		4 Comments	</h4>
+			<ol class="comments-list">
+					<li class="comment even thread-even depth-1" id="comment-3299">
+				<div id="div-comment-3299" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://2.gravatar.com/avatar/2f307af50a7d40d5ea19717d049bbec4?s=64&#038;d=mm&#038;r=g' srcset='http://2.gravatar.com/avatar/2f307af50a7d40d5ea19717d049bbec4?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">AGiotti</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/#comment-3299">
+			October 28, 2010 at 7:20 am</a>		</div>
+
+		<p>Hello, Great article. However, I cannot see the create index statement after this sentence.</p>
+<p>&#8220;With this information we can write the following nonclustered index to cover the SalesOrderDetail table.&#8221;</p>
+<p>Thanks in advance.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/?replytocom=3299#respond' onclick='return addComment.moveForm( "div-comment-3299", "3299", "respond", "930" )' aria-label='Reply to AGiotti'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-onpnt bypostauthor odd alt thread-odd thread-alt depth-1" id="comment-3296">
+				<div id="div-comment-3296" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Ted Krueger (onpnt)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/#comment-3296">
+			October 29, 2010 at 2:21 pm</a>		</div>
+
+		<p>Thank you!</p>
+<p>Here is the create for that nonclustered index on sales detail</p>
+<p>create nonclustered index IDX_SalesID_LineTotal_ASC<br />
+on WISSUG.SalesOrderDetail (SalesOrderID)<br />
+INCLUDE (LineTotal,UnitPriceDiscount)</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/?replytocom=3296#respond' onclick='return addComment.moveForm( "div-comment-3296", "3296", "respond", "930" )' aria-label='Reply to Ted Krueger (onpnt)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-3297">
+				<div id="div-comment-3297" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://2.gravatar.com/avatar/2f307af50a7d40d5ea19717d049bbec4?s=64&#038;d=mm&#038;r=g' srcset='http://2.gravatar.com/avatar/2f307af50a7d40d5ea19717d049bbec4?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">AGiotti</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/#comment-3297">
+			October 30, 2010 at 7:51 am</a>		</div>
+
+		<p>After creating the CLUSTERED index on WISSUG.SalesOrderHearder(SalesOrderID) the operation went from a &#8220;Table Scan&#8221; to a &#8220;Clustered Index Scan&#8221;.<br />
+The whitepaper explains that this type of scan is more optimal than the previous &#8220;Table Scan&#8221;. Since this is a Clustered index, which not only stores the key structure, like a regular index, doesn&#8217;t it also sort and store the data at the leaf-level as well? With that said, wouldn&#8217;t a clustered index scan be considered the same concept as a full table scan, thereby, performing just as poorly as the &#8220;Table scan&#8221;?<br />
+Notice the logical reads on the SalesOrderHeader with and without the index.  <br />
+Sorry for the question but I am a little confused on where the performance gain is?<br />
+/* Without the index<br />
+Table &#8216;Worktable&#8217;. Scan count 0, logical reads 0, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.<br />
+Table &#8216;SalesOrderDetail&#8217;. Scan count 1, logical reads 1233, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.<br />
+Table &#8216;SalesOrderHeader&#8217;. Scan count 1, logical reads 650, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.<br />
+*/</p>
+<p>/* With clustered index<br />
+Table &#8216;Worktable&#8217;. Scan count 0, logical reads 0, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.<br />
+Table &#8216;SalesOrderDetail&#8217;. Scan count 1, logical reads 1233, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.<br />
+Table &#8216;SalesOrderHeader&#8217;. Scan count 1, logical reads 654, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.<br />
+*/</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/?replytocom=3297#respond' onclick='return addComment.moveForm( "div-comment-3297", "3297", "respond", "930" )' aria-label='Reply to AGiotti'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-SQLDenis odd alt thread-odd thread-alt depth-1" id="comment-3298">
+				<div id="div-comment-3298" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">SQLDenis</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/#comment-3298">
+			October 31, 2010 at 8:06 am</a>		</div>
+
+		<p>A clustered index scan vs a table scan will probably be the same&#8230;&#8230;.</p>
+<p>Also a seek is not always better than a scan, see here: <a href="/index.php/DataMgmt/DataDesign/is-an-index-scan-always-better-or-faster">Is an index seek always better or faster than an index scan?</a></p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/?replytocom=3298#respond' onclick='return addComment.moveForm( "div-comment-3298", "3298", "respond", "930" )' aria-label='Reply to SQLDenis'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		</ol>
+						<div id="respond" class="comment-respond">
+			<h3 id="reply-title" class="comment-reply-title">Leave a Reply <small><a rel="nofollow" id="cancel-comment-reply-link" href="/index.php/datamgmt/dbprogramming/execution-plan-tuning-sql-server/#respond" style="display:none;">Cancel reply</a></small></h3>				<form action="/wp-comments-post.php" method="post" id="commentform" class="comment-form">
+					<p class="comment-notes"><span id="email-notes">Your email address will not be published.</span> Required fields are marked <span class="required">*</span></p><p class="comment-form-comment"><label for="comment">Comment</label> <textarea id="comment" name="comment" cols="45" rows="8" maxlength="65525" aria-required="true" required="required"></textarea></p><p class="comment-form-author"><label for="author">Name <span class="required">*</span></label> <input id="author" name="author" type="text" value="" size="30" maxlength="245" aria-required='true' required='required' /></p>
+<p class="comment-form-email"><label for="email">Email <span class="required">*</span></label> <input id="email" name="email" type="text" value="" size="30" maxlength="100" aria-describedby="email-notes" aria-required='true' required='required' /></p>
+<p class="comment-form-url"><label for="url">Website</label> <input id="url" name="url" type="text" value="" size="30" maxlength="200" /></p>
+<p class="form-submit"><input name="submit" type="submit" id="submit" class="submit" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='930' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='0' />
+</p><input type="hidden" id="killer_value" name="killer_value" value="4a47d2983c8bd392b120b627e0e1cab4"/><noscript>Sorry, but you are required to use a javascript enabled brower to comment here.</noscript>				</form>
+					</div><!-- #respond -->
+		</div>			</div>
+				<br style="clear: both;" />
+</div>
+		</div>
+		<div id="page-footer">
+			<div id="botnav"><a href="http://lessthandot.com/" title="LessThanDot Launchpad">Launchpad</a> | <a href="http://lessthandot.com/account.php" title="Your Account Settings">My Account</a> | <a href="http://lessthandot.com/statistics.php" title="Statistics">Statistics</a> | <a href="http://lessthandot.com/donate.php" title="Donate">Donate</a> | <a href="http://lessthandot.com/contactus.php" title="Contact Us">Contact Us</a> | <a href="http://lessthandot.com/aboutus.php" title="About the LessThanDot Team">&copy;2008 - 2019 LessThanDot, LLC</a></div>
+
+		<script type='text/javascript'>
+		var _gaq = _gaq || [];
+		_gaq.push(['_setAccount', 'UA-4471405-1']);
+		_gaq.push(['_trackPageview']);
+		_gaq.push(['_setCustomVar', 1, 'Environment', 'lessthandot.com', 3]);
+
+		(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		})();
+	  </script>			<div class="validator"><a href="http://validator.w3.org/check?uri=referer">Valid XHTML</a> | <a href="http://jigsaw.w3.org/css-validator/check/referer" title="Validate the CSS for this page at the W3C website">Valid CSS</a> | 2018-11-11 15:52</div>
+		</div>
+	</div>
+</div>
+<!-- <script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script> -->
+<script type='text/javascript' src='/wp-includes/js/wp-embed.min.js?ver=4.6.1'></script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var spam_destroyer = {"key":"159ff9dcc225580310c2de238cdd1f1a","lifetime":"3600","limit":"1552765781"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='/wp-content/plugins/spam-destroyer/kill.js?ver=1.2'></script>
+</body>
+</html>

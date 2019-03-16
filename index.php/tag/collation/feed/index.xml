@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>collation &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/collation/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Contained Databases, Temporary Tables and Collations</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/contained-databases-temptables-and-their/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/contained-databases-temptables-and-their/#respond</comments>
+		<pubDate>Tue, 27 Mar 2012 11:54:00 +0000</pubDate>
+		<dc:creator><![CDATA[Axel Achten (axel8s)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[collation]]></category>
+		<category><![CDATA[contained database]]></category>
+		<category><![CDATA[tempdb]]></category>
+		<category><![CDATA[temporary table]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/03/contained-databases-temptables-and-their/</guid>
+		<description><![CDATA[In SQL Server 2012 we now can have Contained Databases. To be precise we now can have partially Contained Databases. The complete definition is found in the MSDN Database. In short a Contained Database holds it's configuration and security information s&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In SQL Server 2012 we now can have Contained Databases. To be precise we now can have partially Contained Databases. The complete definition is found in the <a href="http://msdn.microsoft.com/en-us/library/ff929071(v=sql.110).aspx">MSDN Database</a>. In short a Contained Database holds it&#8217;s configuration and security information so you should be able to move these databases easily between different SQL Servers without having to create users or other configuration items. But as we all know Collations can cause serious problems, certainly if there is a difference between the Collation of the database itself and tempdb. So what happens if we create a Contained Database with a different Collation on a server? And does a Contained Database uses tempdb for it&#8217;s Temporary Tables? Let&#8217;s find out what happens with a normal database and after that wath happens with a Contained Databases.<br />
+First things first, check the Collation settings of the server and tempdb:</p>
+<pre>SELECT SERVERPROPERTY('collation'), DATABASEPROPERTYEX('tempdb','collation')
+GO</pre>
+<p>In my case the server en tempdb Collation are the same, Case-Insensitive and Accent-Sensitive:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB1.png?mtime=1332856134"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB1.png?mtime=1332856134" width="394" height="64" /></a></div>
+<p>To start I create a database with a different Collation than the server default, in my case Case-Sensitive:</p>
+<pre>CREATE DATABASE NotContainedDB
+	COLLATE SQL_Latin1_General_CP1_CS_AS
+GO</pre>
+<p>From within the new database I create a regular and a Temporary Table and insert a value in it:</p>
+<pre>USE NotContainedDB
+GO
+
+CREATE TABLE NotContaintedData (
+	NCDID int IDENTITY (1,1),
+	NCDValue varchar (25)
+	)
+GO
+
+INSERT INTO NotContaintedData
+	VALUES ('CapitalData')
+
+CREATE TABLE #NotContaintedTempData (
+	NCTDID int IDENTITY (1,1),
+	NCTDValue varchar (25)
+	)
+GO
+
+INSERT INTO #NotContaintedTempData
+	VALUES ('CapitalData')
+GO</pre>
+<p>Now if we just write a little query to compare the values in both tables:</p>
+<pre>SELECT * FROM 
+	NotContaintedData NCD
+	INNER JOIN #NotContaintedTempData NCTD
+	ON NCD.NCDValue = NCTD.NCTDValue
+GO</pre>
+<p>We see that SQL Server is unable to compare the Case-Sensitive and Case-Insensitive data:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB2.png?mtime=1332856142"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB2.png?mtime=1332856142" width="996" height="64" /></a></div>
+<p>This behaviour is expected. So will it be the same with a Contained Database? To be able to test it we first have to enable the usage of Contained Databases:</p>
+<pre>SP_CONFIGURE 'contained database authentication', 1
+GO
+RECONFIGURE WITH OVERRIDE
+GO</pre>
+<p>Now we can create a Contained Database, note that we can only use PARTIAL and the database is created with a different Collation than the server default:</p>
+<pre>CREATE DATABASE ContainedDB
+	CONTAINMENT = PARTIAL
+	COLLATE SQL_Latin1_General_CP1_CS_AS
+GO</pre>
+<p>Now I create simular tables to the ones in the noncontained database:</p>
+<pre>USE ContainedDB
+GO
+
+CREATE TABLE ContaintedData (
+	CDID int IDENTITY (1,1),
+	CDValue varchar (25)
+	)
+GO
+
+INSERT INTO ContaintedData
+	VALUES ('CapitalData')
+
+CREATE TABLE #ContaintedTempData (
+	CTDID int IDENTITY (1,1),
+	CTDValue varchar (25)
+	)
+GO
+
+INSERT INTO #ContaintedTempData
+	VALUES ('CapitalData')
+GO</pre>
+<p>If we now run the query where both values are compared:</p>
+<pre>SELECT * FROM 
+	ContaintedData CD
+	INNER JOIN #ContaintedTempData CTD
+	ON CD.CDValue = CTD.CTDValue
+GO</pre>
+<p>We get a resultset:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB3.png?mtime=1332856155"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB3.png?mtime=1332856155" width="274" height="64" /></a></div>
+<p>So what does this means? Is the Temporary Table created in the Contained Database itself or is it stored in tempdb with the Collation of the Contained Database? When you execute the following query in both databases you&#8217;ll find the answer:</p>
+<pre>SP_HELP #ContaintedTempData
+GO</pre>
+<p>The query only works when executed from tempdb. So the Temporary Table is created in tempdb and in the results of the query you can see that the table is created with the Collation of the Contained Database:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB4.png?mtime=1332856165"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB4.png?mtime=1332856165" width="832" height="277" /></a></div>
+<p>So we can conclude that Temporary Tables in a Contained Database are still created in tempdb. But in contrast to the behaviour of a regular database the Temporary Table of a Contained Database keep the Collation of the Contained Database.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/contained-databases-temptables-and-their/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Dealing with Cannot resolve collation conflict for equal to operation errors</title>
+		<link>/index.php/datamgmt/datadesign/dealing-with-cannot-resolve-collation-co/</link>
+		<comments>/index.php/datamgmt/datadesign/dealing-with-cannot-resolve-collation-co/#comments</comments>
+		<pubDate>Mon, 26 Oct 2009 16:10:21 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[collation]]></category>
+		<category><![CDATA[database]]></category>
+		<category><![CDATA[gotcha]]></category>
+		<category><![CDATA[programming]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[tip]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/10/dealing-with-cannot-resolve-collation-co/</guid>
+		<description><![CDATA[This was asked on twitter recently and I gave the answer there. I decided to write a blog post about this because I can use over 140 charaters here instead. You will see the Cannot resolve collation conflict for equal to operation error when you try to join 2 tables. let&#8217;s take a look at [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>This was asked on twitter recently and I gave the answer there. I decided to write a blog post about this because I can use over 140 charaters here instead.<br />
+You will see the Cannot resolve collation conflict for equal to operation error when you try to join 2 tables. let&#8217;s take a look at what we need to do to resolve this. First create and populate these two tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">use</span> tempdb
+go
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">create</span> <span class="kw1">table</span> Test <span class="br0">&#40;</span>SomeColumn <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> not null<span class="br0">&#41;</span>
+<span class="kw1">insert</span> Test <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'bla'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> Test <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'test'</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">create</span> <span class="kw1">table</span> Test2 <span class="br0">&#40;</span>SomeColumn <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="kw1">collate</span> Traditional_Spanish_CI_AI not null<span class="br0">&#41;</span>
+<span class="kw1">insert</span> Test2 <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'Niño'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> Test2 <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'bla'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">use tempdb
+go
+
+
+
+create table Test (SomeColumn varchar(100) not null)
+insert Test values('bla')
+insert Test values('test')
+
+
+create table Test2 (SomeColumn varchar(100) collate Traditional_Spanish_CI_AI not null)
+insert Test2 values('Niño')
+insert Test2 values('bla')</pre></div></div>
+
+<p>Now run the following join between the Test and Test2 tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> Test t1
+join Test2 t2 <span class="kw1">on</span> t1.<span class="me1">SomeColumn</span> <span class="sy0">=</span> t2.<span class="me1">SomeColumn</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from Test t1
+join Test2 t2 on t1.SomeColumn = t2.SomeColumn</pre></div></div>
+
+<p>Here is the error you will get</p>
+<p><strong>Server: Msg 446, Level 16, State 9, Line 1<br />
+Cannot resolve collation conflict for equal to operation.</strong></p>
+<p>To quickly fix this you can use collate in your SQL, you have to make sure that the collation is the same on both columns. So you either add the collate with the collation of the column in test2 to the column in the test table or vice-versa. Here is one example</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> Test t1
+join Test2 t2 <span class="kw1">on</span> t1.<span class="me1">SomeColumn</span> <span class="sy0">=</span> t2.<span class="me1">SomeColumn</span> <span class="kw1">collate</span> Traditional_Spanish_CI_AI</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from Test t1
+join Test2 t2 on t1.SomeColumn = t2.SomeColumn collate Traditional_Spanish_CI_AI</pre></div></div>
+
+<p>You can also apply collate on the other column&#8230;first we need to know what the default was in your database. We can use the ANSI information_schema.columns view to get this info, we need to use the collation_name column. Run the following query to grab it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> column_name,collation_name
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> <span class="st0">'test'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select column_name,collation_name
+from information_schema.columns
+where table_name = 'test'</pre></div></div>
+
+<p>In my case it is SQL_Latin1_General_CP1_CI_AS, now the query becomes the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> Test t1
+join Test2 t2 <span class="kw1">on</span> t1.<span class="me1">SomeColumn</span> <span class="kw1">collate</span> SQL_Latin1_General_CP1_CI_AS <span class="sy0">=</span> t2.<span class="me1">SomeColumn</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from Test t1
+join Test2 t2 on t1.SomeColumn collate SQL_Latin1_General_CP1_CI_AS = t2.SomeColumn</pre></div></div>
+
+<p>Just for fun let&#8217;s see what the collation is for the column in the Test2 table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> column_name,collation_name
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> <span class="st0">'Test2'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select column_name,collation_name
+from information_schema.columns
+where table_name = 'Test2'</pre></div></div>
+
+<p>As expected it is Traditional_Spanish_CI_AI</p>
+<p>You can use the ::fn_helpcollations()function which returns a list of all the collations supported by SQL Server to get more info about the collation</p>
+<p>Run the following query (and yes :: is not a typo)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> ::<span class="kw4">fn_helpcollations</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">where</span> name <span class="sy0">=</span><span class="st0">'Traditional_Spanish_CI_AI'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from ::fn_helpcollations()
+where name ='Traditional_Spanish_CI_AI'</pre></div></div>
+
+<p>The query returns the following description for Traditional_Spanish_CI_AI&#8217;</p>
+<p>Traditional-Spanish, case-insensitive, accent-insensitive, kanatype-insensitive, width-insensitive</p>
+<p>One thing to be aware of is that when using collate it needs to do a conversion so you might get performance problems&#8230;make sure to check those execution plans.</p>
+<p>Hopefully this will help some person when dealing with this in the future.</p>
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/dealing-with-cannot-resolve-collation-co/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+	</channel>
+</rss>

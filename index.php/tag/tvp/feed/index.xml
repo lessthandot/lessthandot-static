@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>tvp &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/tvp/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2011 Day 18: Table-valued Parameters</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-18/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-18/#comments</comments>
+		<pubDate>Sun, 18 Dec 2011 10:45:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[table-valued parameters]]></category>
+		<category><![CDATA[tvp]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-18/</guid>
+		<description><![CDATA[Today we are going to take a look at Table-valued Parameters (sometimes also called table types or just TVP). When you create a table type, the table definition is preserved in the database. When you create a table variable later based on that table type you will use the table definition of the table type, you don't have to specify it again.]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>Today we are going to take a look at Table-valued Parameters (sometimes also called table types or just TVP). When you create a table type, the table definition is preserved in the database. When you create a table variable later based on that table type you will use the table definition of the table type, you don&#8217;t have to specify it again.</p>
+<p>Table-valued parameters have the following restrictions:</p>
+<p><em>SQL Server does not maintain statistics on columns of table-valued parameters.</p>
+<p>Table-valued parameters must be passed as input READONLY parameters to Transact-SQL routines. You cannot perform DML operations such as UPDATE, DELETE, or INSERT on a table-valued parameter in the body of a routine.</p>
+<p>You cannot use a table-valued parameter as target of a SELECT INTO or INSERT EXEC statement. A table-valued parameter can be in the FROM clause of SELECT INTO or in the INSERT EXEC string or stored-procedure.</em></p>
+<p>Here is a small code example, this will create a new table type named SysObjectsCount  with 2 columns</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> TYPE SysObjectsCount <span class="kw1">AS</span> <span class="kw1">TABLE</span><span class="br0">&#40;</span>quantity <span class="kw1">INT</span>, xtype <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TYPE SysObjectsCount AS TABLE(quantity INT, xtype CHAR(2))
+GO</pre></div></div>
+
+<p>Now when we create our variable, we can create it as type SysObjectsCount, this will be almost the same like a table variable but there is no need to specify the table structure. We can insert and select from the variable without a problem</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @mySystableCount <span class="kw1">AS</span> SysObjectsCount
+&nbsp;
+<span class="kw1">INSERT</span> @mySystableCount
+<span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span>,xtype <span class="kw1">FROM</span> sysobjects
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> xtype
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> @mySystableCount</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @mySystableCount AS SysObjectsCount
+
+INSERT @mySystableCount
+SELECT COUNT(*),xtype FROM sysobjects
+GROUP BY xtype
+
+SELECT * FROM @mySystableCount</pre></div></div>
+
+<p>The nice thing is that we can actually pass this table type variable into a stored procedure. Create the following stored procedure, the parameter has to be declared as READONLY. You can also not modify the table inside the proc, if you try to do so, you will get the following error</p>
+<p><em>Msg 10700, Level 16, State 1, Procedure prSysObjectsCount, Line 5<br />
+The table-valued parameter &#8220;@mySystableCount&#8221; is READONLY and cannot be modified.</em></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">PROC</span> prSysObjectsCount <span class="br0">&#40;</span>@mySystableCount SysObjectsCount READONLY, @xtype <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">AS</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> @mySystableCount
+<span class="kw1">WHERE</span> xtype <span class="sy0">=</span> @xtype
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PROC prSysObjectsCount (@mySystableCount SysObjectsCount READONLY, @xtype CHAR(2))
+AS
+SELECT * FROM @mySystableCount
+WHERE xtype = @xtype
+GO</pre></div></div>
+
+<p>Now run the following piece of code, as you can see we are running the proc three times, each time with a different value for @xtype</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @mySystableCount <span class="kw1">AS</span> SysObjectsCount
+&nbsp;
+<span class="kw1">INSERT</span> @mySystableCount
+<span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span>,xtype <span class="kw1">FROM</span> sysobjects
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> xtype
+&nbsp;
+&nbsp;
+<span class="kw1">EXEC</span> prSysObjectsCount @mySystableCount,<span class="st0">'P'</span>
+<span class="kw1">EXEC</span> prSysObjectsCount @mySystableCount,<span class="st0">'U'</span>
+<span class="kw1">EXEC</span> prSysObjectsCount @mySystableCount,<span class="st0">'S'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @mySystableCount AS SysObjectsCount
+
+INSERT @mySystableCount
+SELECT COUNT(*),xtype FROM sysobjects
+GROUP BY xtype
+
+
+EXEC prSysObjectsCount @mySystableCount,'P'
+EXEC prSysObjectsCount @mySystableCount,'U'
+EXEC prSysObjectsCount @mySystableCount,'S'</pre></div></div>
+
+<pre>Output
+
+
+quantity    xtype
+----------- -----
+1365        P 
+
+quantity    xtype
+----------- -----
+21          U 
+
+quantity    xtype
+----------- -----
+74          S </pre>
+<p>As you can see, the Table-valued Parameter can be passed to the proc and in the proc itself we can filter what we need.</p>
+<p>Another example would be for reporting, let&#8217;s say the output is always the same but the input differs. You create a Table-valued Parameter, you do your logic on the Table-valued Parameter and after that you pass the Table-valued Parameter to the stored proc. This way you can reuse the proc since the logic in the proc doesn&#8217;t have to be changed.</p>
+<p>I am sure that you written code where you populate a temporary table and then call a proc, since the proc is in scope the temporary table is available inside the proc. Table-valued Parameters could be used to replace the temporary table approach, however you can&#8217;t modify the Table-valued Parameter, so this might not work for all your needs.</p>
+<p>That is all for today, come back tomorrow for the next post in this series, we are going to to take a look at indexing</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-18/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

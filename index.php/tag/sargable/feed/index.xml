@@ -1,0 +1,507 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>sargable &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/sargable/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2012 Day 3: Sargable Queries</title>
+		<link>/index.php/datamgmt/dbprogramming/sargable-queries/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sargable-queries/#comments</comments>
+		<pubDate>Mon, 03 Dec 2012 13:44:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[database]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[performance tuning]]></category>
+		<category><![CDATA[rdbms]]></category>
+		<category><![CDATA[sargable]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[t-sql]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/sargable-queries/</guid>
+		<description><![CDATA[This is day three of the SQL Advent 2012 series of blog posts. Today we are going to look at sargable queries. You might ask yourself, what is this weird term sargable. Sargable  comes from searchable argument, sometimes also referred as Search ARGument&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This is day three of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at sargable queries. You might ask yourself, what is this weird term sargable. Sargable  comes from searchable argument, sometimes also referred as <span class="MT_red">S</span>earch <span class="MT_red">ARG</span>ument <span class="MT_red">ABLE</span>. What that means is that the query will be able to use an index, a seek will be performed instead of a scan. In general any time you have a function wrapped around a column, an index won&#8217;t be used</p>
+<p>Some examples that are not sargable </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">WHERE</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>Name,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'S'</span>
+<span class="kw1">WHERE</span> <span class="kw1">Year</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span> <span class="sy0">=</span> <span class="nu0">2012</span>
+<span class="kw1">WHERE</span> OrderID <span class="sy0">*</span> <span class="nu0">3</span> <span class="sy0">=</span> <span class="nu0">33000</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">WHERE LEFT(Name,1) = 'S'
+WHERE Year(SomeDate) = 2012
+WHERE OrderID * 3 = 33000</pre></div></div>
+
+<p>Those three should be rewritten like this in order to become sargable </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">WHERE</span> Name <span class="sy0">LIKE</span> <span class="st0">'S%'</span>
+<span class="kw1">WHERE</span> SomeDate <span class="sy0">&gt;=</span> <span class="st0">'20120101'</span> <span class="sy0">AND</span> SomeDate <span class="sy0">&lt;</span> <span class="st0">'20130101'</span>
+<span class="kw1">WHERE</span> OrderID <span class="sy0">=</span> <span class="nu0">33000</span><span class="sy0">/</span><span class="nu0">3</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">WHERE Name LIKE 'S%'
+WHERE SomeDate &gt;= '20120101' AND SomeDate &lt; '20130101'
+WHERE OrderID = 33000/3</pre></div></div>
+
+<p>Let&#8217;s create a table, insert some data so that we can look at the execution plan<br />
+Create this simple table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test<span class="br0">&#40;</span>SomeID <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test(SomeID varchar(100))</pre></div></div>
+
+<p>Let&#8217;s insert some data that will start with a letter followed by some digits</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Test
+<span class="kw1">SELECT</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>v2.<span class="me1">type</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">+</span><span class="kw1">RIGHT</span><span class="br0">&#40;</span><span class="st0">'0000'</span> <span class="sy0">+</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">4</span><span class="br0">&#41;</span>,v1.<span class="me1">number</span><span class="br0">&#41;</span>,<span class="nu0">4</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span> v1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>type,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">AS</span> type 
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span><span class="br0">&#41;</span> v2
+<span class="kw1">WHERE</span> v1.<span class="me1">type</span> <span class="sy0">=</span> <span class="st0">'p'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Test
+SELECT LEFT(v2.type,1) +RIGHT('0000' + CONVERT(varchar(4),v1.number),4) 
+FROM master..spt_values v1
+CROSS JOIN (SELECT DISTINCT LEFT(type,1) AS type 
+FROM master..spt_values) v2
+WHERE v1.type = 'p'</pre></div></div>
+
+<p>That insert should have generated 32768 rows</p>
+<p>Now create this index on that table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> cx_test <span class="kw1">ON</span> Test<span class="br0">&#40;</span>SomeID<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX cx_test ON Test(SomeID)</pre></div></div>
+
+<p>Let&#8217;s take a look at the execution plan, hit CTRL + M, this will add the execution plan once the query is done running</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> SomeID <span class="sy0">LIKE</span> <span class="st0">'s%'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>SomeID,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'s'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM Test
+WHERE SomeID LIKE 's%'
+
+SELECT * FROM Test
+WHERE LEFT(SomeID,1) = 's'</pre></div></div>
+
+<p>Here is what the plans looks like</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/Excecutionplan.PNG?mtime=1354498760"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/Excecutionplan.PNG?mtime=1354498760" width="447" height="295" /></a></div>
+<p>As you can see it is 9% versus 91% between the two queries, that is a big difference<br />
+Hit CTRL + M again to disable the inclusion of the plan</p>
+<p>Run this codeblock, it will give you the plans in a text format</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">ON</span>
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> SomeID <span class="sy0">LIKE</span> <span class="st0">'s%'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>SomeID,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'s'</span>
+GO
+&nbsp;
+<span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET SHOWPLAN_TEXT ON
+GO
+
+SELECT * FROM Test
+WHERE SomeID LIKE 's%'
+
+SELECT * FROM Test
+WHERE LEFT(SomeID,1) = 's'
+GO
+
+SET SHOWPLAN_TEXT OFF
+GO</pre></div></div>
+
+<p>Here are the two plans</p>
+<blockquote><p>|&#8211;Clustered Index Seek(OBJECT:([master].[dbo].[Test].[cx_test]),<br />
+  SEEK:([master].[dbo].[Test].[SomeID] >= &#8216;Rþ&#8217; AND [master].[dbo].[Test].[SomeID] < 'T'),  
+  WHERE:([master].[dbo].[Test].[SomeID] like 's%') ORDERED FORWARD)
+
+    |--Clustered Index Scan(OBJECT:([master].[dbo].[Test].[cx_test]), 
+	WHERE:(substring([master].[dbo].[Test].[SomeID],(1),(1))='s'))
+</p></blockquote>
+<p>As you can see the top one while looking more complicated is actually giving you a seek</p>
+<h2>Making a case sensitive search sargable</h2>
+<p>Now let&#8217;s take a look at how we can make a case sensitive search sargable as well<br />
+In order to do a search and make it case sensitive, you have to have a case sensitive collation, if your table is not created with a case sensitive collation then you can supply it as part of the query</p>
+<p>Here is an example to demonstrate what I mean</p>
+<p>This is a simple table created without a collation</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TempCase1 <span class="br0">&#40;</span>Val <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase1 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'A'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase1 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'a'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TempCase1 (Val CHAR(1))
+INSERT TempCase1 VALUES('A')
+INSERT TempCase1 VALUES('a')</pre></div></div>
+
+<p>Running this select statement will return both rows </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TempCase1
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'A'</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TempCase1
+WHERE Val = 'A' </pre></div></div>
+
+<p>Val<br />
+&#8212;&#8211;<br />
+A<br />
+a</p>
+<p>Now create the same kind of table but with a case sensitive collation</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TempCase2 <span class="br0">&#40;</span>Val <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS<span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase2 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'A'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase2 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'a'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TempCase2 (Val CHAR(1) COLLATE SQL_Latin1_General_CP1_CS_AS)
+INSERT TempCase2 VALUES('A')
+INSERT TempCase2 VALUES('a')</pre></div></div>
+
+<p>Run the same query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TempCase2
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'A'</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TempCase2
+WHERE Val = 'A' </pre></div></div>
+
+<p>Val<br />
+&#8212;&#8211;<br />
+A</p>
+<p>As you can see you only get the one row now that matches the case</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TempCase1
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'A'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TempCase1
+WHERE Val = 'A' COLLATE SQL_Latin1_General_CP1_CS_AS</pre></div></div>
+
+<p>Val<br />
+&#8212;&#8211;<br />
+A<br />
+a</p>
+<p>Now let&#8217;s take a look at how we can make the case sensitive search sargable</p>
+<p>First create this table and insert some data</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TempCase <span class="br0">&#40;</span>Val <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'A'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'B'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'C'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'D'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'E'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'F'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'G'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'H'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TempCase (Val CHAR(1))
+ 
+INSERT TempCase VALUES('A')
+INSERT TempCase VALUES('B')
+INSERT TempCase VALUES('C')
+INSERT TempCase VALUES('D')
+INSERT TempCase VALUES('E')
+INSERT TempCase VALUES('F')
+INSERT TempCase VALUES('G')
+INSERT TempCase VALUES('H')</pre></div></div>
+
+<p>Now we will insert some lowercase characters</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TempCase
+<span class="kw1">SELECT</span> <span class="kw2">LOWER</span><span class="br0">&#40;</span>Val<span class="br0">&#41;</span> <span class="kw1">FROM</span> TempCase</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TempCase
+SELECT LOWER(Val) FROM TempCase</pre></div></div>
+
+<p>Now we will create our real table which will have 65536 rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> CaseSensitiveSearch <span class="br0">&#40;</span>Val <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE CaseSensitiveSearch (Val VARCHAR(50))</pre></div></div>
+
+<p>We will do a couple of cross joins to generate the data for our queries</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> CaseSensitiveSearch
+<span class="kw1">SELECT</span> t1.<span class="me1">val</span> <span class="sy0">+</span> t2.<span class="me1">val</span> <span class="sy0">+</span> t3.<span class="me1">val</span> <span class="sy0">+</span> t4.<span class="me1">val</span>
+<span class="kw1">FROM</span> TempCase t1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> TempCase t2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> TempCase t3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> TempCase t4</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT CaseSensitiveSearch
+SELECT t1.val + t2.val + t3.val + t4.val
+FROM TempCase t1
+CROSS JOIN TempCase t2
+CROSS JOIN TempCase t3
+CROSS JOIN TempCase t4</pre></div></div>
+
+<p>Create an index on the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">INDEX</span> IX_SearchVal <span class="kw1">ON</span> CaseSensitiveSearch<span class="br0">&#40;</span>Val<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE INDEX IX_SearchVal ON CaseSensitiveSearch(Val)</pre></div></div>
+
+<p>Just like before, if we run this we will get back the exact value we passed in and also all the upper case and lower case variations</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' </pre></div></div>
+
+<p>Here are the results of that query<br />
+Val<br />
+&#8212;&#8211;<br />
+AbCd<br />
+ABcd<br />
+Abcd<br />
+ABCd<br />
+aBCd<br />
+abCd<br />
+aBcd<br />
+abcd<br />
+abCD<br />
+aBcD<br />
+abcD<br />
+aBCD<br />
+ABCD<br />
+AbCD<br />
+ABcD<br />
+AbcD</p>
+<p>If you add the collation to the query, you will get only what matches your value</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS</pre></div></div>
+
+<p>Here is the result, it maches what was passed in<br />
+Val<br />
+&#8212;<br />
+ABCD</p>
+<p>The problem with the query above is that it will cause a scan. So what can we do, how can we make it perform better?  It is simple combine the two queries<br />
+First grab all case sensitive and case insensitive values and then after that filter out the case insensitive values</p>
+<p>Here is what that query will look like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+<span class="sy0">AND</span> Val <span class="sy0">LIKE</span> <span class="st0">'ABCD'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+AND Val LIKE 'ABCD'</pre></div></div>
+
+<p>AND Val LIKE &#8216;ABCD&#8217; will result in a seek, now when it also does the Val = &#8216;ABCD&#8217; COLLATE SQL_Latin1_General_CP1_CS_AS part, it only returns the row that matches your value</p>
+<p>If you run both queries, you can look at the plan difference (hit CTRL + M so that the plan is included)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+<span class="sy0">AND</span> Val <span class="sy0">LIKE</span> <span class="st0">'ABCD'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+
+
+
+SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+AND Val LIKE 'ABCD'</pre></div></div>
+
+<p>Here is the plan</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ExcecutionPlan2008.PNG?mtime=1354548699"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/ExcecutionPlan2008.PNG?mtime=1354548699" width="903" height="364" /></a></div>
+<p>As you can see, there is a big difference between the two</p>
+<p>Here is the plan in text as well</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">ON</span>
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+<span class="sy0">AND</span> Val <span class="sy0">LIKE</span> <span class="st0">'ABCD'</span>
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET SHOWPLAN_TEXT ON
+GO
+ 
+SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+
+
+
+SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+AND Val LIKE 'ABCD'
+
+GO
+ 
+SET SHOWPLAN_TEXT OFF
+GO</pre></div></div>
+
+<blockquote><p>  |&#8211;Table Scan(OBJECT:([tempdb].[dbo].[CaseSensitiveSearch]),<br />
+   WHERE:(CONVERT_IMPLICIT(varchar(50),[tempdb].[dbo].[CaseSensitiveSearch].[Val],0)=CONVERT(varchar(8000),[@1],0)))</p>
+<p>    |&#8211;Index Seek(OBJECT:([tempdb].[dbo].[CaseSensitiveSearch].[IX_SearchVal]), SEEK:([tempdb].[dbo].[CaseSensitiveSearch].[Val] >= &#8216;ABCD&#8217;<br />
+     AND [tempdb].[dbo].[CaseSensitiveSearch].[Val] <= 'ABCD'), 
+      WHERE:(CONVERT_IMPLICIT(varchar(50),[tempdb].[dbo].[CaseSensitiveSearch].[Val],0)='ABCD' AND [tempdb].[dbo].[CaseSensitiveSearch].[Val] like 'ABCD') ORDERED FORWARD)</p></blockquote>
+<p>Also take a look at <a href="/index.php/DataMgmt/DataDesign/only-in-a-database-can-you-get-1000-impr">Only In A Database Can You Get 1000% + Improvement By Changing A Few Lines Of Code</a> to see how this works with dates</p>
+<p>That is all for day three of the SQL Advent 2012 series, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sargable-queries/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>features &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/features/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Listing tables that are truly partitioned in SQL Server</title>
+		<link>/index.php/datamgmt/dbprogramming/listing-tables-that-are-truly/</link>
+		<comments>/index.php/datamgmt/dbprogramming/listing-tables-that-are-truly/#comments</comments>
+		<pubDate>Sat, 23 Feb 2013 08:59:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[features]]></category>
+		<category><![CDATA[partitioning]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/listing-tables-that-are-truly/</guid>
+		<description><![CDATA[To list all the tables that are partitioned you can use the sys.partitions view. However be aware that all tables and indexes in SQL Server contain at least one partition, whether or not they are explicitly partitioned.
+
+If you were to do the followin&#8230;]]></description>
+				<content:encoded><![CDATA[<p>To list all the tables that are partitioned you can use the sys.partitions view. However be aware that all tables and indexes in SQL Server contain at least one partition, whether or not they are explicitly partitioned.</p>
+<p>If you were to do the following, you would get back every table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> partition_number,<span class="kw1">rows</span>,<span class="kw2">object_name</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT partition_number,rows,object_name(object_id)
+FROM sys.partitions</pre></div></div>
+
+<p>So what can you do? Let&#8217;s take a look. First we are going to create a partitioned table in case you don&#8217;t have one so that you can get the same output as me.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> SalesPartitioned<span class="br0">&#40;</span>YearCol <span class="kw1">SMALLINT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,OrderID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, SomeData <span class="kw1">UNIQUEIDENTIFIER</span> <span class="kw1">DEFAULT</span> newsequentialid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE SalesPartitioned(YearCol SMALLINT NOT NULL,OrderID INT NOT NULL, SomeData UNIQUEIDENTIFIER DEFAULT newsequentialid())
+GO</pre></div></div>
+
+<p>We are going to insert some data into the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> SalesPartitioned <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="nu0">2007</span>,number
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="nu0">2008</span>,number <span class="sy0">+</span> <span class="nu0">2048</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="nu0">2009</span>,number <span class="sy0">+</span> <span class="nu0">4096</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT SalesPartitioned (YearCol,OrderID)
+SELECT 2007,number
+FROM master..spt_values
+WHERE type = 'P'
+UNION ALL
+SELECT 2008,number + 2048
+FROM master..spt_values
+WHERE type = 'P'
+UNION ALL
+SELECT 2009,number + 4096
+FROM master..spt_values
+WHERE type = 'P'</pre></div></div>
+
+<p>We will now add a primary key</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">SalesPartitioned</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Sales <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">NONCLUSTERED</span> <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.SalesPartitioned ADD CONSTRAINT
+	PK_Sales PRIMARY KEY NONCLUSTERED (YearCol,OrderID)</pre></div></div>
+
+<p>Now it is time to create our partition function. Here is how we will do it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> PARTITION <span class="kw1">FUNCTION</span> pfFiscalYear<span class="br0">&#40;</span><span class="kw1">SMALLINT</span><span class="br0">&#41;</span>
+<span class="kw1">AS</span> RANGE <span class="kw1">RIGHT</span> <span class="kw1">FOR</span> <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">2007</span>,<span class="nu0">2008</span>,<span class="nu0">2009</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PARTITION FUNCTION pfFiscalYear(SMALLINT)
+AS RANGE RIGHT FOR VALUES(2007,2008,2009)</pre></div></div>
+
+<p>What that does is actually create 4 partitions, one for 2007, one for 2008, one for everything after 2008, and one for everything before 2006.<br />
+<=2006
+= 2007
+= 2008
+>= 2009</p>
+<p>You can verify this by using the function $partition</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="nu0">1</span> <span class="kw1">AS</span> val,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">AS</span> partition &nbsp; &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2006</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2006</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2007</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2007</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2008</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2008</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2009</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2009</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2010</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2010</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">3000</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">3000</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select 1 AS val,$partition.pfFiscalYear(1) AS partition	    UNION all
+select 2006,$partition.pfFiscalYear(2006)	UNION all
+select 2007,$partition.pfFiscalYear(2007)	UNION all
+select 2008,$partition.pfFiscalYear(2008)	UNION all
+select 2009,$partition.pfFiscalYear(2009)	UNION all
+select 2010,$partition.pfFiscalYear(2010)	UNION all
+select 3000,$partition.pfFiscalYear(3000)</pre></div></div>
+
+<p>And here is the output</p>
+<pre>val         partition
+----------- -----------
+1           1
+2006        1
+2007        2
+2008        3
+2009        4
+2010        4
+3000        4</pre>
+<p>Now that we have the partition function, we need a partition scheme. A partition scheme is used to map boundary values in partition functions to filegroups. You can have one filegroup for each year placed on a different spindle, this way you don&#8217;t have to wait for the disk if all partitions are on the same spindle. For the sake of simplicity we only have one filegroup. Here is how to create the partition scheme</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> PARTITION SCHEME psFiscalYear
+<span class="kw1">AS</span> PARTITION pfFiscalYear <span class="sy0">ALL</span> <span class="kw1">TO</span> <span class="br0">&#40;</span><span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PARTITION SCHEME psFiscalYear
+AS PARTITION pfFiscalYear ALL TO ([PRIMARY])</pre></div></div>
+
+<p><em>Partition scheme &#8216;psFiscalYear&#8217; has been created successfully. &#8216;PRIMARY&#8217; is marked as the next used filegroup in partition scheme &#8216;psFiscalYear&#8217;.</em></p>
+<p>Now we will add a clustered index and partition this on the YearCol column, the syntax looks like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_Sales <span class="kw1">ON</span> SalesPartitioned<span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">ON</span> psFiscalYear<span class="br0">&#40;</span>YearCol<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX IX_Sales ON SalesPartitioned(YearCol,OrderID)
+ON psFiscalYear(YearCol)</pre></div></div>
+
+<p>Now it is time to list all the tables that are partitioned. Here is how you do it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> partition_number,<span class="kw1">rows</span>,<span class="kw2">object_name</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span> s
+<span class="kw1">WHERE</span> <span class="sy0">EXISTS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="sy0">NULL</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> sys.<span class="me1">partitions</span> s2 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHERE</span> s.<span class="kw2">object_id</span> <span class="sy0">=</span> s2.<span class="kw2">object_id</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> partition_number <span class="sy0">&gt;</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> s.<span class="me1">index_id</span> <span class="sy0">=</span> s2.<span class="me1">index_id</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT partition_number,rows,object_name(object_id)
+FROM sys.partitions s
+WHERE EXISTS(SELECT NULL 
+				FROM sys.partitions s2 
+				WHERE s.object_id = s2.object_id 
+				AND partition_number &gt; 1
+				AND s.index_id = s2.index_id)</pre></div></div>
+
+<p>Here is the output</p>
+<pre>partition_number	rows	TableName
+1	                0	SalesPartitioned
+2	                2048	SalesPartitioned
+3	                2048	SalesPartitioned
+4	                2048	SalesPartitioned</pre>
+<p>As you can see we used WHERE EXISTS, we checked that the object had a partition_number higher than two and we also matched on index_id since a table can have more than one index</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/listing-tables-that-are-truly/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Suppressing xp_cmdshell output</title>
+		<link>/index.php/datamgmt/dbprogramming/supressing-xp_cmdshell-output/</link>
+		<comments>/index.php/datamgmt/dbprogramming/supressing-xp_cmdshell-output/#comments</comments>
+		<pubDate>Thu, 21 Feb 2013 09:13:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[features]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+		<category><![CDATA[xp_cmdshell]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/supressing-xp_cmdshell-output/</guid>
+		<description><![CDATA[Starting with SQL Server 2005 xp_cmdshell is turned off by default as a security measure. You have to explicitly enable xp_cmdshell it. If you have to move files around on a SQL Server box there are probably better ways than using xp_cmdshell, you can use SSIS,&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Starting with SQL Server 2005 xp_cmdshell is turned off by default as a security measure. You have to explicitly <a href="/index.php/DataMgmt/DataDesign/how-to-enable-xp_cmdshell-on-sql-server-2005">enable xp_cmdshell</a> it. If you have to move files around on a SQL Server box there are probably better ways than using xp_cmdshell, you can use SSIS, powershell, plain old DOS.  But old habits are difficult to break and maybe you have ton of legacy code. Someone asked how to supress output from xp_cmdshell when moving a file</p>
+<p>I you move a file with xp_cmdshell, you will get the following output<br />
+output<br />
+1 file(s) moved.<br />
+NULL</p>
+<p>If I want to move a file from c:temp to c:tempold, I would execute the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">xp_cmdshell <span class="st0">'move c:tempbla.txtc:tempoldbla.txt'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">xp_cmdshell 'move c:tempbla.txtc:tempoldbla.txt'</pre></div></div>
+
+<p>Here is what it looks like in SSMS</p>
+<p><a href="/wp-content/uploads/blogs/DataMgmt/Denis/xp_cmdshellMove.PNG?mtime=1361444713"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/xp_cmdshellMove.PNG?mtime=1361444713" width="432" height="224" /></a></p>
+<p>As you can see you get a resultset, in order to surpress that, you can add  no_output to the xp_cmdshell  call, no_output is an optional parameter, specifying that no output should be returned to the client.</p>
+<p>Here is what the command looks like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">xp_cmdshell <span class="st0">'move c:tempbla.txt c:tempoldbla.txt'</span>,no_output</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">xp_cmdshell 'move c:tempbla.txt c:tempoldbla.txt',no_output</pre></div></div>
+
+<p>Executing the command like that will not return a resultset anymore</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/supressing-xp_cmdshell-output/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 13: Features enabled that are not used</title>
+		<link>/index.php/datamgmt/dbprogramming/features-enabled-that-are-not/</link>
+		<comments>/index.php/datamgmt/dbprogramming/features-enabled-that-are-not/#respond</comments>
+		<pubDate>Thu, 13 Dec 2012 10:14:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[features]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/features-enabled-that-are-not/</guid>
+		<description><![CDATA[This is day thirteen of the SQL Advent 2012 series of blog posts.  Today we are going to look at servers where everything is installed and enabled.]]></description>
+				<content:encoded><![CDATA[<p>This is day thirteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at servers where everything is installed and enabled. Before we start this post let&#8217;s look back in time a little. Before SQL Server 2005 came out when you installed SQL Server pretty much everything was turned on by default. This of course widened the attack vector against the database servers. With SQL Server 2005 pretty much everything is turned off and you have to turn the features on if you want to use them. Now sometimes some admins will just turn everything on because that way they don&#8217;t have to deal with this later, this are also the same kind of people who insist that the account needs to be db_owner otherwise their code won&#8217;t work.</p>
+<p>To see what these features are and if they are turned off, you can use the following query. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name, <span class="kw1">value</span>,value_in_use 
+<span class="kw1">FROM</span> sys.<span class="me1">configurations</span>
+<span class="kw1">WHERE</span> name <span class="sy0">IN</span> <span class="br0">&#40;</span>
+<span class="st0">'Agent XPs'</span>,
+<span class="st0">'SQL Mail XPs'</span>,
+<span class="st0">'Database Mail XPs'</span>,
+<span class="st0">'SMO and DMO XPs'</span>,
+<span class="st0">'Ole Automation Procedures'</span>,
+<span class="st0">'Web Assistant Procedures'</span>,
+<span class="st0">'xp_cmdshell'</span>,
+<span class="st0">'Ad Hoc Distributed Queries'</span>,
+<span class="st0">'Replication XPs'</span>,
+<span class="st0">'clr enabled'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name, value,value_in_use 
+FROM sys.configurations
+WHERE name IN (
+'Agent XPs',
+'SQL Mail XPs',
+'Database Mail XPs',
+'SMO and DMO XPs',
+'Ole Automation Procedures',
+'Web Assistant Procedures',
+'xp_cmdshell',
+'Ad Hoc Distributed Queries',
+'Replication XPs',
+'clr enabled')</pre></div></div>
+
+<p>The difference between <em>value </em>and <em>value_in_use </em>is that <em>value_in_use</em> is what is currently used and <em>value </em>will be used next time the server is restarted. If you want to have the change take effect immediately then use RECONFIGURE</p>
+<p>Here is an example that will turn off xp_cmdshell</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXECUTE</span> <span class="kw3">sp_configure</span> <span class="st0">'show advanced options'</span>, <span class="nu0">1</span>
+<span class="kw1">RECONFIGURE</span>
+GO
+&nbsp;
+<span class="kw1">EXECUTE</span> <span class="kw3">sp_configure</span> <span class="st0">'xp_cmdshell'</span>, <span class="st0">'1'</span>
+<span class="kw1">RECONFIGURE</span>
+GO
+&nbsp;
+<span class="kw1">EXECUTE</span> <span class="kw3">sp_configure</span> <span class="st0">'show advanced options'</span>, <span class="nu0">0</span>
+<span class="kw1">RECONFIGURE</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXECUTE sp_configure 'show advanced options', 1
+RECONFIGURE
+GO
+ 
+EXECUTE sp_configure 'xp_cmdshell', '1'
+RECONFIGURE
+GO
+ 
+EXECUTE sp_configure 'show advanced options', 0
+RECONFIGURE
+GO</pre></div></div>
+
+<p>If you prefer the GUI, you can also use that, right click on the database server name in SSMS, select Facets, from the Facet dropdown select Surface Area Configuration. You will see the following Facet properties</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/Facets.PNG?mtime=1355339984"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/Facets.PNG?mtime=1355339984" width="665" height="531" /></a></div>
+<p>Here you can enable or disable the features you are interested in. You can also export these properties as a policy to use on other servers so that the features are the same on all your servers</p>
+<h2>Installing everything by default</h2>
+<p>Here I have mixed feelings myself about what to do. On one hand I don&#8217;t like to install SSAS or SSRS if there is no need for it, on the other hand I don&#8217;t feel like adding that stuff 6 months down the road if there is suddenly a need for it. If I do install it, I make sure it at least doesn&#8217;t run by default but it is disabled. There is no benefit in having SSAS, SSRS or SSIS running and using CPU cycles as well as RAM if nobody is using these services. If you do install it and nobody uses it, disable the services, you will have more RAM and CPU cycles for the SQL Server service available.</p>
+<p>That is all for day thirteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/features-enabled-that-are-not/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

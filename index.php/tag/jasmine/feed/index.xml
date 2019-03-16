@@ -1,0 +1,2018 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>jasmine &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/jasmine/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>A Custom Jasmine Runner to find my slowest Specs</title>
+		<link>/index.php/webdev/a-custom-jasmine-runner-to-find-my-slowest-specs/</link>
+		<comments>/index.php/webdev/a-custom-jasmine-runner-to-find-my-slowest-specs/#respond</comments>
+		<pubDate>Wed, 21 Dec 2016 13:01:04 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Web Developer]]></category>
+		<category><![CDATA[jasmine]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[phantomjs]]></category>
+
+		<guid isPermaLink="false">/?p=4752</guid>
+		<description><![CDATA[I&#8217;ve been playing around lately with a pure command-line Jasmine runner that doesn&#8217;t rely on a SpecRunner file to run tests. I work daily with a largish application that is well over 100K lines of front-end code and greater than 7000 front-end tests. Over time as the codebase and test count has grown, our Continuous [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;ve been playing around lately with a pure command-line Jasmine runner that doesn&#8217;t rely on a SpecRunner file to run tests. I work daily with a largish application that is well over 100K lines of front-end code and greater than 7000 front-end tests. Over time as the codebase and test count has grown, our Continuous Integration environment has continued to get slower. While build servers like Jenkins and TeamCity provide some analytics around slow tests, there is still some digging involved to identify the best targets for improvement, something I&#8217;m hoping a local runner can make easier.</p>
+<p>Sample code for this post: <a href="https://github.com/tarwn/townthing/blob/master/tools/jasmine2-runner/jasmine2-runner.js">tools/jasmine2-runner/jasmine2-runner.js</a> (embedded in a sample project named &#8220;townthing&#8221;).</p>
+<p>I&#8217;ve taken a very small project I&#8217;ve used in prior posts on <a href="/index.php/webdev/uidevelopment/javascript/continuous-javascript-testing-with-karma/" title="Continuous Javascript Testing with Karma ">Karma</a> and <a href="/index.php/webdev/continuous-javascript-test-execution-with-wallabyjs/" title="Continuous Javascript Test Execution with WallabyJS">WallabyJS</a> and written a reusable Jasmine console runner, relying on Phantom 2, that creates a set of statistics as it runs and tries to identify the slowest set of tests in the set without pushing it to a remote server.</p>
+<h2>What are my slowest tests?</h2>
+<p>My test project is small enough that I won&#8217;t learn that much new, but it&#8217;s big enough to serve as an example.</p>
+<p>I have Phantom installed locally and in my path, so to run the tests I can do this:</p>
+<p><code>phantomjs.exe .\tools\jasmine2-runner\jasmine2-runner.js "['../test/compass.spec', '../test/tile.spec', '../test/tree.spec', '../test/weather.spec']"</code></p>
+<p>The sample code uses requirejs, so I&#8217;m passing in an array of specs that will be used in a define statement prior to running jasmine.</p>
+<p>The results from running this look like:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+</pre></td><td class="de1"><pre class="de1">jasmine started
+suiteDone [0.003s,10/10] : compass
+suiteDone [0.175s,19/19] : tile
+suiteDone [0.003s,8/8] : tree
+suiteDone [0.007s,31/31] : weather
+68/68 specs in 0.203s
+-----------------------------------------------------------------
+68 tests passed in 0.186s
+Average Time: 0.003s
+Standard Deviation: 0.004s
+28% (19) of the tests account for 90% of the overall time.
+15% (10) of the tests account for 50% of the overall time.
+-----------------------------------------------------------------
+Slowest Tests:
+&nbsp;[ &nbsp; &nbsp;0.014s]: tile -&gt; getEvaporationAmount -&gt; should be 0 if there are no trees and the terrain doesn't have dry evaporation
+&nbsp;[ &nbsp; &nbsp;0.010s]: tile -&gt; getEvaporationAmount -&gt; should be the terrain's evaporation if there are no trees
+&nbsp;[ &nbsp; &nbsp;0.010s]: tile -&gt; canSupportAdditionalTrees -&gt; should support additional trees if there is enough average rainfall for grass, existing trees, and a new tree
+&nbsp;[ &nbsp; &nbsp;0.009s]: tile -&gt; onGrow -&gt; should provide full amount of water to trees if available after watering the terrain
+&nbsp;[ &nbsp; &nbsp;0.009s]: tile -&gt; canSupportDryGrass -&gt; should be able to support dry grass when there is enough averageRainfall available
+&nbsp;[ &nbsp; &nbsp;0.009s]: tile -&gt; canSupportGrass -&gt; should be able to support grass when there is enough averageRainfall available
+&nbsp;[ &nbsp; &nbsp;0.009s]: tile -&gt; getPlantConsumptionAmount -&gt; should be 0 when the terrain doesn't require any water and there are no trees
+&nbsp;[ &nbsp; &nbsp;0.009s]: tile -&gt; canSupportAdditionalTrees -&gt; should not support a tree if there is not enough average rainfall for grass and new tree
+&nbsp;[ &nbsp; &nbsp;0.009s]: tile -&gt; onGrow -&gt; should evenly split remainder of water if there is not enough left after watering the terrain</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">jasmine started
+suiteDone [0.003s,10/10] : compass
+suiteDone [0.175s,19/19] : tile
+suiteDone [0.003s,8/8] : tree
+suiteDone [0.007s,31/31] : weather
+68/68 specs in 0.203s
+-----------------------------------------------------------------
+68 tests passed in 0.186s
+Average Time: 0.003s
+Standard Deviation: 0.004s
+28% (19) of the tests account for 90% of the overall time.
+15% (10) of the tests account for 50% of the overall time.
+-----------------------------------------------------------------
+Slowest Tests:
+ [    0.014s]: tile -&gt; getEvaporationAmount -&gt; should be 0 if there are no trees and the terrain doesn't have dry evaporation
+ [    0.010s]: tile -&gt; getEvaporationAmount -&gt; should be the terrain's evaporation if there are no trees
+ [    0.010s]: tile -&gt; canSupportAdditionalTrees -&gt; should support additional trees if there is enough average rainfall for grass, existing trees, and a new tree
+ [    0.009s]: tile -&gt; onGrow -&gt; should provide full amount of water to trees if available after watering the terrain
+ [    0.009s]: tile -&gt; canSupportDryGrass -&gt; should be able to support dry grass when there is enough averageRainfall available
+ [    0.009s]: tile -&gt; canSupportGrass -&gt; should be able to support grass when there is enough averageRainfall available
+ [    0.009s]: tile -&gt; getPlantConsumptionAmount -&gt; should be 0 when the terrain doesn't require any water and there are no trees
+ [    0.009s]: tile -&gt; canSupportAdditionalTrees -&gt; should not support a tree if there is not enough average rainfall for grass and new tree
+ [    0.009s]: tile -&gt; onGrow -&gt; should evenly split remainder of water if there is not enough left after watering the terrain</pre></div></div>
+
+<p>So from the top:</p>
+<ul>
+<li>I show the top suite names, so I have feedback on larger codebases</li>
+<li>I get a X/Y specs in Z time overview, to help me see how long the test run took and how much was successful</li>
+<li>Stats: general statistics on just the passing tests and the number of tests responsible for 50% and 90% of the runtime</li>
+<li>Spec list: the tests responsible for 50% of the runtime, by runtime descending</li>
+</ul>
+<p>There are several things we learn from this run:</p>
+<ul>
+<li>A small number of tests (15%) account for half of the overall time (<a href="https://en.wikipedia.org/wiki/Pareto_principle">Pareto Principle<a/>) </li>
+<li>All of those 15% belong to the same top-level suite</li>
+<li>There is ~.017s between the total from the specs and the overall run time</li>
+</ul>
+<p>I don&#8217;t know if that ~0.017 is normal, but I&#8217;ve seen some fairly large numbers sneak our of other codebases where beforeEach logic was set at entirely too high a level, code was running outside the specs, and so on and in this case it&#8217;s low enough I wouldn&#8217;t focus on it. My first stop would be seeing what is going on with the tile class and suite, since that feels like more of a systematic issue across the whole suite than an individual test issue.</p>
+<h2>How it works (and how to re-use it)</h2>
+<p>This runner is not ready for drop-in use with another project, but it&#8217;s also not that far off. </p>
+<p>In a nutshell, the script opens a Phantom page with minimal HTML and no URL. It then injects in jasmine, <a href="/index.php/webdev/uidevelopment/javascript/unit-testing-with-jasmine-2-0-and-require-js/" title="Unit Testing with Jasmine 2.0 and Require.JS">a jasmine bootloader for RequireJS</a>, a custom console runner, requireJS, a requireJS configuration, and then a script that require()&#8217;s the passed in spec list before running window.execute to run the tests. </p>
+<p>The custom console runner takes care of capturing results from the tests and passes them back via the console log, which is captured in the outer phantom script for processing. The top-level suite output flows out as each suite is finished, but the stats wait until the full suite has run to minimize delays that show up if you interact with the console too heavily/frequently.</p>
+<p>Here is that runner:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> Runner <span class="sy0">=</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; execute<span class="sy0">:</span> <span class="kw1">function</span><span class="br0">&#40;</span>callback<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> page <span class="sy0">=</span> require<span class="br0">&#40;</span><span class="st0">'webpage'</span><span class="br0">&#41;</span>.<span class="me1">create</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; page.<span class="me1">onConsoleMessage</span> <span class="sy0">=</span> <span class="kw1">function</span><span class="br0">&#40;</span>msg<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// … handle console output coming back from console worker</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// build some fake content instead of using a real file/URL</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> expectedContent <span class="sy0">=</span> <span class="st0">'&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;'</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> expectedLocation <span class="sy0">=</span> <span class="st0">'file:///'</span> <span class="sy0">+</span> fs.<span class="me1">workingDirectory</span> <span class="sy0">+</span> <span class="st0">'/'</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; page.<span class="me1">setContent</span><span class="br0">&#40;</span>expectedContent<span class="sy0">,</span> expectedLocation<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// standard files</span>
+&nbsp; &nbsp; &nbsp; &nbsp; page.<span class="me1">injectJs</span><span class="br0">&#40;</span><span class="st0">'town/js/lib/jasmine-2.0.0/jasmine.js'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; page.<span class="me1">injectJs</span><span class="br0">&#40;</span><span class="st0">'town/js/lib/jasmine-2.0.0/jasmine-html.js'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; page.<span class="me1">injectJs</span><span class="br0">&#40;</span><span class="st0">'jasmine2-runner-boot.js'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// inject reporter</span>
+&nbsp; &nbsp; &nbsp; &nbsp; page.<span class="me1">injectJs</span><span class="br0">&#40;</span><span class="st0">'console_reporter.js'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; page.<span class="me1">evaluate</span><span class="br0">&#40;</span><span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; jasmine.<span class="me1">addReporter</span><span class="br0">&#40;</span><span class="kw1">new</span> jasmineReporters.<span class="me1">ConsoleReporter</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// inject additional required files</span>
+&nbsp; &nbsp; &nbsp; &nbsp; page.<span class="me1">injectJs</span><span class="br0">&#40;</span><span class="st0">'town/js/lib/require-2.1.11.js'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// execute provided spec list</span>
+&nbsp; &nbsp; &nbsp; &nbsp; page.<span class="me1">evaluate</span><span class="br0">&#40;</span><span class="kw1">function</span><span class="br0">&#40;</span>specs<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// project's requirejs config for tests</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; require.<span class="me1">config</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; baseUrl<span class="sy0">:</span> <span class="st0">&quot;town/js/src&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paths<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;knockout&quot;</span><span class="sy0">:</span> <span class="st0">&quot;../lib/knockout-3.0.0&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;Squire&quot;</span><span class="sy0">:</span> <span class="st0">&quot;../lib/Squire&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; require<span class="br0">&#40;</span>specs<span class="sy0">,</span> <span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; window.<span class="me1">executeTests</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">,</span> files<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var Runner = {
+    execute: function(callback){
+
+        var page = require('webpage').create();
+
+        page.onConsoleMessage = function(msg) {
+            // … handle console output coming back from console worker
+        };
+
+        // build some fake content instead of using a real file/URL
+        var expectedContent = '&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;';
+        var expectedLocation = 'file:///' + fs.workingDirectory + '/';
+        page.setContent(expectedContent, expectedLocation);
+
+        // standard files
+        page.injectJs('town/js/lib/jasmine-2.0.0/jasmine.js');
+        page.injectJs('town/js/lib/jasmine-2.0.0/jasmine-html.js');
+        page.injectJs('jasmine2-runner-boot.js');
+
+        // inject reporter
+        page.injectJs('console_reporter.js');
+        page.evaluate(function(){
+            jasmine.addReporter(new jasmineReporters.ConsoleReporter());
+        });
+
+        // inject additional required files
+        page.injectJs('town/js/lib/require-2.1.11.js');
+
+        // execute provided spec list
+        page.evaluate(function(specs){
+
+            // project's requirejs config for tests
+            require.config({
+                baseUrl: "town/js/src",
+                paths: {
+                    "knockout": "../lib/knockout-3.0.0",
+                    "Squire": "../lib/Squire"
+                }
+            });
+
+            require(specs, function(){
+                window.executeTests();
+            });
+
+        }, files);
+    }
+};</pre></div></div>
+
+<p>The statistics form the console runner are passed to a Processor class that flattens out the suite and spec hierarchy, sorts them by execution time, and then calculates the statistics we saw above.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> StatsProcessor <span class="sy0">=</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; evaluate<span class="sy0">:</span> <span class="kw1">function</span><span class="br0">&#40;</span>rawStats<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> flatStats <span class="sy0">=</span> <span class="br0">&#91;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> flatSuites <span class="sy0">=</span> <span class="br0">&#91;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; StatsProcessor.<span class="me1">flattenSpecs</span><span class="br0">&#40;</span><span class="st0">&quot;&quot;</span><span class="sy0">,</span> rawStats<span class="sy0">,</span> flatStats<span class="sy0">,</span> flatSuites<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> sortedFlatStats <span class="sy0">=</span> flatStats.<span class="me1">sort</span><span class="br0">&#40;</span><span class="kw1">function</span><span class="br0">&#40;</span>a<span class="sy0">,</span>b<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// sort descending by execution time</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> b.<span class="me1">executionTime</span> <span class="sy0">-</span> a.<span class="me1">executionTime</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> averages <span class="sy0">=</span> StatsProcessor.<span class="me1">getAverages</span><span class="br0">&#40;</span>flatStats<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span>averages.<span class="me1">total</span> <span class="sy0">&gt;</span> <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> fiftyPercentOfTotalIndex <span class="sy0">=</span> StatsProcessor.<span class="me1">getPercentOfTotalIndex</span><span class="br0">&#40;</span>sortedFlatStats<span class="sy0">,</span> averages<span class="sy0">,</span> <span class="nu0">0.50</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> ninetyPercentOfTotalIndex <span class="sy0">=</span> StatsProcessor.<span class="me1">getPercentOfTotalIndex</span><span class="br0">&#40;</span>sortedFlatStats<span class="sy0">,</span> averages<span class="sy0">,</span> <span class="nu0">0.90</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; averageExecutionTime<span class="sy0">:</span> averages.<span class="me1">average</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; standardDeviation<span class="sy0">:</span> averages.<span class="me1">standardDeviation</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; totalExecutionTime<span class="sy0">:</span> averages.<span class="me1">total</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; totalCount<span class="sy0">:</span> sortedFlatStats.<span class="me1">length</span><span class="sy0">,</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; fiftyPercent<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; numberOfTests<span class="sy0">:</span> fiftyPercentOfTotalIndex <span class="sy0">+</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ninetyPercent<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; numberOfTests<span class="sy0">:</span> ninetyPercentOfTotalIndex <span class="sy0">+</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; specs<span class="sy0">:</span> sortedFlatStats &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">else</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="nu0">0</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp;
+&nbsp; &nbsp; flattenSpecs<span class="sy0">:</span> <span class="kw1">function</span><span class="br0">&#40;</span>description<span class="sy0">,</span> stats<span class="sy0">,</span> flatStats<span class="sy0">,</span> flatSuites<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// … work …</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp;
+&nbsp; &nbsp; getAverages<span class="sy0">:</span> <span class="kw1">function</span><span class="br0">&#40;</span>flatStats<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// … calculate avg and stddev …</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp;
+&nbsp; &nbsp; getPercentOfTotalIndex<span class="sy0">:</span> <span class="kw1">function</span><span class="br0">&#40;</span>sortedFlatStats<span class="sy0">,</span> averages<span class="sy0">,</span> percentage<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// … find tests that are responsiblce for _percentage_ of execution time …</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var StatsProcessor = {
+    evaluate: function(rawStats){
+        var flatStats = [];
+        var flatSuites = [];
+        StatsProcessor.flattenSpecs("", rawStats, flatStats, flatSuites);
+        var sortedFlatStats = flatStats.sort(function(a,b){
+            // sort descending by execution time
+            return b.executionTime - a.executionTime;
+        });
+
+        var averages = StatsProcessor.getAverages(flatStats);
+        if(averages.total &gt; 0){
+            var fiftyPercentOfTotalIndex = StatsProcessor.getPercentOfTotalIndex(sortedFlatStats, averages, 0.50);
+            var ninetyPercentOfTotalIndex = StatsProcessor.getPercentOfTotalIndex(sortedFlatStats, averages, 0.90);
+
+            return {
+                averageExecutionTime: averages.average,
+                standardDeviation: averages.standardDeviation,
+                totalExecutionTime: averages.total,
+                totalCount: sortedFlatStats.length,
+
+                fiftyPercent: {
+                    numberOfTests: fiftyPercentOfTotalIndex + 1
+                },
+                ninetyPercent: {
+                    numberOfTests: ninetyPercentOfTotalIndex + 1
+                },
+
+                specs: sortedFlatStats          
+            };
+        }
+        else{
+            return 0;
+        }
+    },
+
+    flattenSpecs: function(description, stats, flatStats, flatSuites){
+        // … work …
+    },
+
+    getAverages: function(flatStats){
+        // … calculate avg and stddev …
+    },
+
+    getPercentOfTotalIndex: function(sortedFlatStats, averages, percentage){
+        // … find tests that are responsiblce for _percentage_ of execution time …
+    }
+};</pre></div></div>
+
+<p>Finally, we glue the two together in a simple statement:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">Runner.<span class="me1">execute</span><span class="br0">&#40;</span><span class="kw1">function</span><span class="br0">&#40;</span>result<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> stats <span class="sy0">=</span> StatsProcessor.<span class="me1">evaluate</span><span class="br0">&#40;</span>result<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="coMULTI">/* … display stats output … */</span>
+&nbsp;
+&nbsp; &nbsp; phantom.<span class="me1">exit</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Runner.execute(function(result){
+    var stats = StatsProcessor.evaluate(result);
+
+    /* … display stats output … */
+
+    phantom.exit();
+});</pre></div></div>
+
+<p>Customizing this for other projects is relatively easy, and I&#8217;ll probably work on making it easier to reuse as a I have more time. Right now the main things you need to do are:</p>
+<ul>
+<li>Replace the jasmine paths with ones that make sense for your project</li>
+<li>Replace the &#8220;inject additional required files&#8221; section with the additional dependencies you need</li>
+<li>Update the &#8220;execute provided spec list&#8221; section to match how you run tests</li>
+</ul>
+<p>You will also want to download the runner, console-reporter, and jasmine bootloader from <a href="https://github.com/tarwn/townthing/tree/master/tools/jasmine2-runner" title="jasmine runner folder in github/tarwn/townthing">github</a>.</p>
+<p>For instance, if you are using a basic SpecRunner.html file with the spec and source files listed in script tags, you could drop these in the &#8220;inject additional required files&#8221; section and replace the &#8220;execute provided spec list&#8221; with just a single call to &#8220;windows.executeTests()&#8221;.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/a-custom-jasmine-runner-to-find-my-slowest-specs/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Javascript Test Execution with WallabyJS</title>
+		<link>/index.php/webdev/continuous-javascript-test-execution-with-wallabyjs/</link>
+		<comments>/index.php/webdev/continuous-javascript-test-execution-with-wallabyjs/#respond</comments>
+		<pubDate>Thu, 13 Oct 2016 19:53:07 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Web Developer]]></category>
+		<category><![CDATA[jasmine]]></category>
+		<category><![CDATA[javascript]]></category>
+		<category><![CDATA[requirejs]]></category>
+		<category><![CDATA[unit testing]]></category>
+		<category><![CDATA[wallabyjs]]></category>
+
+		<guid isPermaLink="false">/?p=4676</guid>
+		<description><![CDATA[After working with NCrunch building and running tests in the background for the last several years, it feels like something is broken when I have to wait for test results or push a button to start running them. JavaScript runners just didn&#8217;t feel like they provided the same level of development feedback, whether they were [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>After working with NCrunch building and running tests in the background for the last several years, it feels like something is broken when I have to wait for test results or push a button to start running them. JavaScript runners just didn&#8217;t feel like they provided the same level of development feedback, whether they were command-line runners with gulp tasks, plugins like Chutzpah, or dedicated runners like Karma.</p>
+<p><em>I&#8217;ve posted previously on both <a href="/index.php/enterprisedev/unittest/reducing-code-build-test-friction/">NCrunch</a> and <a href="/index.php/webdev/uidevelopment/javascript/continuous-javascript-testing-with-karma/">Karma</a>, test runners that run .Net and Javascript code continuously behind the scenes as you develop.</em></p>
+<p><a href="https://wallabyjs.com/">WallabyJS</a> is like NCrunch for Javascript. It radiates test statuses directly in your IDE as you edit your code, letting you know what&#8217;s workign and not working without any extra action. No switching to a secondary screen or manually running and waiting for results. It has wide support, integrating with the IntelliJ platform, Visual Studio, Visual Studio Code, Sublime, and more. </p>
+<p>I used this sample project throughout the post: <A href="https://github.com/tarwn/townthing">github.com/tarwn/townthing</a>. It is a small sandbox project that uses RequireJS and had been configured for Karma as well as having a Jasmine SpecRunner for running the tests in the browser. Hopefully this means Wallaby will be able to slide right in.</p>
+<h2>From Zero to Wallaby, in Visual Studio Code</h2>
+<p>First step, open Visual Studio Code and install the extension: ext install wallaby-vscode</p>
+<p>Wallaby has a really easy to follow &#8220;getting started&#8221; guide that I mostly ignored: <A href="https://wallabyjs.com/docs/config/overview.html">https://wallabyjs.com/docs/config/overview.html</a></p>
+<p>I didn&#8217;t pay a lot of attention, but jumped straight to pushing Ctrl+Shift+R, R after installing the extension. It prompted me to identify a config file (I created an empty &#8220;wallaby.js&#8221; file), then upset my firewall briefly by running node.js (which I allowed).</p>
+<p>I then created my wallaby.js configuration using a short example of using wallaby with RequireJS: <a href="https://github.com/wallabyjs/wallaby-requirejs-sample">github.com/wallabyjs/wallaby-requirejs-sample</a></p>
+<p><b>wallaby.js</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1">module.<span class="me1">exports</span> <span class="sy0">=</span> <span class="kw1">function</span> <span class="br0">&#40;</span>wallaby<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; <span class="kw1">return</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; files<span class="sy0">:</span> <span class="br0">&#91;</span>
+&nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span> pattern<span class="sy0">:</span> <span class="st0">'town/js/lib/require-2.1.11.js'</span><span class="sy0">,</span> instrument<span class="sy0">:</span> <span class="kw2">false</span> <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span> pattern<span class="sy0">:</span> <span class="st0">'town/js/lib/*.js'</span><span class="sy0">,</span> load<span class="sy0">:</span> <span class="kw2">false</span> <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span> pattern<span class="sy0">:</span> <span class="st0">'town/js/src/*.js'</span><span class="sy0">,</span> load<span class="sy0">:</span> <span class="kw2">false</span> <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span> pattern<span class="sy0">:</span> <span class="st0">'town/js/test/test-main.js'</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#93;</span><span class="sy0">,</span>
+&nbsp;
+&nbsp; &nbsp; tests<span class="sy0">:</span> <span class="br0">&#91;</span>
+&nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span> pattern<span class="sy0">:</span> <span class="st0">'town/js/test/*.spec.js'</span><span class="sy0">,</span> load<span class="sy0">:</span> <span class="kw2">false</span> <span class="br0">&#125;</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="br0">&#93;</span><span class="sy0">,</span>
+&nbsp;
+&nbsp; &nbsp; testFramework<span class="sy0">:</span> <span class="st0">'jasmine'</span>
+&nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">module.exports = function (wallaby) {
+  return {
+    files: [
+      { pattern: 'town/js/lib/require-2.1.11.js', instrument: false },
+      { pattern: 'town/js/lib/*.js', load: false },
+      { pattern: 'town/js/src/*.js', load: false },
+      { pattern: 'town/js/test/test-main.js' }
+    ],
+
+    tests: [
+      { pattern: 'town/js/test/*.spec.js', load: false },
+    ],
+
+    testFramework: 'jasmine'
+  };
+};</pre></div></div>
+
+<p>This identifies all the files and tests for wallaby, but tells it not to actually load anything but RequireJS and and my RequireJS configuration (tets-main.js).</p>
+<p>Currently, my test main is focused on running karma, but we can easily switch it to be able to run either.</p>
+<p><b>test-main.js</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> tests <span class="sy0">=</span> <span class="br0">&#91;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">var</span> baseUrl <span class="sy0">=</span> <span class="st0">''</span><span class="sy0">;</span>
+<span class="kw1">var</span> isUsingKarma <span class="sy0">=</span> <span class="br0">&#40;</span>window.__karma__ <span class="sy0">!=</span> <span class="kw2">undefined</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">var</span> isUsingWallaby <span class="sy0">=</span> <span class="br0">&#40;</span>wallaby <span class="sy0">!=</span> <span class="kw2">undefined</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">if</span><span class="br0">&#40;</span>isUsingKarma<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; baseUrl <span class="sy0">=</span> <span class="st0">'/base/src'</span><span class="sy0">;</span>
+&nbsp; <span class="kw1">for</span> <span class="br0">&#40;</span><span class="kw1">var</span> file <span class="kw1">in</span> window.__karma__.<span class="me1">files</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>window.__karma__.<span class="me1">files</span>.<span class="kw3">hasOwnProperty</span><span class="br0">&#40;</span>file<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span><span class="co2">/spec\.js$/</span>.<span class="me1">test</span><span class="br0">&#40;</span>file<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; tests.<span class="me1">push</span><span class="br0">&#40;</span>file<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span>
+<span class="kw1">else</span> <span class="kw1">if</span><span class="br0">&#40;</span>isUsingWallaby<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; baseUrl <span class="sy0">=</span> <span class="st0">'/town/js/src'</span><span class="sy0">;</span>
+&nbsp; wallaby.<span class="me1">delayStart</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; tests <span class="sy0">=</span> wallaby.<span class="me1">tests</span><span class="sy0">;</span> &nbsp;
+<span class="br0">&#125;</span>
+&nbsp;
+requirejs.<span class="me1">config</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; <span class="co1">// Karma serves files from '/base'</span>
+&nbsp; baseUrl<span class="sy0">:</span> baseUrl<span class="sy0">,</span>
+&nbsp;
+&nbsp; paths<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="st0">&quot;knockout&quot;</span><span class="sy0">:</span> <span class="st0">&quot;../lib/knockout-3.0.0&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="st0">&quot;Squire&quot;</span><span class="sy0">:</span> <span class="st0">&quot;../lib/Squire&quot;</span>
+&nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="co1">// Let's get started!</span>
+require<span class="br0">&#40;</span>tests<span class="sy0">,</span> <span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp;
+&nbsp; <span class="kw1">if</span><span class="br0">&#40;</span>isUsingKarma<span class="br0">&#41;</span>
+&nbsp; &nbsp; window.__karma__.<span class="me1">start</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; <span class="kw1">else</span> <span class="kw1">if</span><span class="br0">&#40;</span>isUsingWallaby<span class="br0">&#41;</span>
+&nbsp; &nbsp; wallaby.<span class="me1">start</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var tests = [];
+
+var baseUrl = '';
+var isUsingKarma = (window.__karma__ != undefined);
+var isUsingWallaby = (wallaby != undefined);
+
+if(isUsingKarma){
+  baseUrl = '/base/src';
+  for (var file in window.__karma__.files) {
+    if (window.__karma__.files.hasOwnProperty(file)) {
+      if (/spec\.js$/.test(file)) {
+        tests.push(file);
+      }
+    }
+  }
+}
+else if(isUsingWallaby){
+  baseUrl = '/town/js/src';
+  wallaby.delayStart();
+  tests = wallaby.tests;  
+}
+
+requirejs.config({
+  // Karma serves files from '/base'
+  baseUrl: baseUrl,
+
+  paths: {
+    "knockout": "../lib/knockout-3.0.0",
+    "Squire": "../lib/Squire"
+  }
+});
+
+// Let's get started!
+require(tests, function(){
+
+  if(isUsingKarma)
+  	window.__karma__.start();
+  else if(isUsingWallaby)
+    wallaby.start();
+
+});</pre></div></div>
+
+<p>The key parts are to ensure I delay wallaby to start, set the test collection and baseUrl for requireJS, then start the tests inside a require statement at the end.</p>
+<p><i>Note: I did manage to completely lock up Visual Studio Code while updating the test-main file, but I&#8217;m not sure if that was VS Code&#8217;s fault or Wallaby&#8217;s</i></p>
+<p>And there we go. As I type my code in the editor, I get instant notifications of errors (including some handy hover boxes with details) and my test markers turn green/red as I fix and break tests.</p>
+<p>Here is the working code:<br />
+<div id="attachment_4678" style="width: 810px" class="wp-caption alignleft"><a href="/wp-content/uploads/2016/10/PassingTests.png"><img src="/wp-content/uploads/2016/10/PassingTests-1024x338.png" alt="Passing Tests w/ Inline Markers and Wallaby Console" width="800"" class="size-large wp-image-4678" srcset="/wp-content/uploads/2016/10/PassingTests-1024x338.png 1024w, /wp-content/uploads/2016/10/PassingTests-300x99.png 300w" sizes="(max-width: 1024px) 100vw, 1024px" /></a><p class="wp-caption-text">Passing Tests w/ Inline Markers and Wallaby Console</p></div></p>
+<p>and now when I add a &#8220;+ 1&#8221; to the end of the line without even saving the file, the test marker turns red and I get instant results in the console below:<br />
+<div id="attachment_4679" style="width: 810px" class="wp-caption alignleft"><a href="/wp-content/uploads/2016/10/FailingTests.png"><img src="/wp-content/uploads/2016/10/FailingTests-1024x436.png" alt="Failing Tests - Red Marker, Clickable Console Details" width="800" class="size-large wp-image-4679" srcset="/wp-content/uploads/2016/10/FailingTests-1024x436.png 1024w, /wp-content/uploads/2016/10/FailingTests-300x127.png 300w" sizes="(max-width: 1024px) 100vw, 1024px" /></a><p class="wp-caption-text">Failing Tests &#8211; Red Marker, Clickable Console Details</p></div></p>
+<p>This is much closer to the experience you get with NCrunch and Visual Studio Code is actually a more limited wallaby experience than other editors. The setup was quicker than karma, even though I&#8217;ve setup karma more times. If you work in Javascript daily, this is definitely worth a long look.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/continuous-javascript-test-execution-with-wallabyjs/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Stop Manually Updating Your Jasmine SpecRunner</title>
+		<link>/index.php/webdev/stop-manually-updating-your-jasmine-specrunner/</link>
+		<comments>/index.php/webdev/stop-manually-updating-your-jasmine-specrunner/#respond</comments>
+		<pubDate>Thu, 06 Oct 2016 12:29:16 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Web Developer]]></category>
+		<category><![CDATA[Gulp]]></category>
+		<category><![CDATA[jasmine]]></category>
+		<category><![CDATA[requirejs]]></category>
+
+		<guid isPermaLink="false">/?p=4674</guid>
+		<description><![CDATA[I&#8217;ve used a number of test frameworks and runners over the years, but my first club out of the bag is still running a SpecRunner file in the browser, with all of the dev tools and console output I&#8217;m used to from normal debugging sessions. The painful bit has always been manually keeping the SpecRunner [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;ve used a number of test frameworks and runners over the years, but my first club out of the bag is still running a SpecRunner file in the browser, with all of the dev tools and console output I&#8217;m used to from normal debugging sessions. The painful bit has always been manually keeping the SpecRunner file up to date and forgetting every 3rd or 4th file. Having the SpecRunner is valuable, manually context switching to catch it up over and over is not. So let&#8217;s automate it away.</p>
+<p>In a prior post, I used gulp to keep my static assets up to date while running a self-hosted website: <a href="/index.php/webdev/self-hosted-web-updating-assets-without-restarting-the-debugger/">Self-Hosted Web – Updating assets without restarting the debugger</a></p>
+<p>This post will use a similar approach, using gulp &#8220;watch&#8221; to watch for changes to *.spec.js files in the filesystem and rebuilding a list of specs in a RequireJS define statement, so we automatically will have an up-to-date spec list every time we add or remove a spec file, with no manual editing required.</p>
+<p><em>Note: Examples all use Jasmine and RequireJS throughout the post</em></p>
+<h2>Using Gulp to Create the Spec List</h2>
+<p>Here&#8217;s a sample SpecRunner file that&#8217;s relying on RequireJS to define the specs:</p>
+<p><b>SpecRunner.html</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+</pre></td><td class="de1"><pre class="de1"><span class="sy0">&lt;!</span>DOCTYPE html<span class="sy0">&gt;</span>
+<span class="sy0">&lt;</span>html<span class="sy0">&gt;</span>
+<span class="sy0">&lt;</span>head<span class="sy0">&gt;</span>
+&nbsp; <span class="sy0">&lt;</span>meta charset<span class="sy0">=</span><span class="st0">&quot;utf-8&quot;</span><span class="sy0">&gt;</span>
+&nbsp; <span class="sy0">&lt;</span>title<span class="sy0">&gt;</span>Jasmine Spec Runner v2.4.1<span class="sy0">&lt;/</span>title<span class="sy0">&gt;</span>
+&nbsp;
+&nbsp; <span class="sy0">&lt;</span>link rel<span class="sy0">=</span><span class="st0">&quot;shortcut icon&quot;</span> type<span class="sy0">=</span><span class="st0">&quot;image/png&quot;</span> href<span class="sy0">=</span><span class="st0">&quot;lib/jasmine-2.4.1/jasmine_favicon.png&quot;</span><span class="sy0">&gt;</span>
+&nbsp; <span class="sy0">&lt;</span>link rel<span class="sy0">=</span><span class="st0">&quot;stylesheet&quot;</span> href<span class="sy0">=</span><span class="st0">&quot;lib/jasmine-2.4.1/jasmine.css&quot;</span><span class="sy0">&gt;</span>
+&nbsp;
+&nbsp; <span class="sy0">&lt;</span>script src<span class="sy0">=</span><span class="st0">&quot;lib/jasmine-2.4.1/jasmine.js&quot;</span><span class="sy0">&gt;&lt;/</span>script<span class="sy0">&gt;</span>
+&nbsp; <span class="sy0">&lt;</span>script src<span class="sy0">=</span><span class="st0">&quot;lib/jasmine-2.4.1/jasmine-html.js&quot;</span><span class="sy0">&gt;&lt;/</span>script<span class="sy0">&gt;</span>
+&nbsp; <span class="sy0">&lt;</span>script src<span class="sy0">=</span><span class="st0">&quot;lib/jasmine-2.4.1/boot-without-onload.js&quot;</span><span class="sy0">&gt;&lt;/</span>script<span class="sy0">&gt;</span>
+&nbsp;
+&nbsp; <span class="sy0">&lt;</span>script src<span class="sy0">=</span><span class="st0">&quot;../libs/require.js&quot;</span><span class="sy0">&gt;&lt;/</span>script<span class="sy0">&gt;</span>
+&nbsp; <span class="sy0">&lt;</span>script src<span class="sy0">=</span><span class="st0">&quot;main.js&quot;</span><span class="sy0">&gt;&lt;/</span>script<span class="sy0">&gt;</span>
+&nbsp;
+&nbsp; <span class="sy0">&lt;</span>script type<span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span><span class="sy0">&gt;</span>
+&nbsp; &nbsp; &nbsp; <span class="co1">// import the specs list</span>
+&nbsp; &nbsp; &nbsp; require<span class="br0">&#40;</span><span class="br0">&#91;</span><span class="st0">&quot;../tests/allSpecs&quot;</span><span class="br0">&#93;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; window.<span class="me1">executeTests</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; <span class="sy0">&lt;/</span>script<span class="sy0">&gt;</span>
+&nbsp;
+<span class="sy0">&lt;/</span>head<span class="sy0">&gt;</span>
+<span class="sy0">&lt;</span>body<span class="sy0">&gt;</span>
+<span class="sy0">&lt;/</span>body<span class="sy0">&gt;</span>
+<span class="sy0">&lt;/</span>html<span class="sy0">&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;title&gt;Jasmine Spec Runner v2.4.1&lt;/title&gt;
+
+  &lt;link rel="shortcut icon" type="image/png" href="lib/jasmine-2.4.1/jasmine_favicon.png"&gt;
+  &lt;link rel="stylesheet" href="lib/jasmine-2.4.1/jasmine.css"&gt;
+
+  &lt;script src="lib/jasmine-2.4.1/jasmine.js"&gt;&lt;/script&gt;
+  &lt;script src="lib/jasmine-2.4.1/jasmine-html.js"&gt;&lt;/script&gt;
+  &lt;script src="lib/jasmine-2.4.1/boot-without-onload.js"&gt;&lt;/script&gt;
+
+  &lt;script src="../libs/require.js"&gt;&lt;/script&gt;
+  &lt;script src="main.js"&gt;&lt;/script&gt;
+
+  &lt;script type="text/javascript"&gt;
+      // import the specs list
+      require(["../tests/allSpecs"], function () {
+          window.executeTests();
+      });
+  &lt;/script&gt;
+
+&lt;/head&gt;
+&lt;body&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre></div></div>
+
+<p>This SpecRunner directly includes only Jasmine, RequireJS, and a set of Require configs in main.js, everything else is loaded from the &#8220;allSpecs.js&#8221; file. The custom bootloader and window.executeTests() method replace the vanilla bootloader so we can make sure we load our spec files and their dependencies before running the tests (see <a href="/index.php/webdev/uidevelopment/javascript/unit-testing-with-jasmine-2-0-and-require-js/">Unit Testing with Jasmine 2.0 and Require.JS</a> for more info).</p>
+<p>The allSpecs file is simply a list of spec files in a RequireJS define() statement (currently only the first spec file for this tiny sample project)</p>
+<p><b>allSpecs.js</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">define<span class="br0">&#40;</span><span class="br0">&#91;</span><span class="st0">'spec/siteWideViewModel.spec.js'</span><span class="sy0">,</span>
+<span class="br0">&#93;</span><span class="sy0">,</span> <span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#123;</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">define(['spec/siteWideViewModel.spec.js',
+], function(){ });</pre></div></div>
+
+<p>The advantage of doing this as a separate file is that we keep the change history for the mechanics of how we run the tests (SpecRunner) and the actual list of spec files (allSpecs) from crossing and greatly simplify future updates to the SpecRunner as newer versions of Jasmine come out as well as keep the text content we have to manage in our gulpfile to a minimum. Additionally, we can now use this &#8220;allSpecs&#8221; file in other test runners, like Karma or via a PhantomJS script, to ensure we&#8217;re running exactly the same set of tests locally and in CI.</p>
+<p>All we need now is to be able to build and maintain that allSpecs file. Using <a href="http://gulpjs.com/">Gulp</a>, we can setup a task to watch the file system for any changes to files that match a pattern of *.spec.js. When we see a change, we can grab a full list of the spec files and concatenate that into a new define statement, overwriting the allSpecs file with an updated list.</p>
+<p><b>gulpfile.js</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> gulp <span class="sy0">=</span> require<span class="br0">&#40;</span><span class="st0">'gulp'</span><span class="br0">&#41;</span><span class="sy0">,</span>
+&nbsp; &nbsp; less <span class="sy0">=</span> require<span class="br0">&#40;</span><span class="st0">'gulp-less'</span><span class="br0">&#41;</span><span class="sy0">,</span>
+&nbsp; &nbsp; watch <span class="sy0">=</span> require<span class="br0">&#40;</span><span class="st0">'gulp-watch'</span><span class="br0">&#41;</span><span class="sy0">,</span>
+&nbsp; &nbsp; insert <span class="sy0">=</span> require<span class="br0">&#40;</span><span class="st0">'gulp-insert'</span><span class="br0">&#41;</span><span class="sy0">,</span>
+&nbsp; &nbsp; concat <span class="sy0">=</span> require<span class="br0">&#40;</span><span class="st0">'gulp-concat'</span><span class="br0">&#41;</span><span class="sy0">,</span>
+&nbsp; &nbsp; concatFilenames <span class="sy0">=</span> require<span class="br0">&#40;</span><span class="st0">'gulp-concat-filenames'</span><span class="br0">&#41;</span><span class="sy0">,</span>
+&nbsp; &nbsp; argv <span class="sy0">=</span> require<span class="br0">&#40;</span><span class="st0">'yargs'</span><span class="br0">&#41;</span>.<span class="me1">argv</span><span class="sy0">;;</span>
+&nbsp;
+<span class="kw1">var</span> config <span class="sy0">=</span> <span class="br0">&#123;</span> <span class="br0">&#125;</span><span class="sy0">;</span>
+config.<span class="me1">assetsPath</span> <span class="sy0">=</span> <span class="st0">&quot;Assets&quot;</span><span class="sy0">;</span>
+config.<span class="me1">assetsOutputPath</span> <span class="sy0">=</span> <span class="br0">&#40;</span>argv.<span class="me1">output</span> <span class="sy0">||</span> <span class="st0">&quot;bin/Debug/&quot;</span><span class="br0">&#41;</span> <span class="sy0">+</span> config.<span class="me1">assetsPath</span><span class="sy0">;</span>
+&nbsp;
+gulp.<span class="me1">task</span><span class="br0">&#40;</span><span class="st0">'watch'</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// pick up new spec files and include them in the &quot;allSpec&quot; list</span>
+&nbsp; &nbsp; <span class="co1">// update one time when we start then watch for later updates</span>
+&nbsp; &nbsp; regenerateAllSpecsFile<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; gulp.<span class="me1">watch</span><span class="br0">&#40;</span><span class="br0">&#91;</span> config.<span class="me1">assetsPath</span> <span class="sy0">+</span> <span class="st0">'/tests/spec/**/*.spec.js'</span><span class="br0">&#93;</span><span class="sy0">,</span> handleSpecChanges<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">function</span> handleSpecChanges<span class="br0">&#40;</span>obj<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>obj.<span class="me1">type</span> <span class="sy0">===</span> <span class="st0">'added'</span> <span class="sy0">||</span> obj.<span class="me1">type</span> <span class="sy0">===</span> <span class="st0">'deleted'</span> <span class="sy0">||</span> obj.<span class="me1">type</span> <span class="sy0">===</span> <span class="st0">'renamed'</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; console.<span class="me1">log</span><span class="br0">&#40;</span><span class="st0">'Spec '</span> <span class="sy0">+</span> obj.<span class="me1">type</span> <span class="sy0">+</span> <span class="st0">': '</span> <span class="sy0">+</span> obj.<span class="me1">path</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; regenerateAllSpecsFile<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">function</span> regenerateAllSpecsFile<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; gulp.<span class="me1">src</span><span class="br0">&#40;</span>config.<span class="me1">assetsPath</span> <span class="sy0">+</span> <span class="st0">'/tests/spec/**/*.spec.js'</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; .<span class="me1">pipe</span><span class="br0">&#40;</span>concatFilenames<span class="br0">&#40;</span><span class="st0">'allSpecs.js'</span><span class="sy0">,</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; root<span class="sy0">:</span> config.<span class="me1">assetsPath</span> <span class="sy0">+</span> <span class="st0">&quot;/tests&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; prepend<span class="sy0">:</span> <span class="st0">&quot;'&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; append<span class="sy0">:</span> <span class="st0">&quot;',&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; .<span class="me1">pipe</span><span class="br0">&#40;</span>insert.<span class="me1">transform</span><span class="br0">&#40;</span><span class="kw1">function</span> <span class="br0">&#40;</span>contents<span class="sy0">,</span> file<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">'define(['</span> <span class="sy0">+</span> contents <span class="sy0">+</span> <span class="st0">'], function(){ });'</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; .<span class="me1">pipe</span><span class="br0">&#40;</span>gulp.<span class="me1">dest</span><span class="br0">&#40;</span>config.<span class="me1">assetsPath</span> <span class="sy0">+</span> <span class="st0">&quot;/tests&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var gulp = require('gulp'),
+    less = require('gulp-less'),
+    watch = require('gulp-watch'),
+    insert = require('gulp-insert'),
+    concat = require('gulp-concat'),
+    concatFilenames = require('gulp-concat-filenames'),
+    argv = require('yargs').argv;;
+
+var config = { };
+config.assetsPath = "Assets";
+config.assetsOutputPath = (argv.output || "bin/Debug/") + config.assetsPath;
+
+gulp.task('watch', function () {
+    // pick up new spec files and include them in the "allSpec" list
+    // update one time when we start then watch for later updates
+    regenerateAllSpecsFile();
+    gulp.watch([ config.assetsPath + '/tests/spec/**/*.spec.js'], handleSpecChanges);
+});
+
+function handleSpecChanges(obj) {
+    if (obj.type === 'added' || obj.type === 'deleted' || obj.type === 'renamed') {
+        console.log('Spec ' + obj.type + ': ' + obj.path);
+        regenerateAllSpecsFile();
+    }
+}
+
+function regenerateAllSpecsFile() {
+    gulp.src(config.assetsPath + '/tests/spec/**/*.spec.js')
+        .pipe(concatFilenames('allSpecs.js', {
+            root: config.assetsPath + "/tests",
+            prepend: "'",
+            append: "',"
+        }))
+        .pipe(insert.transform(function (contents, file) {
+            return 'define([' + contents + '], function(){ });';
+        }))
+        .pipe(gulp.dest(config.assetsPath + "/tests"));
+}</pre></div></div>
+
+<p>And there we go. Now as we add a new spec file or remove one, we don&#8217;t have to also of update our SpecRunner file, just refresh the browser, keep working, and make sure the automatically updated file is in our source control push later.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/stop-manually-updating-your-jasmine-specrunner/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Continuous Javascript Testing with Karma</title>
+		<link>/index.php/webdev/uidevelopment/javascript/continuous-javascript-testing-with-karma/</link>
+		<comments>/index.php/webdev/uidevelopment/javascript/continuous-javascript-testing-with-karma/#comments</comments>
+		<pubDate>Thu, 03 Apr 2014 15:27:39 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Unit Testing]]></category>
+		<category><![CDATA[jasmine]]></category>
+		<category><![CDATA[javascript]]></category>
+		<category><![CDATA[karma]]></category>
+		<category><![CDATA[requirejs]]></category>
+
+		<guid isPermaLink="false">/?p=2483</guid>
+		<description><![CDATA[I use a continuous testing tool named NCrunch for all of my .Net code. In fact, NCrunch has spoiled me so much that manually running tests is bordering on painful. I&#8217;ve gotten used to doing absolutely nothing and still having the latest build results, test results, code coverage, highlighted execution paths for failed tests, and [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I use a continuous testing tool named <a href="http://www.ncrunch.net/">NCrunch</a> for all of my .Net code. In fact,  <a href="/index.php/enterprisedev/unittest/reducing-code-build-test-friction/">NCrunch has spoiled me</a> so much that manually running tests is bordering on painful. I&#8217;ve gotten used to doing absolutely nothing and still having the latest build results, test results, code coverage, highlighted execution paths for failed tests, and little hover notices on each line that passed an exception. Make a change, magic happens. All coding should work like that.</p>
+<p>The AngularJS team has built a continuous javascript testrunner named <a href="http://karma-runner.github.io/">karma</a>, so of course I&#8217;m going to give it a try. </p>
+<p>At the time of this post, the current version is 0.12 and I will be using Jasmine 2.0 (<a href="/index.php/webdev/uidevelopment/javascript/testing-asynchronous-javascript-w-jasmine/" title="Testing Asynchronous Javascript w/ Jasmine 2.0.0">woo, Async!</a>), RequireJS (also a <a href="/index.php/webdev/uidevelopment/javascript/unit-testing-with-jasmine-2-0-and-require-js/" title="Unit Testing with Jasmine 2.0 and Require.JS">recent topic</a>), and <a href="https://github.com/iammerrick/Squire.js/" title="iammerrick/Squire.js on github">Squire.js</a> (for injecting mocks). The sample project I&#8217;m using for demos is just something that was handy that already had some tests.</p>
+<h1>Setting up Karma</h1>
+<p>Setting up karma is pretty straightforward. The karma site has clear information already on how to <a href="http://karma-runner.github.io/0.12/intro/installation.html" title="Karma - Installation">install the package</a> and <a href="http://karma-runner.github.io/0.10/intro/configuration.html" title="Karma - Configuration">set up the configuration</a>, so I&#8217;m not going to go into the details on that.</p>
+<p>One minor variance is that I chose to install karma local to my project rather than globally, so I&#8217;ll have to run the tools from the node_modules subdirectory.</p>
+<p>I created a package.json file for my project:</p>
+<p><b>package.json: </b> <a href="https://github.com/tarwn/townthing/blob/master/package.json">townthing/package.json</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="st0">&quot;name&quot;</span><span class="sy0">:</span> <span class="st0">&quot;townthing&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="st0">&quot;version&quot;</span><span class="sy0">:</span> <span class="st0">&quot;0.1.0&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="st0">&quot;description&quot;</span><span class="sy0">:</span> <span class="st0">&quot;sample project I'm playing with&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="st0">&quot;repository&quot;</span><span class="sy0">:</span> <span class="st0">&quot;https://github.com/tarwn/townthing&quot;</span><span class="sy0">,</span>
+&nbsp;
+&nbsp; &nbsp; <span class="st0">&quot;devDependencies&quot;</span><span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;karma&quot;</span><span class="sy0">:</span> <span class="st0">&quot;~0.11&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;karma-jasmine&quot;</span><span class="sy0">:</span> <span class="st0">&quot;~0.2&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;karma-phantomjs-launcher&quot;</span><span class="sy0">:</span> <span class="st0">&quot;~0.1&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;karma-chrome-launcher&quot;</span><span class="sy0">:</span> <span class="st0">&quot;~0.1&quot;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">{
+	"name": "townthing",
+	"version": "0.1.0",
+	"description": "sample project I'm playing with",
+	"repository": "https://github.com/tarwn/townthing",
+
+	"devDependencies": {
+		"karma": "~0.11",
+		"karma-jasmine": "~0.2",
+		"karma-phantomjs-launcher": "~0.1",
+		"karma-chrome-launcher": "~0.1"
+	}
+}</pre></div></div>
+
+<div style="background-color: #eeeeee; padding: .5em;">
+<b>Important Note:</b> Be careful with your versions. I&#8217;ve found out the hard way that karma keeps their dependencies wide open &#8220;*&#8221; until they are ready to move versions, then they lock them down to something that may not actually be the latest version. Karma 0.10 worked fine with karma-jasmine 0.2 until they released 0.10.10 which locked in a requirement for karma-jasmine ~0.1. More recently the karma-phantomjs-launcher has revved to 1.3, which somehow broke a perfectly working 0.12 karma against 1.2 despite there being no actual code changes (I suspect a versioning side-effect mixed with their *-version acceptance).
+</div>
+<p>And then go through the steps to create my karma configuration:<br />
+<b>karma.conf.js: </b> <a href="https://github.com/tarwn/townthing/blob/master/karma.conf.js">townthing/karma.conf.js</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+</pre></td><td class="de1"><pre class="de1">module.<span class="me1">exports</span> <span class="sy0">=</span> <span class="kw1">function</span><span class="br0">&#40;</span>config<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; config.<span class="kw1">set</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; basePath<span class="sy0">:</span> <span class="st0">'town/js'</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; frameworks<span class="sy0">:</span> <span class="br0">&#91;</span><span class="st0">'jasmine'</span><span class="sy0">,</span> <span class="st0">'requirejs'</span><span class="br0">&#93;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; files<span class="sy0">:</span> <span class="br0">&#91;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">'test/test-main.js'</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>pattern<span class="sy0">:</span> <span class="st0">'**/*.js'</span><span class="sy0">,</span> included<span class="sy0">:</span> <span class="kw2">false</span><span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#93;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; exclude<span class="sy0">:</span> <span class="br0">&#91;</span> <span class="st0">'**/main.js'</span> <span class="br0">&#93;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; reporters<span class="sy0">:</span> <span class="br0">&#91;</span><span class="st0">'dots'</span><span class="br0">&#93;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; port<span class="sy0">:</span> <span class="nu0">9876</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; colors<span class="sy0">:</span> <span class="kw2">true</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// possible values: config.LOG_DISABLE || config.LOG_ERROR || config.LOG_WARN || config.LOG_INFO || config.LOG_DEBUG</span>
+&nbsp; &nbsp; &nbsp; &nbsp; logLevel<span class="sy0">:</span> config.<span class="me1">LOG_DEBUG</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; autoWatch<span class="sy0">:</span> <span class="kw2">true</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; browsers<span class="sy0">:</span> <span class="br0">&#91;</span><span class="st0">'PhantomJS'</span><span class="br0">&#93;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; captureTimeout<span class="sy0">:</span> <span class="nu0">60000</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; singleRun<span class="sy0">:</span> <span class="kw2">false</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">module.exports = function(config) {
+	config.set({
+		basePath: 'town/js',
+		frameworks: ['jasmine', 'requirejs'],
+		files: [
+		  'test/test-main.js',
+		  {pattern: '**/*.js', included: false}
+		],
+		exclude: [ '**/main.js' ],
+		reporters: ['dots'],
+		port: 9876,
+		colors: true,
+		// possible values: config.LOG_DISABLE || config.LOG_ERROR || config.LOG_WARN || config.LOG_INFO || config.LOG_DEBUG
+		logLevel: config.LOG_DEBUG,
+		autoWatch: true,
+		browsers: ['PhantomJS'],
+		captureTimeout: 60000,
+		singleRun: false
+	});
+};</pre></div></div>
+
+<p>I already had a set of 68 specs configured to run from my SpecRunner file, with my Require.js configuration specified inline. Before I co-opted this project as a blog example, the tests were specified in script tags, but I have moved them to a require() statement and used the custom boot script created for my <a href="/index.php/webdev/uidevelopment/javascript/unit-testing-with-jasmine-2-0-and-require-js/">Jasmine 2.0 and RequireJS post</a>.</p>
+<p><b>SpecRunner:</b> <a href="https://github.com/tarwn/townthing/blob/54f182bf96ff036a8765f421884d465d890c598c/town/js/test/SpecRunner.html">townthing/js/test/SpecRunner.json</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+</pre></td><td class="de1"><pre class="de1"><span class="sc0">&lt;!DOCTYPE HTML&gt;</span>
+<span class="sc2">&lt;<span class="kw2">html</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">head</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">meta</span> <span class="kw3">http-equiv</span><span class="sy0">=</span><span class="st0">&quot;Content-Type&quot;</span> <span class="kw3">content</span><span class="sy0">=</span><span class="st0">&quot;text/html; charset=UTF-8&quot;</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">title</span>&gt;</span>Jasmine Spec Runner v2.0.0<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">title</span>&gt;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">link</span> <span class="kw3">rel</span><span class="sy0">=</span><span class="st0">&quot;shortcut icon&quot;</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;image/png&quot;</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;../lib/jasmine-2.0.0/jasmine_favicon.png&quot;</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">link</span> <span class="kw3">rel</span><span class="sy0">=</span><span class="st0">&quot;stylesheet&quot;</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/css&quot;</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;../lib/jasmine-2.0.0/jasmine.css&quot;</span>&gt;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;../lib/jasmine-2.0.0/jasmine.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;../lib/jasmine-2.0.0/jasmine-html.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;../lib/jasmine-2.0.0/boot-without-onload.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;../lib/require-2.1.11.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span>&gt;</span>
+&nbsp; &nbsp; require.config({
+&nbsp; &nbsp; &nbsp; &nbsp; baseUrl: &quot;../src&quot;,
+&nbsp; &nbsp; &nbsp; &nbsp; paths: {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &quot;knockout&quot;: &quot;../lib/knockout-3.0.0&quot;,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &quot;Squire&quot;: &quot;../lib/Squire&quot;
+&nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; });
+&nbsp;
+&nbsp; &nbsp; require(['../test/compass.spec', '../test/tile.spec', '../test/tree.spec', '../test/weather.spec'],function(){
+&nbsp; &nbsp; &nbsp; &nbsp; window.executeTests();
+&nbsp; &nbsp; });
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">head</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">body</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">body</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">html</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;!DOCTYPE HTML&gt;
+&lt;html&gt;
+&lt;head&gt;
+	&lt;meta http-equiv="Content-Type" content="text/html; charset=UTF-8"&gt;
+	&lt;title&gt;Jasmine Spec Runner v2.0.0&lt;/title&gt;
+
+	&lt;link rel="shortcut icon" type="image/png" href="../lib/jasmine-2.0.0/jasmine_favicon.png"&gt;
+	&lt;link rel="stylesheet" type="text/css" href="../lib/jasmine-2.0.0/jasmine.css"&gt;
+
+	&lt;script type="text/javascript" src="../lib/jasmine-2.0.0/jasmine.js"&gt;&lt;/script&gt;
+	&lt;script type="text/javascript" src="../lib/jasmine-2.0.0/jasmine-html.js"&gt;&lt;/script&gt;
+	&lt;script type="text/javascript" src="../lib/jasmine-2.0.0/boot-without-onload.js"&gt;&lt;/script&gt;
+
+	&lt;script src="../lib/require-2.1.11.js"&gt;&lt;/script&gt;
+
+	&lt;script type="text/javascript"&gt;
+	require.config({
+		baseUrl: "../src",
+		paths: {
+			"knockout": "../lib/knockout-3.0.0",
+			"Squire": "../lib/Squire"
+		}
+	});
+
+	require(['../test/compass.spec', '../test/tile.spec', '../test/tree.spec', '../test/weather.spec'],function(){
+		window.executeTests();
+	});
+	&lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre></div></div>
+
+<p>The folder structure is a little odd, as this was originally just a play project. My test libraries are mixed with the core libraries and my specs and src have a flat structure. Were this a production project, I would also try to find a way to combine this inline config with the one below and generate the list of spec files instead of hand-coding them.</p>
+<p>Because I am using RequireJS, I&#8217;ve included that option in my configuration and created a RequireJS configuration based on the one supplied in the <a href="http://karma-runner.github.io/0.10/plus/requirejs.html" title="Karma - RequireJS">RequireJS instructions</a> on the karma site.</p>
+<p><b>test-main.js: </b> <a href="">townthing/town/js/test/test-main.js</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> tests <span class="sy0">=</span> <span class="br0">&#91;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+<span class="kw1">for</span> <span class="br0">&#40;</span><span class="kw1">var</span> file <span class="kw1">in</span> window.__karma__.<span class="me1">files</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>window.__karma__.<span class="me1">files</span>.<span class="kw3">hasOwnProperty</span><span class="br0">&#40;</span>file<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span><span class="co2">/spec\.js$/</span>.<span class="me1">test</span><span class="br0">&#40;</span>file<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; tests.<span class="me1">push</span><span class="br0">&#40;</span>file<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+requirejs.<span class="me1">config</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// Karma serves files from '/base'</span>
+&nbsp; &nbsp; baseUrl<span class="sy0">:</span> <span class="st0">'/base/src'</span><span class="sy0">,</span>
+&nbsp;
+&nbsp; &nbsp; paths<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;knockout&quot;</span><span class="sy0">:</span> <span class="st0">&quot;../lib/knockout-3.0.0&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;Squire&quot;</span><span class="sy0">:</span> <span class="st0">&quot;../lib/Squire&quot;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+require<span class="br0">&#40;</span>tests<span class="sy0">,</span> <span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; window.__karma__.<span class="me1">start</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var tests = [];
+for (var file in window.__karma__.files) {
+	if (window.__karma__.files.hasOwnProperty(file)) {
+		if (/spec\.js$/.test(file)) {
+			tests.push(file);
+		}
+	}
+}
+
+requirejs.config({
+    // Karma serves files from '/base'
+    baseUrl: '/base/src',
+
+	paths: {
+		"knockout": "../lib/knockout-3.0.0",
+		"Squire": "../lib/Squire"
+	}
+});
+require(tests, function(){
+	window.__karma__.start();
+});</pre></div></div>
+
+<p>The biggest difference between my script and the sample one is I am loading the tests and starting karma after the configuration, rather than inside it. I am using Squire to mock several of the RequireJS modules for tests, had I used the configuration to start karma then each time I created a new instal of Squire I would have kicked off conflicting runs when it ran the same configuration.</p>
+<p>Running karma locally is then as easy as: <code>node .\node_modules\karma\bin\karma start karma.conf.js</code></p>
+<p>It&#8217;s only a few more steps to create a single test-main.js that both the jasmine SpecRunner file and karma can share.</p>
+<h1>The Results</h1>
+<p>Once I have the configurations set up, my tests run successfully from karma. I have them configured to use PhantomJS, but can also override that by sending in command-line arguments to do a single-run in other browsers (like Chrome) when I need to troubleshoot.</p>
+<p><code>node .\node_modules\karma\bin\karma start karma.conf.js --single-run</code></p>
+<div id="attachment_2492" style="width: 577px" class="wp-caption aligncenter"><a href="/wp-content/uploads/2014/03/karma.png"><img src="/wp-content/uploads/2014/03/karma.png" alt="Successful Tests w/ Non-Impacting Errors" width="567" class="size-full wp-image-2492" srcset="/wp-content/uploads/2014/03/karma.png 567w, /wp-content/uploads/2014/03/karma-300x113.png 300w" sizes="(max-width: 567px) 100vw, 567px" /></a><p class="wp-caption-text">Successful Tests w/ Non-Impacting Errors</p></div>
+<p>I was getting errors about missing timestamps when Squire loads some of the dependencies, but the files are found so I&#8217;m not sure why they are occurring (and they don&#8217;t happen on one of my other projects). I found a similar <a href="https://github.com/princed/karma-chai-plugins/issues/4">issue</a> and <a href="http://stackoverflow.com/questions/20733090/karma-error-there-is-no-timestamp-for">stackoverflow</a> question, so I&#8217;m not the only one with this particular issue. </p>
+<p><code>node .\node_modules\karma\bin\karma start karma.conf.js --single-run</code></p>
+<div id="attachment_2543" style="width: 815px" class="wp-caption aligncenter"><a href="/wp-content/uploads/2014/04/karma2.png"><img src="/wp-content/uploads/2014/04/karma2.png" alt="Karma Run - Take 2 - (Node hasn&#039;t eaten my blue background in this window)" width="805" height="88" class="size-full wp-image-2543" srcset="/wp-content/uploads/2014/04/karma2.png 805w, /wp-content/uploads/2014/04/karma2-300x32.png 300w" sizes="(max-width: 805px) 100vw, 805px" /></a><p class="wp-caption-text">Karma Run &#8211; Take 2 &#8211; (Node hasn&#8217;t eaten my blue background in this window)</p></div>
+<p>I was able to correct the issue from switching my test-main.js require basePath from &#8220;base/src&#8221; to &#8220;/base/src&#8221;, I&#8217;m still digging into why this worked.</p>
+<h1>My Thoughts</h1>
+<p>NCrunch set the bar high, and while karma runs my tests continuously, I think comparing it NCrunch would be unfair to karma because it just isn&#8217;t in the same league.</p>
+<p>Running locally, Karma does not give me that much more value than just refreshing a SpecRunner file in the browser. With the browser I have to change Alt+Tab to the window and F5 refresh, with karma the console output of test results is there, but it doesn&#8217;t have the browser&#8217;s ability to click on an error and see the code in context, see files that didn&#8217;t load correctly, etc. Karma has a plugin infrastructure for other reporters, but the few I&#8217;ve looked at have been focused on providing static files. I briefly looked at an HTML reporter in the hope that it might do some AJAX-y magic, but it simply created HTML output files.</p>
+<p>One thing I really like about karma is it&#8217;s ability to easily plug in other browsers and run across one or more simultaneously. In a build server environment, this would mean I could easily run my JS unit tests across a wide set of browsers, collect the results, and then either capture the text output from karma or use a plugin for my build server to integrate in the results.</p>
+<p>So overall, I think it makes a great tool for running unit tests the same locally and on the build server and being able to easily do so across a wide range of browsers, but I really don&#8217;t like the choice of using the console as the primary output. I think they overlooked the fact that they already have a browser front-end and a web server that could have been used to provide a richer front-end (potentially one that could be compared to NCrunch) and stil had a slimmer console or other-plugin-of-choice reporting mechanism for those that prefer it or are automating against it.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/uidevelopment/javascript/continuous-javascript-testing-with-karma/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Unit Testing with Jasmine 2.0 and Require.JS</title>
+		<link>/index.php/webdev/uidevelopment/javascript/unit-testing-with-jasmine-2-0-and-require-js/</link>
+		<comments>/index.php/webdev/uidevelopment/javascript/unit-testing-with-jasmine-2-0-and-require-js/#comments</comments>
+		<pubDate>Tue, 04 Mar 2014 13:41:12 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Unit Testing]]></category>
+		<category><![CDATA[jasmine]]></category>
+		<category><![CDATA[javascript]]></category>
+		<category><![CDATA[requirejs]]></category>
+
+		<guid isPermaLink="false">/?p=2475</guid>
+		<description><![CDATA[Jasmine 2.0 has changed how it loads and executes tests, using a boot script now to handle the details. If you try to plug some require() calls into the sample SpecRunner.html page, Jasmine will be done and finished before the require() statement loads the test modules and their dependencies. The problem is that RequireJS loads [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Jasmine 2.0 has changed how it loads and executes tests, using a boot script now to handle the details. If you try to plug some require() calls into the sample SpecRunner.html page, Jasmine will be done and finished before the require() statement loads the test modules and their dependencies.</p>
+<p>The problem is that RequireJS loads the dependencies asynchronously, but the standard boot script for Jasmine runs when window.onload is called. So how do we fix it?</p>
+<h2>Option 1: Call window.onload Ourselves</h2>
+<p>One option to solve this is to simply call window.onload again:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;tests/lib/jasmine-2.0.0/jasmine.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;tests/lib/jasmine-2.0.0/jasmine-html.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;tests/lib/jasmine-2.0.0/boot.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;lib/require-2.1.8.min.js&quot;</span> data-main<span class="sy0">=</span><span class="st0">&quot;test-main&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp;
+<span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span>&gt;</span>
+&nbsp; &nbsp; // list spec files here
+&nbsp; &nbsp; require([
+&nbsp; &nbsp; &nbsp; &nbsp; &quot;spec/someAwesomeProcess.spec&quot;,
+&nbsp; &nbsp; &nbsp; &nbsp; &quot;spec/anotherAwesomeProcess.spec&quot;
+&nbsp;
+&nbsp; &nbsp; ], function () {
+&nbsp; &nbsp; &nbsp; &nbsp; window.onload();
+&nbsp; &nbsp; });
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;script type="text/javascript" src="tests/lib/jasmine-2.0.0/jasmine.js"&gt;&lt;/script&gt;
+&lt;script type="text/javascript" src="tests/lib/jasmine-2.0.0/jasmine-html.js"&gt;&lt;/script&gt;
+&lt;script type="text/javascript" src="tests/lib/jasmine-2.0.0/boot.js"&gt;&lt;/script&gt;
+&lt;script type="text/javascript" src="lib/require-2.1.8.min.js" data-main="test-main"&gt;&lt;/script&gt;
+
+&lt;script type="text/javascript"&gt;
+	// list spec files here
+	require([
+		"spec/someAwesomeProcess.spec",
+		"spec/anotherAwesomeProcess.spec"
+
+	], function () {
+		window.onload();
+	});
+&lt;/script&gt;</pre></div></div>
+
+<p>But that&#8217;s icky and causes you to have two test bars across the screen (and probably doesn&#8217;t work well with other reporters either).</p>
+<p><a href="/wp-content/uploads/2014/02/JasmineDoubleFail.png"><img src="/wp-content/uploads/2014/02/JasmineDoubleFail.png" alt="JasmineDoubleFail" width="726" height="182" class="aligncenter size-full wp-image-2477" srcset="/wp-content/uploads/2014/02/JasmineDoubleFail.png 726w, /wp-content/uploads/2014/02/JasmineDoubleFail-300x75.png 300w" sizes="(max-width: 726px) 100vw, 726px" /></a></p>
+<p>Yeah, that&#8217;s special.</p>
+<h2>Option 2: Custom Boot Script</h2>
+<p>Or we can fix the root cause, the fact that the tests are running on window.onload and that doesn&#8217;t play well with AMD. The boot script included with Jasmine is supposed to be a template that can be customized to your own needs, so let&#8217;s take advantage of that. Copying the existing boot script, we can replace the section that registers the tests to onload with one that will add a callable method to the window:</p>
+<p><b>boot-without-onload.js</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="coMULTI">/**</span>
+<span class="coMULTI">&nbsp; &nbsp;* ## Execution</span>
+<span class="coMULTI">&nbsp; &nbsp;*</span>
+<span class="coMULTI">&nbsp; &nbsp;* No onload, only on demand now</span>
+<span class="coMULTI">&nbsp; &nbsp;*/</span>
+&nbsp;
+&nbsp; window.<span class="me1">executeTests</span> <span class="sy0">=</span> <span class="kw1">function</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; htmlReporter.<span class="me1">initialize</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; env.<span class="me1">execute</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; <span class="br0">&#125;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  /**
+   * ## Execution
+   *
+   * No onload, only on demand now
+   */
+
+  window.executeTests = function(){
+    htmlReporter.initialize();
+    env.execute();
+  };</pre></div></div>
+
+<p>And then update our SpecRunner to include this replacement boot script and require the test files prior to executing the tests:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;tests/lib/jasmine-2.0.0/jasmine.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;tests/lib/jasmine-2.0.0/jasmine-html.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;tests/lib/jasmine-2.0.0/boot-without-onload.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;lib/require-2.1.8.min.js&quot;</span> data-main<span class="sy0">=</span><span class="st0">&quot;test-main&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; // list spec files here
+&nbsp; &nbsp; &nbsp; &nbsp; require([
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &quot;spec/someAwesomeProcess.spec&quot;,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &quot;spec/anotherAwesomeProcess.spec&quot;
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; ], function () {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; window.executeTests();
+&nbsp; &nbsp; &nbsp; &nbsp; });
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    &lt;script type="text/javascript" src="tests/lib/jasmine-2.0.0/jasmine.js"&gt;&lt;/script&gt;
+    &lt;script type="text/javascript" src="tests/lib/jasmine-2.0.0/jasmine-html.js"&gt;&lt;/script&gt;
+    &lt;script type="text/javascript" src="tests/lib/jasmine-2.0.0/boot-without-onload.js"&gt;&lt;/script&gt;
+    &lt;script type="text/javascript" src="lib/require-2.1.8.min.js" data-main="test-main"&gt;&lt;/script&gt;
+
+    &lt;script type="text/javascript"&gt;
+        // list spec files here
+        require([
+            "spec/someAwesomeProcess.spec",
+            "spec/anotherAwesomeProcess.spec"
+
+        ], function () {
+            window.executeTests();
+        });
+    &lt;/script&gt;</pre></div></div>
+
+<p>And there we go, Jasmine is now working exactly the same as if we were running without RequireJS (and had pasted 500 script tags in the file).</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/uidevelopment/javascript/unit-testing-with-jasmine-2-0-and-require-js/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>AngularJS vs Knockout &#8211; Automated Testing (7 of 8)</title>
+		<link>/index.php/webdev/uidevelopment/angularjs-vs-knockout-automated-testing-7/</link>
+		<comments>/index.php/webdev/uidevelopment/angularjs-vs-knockout-automated-testing-7/#respond</comments>
+		<pubDate>Tue, 15 Oct 2013 13:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[UI Development]]></category>
+		<category><![CDATA[angularjs]]></category>
+		<category><![CDATA[jasmine]]></category>
+		<category><![CDATA[knockout]]></category>
+		<category><![CDATA[unit testing]]></category>
+		<category><![CDATA[you better mock yourself]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/10/angularjs-vs-knockout-automated-testing-7/</guid>
+		<description><![CDATA[I'm reviewing Angular and Knockout to determine which would fit better for a variety of upcoming projects. As we get into projects that are larger than a few small views and routes, the ability to add automated testing becomes important.  Unit testing p&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;m reviewing Angular and Knockout to determine which would fit better for a variety of upcoming projects. As we get into projects that are larger than a few small views and routes, the ability to add automated testing becomes important.  Unit testing provides a safety net against future us screwing up the code that present us is writing, can be used before we write the code (TDD) or after, and helps us keep some of the complexity in check as the project size grows and ages. Let&#8217;s put AngularJS and Knockout under test.</p>
+<div style="background-color: #eeeeee; padding: 1em;">
+This is the seventh of eight posts looking at the capabilities of knockout and Angular. In the <a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-introduction-1" title="AngularJS vs Knockout - Introduction">introduction post</a>, I outlined the capabilities that I am evaluating for. In the <a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-modules-and-di-6" title="AngularJS vs Knockout - Modules and DI">sixth post</a>, I looked at Modules and Dependency injection, an important lead up to this post, which intends to jump into unit testing those modules.
+</div>
+<p>All of the examples presented throughout the series are available in the <a href="https://github.com/tarwn/AngularJS-vs-Knockout/" title="View all of the post examples on github">tarwn/AngularJS-vs-Knockout</a> repository on github.</p>
+<p>In both sections I&#8217;ll be using <a href="http://pivotal.github.io/jasmine/">Jasmine 1.3.1</a>, the focus is on how the libraries are to test, so this will provide a somewhat level playing field. We&#8217;ll be testing the modules from the previous post, so I&#8217;ll also be including <a href="http://requirejs.org/">RequireJS</a> for the Knockout side of things, but skipping script.js and going with standard script tags for the Angular side (aka, being lazy). I&#8217;ll also be pulling in <a href="https://github.com/iammerrick/Squire.js/">Squire.js</a> and <a href="https://github.com/derickbailey/jasmine.async">Jasmine.Async</a> to add mocking for RequireJS and asynchronous shortcut methods for Jasmine, respectively.</p>
+<p>Both sets of tests are tested from a single Jasmine testrunner, in the github repository: <a href="https://github.com/tarwn/AngularJS-vs-Knockout/blob/master/SpecRunner.html" title="View full example file on github">SpecRunner.html</a></p>
+<h2>Unit Testing AngularJS</h2>
+<p>Unit Testing is of huge importance to the AngularJS team, for which I can&#8217;t applaud them enough. It is constantly mentioned in documentation and tutorials and has resulted in the <a href="http://karma-runner.github.io/0.10/index.html">karma</a> test runner, a tool I&#8217;m impatient to start playing with but unfortunately have not yet had time for.</p>
+<h3>AngularJS Modules Under Test</h3>
+<p>In the <a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-modules-and-di-6">previous post</a>, we had sampleApp and sampleServices modules that we moved into external files, using script.js as an asynchronous module loader. Other than creating a copy of the files and putting them in a new folder (js/UnitTesting) specific to this post, no modifications have been made.</p>
+<p>Relevant sections of <a href="https://github.com/tarwn/AngularJS-vs-Knockout/blob/master/SpecRunner.html" title="View full example file on github">SpecRunner.html</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">html</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">head</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- ... --&gt;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- Angular files libraries --&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;Angular/js/lib/angular-1.0.8.min.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;Angular/js/lib/angular-mocks.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- Angular source files --&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;Angular/js/UnitTesting/sampleApp.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;Angular/js/UnitTesting/sampleServices.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- Angular specs --&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;Angular/UnitTestingSpecs.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- ... --&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;html&gt;
+&lt;head&gt;
+    &lt;!-- ... --&gt;
+
+    &lt;!-- Angular files libraries --&gt;
+    &lt;script src="Angular/js/lib/angular-1.0.8.min.js"&gt;&lt;/script&gt;
+    &lt;script src="Angular/js/lib/angular-mocks.js"&gt;&lt;/script&gt;
+    &lt;!-- Angular source files --&gt;
+    &lt;script src="Angular/js/UnitTesting/sampleApp.js"&gt;&lt;/script&gt;
+    &lt;script src="Angular/js/UnitTesting/sampleServices.js"&gt;&lt;/script&gt;
+    &lt;!-- Angular specs --&gt;
+    &lt;script src="Angular/UnitTestingSpecs.js"&gt;&lt;/script&gt;
+
+    &lt;!-- ... --&gt;</pre></div></div>
+
+<p>The specs file then handles mocking the service for the controller and defines the tests I want to run:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+</pre></td><td class="de1"><pre class="de1"><span class="co1">// &nbsp;borrowed heavily from http://www.benlesh.com/2013/05/angularjs-unit-testing-controllers.html</span>
+describe<span class="br0">&#40;</span><span class="st0">&quot;Angular&quot;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; describe<span class="br0">&#40;</span><span class="st0">&quot;Testing the ModuleDIController&quot;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> $scope <span class="sy0">=</span> <span class="kw2">null</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> expectedServiceResponse <span class="sy0">=</span> <span class="br0">&#91;</span><span class="br0">&#123;</span> name<span class="sy0">:</span> <span class="st0">&quot;A&quot;</span><span class="sy0">,</span> number<span class="sy0">:</span> <span class="nu0">123</span> <span class="br0">&#125;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> mockService <span class="sy0">=</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; getList<span class="sy0">:</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="kw1">return</span> expectedServiceResponse<span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; beforeEach<span class="br0">&#40;</span>module<span class="br0">&#40;</span><span class="st0">'sampleApp'</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; beforeEach<span class="br0">&#40;</span>inject<span class="br0">&#40;</span><span class="kw1">function</span> <span class="br0">&#40;</span>$rootScope<span class="sy0">,</span> $controller<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; $scope <span class="sy0">=</span> $rootScope.$new<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; $controller<span class="br0">&#40;</span><span class="st0">'ModuleDIController'</span><span class="sy0">,</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; $scope<span class="sy0">:</span> $scope<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ListOfItemsService<span class="sy0">:</span> mockService
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ... tests here ...</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">//  borrowed heavily from http://www.benlesh.com/2013/05/angularjs-unit-testing-controllers.html
+describe("Angular", function () {
+    describe("Testing the ModuleDIController", function () {
+        var $scope = null;
+
+        var expectedServiceResponse = [{ name: "A", number: 123 }];
+        var mockService = {
+            getList: function () { return expectedServiceResponse; }
+        };
+
+        beforeEach(module('sampleApp'));
+        beforeEach(inject(function ($rootScope, $controller) {
+            $scope = $rootScope.$new();
+            $controller('ModuleDIController', {
+                $scope: $scope,
+                ListOfItemsService: mockService
+            });
+        }));
+
+        // ... tests here ...
+    });
+});</pre></div></div>
+
+<p>If you&#8217;re going to work with AngularJS, read everything on <a href="http://www.benlesh.com/" title="Benjamin Lesh: Try, Catch, Fail">Ben Lesh&#8217;s</a> (<a href="https://twitter.com/BenLesh" title="@BenLesh on twitter">@BenLesh</a>) site. It helped me tremendously for both this post and the custom validation section of the validation post. </p>
+<p>The spec file starts off by defining both a mock service and the expected response it is going to return. Before each test I load a fresh  sampleApp module, ensuring a clean starting point. Then I use <a href="http://docs.angularjs.org/api/angular.mock.inject" title="AngularJS: angular.mock.inject">inject</a> to create an $injector that will be used for resolving references in my tests, which resolves the ModuleDIController by passing in the provided scope and my mock service.<br />
+That last part works, but honestly I only sort of understand what it&#8217;s doing. Even after several more readings of the pages on the injector and the mock.inject call, I&#8217;m still not 100% sure I grasp more than the basic operation.</p>
+<p>The tests themselves are pretty straightforward at that point:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1">it<span class="br0">&#40;</span><span class="st0">'should start with an empty list of items'</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; expect<span class="br0">&#40;</span>$scope.<span class="me1">listOfItems</span><span class="br0">&#41;</span>.<span class="me1">toEqual</span><span class="br0">&#40;</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+it<span class="br0">&#40;</span><span class="st0">'should populate list from service when fillItems() is called'</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; $scope.<span class="me1">fillItems</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; expect<span class="br0">&#40;</span>$scope.<span class="me1">listOfItems</span><span class="br0">&#41;</span>.<span class="me1">toEqual</span><span class="br0">&#40;</span>expectedServiceResponse<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">it('should start with an empty list of items', function () {
+    expect($scope.listOfItems).toEqual([]);
+});
+
+it('should populate list from service when fillItems() is called', function () {
+    $scope.fillItems();
+    expect($scope.listOfItems).toEqual(expectedServiceResponse);
+});</pre></div></div>
+
+<p>And there we have it, verification that our controller uses the service properly to fill it&#8217;s local collection.</p>
+<p>This may not be that complicated a test, but once we have the basic components together, extending it to more complex cases is pretty straightforward.</p>
+<h2>Unit Testing Knockout/RequireJS</h2>
+<p>Unit testing modules defined with RequireJS is challenging. There are a couple libraries out there that people have built to inject mocks and the documentation is sparse for all the examples I found. I chose SquireJS due to having slightly more documentation than the others, but it still took a few iterations to get it working (then I lost those changes and had to redo them after not looking at the code for a couple weeks).</p>
+<h3>Knockout/RequireJS Modules Under Test</h3>
+<p>In the <a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-modules-and-di-6">previous post</a>, we had sampleApp/ModuleDIModel and sampleServices/ListOfItemsService modules being loaded by RequireJS. Like the AngularJS example, the only change I have made is to move a copy of these files into a folder specific for this post (js/UnitTesting).</p>
+<p>Relevant sections of <a href="https://github.com/tarwn/AngularJS-vs-Knockout/blob/master/SpecRunner.html" title="View full example file on github">SpecRunner.html</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">html</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">head</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- ... --&gt;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- Knockout + RequireJS files --&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;Knockout/js/lib/knockout-2.3.0.min.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;Knockout/js/lib/require-2.1.8.min.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- Knockout specs --&gt;</span> &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;Knockout/UnitTestingSpecs.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- ... --&gt;</span>
+&nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">head</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">body</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">body</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">html</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;html&gt;
+&lt;head&gt;
+    &lt;!-- ... --&gt;
+
+    &lt;!-- Knockout + RequireJS files --&gt;
+    &lt;script src="Knockout/js/lib/knockout-2.3.0.min.js"&gt;&lt;/script&gt;
+    &lt;script src="Knockout/js/lib/require-2.1.8.min.js"&gt;&lt;/script&gt;
+    &lt;!-- Knockout specs --&gt;    
+    &lt;script src="Knockout/UnitTestingSpecs.js"&gt;&lt;/script&gt;
+
+    &lt;!-- ... --&gt;
+  &lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre></div></div>
+
+<p>Like the AngularJS example, the specs file is responsible for supplying the mocks and defining the tests:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+</pre></td><td class="de1"><pre class="de1">require.<span class="me1">config</span><span class="br0">&#40;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; baseUrl<span class="sy0">:</span> <span class="st0">&quot;Knockout/js/UnitTesting&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; paths<span class="sy0">:</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;Squire&quot;</span><span class="sy0">:</span> <span class="st0">&quot;../../js/lib/Squire&quot;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+describe<span class="br0">&#40;</span><span class="st0">&quot;Knockout&quot;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; describe<span class="br0">&#40;</span><span class="st0">&quot;Testing the ModuleDIModel&quot;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> async <span class="sy0">=</span> <span class="kw1">new</span> AsyncSpec<span class="br0">&#40;</span><span class="kw1">this</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> viewmodel <span class="sy0">=</span> <span class="kw2">null</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> expectedServiceResponse <span class="sy0">=</span> <span class="br0">&#91;</span><span class="br0">&#123;</span> name<span class="sy0">:</span> <span class="st0">&quot;A&quot;</span><span class="sy0">,</span> number<span class="sy0">:</span> <span class="nu0">123</span> <span class="br0">&#125;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> mockService <span class="sy0">=</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; getList<span class="sy0">:</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="kw1">return</span> expectedServiceResponse<span class="sy0">;</span> <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; async.<span class="me1">beforeEach</span><span class="br0">&#40;</span><span class="kw1">function</span> <span class="br0">&#40;</span>done<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; require<span class="br0">&#40;</span><span class="br0">&#91;</span><span class="st0">'Squire'</span><span class="br0">&#93;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span>Squire<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> squire <span class="sy0">=</span> <span class="kw1">new</span> Squire<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; squire.<span class="me1">mock</span><span class="br0">&#40;</span><span class="st0">&quot;sampleServices/ListOfItemsService&quot;</span><span class="sy0">,</span> mockService<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .<span class="me1">require</span><span class="br0">&#40;</span><span class="br0">&#91;</span><span class="st0">&quot;sampleApp/ModuleDIModel&quot;</span><span class="br0">&#93;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span>ModuleDIModel<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; viewmodel <span class="sy0">=</span> <span class="kw1">new</span> ModuleDIModel<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; done<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ... tests here</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">require.config({
+    baseUrl: "Knockout/js/UnitTesting",
+    paths: {
+        "Squire": "../../js/lib/Squire"
+    }
+});
+
+describe("Knockout", function () {
+    
+    describe("Testing the ModuleDIModel", function () {
+        var async = new AsyncSpec(this);
+        var viewmodel = null;
+
+        var expectedServiceResponse = [{ name: "A", number: 123 }];
+        var mockService = {
+            getList: function () { return expectedServiceResponse; }
+        };
+
+        async.beforeEach(function (done) {
+            require(['Squire'], function (Squire) {
+                var squire = new Squire();
+                squire.mock("sampleServices/ListOfItemsService", mockService)
+                      .require(["sampleApp/ModuleDIModel"], function (ModuleDIModel) {
+                          viewmodel = new ModuleDIModel();
+                          done();
+                      });
+            });
+        });
+
+        // ... tests here
+    });
+});</pre></div></div>
+
+<p>I start out by configuring the base URL for the file that will be under test and the path for Squire. Like the AngularJS example, the first real step is defining the mock service and it&#8217;s expected response. Before each test, I then use Squire to mock the ListOfItemsService and load a fresh copy of the Model I am putting under test to ensure each test starts with a clean slate.</p>
+<p>Like before, the tests themselves are pretty straightforward at that point:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1">it<span class="br0">&#40;</span><span class="st0">&quot;should start with an empty list of items&quot;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span>done<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; expect<span class="br0">&#40;</span>viewmodel.<span class="me1">listOfItems</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>.<span class="me1">toEqual</span><span class="br0">&#40;</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+it<span class="br0">&#40;</span><span class="st0">&quot;should populate list from service when fillItems() is called&quot;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span>done<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; viewmodel.<span class="me1">fillItems</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; expect<span class="br0">&#40;</span>viewmodel.<span class="me1">listOfItems</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>.<span class="me1">toEqual</span><span class="br0">&#40;</span>expectedServiceResponse<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">it("should start with an empty list of items", function (done) {
+    expect(viewmodel.listOfItems()).toEqual([]);
+});
+
+it("should populate list from service when fillItems() is called", function (done) {
+    viewmodel.fillItems();
+    expect(viewmodel.listOfItems()).toEqual(expectedServiceResponse);
+});</pre></div></div>
+
+<p>With the exception of having a viewmodel variable instead of a $scope variable and evaluating the listOfItems value with ()&#8217;s, the tests are almost identical to AngularJS&#8217;s.</p>
+<p>As I mentioned at the beginning, the documentation was sparse, so for once the Knockout/RequireJS side of things took more twiddling and frustration to get working. Now that I do have the tests working, though, I think it&#8217;s given me enough of a grasp of the mechanism that I could handle more complex test cases just as easily as I felt I could with AngularJS.</p>
+<h2>Some Differences</h2>
+<p>There were a number of frustrations before I got this working.</p>
+<h3>Injecting Dependencies</h3>
+<p>Again, kudos to the AngularJS team for making testing such a major focus. Unfortunately, I&#8217;m still parsing and re-parsing the inject() documentation to try and understand how what I did above works. I think part of the problem is that it&#8217;s a little recursive, as the injector is being used and replaced all at once&#8230;or something. Basically I&#8217;m a monkey with a lighter at this point, I know how to make the fire come out but have no idea why or how it does so.</p>
+<p>And then we get to RequireJS, which has no focus on unit testing and the couple libraries that have tied into it have very few blogs posts and little documentation behind them. Once I got this first example together, I am feeling much more confidant about doing it again. Unlike Angular&#8217;s inject method, I think I have a pretty good idea how Squire works, but it was still frustrating to get that first test worked out.</p>
+<h3>Documentation</h3>
+<p>Usually AngularJS is the one that leaves me confused and forcing myself to reread the documentation. In this case, there are a lot of great posts out there that allowed me to ignore the documentation until I got it working (at which point I went back and started rereading it). Did I mention <a href="http://www.benlesh.com/2013/06/angular-js-unit-testing-services.html" title="Ben Lesh - Try, Catch, Fail - 'Angular JS - Unit Testing - Services'">Ben&#8217;s posts</a>?</p>
+<p>Mocking modules for RequireJS was much more sparse. To the point where I started recognizing their page titles in google as I was searching alternative terms to try and get more information. There are a very small number of posts on Squire, a few on testr.js, etc. I think the new secret phrase for people looking into this should be &#8220;hurp durp example&#8221;. If you have spent any time looking into this topic, you not only know what I&#8217;m talking about, you&#8217;ve also read it like 40 times in case you missed something.</p>
+<h2>Final Thoughts</h2>
+<p>The AngularJS side was faster to get up to speed on and required fewer external dependencies. The Knockout/RequireJS side required me to pull in Squire and Jasmine.async and was tougher to get running initially. But now that I have them both running, I&#8217;ve found I don&#8217;t have a strong opinion about either of them, neither looks like it will be that much harder to extend or build more tests with. </p>
+<p>I am definitely looking forward to playing with <a href="http://karma-runner.github.io/0.10/index.html">Karma</a> in the near future. I am used to continuous test execution and coverage with <a href="/index.php/EnterpriseDev/UnitTest/reducing-code-build-test-friction" title="LessThanDot Blog - 
+Reducing Code-Build-Test Friction with NCrunch">NCrunch</a> and going back to manually executing tests has been annoying.</p>
+<div style="background-color: #DDDDDD; padding: 8px; width: 400px;">
+<h3>Knockout vs AngularJS</h3>
+<ul style="margin: 0px; padding: 4px;">
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-introduction-1">Introductory Post</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-data-binding-2">Data Binding</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-validation-3">Validation</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-serialization-4">Serialization</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-templating-5">Templating</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-modules-and-di-6">Modules + Dependency Injection</a></li>
+<li><b>Automated Testing</b></li>
+<li><a href="/index.php/WebDev/UIDevelopment/AJAX/angularjs-vs-knockout-spa-routing-history-8">SPA Routing/History</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-final-thoughts-9">Final, Final Thoughts</a></li>
+</ul>
+</div>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/uidevelopment/angularjs-vs-knockout-automated-testing-7/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>AngularJS vs Knockout &#8211; Introduction (1 of 8)</title>
+		<link>/index.php/webdev/uidevelopment/angularjs-vs-knockout-introduction-1/</link>
+		<comments>/index.php/webdev/uidevelopment/angularjs-vs-knockout-introduction-1/#comments</comments>
+		<pubDate>Mon, 07 Oct 2013 17:39:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[UI Development]]></category>
+		<category><![CDATA[$script.js]]></category>
+		<category><![CDATA[angularjs]]></category>
+		<category><![CDATA[director]]></category>
+		<category><![CDATA[durandal]]></category>
+		<category><![CDATA[finch]]></category>
+		<category><![CDATA[jasmine]]></category>
+		<category><![CDATA[knockout]]></category>
+		<category><![CDATA[mvc]]></category>
+		<category><![CDATA[mvvm]]></category>
+		<category><![CDATA[requirejs]]></category>
+		<category><![CDATA[sammyjs]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/10/angularjs-vs-knockout-introduction-1/</guid>
+		<description><![CDATA[I'm reviewing Angular and Knockout to determine which would fit better for a variety of upcoming projects. There are already plenty of posts out there comparing AngularJS and Knockout. I have been slowly reading through all the comparisons I could find, but unfortunately I keep running into cases where the posts are too high level, miss capabilities I need, or have errors that undermine my trust in the rest of the post.]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;m reviewing Angular and Knockout to determine which would fit better for a variety of upcoming projects. There are already plenty of posts out there comparing <a href="http://angularjs.org/">AngularJS</a> and <a href="http://knockoutjs.com/">Knockout</a>. I have been slowly reading through all the comparisons I could find, but unfortunately I keep running into cases where the posts are too high level, miss capabilities I need, or have errors that undermine my trust in the rest of the post. </p>
+<p>The thing is, Knockout and AngularJS are attempting to solve two different problems. One is simply an MVVM binding framework, the other is a SPA-in-a-box solution. So instead of trying to directly compare the two frameworks, I&#8217;ve outlined the capabilities I need and will review how well each of the frameworks meets those capabilities. Where one library does not meet a particular set of needs, I&#8217;ll look at a common solution that people use with that library. Since Knockout is purely a databinding library, I expect to have to pull in others when it&#8217;s time to talk about routing, modules, and unit testing, while I shouldn&#8217;t have to do this as much with AngularJS.</p>
+<p>Here are the capabilities I need:</p>
+<ul style="padding-left: 2em;">
+<li>Data binding &#8211; bind HTML elements to JavaScript data models</li>
+<li>Validation &#8211; validation of raw inputs by applying rules for fields or model properties</li>
+<li>Serialization &#8211; easy method for serializing models to POST to server-side APIs</li>
+<li>Templating &#8211; define HTML templates for re-usable complex collections of HTML</li>
+<li>Modules + DI &#8211; keep my javascript files separate, help me order them properly, manage dependencies for me</li>
+<li>Automated Testing &#8211; Exploring unit testing and possibilities for higher level testing</li>
+<li>SPA Routing/History &#8211; make it easy for me to route between views in a single page app, with history/deep linking</li>
+</ul>
+<p>Before I dive into either of these libraries, though, I need some assurance that they will support the browsers I need, won&#8217;t get me into an odd licensing situation, and have sizable communities maintaining them. Here is a list of all the libraries I&#8217;ve incorporated in the series:</p>
+<table class="tables" style="border-collapse: collapse">
+<tr>
+<th>Package</th>
+<th>License</th>
+<th>Current Version</th>
+<th>Latest Update</th>
+<th>Contributors</th>
+</tr>
+<tr>
+<td><a href="http://angularjs.org/">AngularJS</a></td>
+<td>MIT</td>
+<td>1.0.8, 1.2.0 rc 2</td>
+<td>2 Days Ago</td>
+<td>392</td>
+</tr>
+<tr>
+<td><a href="http://knockoutjs.com/">Knockout</a></td>
+<td>MIT</td>
+<td>2.3.0, 3.0.0 beta</td>
+<td>3 Days Ago</td>
+<td>38</td>
+</tr>
+<tr>
+<td><a href="https://github.com/ifandelse/Knockout.js-External-Template-Engine">Knockout.js External Template Engine</a></td>
+<td>MIT</td>
+<td>2.0.5</td>
+<td>A year ago</td>
+<td>3</td>
+</tr>
+<tr>
+<td><a href="http://requirejs.org/">RequireJS</a></td>
+<td>MIT or BSD</td>
+<td>2.1.8</td>
+<td>6 Days Ago</td>
+<td>53</td>
+</tr>
+<tr>
+<td><a href="http://sammyjs.org/">SammyJS</a></td>
+<td>MIT</td>
+<td>0.7.4</td>
+<td>6 Months Ago</td>
+<td>47</td>
+</tr>
+<tr>
+<td><a href="http://durandaljs.com/">Durandal</a></td>
+<td>MIT</td>
+<td>2.0.0</td>
+<td>1 month ago</td>
+<td>27</td>
+</tr>
+<tr>
+<td><a href="http://stoodder.github.io/finchjs/">Finch.js</a></td>
+<td>MIT</td>
+<td>0.5.13</td>
+<td>5 months ago</td>
+<td>2</td>
+</tr>
+<tr>
+<td><a href="https://github.com/flatiron/director">flatiron director</a></td>
+<td>MIT</td>
+<td>1.2.0</td>
+<td>4 months ago</td>
+<td>42</td>
+</tr>
+<tr>
+<td><a href="https://github.com/ded/script.js/">$script.js</a></td>
+<td>??</td>
+<td>N/A (source)</td>
+<td>5 months ago</td>
+<td>8</td>
+</tr>
+<tr>
+<td><a href="http://pivotal.github.io/jasmine/">Jasmine</a></td>
+<td>MIT</td>
+<td>1.3.1</td>
+<td>18 hours ago</td>
+<td>49</td>
+</tr>
+<tr>
+<td><a href="https://github.com/derickbailey/jasmine.async">Jasmine.Async</a></td>
+<td>MIT</td>
+<td>0.1.0</td>
+<td>1 year ago</td>
+<td>1</td>
+</tr>
+<tr>
+<td><a href="https://github.com/iammerrick/Squire.js/">Squire.js</a></td>
+<td>MIT</td>
+<td>N/A (source)</td>
+<td>2 months ago</td>
+<td>6</td>
+</tr>
+</table>
+<p><i>Latest Update + Current Version as of when I added the table row.</i></p>
+<p>Browser Compatibility:</p>
+<table class="tables" style="border-collapse: collapse">
+<tr>
+<th>Package</th>
+<th>Browsers</th>
+</tr>
+<tr>
+<td><a href="http://angularjs.org/">AngularJS</a></td>
+<td>Not Documented? (<a href="http://docs.angularjs.org/guide/ie">extra requirements</a> for IE8-)</td>
+</tr>
+<tr>
+<td><a href="http://knockoutjs.com/">Knockout</a></td>
+<td>IE 6+, Firefox 2+, Safari (desktop/mobile), Chrome, Opera</td>
+</tr>
+<tr>
+<td><a href="https://github.com/ifandelse/Knockout.js-External-Template-Engine">Knockout.js External Template Engine</a></td>
+<td>??</td>
+</tr>
+<tr>
+<td><a href="http://requirejs.org/">RequireJS</a></td>
+<td>IE 6+, Firefox 2+, Safari 3.2+, Chrome 3+, Opera 10+</td>
+</tr>
+<tr>
+<td><a href="http://sammyjs.org/">SammyJS</a></td>
+<td>IE 8+, Firefox 3+, Safari 3+, Chrome 5+, Opera 10+, Mobile WebKit</td>
+</tr>
+<tr>
+<td><a href="http://durandaljs.com/">Durandal</a></td>
+<td>Not Documented?</td>
+</tr>
+<tr>
+<td><a href="http://stoodder.github.io/finchjs/">Finch.js</a></td>
+<td>Not Documented?</td>
+</tr>
+<tr>
+<td><a href="https://github.com/flatiron/director">flatiron director</a></td>
+<td>??</td>
+</tr>
+<tr>
+<td><a href="https://github.com/ded/script.js/">$script.js</a></td>
+<td>IE 6+, Firefox 2+, Safari 3+, Chrome 9+</td>
+</tr>
+<tr>
+<td><a href="http://pivotal.github.io/jasmine/">Jasmine</a>, <a href="https://github.com/derickbailey/jasmine.async">Jasmine.Async</a></td>
+<td>Not client facing. Supports a wide range of browsers, including PhantomJS. Chutzpah plugin for Visual Studio (no ncrunch yet though)</td>
+</tr>
+<tr>
+<td><a href="https://github.com/iammerrick/Squire.js/">Squire.js</a></td>
+<td>Also not client facing</td>
+</tr>
+</table>
+<p>I&#8217;ll explore each capability in both frameworks as well as my opinions and frustrations along the way. Then when the whole series is posted, I&#8217;ll offer a final set of opinions. The plan is to post daily (weekdays) until I get to the end, so keep an eye out on the site or follow me on <a href="http://twitter.com/tarwn" title="Follow @tarwn on twitter">twitter</a> for updates.</p>
+<p>I haven&#8217;t actually written the last post yet, so you have plenty of time to color my opinion and point out where I did things wrong as I roll out each post <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="background-color: #DDDDDD; padding: 8px; width: 400px;">
+<h3>Knockout vs AngularJS</h3>
+<ul style="margin: 0px; padding: 4px;">
+<li><b>Introductory Post</b></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-data-binding-2">Data Binding</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-validation-3">Validation</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-serialization-4">Serialization</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-templating-5">Templating</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-modules-and-di-6">Modules + Dependency Injection</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-automated-testing-7">Automated Testing</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/AJAX/angularjs-vs-knockout-spa-routing-history-8">SPA Routing/History</a></li>
+<li><a href="/index.php/WebDev/UIDevelopment/angularjs-vs-knockout-final-thoughts-9">Final, Final Thoughts</a></li>
+</ul>
+</div>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/uidevelopment/angularjs-vs-knockout-introduction-1/feed/</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,1350 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>errors &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/errors/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2012 Day 12: Proactive notifications</title>
+		<link>/index.php/datamgmt/dbprogramming/proactive-notifications/</link>
+		<comments>/index.php/datamgmt/dbprogramming/proactive-notifications/#respond</comments>
+		<pubDate>Wed, 12 Dec 2012 08:42:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[errors]]></category>
+		<category><![CDATA[notifications]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/proactive-notifications/</guid>
+		<description><![CDATA[This is day twelve of the SQL Advent 2012 series of blog posts. Today we are going to look at SQL Server proactive notifications]]></description>
+				<content:encoded><![CDATA[<p>This is day twelve of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at SQL Server proactive notifications. In the <a href="/index.php/DataMgmt/business-intelligence-1/sql-server-maintenance">SQL Server Maintenance</a> post from yesterday I touched upon proactive notifications a little, today I want to dive a little deeper into this subject. </p>
+<p>The last thing you want as a DBA is to hear any of the following things from the end users</p>
+<ul>
+<li>The transaction log is full</li>
+<li>The database is very slow</li>
+<li>The latest backup we have is 9 days old</li>
+<li>The table that was created has 2 extra columns this morning</li>
+<li>Everything is locked up can&#8217;t get any results back from a query</li>
+<li>Deadlocks are occurring</li>
+</ul>
+<p>What you really want to have at your shop is a tool like <a href="http://www.quest.com/foglight-for-sql-server/">Quest Foglight</a>, <a href="http://www.confio.com/performance/sql-server/ignite/">Confio Ignite</a>, <a href="http://www.red-gate.com/products/dba/sql-monitor/">Red Gate SQL Monitor</a> or similar. The benefit of these tools is that there is a central location where you can look at all the alerts at a glance. You get a lot of stuff out of the box and all you have to do is tell it what server to start monitoring. I would suggest to start using the trial version to see if it is something that would be beneficial for your organization.</p>
+<p>Of course you can roll your own solution as well, this will involve work and unless your time is worthless or you are bored out of your mind after work I wouldn&#8217;t do it.</p>
+<h2>Utilize the logs</h2>
+<p>You need to scan the errorlog periodically to see if there are errors, you can automate this, no need to start opening log files every 5 minutes. create a SQL Agent job that runs every 5 minutes and checks if there are any errors since it last ran. You can use the xp_readerrorlog proc to read the error log from with sql server with T-SQL.</p>
+<p>Here is a small example of what you can do if you have this in a SQL Agent job that runs every 5 minutes or so, you can of course email yourself the results, dump the result into a table that is perhaps shown on a dashboard in the office, there are many possibilities.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--This will hold the rows</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #ErrorLog <span class="br0">&#40;</span>LogDate <span class="kw1">datetime</span>, ProcessInfo <span class="kw1">VarChar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span>, ErrorMessage <span class="kw1">VarChar</span><span class="br0">&#40;</span><span class="kw2">Max</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="co1">-- Dump the errorlog into the table</span>
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> #ErrorLog
+<span class="kw1">EXEC</span> master.<span class="me1">dbo</span>.<span class="me1">xp_readerrorlog</span>
+&nbsp;
+<span class="co1">-- Delete everything older than 5 minutes</span>
+<span class="co1">-- ideally you will store the max date when it ran last</span>
+<span class="kw1">DELETE</span> #ErrorLog
+<span class="kw1">WHERE</span> LogDate <span class="sy0">&lt;</span> &nbsp;<span class="kw2">DATEADD</span><span class="br0">&#40;</span>mi,<span class="sy0">-</span><span class="nu0">5</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="co1">-- Some stuff you want to check for</span>
+<span class="co1">-- Failed backups...you want to know this</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #ErrorLog
+<span class="kw1">WHERE</span> ErrorMessage <span class="sy0">LIKE</span><span class="st0">'BACKUP failed%'</span>
+&nbsp;
+<span class="co1">-- Why does it take so looong to grow a file, maybe rethink your settings</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #ErrorLog
+<span class="kw1">WHERE</span> ErrorMessage <span class="sy0">LIKE</span><span class="st0">'Autogrow of file%'</span>
+&nbsp;
+<span class="co1">-- What is going on any backups or statistic updates running at this time?</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #ErrorLog
+<span class="kw1">WHERE</span> ErrorMessage <span class="sy0">LIKE</span><span class="st0">'SQL Server has encountered %occurrence(s) of I/O requests taking longer than%'</span>
+&nbsp;
+<span class="co1">-- My mirror might not be up to date</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #ErrorLog
+<span class="kw1">WHERE</span> ErrorMessage <span class="sy0">LIKE</span><span class="st0">'The alert for '</span><span class="st0">'unsent log'</span><span class="st0">' has been raised%'</span>
+&nbsp;
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> #ErrorLog </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--This will hold the rows
+CREATE TABLE #ErrorLog (LogDate datetime, ProcessInfo VarChar(10), ErrorMessage VarChar(Max))
+
+-- Dump the errorlog into the table
+INSERT INTO #ErrorLog
+EXEC master.dbo.xp_readerrorlog
+
+-- Delete everything older than 5 minutes
+-- ideally you will store the max date when it ran last
+DELETE #ErrorLog
+WHERE LogDate &lt;  DATEADD(mi,-5,GETDATE())
+
+-- Some stuff you want to check for
+-- Failed backups...you want to know this
+SELECT * FROM #ErrorLog
+WHERE ErrorMessage LIKE'BACKUP failed%'
+
+-- Why does it take so looong to grow a file, maybe rethink your settings
+SELECT * FROM #ErrorLog
+WHERE ErrorMessage LIKE'Autogrow of file%'
+
+-- What is going on any backups or statistic updates running at this time?
+SELECT * FROM #ErrorLog
+WHERE ErrorMessage LIKE'SQL Server has encountered %occurrence(s) of I/O requests taking longer than%'
+
+-- My mirror might not be up to date
+SELECT * FROM #ErrorLog
+WHERE ErrorMessage LIKE'The alert for ''unsent log'' has been raised%'
+
+
+DROP TABLE #ErrorLog </pre></div></div>
+
+<p>Those are just small samples, you might want to look for other kind of messages from the errorlog</p>
+<p>
+<h2>The transaction log is full</h2>
+<p>You want to make sure that you know you are running out of space before you run out of space. I covered this in the <a href="/index.php/DataMgmt/business-intelligence-1/sql-server-maintenance">SQL Server Maintenance</a> post Take a look at the sections <em>Make sure that you have enough space left on the drives</em> and <em>Make sure that you have enough space left for the filegroups</em> In those two section I described what to look for and also supplied code that you can then plug into your own solution</p>
+<p>
+<h2>The database is very slow</h2>
+<p>This complaint you hear every now and then, I have seen this from time to time. There are several things that could be happening, here is a list</p>
+<p>Someone decided to take a backup of that 1 TB database in the middle of the day<br />
+The update statistics job is still running<br />
+Statistics are stale and haven&#8217;t been updated in a long time<br />
+The virus scan is running amok and nobody told it to ignore the database files<br />
+Someone decided to query all the data all at once</p>
+<p>If you have a tool like <a href="http://www.quest.com/foglight-for-sql-server/">Quest Foglight</a>, <a href="http://www.confio.com/performance/sql-server/ignite/">Confio Ignite</a>, <a href="http://www.red-gate.com/products/dba/sql-monitor/">Red Gate SQL Monitor</a> or similar then you can see what query ran at what time, what it did and how long it ran.</p>
+<p>You can of course also use sp_who2, BlkBy column and DBCC INPUTBUFFER to see what is going on</p>
+<p>If you like to use Dynamic Management Views, then take a look at Glenn Berry&#8217;s <a href="http://sqlserverperformance.wordpress.com/2012/12/06/sql-server-2005-diagnostic-information-queries-dec-2012/">SQL Server 2005 Diagnostic Information Queries (Dec 2012)</a> and <a href="http://sqlserverperformance.wordpress.com/2012/11/27/sql-server-2008-diagnostic-information-queries-nov-2012/">SQL Server 2008 Diagnostic Information Queries (Nov 2012)</a> posts, there is a .sql file in each post with all kind of queries to discover all kinds of stuff about your server. </p>
+<p>It could also be that your hardware is having issues, make sure the IOs look good and check the eventlog for any clues.</p>
+<p>
+<h2>The latest backup we have is 9 days old</h2>
+<p>The following query will give you for all the databases the last time it was backed up or display NEVER if it wasn&#8217;t backed up</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> s.<span class="me1">Name</span> <span class="kw1">AS</span> DatabaseName,<span class="st0">'Database backup was taken on &nbsp;'</span> <span class="sy0">+</span> 
+<span class="kw1">CASE</span> <span class="kw1">WHEN</span> <span class="kw2">MAX</span><span class="br0">&#40;</span>b.<span class="me1">backup_finish_date</span><span class="br0">&#41;</span> <span class="kw1">IS</span> <span class="sy0">NULL</span> <span class="kw1">THEN</span> <span class="st0">'NEVER!!!'</span> <span class="kw1">ELSE</span>
+<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">12</span><span class="br0">&#41;</span>, <span class="br0">&#40;</span><span class="kw2">MAX</span><span class="br0">&#40;</span>b.<span class="me1">backup_finish_date</span><span class="br0">&#41;</span><span class="br0">&#41;</span>, <span class="nu0">101</span><span class="br0">&#41;</span> <span class="kw1">END</span> <span class="kw1">AS</span> LastBackUpTime
+<span class="kw1">FROM</span> sys.<span class="me1">sysdatabases</span> s
+<span class="kw1">LEFT</span> <span class="sy0">OUTER</span> <span class="sy0">JOIN</span> msdb.<span class="me1">dbo</span>.<span class="me1">backupset</span> b <span class="kw1">ON</span> b.<span class="me1">database_name</span> <span class="sy0">=</span> s.<span class="me1">name</span>
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> s.<span class="me1">Name</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT s.Name AS DatabaseName,'Database backup was taken on  ' + 
+CASE WHEN MAX(b.backup_finish_date) IS NULL THEN 'NEVER!!!' ELSE
+CONVERT(VARCHAR(12), (MAX(b.backup_finish_date)), 101) END AS LastBackUpTime
+FROM sys.sysdatabases s
+LEFT OUTER JOIN msdb.dbo.backupset b ON b.database_name = s.name
+GROUP BY s.Name</pre></div></div>
+
+<p>Here is what the output will look like</p>
+<pre>DatabaseName	LastBackUpTime
+--------------  ---------------------------------------
+model	        Database backup was taken on  NEVER!!!
+msdb	        Database backup was taken on  12/10/2012
+ReportServer	Database backup was taken on  NEVER!!!</pre>
+<p>As you can see that is not that great, all the databases should be backed up on a regular basis. Scroll up to the <em>Utilize the logs</em> section to see how you can check the errorlog for failed backup messages.</p>
+<p>
+<h2>Everything is locked up, you can&#8217;t get any results back from a query</h2>
+<p>Usually this indicates that there is an open transaction somewhere that has not finished or someone did the BEGIN TRAN  part but never did a COMMIT or ROLLBACK.</p>
+<p>Some people just restart the server to &#8216;fix&#8217; the issue, of course if you do that you will never know what the root cause is and you never know when it will happen again.</p>
+<p>We can easily show what happens when you have an open transaction, btw don&#8217;t do this on the production server.</p>
+<p>In 1 query window run this, replace SomeTable with a real table name.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BEGIN</span> <span class="kw1">TRAN</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1</span> <span class="sy0">*</span> <span class="kw1">FROM</span> SomeTable <span class="kw1">WITH</span><span class="br0">&#40;</span>UPDLOCK, <span class="kw1">HOLDLOCK</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BEGIN TRAN
+
+SELECT TOP 1 * FROM SomeTable WITH(UPDLOCK, HOLDLOCK)</pre></div></div>
+
+<p>You will get a message that the query completed successfully</p>
+<p>In another window run this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1</span> <span class="sy0">*</span> <span class="kw1">FROM</span> SomeTable <span class="kw1">WITH</span><span class="br0">&#40;</span>UPDLOCK, <span class="kw1">HOLDLOCK</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT TOP 1 * FROM SomeTable WITH(UPDLOCK, HOLDLOCK)</pre></div></div>
+
+<p>That query won&#8217;t return anything unless the first one is commited or rolled back<br />
+Now run this query below, the first column should have the text AWAITING COMMAND</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp; sys.<span class="me1">cmd</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,sys.<span class="me1">last_batch</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_type</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_subtype</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">DB_NAME</span><span class="br0">&#40;</span>lok.<span class="me1">resource_database_id</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_description</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_associated_entity_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_lock_partition</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_mode</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_type</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_status</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_owner_type</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_owner_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">lock_owner_address</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">waiting_task_address</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">session_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">exec_context_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">wait_duration_ms</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">wait_type</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">resource_address</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">blocking_task_address</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">blocking_session_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">blocking_exec_context_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">resource_description</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;sys.<span class="me1">dm_tran_locks</span> lok
+<span class="sy0">JOIN</span> &nbsp; &nbsp;sys.<span class="me1">dm_os_waiting_tasks</span> wat
+<span class="kw1">ON</span> &nbsp; &nbsp; &nbsp;lok.<span class="me1">lock_owner_address</span> <span class="sy0">=</span> wat.<span class="me1">resource_address</span>
+<span class="sy0">JOIN</span>&nbsp; &nbsp; sys.<span class="me1">sysprocesses</span> sys <span class="kw1">ON</span> wat.<span class="me1">blocking_session_id</span> <span class="sy0">=</span> sys.<span class="me1">spid</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT   sys.cmd
+        ,sys.last_batch
+        ,lok.resource_type
+        ,lok.resource_subtype
+        ,DB_NAME(lok.resource_database_id)
+        ,lok.resource_description
+        ,lok.resource_associated_entity_id
+        ,lok.resource_lock_partition
+        ,lok.request_mode
+        ,lok.request_type
+        ,lok.request_status
+        ,lok.request_owner_type
+        ,lok.request_owner_id
+        ,lok.lock_owner_address
+        ,wat.waiting_task_address
+        ,wat.session_id
+        ,wat.exec_context_id
+        ,wat.wait_duration_ms
+        ,wat.wait_type
+        ,wat.resource_address
+        ,wat.blocking_task_address
+        ,wat.blocking_session_id
+        ,wat.blocking_exec_context_id
+        ,wat.resource_description
+FROM    sys.dm_tran_locks lok
+JOIN    sys.dm_os_waiting_tasks wat
+ON      lok.lock_owner_address = wat.resource_address
+JOIN	sys.sysprocesses sys ON wat.blocking_session_id = sys.spid</pre></div></div>
+
+<p>As you can see you have a blocking_session_id and a session_id, this will tell you which session_id is being blocked. You can now verify that the transaction session_id  is blocking the other id</p>
+<p>Go back to that first command window and execute a rollback</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ROLLBACK</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ROLLBACK</pre></div></div>
+
+<p>The query that had that second select should now be done as well, if you run that query that checks for the waits it should be clean as well.</p>
+<p>Of course you could have done the same excercise by running sp_who2, looking at the BlkBy column, finding out what that session is doing by running DBCC INPUTBUFFER(session_id) with that session_id</p>
+<p>
+<h2>Deadlocks are occurring</h2>
+<p>There is already a post written on LessThanDot explaining how you can get emailed when deadlocks occur. Ted Krueger wrote that post and it can be found here: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/proactive-deadlock-notifications">Proactive Deadlock Notifications</a></p>
+<h2>Summary</h2>
+<p>I only touched the surface of what can be done in this post. I want you to find out if there is any monitoring being done in your shop, who gets notified? I have worked in places where the end user was the proactive notification, as long as we fixed it before the business users started to complaint life was good. Manual notifications and homebrew solutions might work for a while but when you add more and more servers and you add more people to the team this becomes laborious and error prone.</p>
+<p>If there is one New Year&#8217;s resolution you should add next year, I would suggest proactive notifications. Get trial versions of the tools, try them out until January 1st and then decide if you think it is worth.</p>
+<p>That is all for day twelve of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/proactive-notifications/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>How to find what column caused the String or binary data would be truncated message</title>
+		<link>/index.php/datamgmt/datadesign/how-to-find-what-column/</link>
+		<comments>/index.php/datamgmt/datadesign/how-to-find-what-column/#comments</comments>
+		<pubDate>Wed, 27 Jul 2011 15:39:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[errors]]></category>
+		<category><![CDATA[importing]]></category>
+		<category><![CDATA[truncation]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/07/how-to-find-what-column/</guid>
+		<description><![CDATA[How to find what column caused the String or binary data would be truncated message. Sometimes you get data from Excel or another system and you need to import that data into your tables. Some people will use an import wizard and all the columns will be nvarchar(255) in the import table]]></description>
+				<content:encoded><![CDATA[<p>Sometimes you get data from Excel or another system and you need to import that data into your tables. Some people will use an import wizard and all the columns will be nvarchar(255) in the import table</p>
+<p>Here is an example of a table created by the import/export wizard based on an Excel file</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Sheet1$<span class="br0">&#93;</span> <span class="br0">&#40;</span>
+<span class="br0">&#91;</span>emailaddress<span class="br0">&#93;</span> <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>,
+<span class="br0">&#91;</span><span class="kw1">Value</span><span class="br0">&#93;</span> <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>,
+<span class="br0">&#91;</span>CategoryName<span class="br0">&#93;</span> <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>,
+<span class="br0">&#91;</span>CategoryDescription<span class="br0">&#93;</span> <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>,
+<span class="br0">&#91;</span>CategoryID<span class="br0">&#93;</span> <span class="kw1">float</span>,
+<span class="br0">&#91;</span>UserAdditionalInfoTextValue<span class="br0">&#93;</span> <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>,
+<span class="br0">&#91;</span>F9<span class="br0">&#93;</span> <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>
+<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE [dbo].[Sheet1$] (
+[emailaddress] nvarchar(255),
+[Value] nvarchar(255),
+[CategoryName] nvarchar(255),
+[CategoryDescription] nvarchar(255),
+[CategoryID] float,
+[UserAdditionalInfoTextValue] nvarchar(255),
+[F9] nvarchar(255)
+)</pre></div></div>
+
+<p>Sometimes the data that you are importing won&#8217;t fit into your column and you get the helpful  <strong>String or binary data would be truncated</strong> message.<br />
+Of course it doesn&#8217;t tell you which column it is, now you need to figure out which column and compare the tables</p>
+<p>I will show you what I mean, first create these two tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">use</span> tempdb
+go
+&nbsp;
+<span class="kw1">create</span> <span class="kw1">table</span> TestTrunc<span class="br0">&#40;</span>
+&nbsp; &nbsp; Col1 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; Col2 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">15</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; Col3 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; Col4 <span class="kw1">nchar</span><span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; Col5 <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; Go
+&nbsp; &nbsp; 
+&nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">create</span> <span class="kw1">table</span> temp<span class="br0">&#40;</span>
+&nbsp; &nbsp; Col1 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; Col2 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; Col3 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; Col4 <span class="kw1">nchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; Col5 <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span><span class="br0">&#41;</span>&nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">use tempdb
+go
+
+create table TestTrunc(
+	Col1 varchar(10),
+	Col2 varchar(15),
+	Col3 varchar(20),
+	Col4 nchar(3),
+	Col5 nvarchar(10))
+	Go
+	
+	
+	create table temp(
+	Col1 varchar(50),
+	Col2 varchar(50),
+	Col3 varchar(50),
+	Col4 nchar(10),
+	Col5 nvarchar(50))		
+	GO</pre></div></div>
+
+<p>Now let&#8217;s insert some data into the temp table	</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> &nbsp;temp
+<span class="kw1">select</span> <span class="st0">'1234567890'</span>,<span class="st0">'12345678901234567890'</span>,<span class="st0">'bla'</span>,<span class="st0">'1234'</span>,<span class="st0">'123456789011111'</span> &nbsp; 
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'1234567890111'</span>,<span class="st0">'1233'</span>,<span class="st0">'bla111'</span>,<span class="st0">'1234'</span>,<span class="st0">'123456111'</span> &nbsp; </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert 	temp
+select '1234567890','12345678901234567890','bla','1234','123456789011111'	
+union all
+select '1234567890111','1233','bla111','1234','123456111'	</pre></div></div>
+
+<p>If we now try to insert the data from the temp table into the TestTrunc table it will blow up</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> TestTrunc
+<span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> temp</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert TestTrunc
+select * from temp</pre></div></div>
+
+<p><em>Msg 8152, Level 16, State 14, Line 1<br />
+String or binary data would be truncated.<br />
+The statement has been terminated.</em></p>
+<p>Yes, very nice&#8230;.could you indicate which column it actually has a problem with?</p>
+<p>Now the purpose of this post is to create code that you then can modify for your own needs and can use it to compare any two tables.</p>
+<p>First thing we need to know is what the columns are in the table that are (n)chars or (n)varchar</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> column_name
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> <span class="st0">'temp'</span>
+and data_type in<span class="br0">&#40;</span><span class="st0">'varchar'</span>,<span class="st0">'char'</span>,<span class="st0">'nvarchar'</span>,<span class="st0">'nchar'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select column_name
+from information_schema.columns
+where table_name = 'temp'
+and data_type in('varchar','char','nvarchar','nchar')</pre></div></div>
+
+<p>
+column_name<br />
+&#8212;&#8212;&#8212;&#8212;&#8211;<br />
+Col1<br />
+Col2<br />
+Col3<br />
+Col4<br />
+Col5</p>
+<p>That was easy, now we want to know the max length of the data in each column</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @<span class="kw1">sql</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">8000</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="st0">'select &nbsp;0 as _col0 ,'</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span> &nbsp; <span class="st0">'max(len( '</span> <span class="sy0">+</span> column_name<span class="sy0">+</span> <span class="st0">')) AS '</span> <span class="sy0">+</span> column_name <span class="sy0">+</span> <span class="st0">','</span> 
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> <span class="st0">'temp'</span>
+and data_type in<span class="br0">&#40;</span><span class="st0">'varchar'</span>,<span class="st0">'char'</span>,<span class="st0">'nvarchar'</span>,<span class="st0">'nchar'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">sql</span>,<span class="kw2">len</span><span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span> <span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span><span class="st0">' into MaxLengths from temp'</span>
+&nbsp;
+<span class="co1">--select @sql -debugging so simple, a caveman can do it</span>
+&nbsp;
+<span class="kw1">exec</span> <span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @sql varchar(8000)
+select @sql = 'select  0 as _col0 ,'
+select @sql +=   'max(len( ' + column_name+ ')) AS ' + column_name + ',' 
+from information_schema.columns
+where table_name = 'temp'
+and data_type in('varchar','char','nvarchar','nchar')
+
+select @sql = left(@sql,len(@sql) -1)
+select @sql +=' into MaxLengths from temp'
+
+--select @sql -debugging so simple, a caveman can do it
+
+exec (@sql)</pre></div></div>
+
+<p>That code basically creates and runs the following </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> &nbsp;<span class="nu0">0</span> <span class="kw1">as</span> _col0 ,
+&nbsp; &nbsp; <span class="kw2">max</span><span class="br0">&#40;</span><span class="kw2">len</span><span class="br0">&#40;</span> Col1<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">AS</span> Col1,
+&nbsp; &nbsp; <span class="kw2">max</span><span class="br0">&#40;</span><span class="kw2">len</span><span class="br0">&#40;</span> Col2<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">AS</span> Col2,
+&nbsp; &nbsp; <span class="kw2">max</span><span class="br0">&#40;</span><span class="kw2">len</span><span class="br0">&#40;</span> Col3<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">AS</span> Col3,
+&nbsp; &nbsp; <span class="kw2">max</span><span class="br0">&#40;</span><span class="kw2">len</span><span class="br0">&#40;</span> Col4<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">AS</span> Col4,
+&nbsp; &nbsp; <span class="kw2">max</span><span class="br0">&#40;</span><span class="kw2">len</span><span class="br0">&#40;</span> Col5<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">AS</span> Col5 
+<span class="kw1">into</span> MaxLengths 
+<span class="kw1">from</span> temp</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select  0 as _col0 ,
+	max(len( Col1)) AS Col1,
+	max(len( Col2)) AS Col2,
+	max(len( Col3)) AS Col3,
+	max(len( Col4)) AS Col4,
+	max(len( Col5)) AS Col5 
+into MaxLengths 
+from temp</pre></div></div>
+
+<p>If we now look in the MaxLengths table we will see the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> MaxLengths</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from MaxLengths</pre></div></div>
+
+<p></p>
+<pre>_col0	Col1	Col2	Col3	Col4	Col5
+---------------------------------------------------
+0	13	20	6	4	15</pre>
+<p>Next to figure out is what the max length of the column itself is in the table that we want to insert into<br />
+Run the following query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> character_maximum_length,column_name
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> <span class="st0">'TestTrunc'</span>
+and data_type in<span class="br0">&#40;</span><span class="st0">'varchar'</span>,<span class="st0">'char'</span>,<span class="st0">'nvarchar'</span>,<span class="st0">'nchar'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select character_maximum_length,column_name
+from information_schema.columns
+where table_name = 'TestTrunc'
+and data_type in('varchar','char','nvarchar','nchar')</pre></div></div>
+
+<p>Here is the result<br />
+</p>
+<pre>character_maximum_length	column_name
+--------------------------------------------
+10				Col1
+15				Col2
+20				Col3
+3				Col4
+10				Col5</pre>
+<p>We will again do this dynamically and insert the values into another table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @<span class="kw1">sql</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">8000</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="st0">'select 0 as _col0, '</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span> &nbsp; <span class="st0">''</span> <span class="sy0">+</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,character_maximum_length<span class="br0">&#41;</span><span class="sy0">+</span> <span class="st0">' AS '</span> <span class="sy0">+</span> column_name <span class="sy0">+</span> <span class="st0">','</span> 
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> <span class="st0">'TestTrunc'</span>
+and data_type in<span class="br0">&#40;</span><span class="st0">'varchar'</span>,<span class="st0">'char'</span>,<span class="st0">'nvarchar'</span>,<span class="st0">'nchar'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">sql</span>,<span class="kw2">len</span><span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span> <span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span><span class="st0">' into TempTrunc '</span>
+&nbsp;
+<span class="co1">--select @sql -debugging so simple, a caveman can do it</span>
+&nbsp;
+<span class="kw1">exec</span> <span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @sql varchar(8000)
+select @sql = 'select 0 as _col0, '
+select @sql +=   '' + convert(varchar(20),character_maximum_length)+ ' AS ' + column_name + ',' 
+from information_schema.columns
+where table_name = 'TestTrunc'
+and data_type in('varchar','char','nvarchar','nchar')
+
+select @sql = left(@sql,len(@sql) -1)
+select @sql +=' into TempTrunc '
+
+--select @sql -debugging so simple, a caveman can do it
+
+exec (@sql)</pre></div></div>
+
+<p>Now we can see what we have in the two tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="st0">'TempTrunc'</span> <span class="kw1">as</span> TableNAme,<span class="sy0">*</span> <span class="kw1">from</span> TempTrunc
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="st0">'MaxLengths'</span> <span class="kw1">as</span> TableNAme,<span class="sy0">*</span> <span class="kw1">from</span> MaxLengths</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select 'TempTrunc' as TableNAme,* from TempTrunc
+union all
+select 'MaxLengths' as TableNAme,* from MaxLengths</pre></div></div>
+
+<p></p>
+<pre>TableNAme	_col0	Col1	Col2	Col3	Col4	Col5
+-------------------------------------------------------------
+TempTrunc	0	10	15	20	3	10
+MaxLengths	0	13	20	6	4	15</pre>
+<p>As you can see, all columns except for Col3 will cause the truncation problem<br />
+Of course we want to do something like this, it will tell us which columns have truncation problems</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> &nbsp;<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col1</span> <span class="sy0">&gt;</span> tt.<span class="me1">col1</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> <span class="kw1">else</span> <span class="st0">'no truncation'</span> <span class="kw1">end</span> <span class="kw1">as</span> Col1,
+&nbsp;<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col2</span> <span class="sy0">&gt;</span> tt.<span class="me1">col2</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> <span class="kw1">else</span> <span class="st0">'no truncation'</span> <span class="kw1">end</span> <span class="kw1">as</span> Col2,
+&nbsp;<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col3</span> <span class="sy0">&gt;</span> tt.<span class="me1">col3</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> <span class="kw1">else</span> <span class="st0">'no truncation'</span> &nbsp;<span class="kw1">end</span> <span class="kw1">as</span> Col3,
+&nbsp;<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col4</span> <span class="sy0">&gt;</span> tt.<span class="me1">col4</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> &nbsp;<span class="kw1">else</span> <span class="st0">'no truncation'</span> <span class="kw1">end</span> <span class="kw1">as</span> Col4,
+&nbsp;<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col5</span> <span class="sy0">&gt;</span> tt.<span class="me1">col5</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> <span class="kw1">else</span> <span class="st0">'no truncation'</span> &nbsp;<span class="kw1">end</span> <span class="kw1">as</span> Col5
+&nbsp; &nbsp;<span class="kw1">from</span> MaxLengths t
+join TempTrunc tt <span class="kw1">on</span> t._col0 <span class="sy0">=</span> tt._col0</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select  case when  t.col1 &gt; tt.col1 then 'truncation' else 'no truncation' end as Col1,
+ case when  t.col2 &gt; tt.col2 then 'truncation' else 'no truncation' end as Col2,
+ case when  t.col3 &gt; tt.col3 then 'truncation' else 'no truncation'  end as Col3,
+ case when  t.col4 &gt; tt.col4 then 'truncation'  else 'no truncation' end as Col4,
+ case when  t.col5 &gt; tt.col5 then 'truncation' else 'no truncation'  end as Col5
+   from MaxLengths t
+join TempTrunc tt on t._col0 = tt._col0</pre></div></div>
+
+<p></p>
+<pre>Col1		Col2		Col3			Col4		Col5
+------------------------------------------------------------------------------------
+truncation	truncation	no truncation	     truncation	     truncation</pre>
+<p>And again, we will use a dynamic approach, we don&#8217;t know the real column names</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @<span class="kw1">sql</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">8000</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="st0">'select &nbsp;'</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span> &nbsp; <span class="st0">''</span> <span class="sy0">+</span> <span class="st0">'case when &nbsp;t.'</span> <span class="sy0">+</span> column_name <span class="sy0">+</span> <span class="st0">' &gt; tt.'</span> <span class="sy0">+</span> column_name
+<span class="sy0">+</span> <span class="st0">' then '</span><span class="st0">'truncation'</span><span class="st0">' else '</span><span class="st0">'no truncation'</span><span class="st0">' end as '</span><span class="sy0">+</span> column_name
+<span class="sy0">+</span> <span class="st0">','</span> 
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> <span class="st0">'MaxLengths'</span>
+and column_name <span class="sy0">&lt;&gt;</span> <span class="st0">'_col0'</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">sql</span>,<span class="kw2">len</span><span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span> <span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span><span class="st0">' &nbsp;from MaxLengths t</span>
+<span class="st0">join TempTrunc tt on t._col0 = tt._col0 '</span>
+&nbsp;
+<span class="co1">--select @sql -debugging so simple, a caveman can do it</span>
+&nbsp;
+<span class="kw1">exec</span> <span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @sql varchar(8000)
+select @sql = 'select  '
+select @sql +=   '' + 'case when  t.' + column_name + ' &gt; tt.' + column_name
++ ' then ''truncation'' else ''no truncation'' end as '+ column_name
++ ',' 
+from information_schema.columns
+where table_name = 'MaxLengths'
+and column_name &lt;&gt; '_col0'
+select @sql = left(@sql,len(@sql) -1)
+select @sql +='  from MaxLengths t
+join TempTrunc tt on t._col0 = tt._col0 '
+
+--select @sql -debugging so simple, a caveman can do it
+
+exec (@sql)</pre></div></div>
+
+<p></p>
+<pre>Col1		Col2		Col3			Col4		Col5
+------------------------------------------------------------------------------------
+truncation	truncation	no truncation	      truncation    truncation</pre>
+<p>That is all there is to it, you can of course customize it by passing in the table names and make this part of your toolkit to quickly see where the problem is</p>
+<h2>Making it truly dynamic</h2>
+<p>Here is what it would look like with dynamic table names</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @ImportTable <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">declare</span> @DestinationTable <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @ImportTable <span class="sy0">=</span> <span class="st0">'temp'</span>
+<span class="kw1">select</span> @DestinationTable <span class="sy0">=</span> <span class="st0">'TestTrunc'</span>
+&nbsp;
+<span class="kw1">declare</span> @ImportTableCompare <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">declare</span> @DestinationTableCompare <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @ImportTableCompare <span class="sy0">=</span> <span class="st0">'MaxLengths'</span>
+<span class="kw1">select</span> @DestinationTableCompare <span class="sy0">=</span> <span class="st0">'TempTrunc'</span>
+&nbsp;
+&nbsp;
+<span class="kw1">declare</span> @<span class="kw1">sql</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">8000</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> &nbsp;<span class="sy0">=</span> <span class="st0">''</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="st0">'select &nbsp;0 as _col0 ,'</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span> &nbsp; <span class="st0">'max(len( '</span> <span class="sy0">+</span> column_name<span class="sy0">+</span> <span class="st0">')) AS '</span> <span class="sy0">+</span> column_name <span class="sy0">+</span> <span class="st0">','</span> 
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> @ImportTable
+and data_type in<span class="br0">&#40;</span><span class="st0">'varchar'</span>,<span class="st0">'char'</span>,<span class="st0">'nvarchar'</span>,<span class="st0">'nchar'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">sql</span>,<span class="kw2">len</span><span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span> <span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span><span class="st0">' into '</span> <span class="sy0">+</span> @ImportTableCompare <span class="sy0">+</span> <span class="st0">' from '</span> <span class="sy0">+</span> @ImportTable
+&nbsp;
+<span class="co1">--select @sql -debugging so simple, a caveman can do it</span>
+&nbsp;
+<span class="kw1">exec</span> <span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">sql</span> &nbsp;<span class="sy0">=</span> <span class="st0">''</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="st0">'select 0 as _col0, '</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span> &nbsp; <span class="st0">''</span> <span class="sy0">+</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,character_maximum_length<span class="br0">&#41;</span><span class="sy0">+</span> <span class="st0">' AS '</span> <span class="sy0">+</span> column_name <span class="sy0">+</span> <span class="st0">','</span> 
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> @DestinationTable
+and data_type in<span class="br0">&#40;</span><span class="st0">'varchar'</span>,<span class="st0">'char'</span>,<span class="st0">'nvarchar'</span>,<span class="st0">'nchar'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">sql</span>,<span class="kw2">len</span><span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span> <span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span><span class="st0">' into '</span> <span class="sy0">+</span> @DestinationTableCompare
+&nbsp;
+<span class="co1">--select @sql -debugging so simple, a caveman can do it</span>
+&nbsp;
+<span class="kw1">exec</span> <span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">select</span> @<span class="kw1">sql</span> &nbsp;<span class="sy0">=</span> <span class="st0">''</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="st0">'select &nbsp;'</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span> &nbsp; <span class="st0">''</span> <span class="sy0">+</span> <span class="st0">'case when &nbsp;t.'</span> <span class="sy0">+</span> column_name <span class="sy0">+</span> <span class="st0">' &gt; tt.'</span> <span class="sy0">+</span> column_name
+<span class="sy0">+</span> <span class="st0">' then '</span><span class="st0">'truncation'</span><span class="st0">' else '</span><span class="st0">'no truncation'</span><span class="st0">' end as '</span><span class="sy0">+</span> column_name
+<span class="sy0">+</span> <span class="st0">','</span> 
+<span class="kw1">from</span> information_schema.<span class="me1">columns</span>
+<span class="kw1">where</span> table_name <span class="sy0">=</span> @ImportTableCompare
+and column_name <span class="sy0">&lt;&gt;</span> <span class="st0">'_col0'</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="kw1">left</span><span class="br0">&#40;</span>@<span class="kw1">sql</span>,<span class="kw2">len</span><span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span> <span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> @<span class="kw1">sql</span> <span class="sy0">+=</span><span class="st0">' &nbsp;from '</span> <span class="sy0">+</span> @ImportTableCompare <span class="sy0">+</span> <span class="st0">' t</span>
+<span class="st0">join '</span> <span class="sy0">+</span> @DestinationTableCompare <span class="sy0">+</span> <span class="st0">' tt on t._col0 = tt._col0 '</span>
+&nbsp;
+<span class="co1">--select @sql -debugging so simple, a caveman can do it</span>
+&nbsp;
+<span class="kw1">exec</span> <span class="br0">&#40;</span>@<span class="kw1">sql</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">exec</span> <span class="br0">&#40;</span><span class="st0">'drop table '</span> <span class="sy0">+</span> @ImportTableCompare<span class="sy0">+</span> <span class="st0">','</span> <span class="sy0">+</span> @DestinationTableCompare <span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @ImportTable varchar(100)
+declare @DestinationTable varchar(100)
+select @ImportTable = 'temp'
+select @DestinationTable = 'TestTrunc'
+
+declare @ImportTableCompare varchar(100)
+declare @DestinationTableCompare varchar(100)
+select @ImportTableCompare = 'MaxLengths'
+select @DestinationTableCompare = 'TempTrunc'
+
+
+declare @sql varchar(8000)
+select @sql  = ''
+select @sql = 'select  0 as _col0 ,'
+select @sql +=   'max(len( ' + column_name+ ')) AS ' + column_name + ',' 
+from information_schema.columns
+where table_name = @ImportTable
+and data_type in('varchar','char','nvarchar','nchar')
+
+select @sql = left(@sql,len(@sql) -1)
+select @sql +=' into ' + @ImportTableCompare + ' from ' + @ImportTable
+
+--select @sql -debugging so simple, a caveman can do it
+
+exec (@sql)
+
+
+
+select @sql  = ''
+select @sql = 'select 0 as _col0, '
+select @sql +=   '' + convert(varchar(20),character_maximum_length)+ ' AS ' + column_name + ',' 
+from information_schema.columns
+where table_name = @DestinationTable
+and data_type in('varchar','char','nvarchar','nchar')
+
+select @sql = left(@sql,len(@sql) -1)
+select @sql +=' into ' + @DestinationTableCompare
+
+--select @sql -debugging so simple, a caveman can do it
+
+exec (@sql)
+
+
+select @sql  = ''
+select @sql = 'select  '
+select @sql +=   '' + 'case when  t.' + column_name + ' &gt; tt.' + column_name
++ ' then ''truncation'' else ''no truncation'' end as '+ column_name
++ ',' 
+from information_schema.columns
+where table_name = @ImportTableCompare
+and column_name &lt;&gt; '_col0'
+select @sql = left(@sql,len(@sql) -1)
+select @sql +='  from ' + @ImportTableCompare + ' t
+join ' + @DestinationTableCompare + ' tt on t._col0 = tt._col0 '
+
+--select @sql -debugging so simple, a caveman can do it
+
+exec (@sql)
+
+
+exec ('drop table ' + @ImportTableCompare+ ',' + @DestinationTableCompare )</pre></div></div>
+
+<p></p>
+<h3>To Do list</h3>
+<p>Here are some things for you to add&#8230;&#8230;.</p>
+<p>Now if you have worked with SQL Server for a while now, you might notice that what I did was not really what you would call defensive programming.<br />
+Can you tell what I forgot?</p>
+<p><strong>1)</strong> if the column name has spaces or other weird characters I am not taking care of that. To take care of that use the QUOTENAME function or put brackets around column_name</p>
+<p><strong>2)</strong> I also didn&#8217;t look at the schema the table is in, you can use the TABLE_SCHEMA column for that, and the same applies as for columns, use QUOTENAME to take care of schemas that have an invalid name.</p>
+<p><strong>3)</strong> LEN trims spaces, be aware of that otherwise you might still get truncation if inserting into a char column.</p>
+<p>example</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">table</span> TestTrim<span class="br0">&#40;</span>SomeData <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+go
+&nbsp;
+<span class="kw1">declare</span> @d <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'12 &nbsp;'</span>
+<span class="kw1">select</span> <span class="kw2">len</span><span class="br0">&#40;</span>@d<span class="br0">&#41;</span> <span class="kw1">as</span> <span class="kw2">len</span> ,datalength<span class="br0">&#40;</span>@d<span class="br0">&#41;</span> <span class="kw1">as</span> datalength
+&nbsp;
+<span class="co1">--len &nbsp; datalength</span>
+<span class="co1">--2 &nbsp; &nbsp; 5</span>
+&nbsp;
+&nbsp;
+<span class="kw1">insert</span> TestTrim
+<span class="kw1">values</span> <span class="br0">&#40;</span>@d<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">select</span> <span class="sy0">*</span>,<span class="kw2">len</span><span class="br0">&#40;</span>SomeData<span class="br0">&#41;</span> <span class="kw1">as</span> <span class="kw2">len</span>,datalength<span class="br0">&#40;</span>SomeData<span class="br0">&#41;</span> &nbsp;<span class="kw1">as</span> datalength
+<span class="kw1">from</span> TestTrim
+<span class="co1">--SomeData&nbsp; len &nbsp; &nbsp; datalength</span>
+<span class="co1">--12 &nbsp; &nbsp;&nbsp; &nbsp; 2 &nbsp; &nbsp; &nbsp; 3</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create table TestTrim(SomeData char(3))
+go
+
+declare @d char(5) = '12  '
+select len(@d) as len ,datalength(@d) as datalength
+
+--len	datalength
+--2		5
+
+
+insert TestTrim
+values (@d)
+
+select *,len(SomeData) as len,datalength(SomeData)  as datalength
+from TestTrim
+--SomeData	len		datalength
+--12 		2		3</pre></div></div>
+
+<p><strong>4)</strong> The columns that have varchar(max) values<br />
+Create this table<br />
+create table TestTrim(SomeData varchar(max))<br />
+go</p>
+<p>Now run this and observe character_maximum_length<br />
+select * from information_schema.columns<br />
+where table_name = &#8216;TestTrim&#8217;</p>
+<p>As you can see the character_maximum_length is  -1 for (max) columns, you need to take that into account</p>
+<p><strong>5)</strong> If your database uses a case sensitive collation then you need to take that into account with column and table names</p>
+<p>That is it for this post, hopefully the code helps you to find out where the truncation occurs and if you do the 5 modifications like I suggested it should be pretty bullet proof</p>
+<p>Bonus, use IIF instead of CASE.<br />
+If you are using SQL Server Denali CTP3 or up, you can use IIF instead of CASE. See <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/a-quick-look-at-the">A Quick look at the new IIF function in Denali CTP3 for more information about IIF</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> &nbsp;
+<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col1</span> <span class="sy0">&gt;</span> tt.<span class="me1">col1</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> <span class="kw1">else</span> <span class="st0">'no truncation'</span> <span class="kw1">end</span> <span class="kw1">as</span> Col1,
+<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col2</span> <span class="sy0">&gt;</span> tt.<span class="me1">col2</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> <span class="kw1">else</span> <span class="st0">'no truncation'</span> <span class="kw1">end</span> <span class="kw1">as</span> Col2,
+<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col3</span> <span class="sy0">&gt;</span> tt.<span class="me1">col3</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> <span class="kw1">else</span> <span class="st0">'no truncation'</span> &nbsp;<span class="kw1">end</span> <span class="kw1">as</span> Col3,
+<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col4</span> <span class="sy0">&gt;</span> tt.<span class="me1">col4</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> <span class="kw1">else</span> <span class="st0">'no truncation'</span> <span class="kw1">end</span> <span class="kw1">as</span> Col4,
+<span class="kw1">case</span> <span class="kw1">when</span> &nbsp;t.<span class="me1">col5</span> <span class="sy0">&gt;</span> tt.<span class="me1">col5</span> <span class="kw1">then</span> <span class="st0">'truncation'</span> <span class="kw1">else</span> <span class="st0">'no truncation'</span> &nbsp;<span class="kw1">end</span> <span class="kw1">as</span> Col5
+<span class="kw1">from</span> MaxLengths t
+join TempTrunc tt <span class="kw1">on</span> t._col0 <span class="sy0">=</span> tt._col0</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select  
+case when  t.col1 &gt; tt.col1 then 'truncation' else 'no truncation' end as Col1,
+case when  t.col2 &gt; tt.col2 then 'truncation' else 'no truncation' end as Col2,
+case when  t.col3 &gt; tt.col3 then 'truncation' else 'no truncation'  end as Col3,
+case when  t.col4 &gt; tt.col4 then 'truncation' else 'no truncation' end as Col4,
+case when  t.col5 &gt; tt.col5 then 'truncation' else 'no truncation'  end as Col5
+from MaxLengths t
+join TempTrunc tt on t._col0 = tt._col0</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> &nbsp;
+IIF<span class="br0">&#40;</span>t.<span class="me1">col1</span> <span class="sy0">&gt;</span> tt.<span class="me1">col1</span>,<span class="st0">'truncation'</span>,<span class="st0">'no truncation'</span><span class="br0">&#41;</span> <span class="kw1">as</span> Col1,
+IIF<span class="br0">&#40;</span>t.<span class="me1">col2</span> <span class="sy0">&gt;</span> tt.<span class="me1">col2</span>,<span class="st0">'truncation'</span>,<span class="st0">'no truncation'</span><span class="br0">&#41;</span> <span class="kw1">as</span> Col2,
+IIF<span class="br0">&#40;</span>t.<span class="me1">col3</span> <span class="sy0">&gt;</span> tt.<span class="me1">col3</span>,<span class="st0">'truncation'</span>,<span class="st0">'no truncation'</span><span class="br0">&#41;</span> <span class="kw1">as</span> Col3,
+IIF<span class="br0">&#40;</span>t.<span class="me1">col4</span> <span class="sy0">&gt;</span> tt.<span class="me1">col4</span>,<span class="st0">'truncation'</span>,<span class="st0">'no truncation'</span><span class="br0">&#41;</span> <span class="kw1">as</span> Col4,
+IIF<span class="br0">&#40;</span>t.<span class="me1">col5</span> <span class="sy0">&gt;</span> tt.<span class="me1">col5</span>,<span class="st0">'truncation'</span>,<span class="st0">'no truncation'</span><span class="br0">&#41;</span> <span class="kw1">as</span> Col5
+<span class="kw1">from</span> MaxLengths t
+join TempTrunc tt <span class="kw1">on</span> t._col0 <span class="sy0">=</span> tt._col0</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select  
+IIF(t.col1 &gt; tt.col1,'truncation','no truncation') as Col1,
+IIF(t.col2 &gt; tt.col2,'truncation','no truncation') as Col2,
+IIF(t.col3 &gt; tt.col3,'truncation','no truncation') as Col3,
+IIF(t.col4 &gt; tt.col4,'truncation','no truncation') as Col4,
+IIF(t.col5 &gt; tt.col5,'truncation','no truncation') as Col5
+from MaxLengths t
+join TempTrunc tt on t._col0 = tt._col0</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/how-to-find-what-column/feed/</wfw:commentRss>
+		<slash:comments>13</slash:comments>
+		</item>
+		<item>
+		<title>Trapping errors when working with linked servers</title>
+		<link>/index.php/datamgmt/datadesign/trapping-errors-when-working-with/</link>
+		<comments>/index.php/datamgmt/datadesign/trapping-errors-when-working-with/#comments</comments>
+		<pubDate>Tue, 15 Feb 2011 15:07:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[errors]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[linked servers]]></category>
+		<category><![CDATA[trapping]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/02/trapping-errors-when-working-with/</guid>
+		<description><![CDATA[I have a bunch of linked servers to SQL Servers and also to Sybase ASE Servers ON AIX machines. There are some interesting things that can happen. For example if you type the name of the object or the linked server itself wrong, you can't trap this.....&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I have a bunch of linked servers to SQL Servers and also to Sybase ASE Servers ON AIX machines. There are some interesting things that can happen. For example if you type the name of the object or the linked server itself wrong, you can&#8217;t trap this&#8230;.. or can you?</p>
+<p>Let&#8217;s take a look. Open up SSMS and connect to your local instance. Now create a linked server named TestLinkedServer which points to the local server. The code to do that is below.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> master.<span class="me1">dbo</span>.<span class="kw3">SP_ADDLINKEDSERVER</span> @server <span class="sy0">=</span> N<span class="st0">'TestLinkedServer'</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;@srvproduct<span class="sy0">=</span>N<span class="st0">''</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;@datasrc<span class="sy0">=</span><span class="st0">'(local)'</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;@provider<span class="sy0">=</span><span class="st0">'SQLNCLI'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC master.dbo.SP_ADDLINKEDSERVER @server = N'TestLinkedServer',
+                                   @srvproduct=N'',
+                                   @datasrc='(local)',
+                                   @provider='SQLNCLI'</pre></div></div>
+
+<p>Now we can do a small test, run the following code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> <span class="kw1">OPENQUERY</span><span class="br0">&#40;</span>TestLinkedServer,<span class="st0">'select count(*) from tempdb..sysobjects'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM OPENQUERY(TestLinkedServer,'select count(*) from tempdb..sysobjects')</pre></div></div>
+
+<p>That should return an integer.</p>
+<p>If we try something more interesting like a division by zero, will it get trapped?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BEGIN</span> <span class="kw1">TRY</span> &nbsp; 
+&nbsp; &nbsp; &nbsp;<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> <span class="kw1">OPENQUERY</span><span class="br0">&#40;</span>TestLinkedServer,<span class="st0">'select 1/0'</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">TRY</span>
+&nbsp;
+<span class="kw1">BEGIN</span> <span class="kw1">CATCH</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">PRINT</span> ERR<span class="sy0">OR</span>_MESSAGE<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">PRINT</span> &nbsp;ERR<span class="sy0">OR</span>_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">CATCH</span>
+<span class="kw1">PRINT</span> <span class="st0">'TEST'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BEGIN TRY	
+	 SELECT * FROM OPENQUERY(TestLinkedServer,'select 1/0')
+END TRY
+
+BEGIN CATCH
+	 
+	PRINT ERROR_MESSAGE() 
+	PRINT  ERROR_NUMBER()
+END CATCH
+PRINT 'TEST'</pre></div></div>
+
+<p><em>Divide by zero error encountered.<br />
+8134<br />
+TEST</em></p>
+<p>Yes, that worked just as expected.<br />
+Now what do you think will happen if we change the table name from sysobjects to sysobjects2? Let&#8217;s run it and see</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BEGIN</span> <span class="kw1">TRY</span> &nbsp; 
+&nbsp; &nbsp; &nbsp;<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> <span class="kw1">OPENQUERY</span><span class="br0">&#40;</span>TestLinkedServer,<span class="st0">'select count(*) from tempdb..sysobjects2'</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">TRY</span>
+&nbsp;
+<span class="kw1">BEGIN</span> <span class="kw1">CATCH</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">PRINT</span> ERR<span class="sy0">OR</span>_MESSAGE<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">PRINT</span> &nbsp;ERR<span class="sy0">OR</span>_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">CATCH</span>
+<span class="kw1">PRINT</span> <span class="st0">'TEST'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BEGIN TRY	
+	 SELECT * FROM OPENQUERY(TestLinkedServer,'select count(*) from tempdb..sysobjects2')
+END TRY
+
+BEGIN CATCH
+	 
+	PRINT ERROR_MESSAGE() 
+	PRINT  ERROR_NUMBER()
+END CATCH
+PRINT 'TEST'</pre></div></div>
+
+<p><em>OLE DB provider &#8220;SQLNCLI10&#8221; for linked server &#8220;TestLinkedServer&#8221; returned message &#8220;Deferred prepare could not be completed.&#8221;.<br />
+Msg 8180, Level 16, State 1, Line 1<br />
+Statement(s) could not be prepared.<br />
+Msg 208, Level 16, State 1, Line 1<br />
+Invalid object name &#8216;tempdb..sysobjects2&#8217;.</em></p>
+<p>Ouch it blew up on us and never made it to the print statement.</p>
+<p>How about if we use TestLinkedServer2 instead of TestLinkedServer?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BEGIN</span> <span class="kw1">TRY</span> &nbsp; 
+&nbsp; &nbsp; &nbsp;<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> <span class="kw1">OPENQUERY</span><span class="br0">&#40;</span>TestLinkedServer2,<span class="st0">'select count(*) from tempdb..sysobjects'</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">TRY</span>
+&nbsp;
+<span class="kw1">BEGIN</span> <span class="kw1">CATCH</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">PRINT</span> ERR<span class="sy0">OR</span>_MESSAGE<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">PRINT</span> &nbsp;ERR<span class="sy0">OR</span>_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">CATCH</span>
+<span class="kw1">PRINT</span> <span class="st0">'TEST'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BEGIN TRY	
+	 SELECT * FROM OPENQUERY(TestLinkedServer2,'select count(*) from tempdb..sysobjects')
+END TRY
+
+BEGIN CATCH
+	 
+	PRINT ERROR_MESSAGE() 
+	PRINT  ERROR_NUMBER()
+END CATCH
+PRINT 'TEST'</pre></div></div>
+
+<p><em>Msg 7202, Level 11, State 2, Line 4<br />
+Could not find server &#8216;TestLinkedServer2&#8217; in sys.servers. Verify that the correct server name was specified. If necessary, execute the stored procedure sp_addlinkedserver to add the server to sys.servers.</em></p>
+<p>Same problem, blows up and never makes it to the print statement. What if we take the last two examples and wrap them inside an exec statement?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BEGIN</span> <span class="kw1">TRY</span> &nbsp; 
+&nbsp; &nbsp; &nbsp;<span class="kw1">exec</span><span class="br0">&#40;</span> <span class="st0">'SELECT * FROM OPENQUERY(TestLinkedServer,'</span><span class="st0">'select count(*) from tempdb..sysobjects2'</span><span class="st0">')'</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">TRY</span>
+&nbsp;
+<span class="kw1">BEGIN</span> <span class="kw1">CATCH</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">PRINT</span> ERR<span class="sy0">OR</span>_MESSAGE<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">PRINT</span> &nbsp;ERR<span class="sy0">OR</span>_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">CATCH</span>
+<span class="kw1">PRINT</span> <span class="st0">'TEST'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BEGIN TRY	
+	 exec( 'SELECT * FROM OPENQUERY(TestLinkedServer,''select count(*) from tempdb..sysobjects2'')')
+END TRY
+
+BEGIN CATCH
+	 
+	PRINT ERROR_MESSAGE() 
+	PRINT  ERROR_NUMBER()
+END CATCH
+PRINT 'TEST'</pre></div></div>
+
+<p><em>OLE DB provider &#8220;SQLNCLI10&#8221; for linked server &#8220;TestLinkedServer&#8221; returned message &#8220;Deferred prepare could not be completed.&#8221;.<br />
+Invalid object name &#8216;tempdb..sysobjects2&#8217;.<br />
+208<br />
+TEST</em></p>
+<p>That caught the exception and TEST was printed</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BEGIN</span> <span class="kw1">TRY</span> &nbsp; 
+&nbsp; &nbsp; &nbsp;<span class="kw1">exec</span><span class="br0">&#40;</span> <span class="st0">'SELECT * FROM OPENQUERY(TestLinkedServer2,'</span><span class="st0">'select count(*) from tempdb..sysobjects'</span><span class="st0">')'</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">TRY</span>
+&nbsp;
+<span class="kw1">BEGIN</span> <span class="kw1">CATCH</span>
+&nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">PRINT</span> ERR<span class="sy0">OR</span>_MESSAGE<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">PRINT</span> &nbsp;ERR<span class="sy0">OR</span>_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw1">END</span> <span class="kw1">CATCH</span>
+<span class="kw1">PRINT</span> <span class="st0">'TEST'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BEGIN TRY	
+	 exec( 'SELECT * FROM OPENQUERY(TestLinkedServer2,''select count(*) from tempdb..sysobjects'')')
+END TRY
+
+BEGIN CATCH
+	 
+	PRINT ERROR_MESSAGE() 
+	PRINT  ERROR_NUMBER()
+END CATCH
+PRINT 'TEST'</pre></div></div>
+
+<p><em>Could not find server &#8216;TestLinkedServer2&#8217; in sys.servers. Verify that the correct server name was specified. If necessary, execute the stored procedure sp_addlinkedserver to add the server to sys.servers.<br />
+7202<br />
+TEST</em></p>
+<p>Beautiful, Even using a non existent linked server name is caught when using it inside an EXEC statement.</p>
+<p>As you can see it is possible to trap a problem with linked servers if you wrap it inside an Exec statement which you could not trap otherwise. One thing you can&#8217;t trap however is a timeout.</p>
+<p>Here are some of the error messages I trapped on my boxes</p>
+<p>Cannot fetch a row from OLE DB provider &#8220;MSDASQL&#8221; for linked server &#8220;Test&#8221;.<br />
+Cannot initialize the data source object of OLE DB provider &#8220;MSDASQL&#8221; for linked server &#8220;Test&#8221;.<br />
+The OLE DB provider &#8220;MSDASQL&#8221; for linked server &#8220;Test&#8221; could not INSERT INTO table &#8220;[MSDASQL]&#8221;.<br />
+The OLE DB provider &#8220;MSDASQL&#8221; for linked server &#8220;Test&#8221; reported an error committing the current transaction.</p>
+<p>Hope you learned something and hopefully this will help you in your troubles with linked servers</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/trapping-errors-when-working-with/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

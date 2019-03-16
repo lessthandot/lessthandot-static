@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
+		<link rel="shortcut icon" href="http://lessthandot.com/favicon.ico" type="image/vnd.microsoft.icon" />
+	<title>Less Than Dot - Blog -   Removing old files with SSIS</title>
+	<meta prefix="og: http://ogp.me/ns#" property="og:title" content="Less Than Dot - Blog -   Removing old files with SSIS" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:url" content="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/" />
+		<meta prefix="og: http://ogp.me/ns#" property="og:image" content="http://lessthandot.com/images/logo_prod.png" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:site_name" content="LessThanDot" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:description" content="This post will illustrate two methods for removing old files from directories using SSIS.  This task is often used to delete old backup files and other ETL files that are not required any longer.  We’ll step through two methods.  First method uses a script task entirely for the removal and the logging events.  This method will also have some comments in for logging and using the FireInformation method to mimic the normal logging abilities of SSIS.  The FireInformation method didn’t provide much more of a performance boost so it wasn’t used here.  Second method uses a Foreach Loop Container, Script Task for logic and a File System Task for the delete event.  SSIS Logging will be utilized with the OnPreExecute and OnPostExecute events in the second method over the System.IO method of AppendText." />
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0" href="/index.php/feed/" />
+	<link rel="alternate" type="application/atom+xml" title="Atom" href="/index.php/feed/atom/" />
+
+	<!-- this page is the canonical URL -->	
+	<link rel="stylesheet" href="/wp-content/themes/lessthandot2009/style.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsite.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsiteprint.css" media="print" type="text/css" />
+
+	<link rel='dns-prefetch' href='//ajax.googleapis.com' />
+<link rel='dns-prefetch' href='//s.w.org' />
+<link rel="alternate" type="application/rss+xml" title="LessthanDot &raquo; Removing old files with SSIS Comments Feed" href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/feed/" />
+		<script type="text/javascript">
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/svg\/","svgExt":".svg","source":{"concatemoji":"\/wp-includes\/js\/wp-emoji-release.min.js?ver=4.6.1"}};
+			!function(a,b,c){function d(a){var c,d,e,f,g,h=b.createElement("canvas"),i=h.getContext&&h.getContext("2d"),j=String.fromCharCode;if(!i||!i.fillText)return!1;switch(i.textBaseline="top",i.font="600 32px Arial",a){case"flag":return i.fillText(j(55356,56806,55356,56826),0,0),!(h.toDataURL().length<3e3)&&(i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,65039,8205,55356,57096),0,0),c=h.toDataURL(),i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,55356,57096),0,0),d=h.toDataURL(),c!==d);case"diversity":return i.fillText(j(55356,57221),0,0),e=i.getImageData(16,16,1,1).data,f=e[0]+","+e[1]+","+e[2]+","+e[3],i.fillText(j(55356,57221,55356,57343),0,0),e=i.getImageData(16,16,1,1).data,g=e[0]+","+e[1]+","+e[2]+","+e[3],f!==g;case"simple":return i.fillText(j(55357,56835),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode8":return i.fillText(j(55356,57135),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode9":return i.fillText(j(55358,56631),0,0),0!==i.getImageData(16,16,1,1).data[0]}return!1}function e(a){var c=b.createElement("script");c.src=a,c.type="text/javascript",b.getElementsByTagName("head")[0].appendChild(c)}var f,g,h,i;for(i=Array("simple","flag","unicode8","diversity","unicode9"),c.supports={everything:!0,everythingExceptFlag:!0},h=0;h<i.length;h++)c.supports[i[h]]=d(i[h]),c.supports.everything=c.supports.everything&&c.supports[i[h]],"flag"!==i[h]&&(c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&c.supports[i[h]]);c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&!c.supports.flag,c.DOMReady=!1,c.readyCallback=function(){c.DOMReady=!0},c.supports.everything||(g=function(){c.readyCallback()},b.addEventListener?(b.addEventListener("DOMContentLoaded",g,!1),a.addEventListener("load",g,!1)):(a.attachEvent("onload",g),b.attachEvent("onreadystatechange",function(){"complete"===b.readyState&&c.readyCallback()})),f=c.source||{},f.concatemoji?e(f.concatemoji):f.wpemoji&&f.twemoji&&(e(f.twemoji),e(f.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+<link rel='stylesheet' id='bwp-syntax-css'  href='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/css/bwp-syntax-global.css?ver=4.6.1' type='text/css' media='all' />
+<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js?ver=1.12.4'></script>
+<script type='text/javascript' src='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/js/bwp-syntax.js?ver=4.6.1'></script>
+<link rel='https://api.w.org/' href='/wp-json/' />
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="/wp-includes/wlwmanifest.xml" /> 
+<link rel='prev' title='Error: The GetBytes function can only be used on columns of type Text, NText, or Image' href='/index.php/datamgmt/datadesign/error-the-getbytes-function-can-only-be/' />
+<link rel='next' title='How to refresh the local IntelliSense cache in SQL Server Management Studio' href='/index.php/datamgmt/dbprogramming/how-to-refresh-the-local-intellisense-ca/' />
+<meta name="generator" content="WordPress 4.6.1" />
+<link rel="canonical" href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/" />
+<link rel='shortlink' href='/?p=809' />
+<link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdbprogramming%2Fremoving-old-files-with-ssis-sql-server%2F" />
+<link rel="alternate" type="text/xml+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdbprogramming%2Fremoving-old-files-with-ssis-sql-server%2F&#038;format=xml" />
+<style type='text/css'>.rp4wp-related-posts ul{width:100%;padding:0;margin:0;float:left;}
+.rp4wp-related-posts ul>li{list-style:none;padding:0;margin:0;padding-bottom:20px;clear:both;}
+.rp4wp-related-posts ul>li>p{margin:0;padding:0;}
+.rp4wp-related-post-image{width:35%;padding-right:25px;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;float:left;}</style>
+	<script src="http://lessthandot.com/includes/allsite.js" type="text/javascript" ></script>
+</head>
+<body>
+<div id="contain"><div id="subcontain"><div id="ttl"><div id="hdr"><div id="snav"><a href="http://lessthandot.com/login.php?backtrack=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?">Member Login</a>
+</div><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="logoc"><img src="http://lessthandot.com/images/logo_prod.png" alt="LessThanDot Site Logo" border="0" /></a><h1>LessThanDot</h1><div class="pgsttl">A decade of helpful technical content</div></div><div id="nav">
+<ul>
+<li><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="h" ><span>Launchpad</span></a></li>
+<li class="cur"><a href="/" title="LessThanDot Blogs" id="b" ><span>Blogs</span></a></li>
+<li><a href="http://forum.lessthandot.com/" title="LessThanDot Community Forums" id="f" ><span>Forum</span></a></li>
+<li><a href="http://wiki.lessthandot.com/" title="LessThanDot Wiki Articles" id="w" ><span>Wiki</span></a></li>
+<li><a href="http://sqlcop.lessthandot.com/" title="LessThanDot SQLCop" id="a" ><span>SQLCop</span></a></li>
+<li><a href="http://lessthandot.com/account.php" title="Your Account Settings" id="r"  class="l_ie"><span>My Account</span></a></li></ul></div>
+</div><div id="content">
+<div id="fac"><div id="fa">
+		<p>Less Than Dot is a community of passionate IT professionals and enthusiasts dedicated to sharing technical knowledge, experience, and assistance. Inside you will find reference materials, interesting technical discussions, and expert tips and commentary.</p></div></div><div class="content-sidebar">
+	<div id="social" class="sdsec">
+		<h2>LTD Social Sitings</h2>
+		<div>
+		<a id="social_twitter" href="http://twitter.com/LessThanDot/" title="Follow us on Twitter" ><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Lessthandot twitter"/></a> 
+		<a href="http://www.linkedin.com/groups?home=&amp;gid=113440" title="Join us on LinkedIn" ><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="Lessthandot Linkedin" /></a> 
+		<a href="http://www.facebook.com/group.php?gid=19330511063" title="Join us on Facebook" ><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Lessthandot facebook"/></a> 
+		<a href="http://lessthandot.com/rss.php" title="LessThanDot News Feed" ><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="Lessthandot rss"/></a> 
+		</div>
+		<p><em>Note: Watch for social icons on posts by your favorite authors to follow their postings on these and other social sites.</em></p>
+	</div><div class="content-sidebar-section">
+<h2>Tag cloud</h2>
+	<p class="tag-cloud">
+		<a href='/index.php/tag/net/' class='tag-link-245 tag-link-position-1' title='21 topics' style='font-size: 8.9565217391304pt;'>.net</a> <a href='/index.php/tag/asp-net/' class='tag-link-168 tag-link-position-2' title='21 topics' style='font-size: 8.9565217391304pt;'>asp.net</a> <a href='/index.php/tag/azure-2/' class='tag-link-321 tag-link-position-3' title='29 topics' style='font-size: 10.173913043478pt;'>azure</a> <a href='/index.php/tag/book/' class='tag-link-130 tag-link-position-4' title='26 topics' style='font-size: 9.7391304347826pt;'>book</a> <a href='/index.php/tag/business-intelligence-2/' class='tag-link-256 tag-link-position-5' title='30 topics' style='font-size: 10.260869565217pt;'>business intelligence</a> <a href='/index.php/tag/c/' class='tag-link-138 tag-link-position-6' title='40 topics' style='font-size: 11.304347826087pt;'>c#</a> <a href='/index.php/tag/database/' class='tag-link-134 tag-link-position-7' title='31 topics' style='font-size: 10.434782608696pt;'>database</a> <a href='/index.php/tag/excel/' class='tag-link-155 tag-link-position-8' title='16 topics' style='font-size: 8pt;'>excel</a> <a href='/index.php/tag/gotcha/' class='tag-link-240 tag-link-position-9' title='19 topics' style='font-size: 8.6086956521739pt;'>gotcha</a> <a href='/index.php/tag/how-to/' class='tag-link-272 tag-link-position-10' title='44 topics' style='font-size: 11.652173913043pt;'>how to</a> <a href='/index.php/tag/mongodb/' class='tag-link-765 tag-link-position-11' title='17 topics' style='font-size: 8.2608695652174pt;'>mongodb</a> <a href='/index.php/tag/nosql/' class='tag-link-775 tag-link-position-12' title='18 topics' style='font-size: 8.4347826086957pt;'>nosql</a> <a href='/index.php/tag/performance/' class='tag-link-179 tag-link-position-13' title='26 topics' style='font-size: 9.7391304347826pt;'>performance</a> <a href='/index.php/tag/security-2/' class='tag-link-398 tag-link-position-14' title='25 topics' style='font-size: 9.5652173913043pt;'>security</a> <a href='/index.php/tag/sql/' class='tag-link-132 tag-link-position-15' title='42 topics' style='font-size: 11.478260869565pt;'>sql</a> <a href='/index.php/tag/sql-advent-2012/' class='tag-link-1416 tag-link-position-16' title='18 topics' style='font-size: 8.4347826086957pt;'>sql advent 2012</a> <a href='/index.php/tag/sql-friday/' class='tag-link-377 tag-link-position-17' title='18 topics' style='font-size: 8.4347826086957pt;'>sql friday</a> <a href='/index.php/tag/sql-server/' class='tag-link-154 tag-link-position-18' title='145 topics' style='font-size: 16.086956521739pt;'>sql server</a> <a href='/index.php/tag/sql-server-2000/' class='tag-link-366 tag-link-position-19' title='45 topics' style='font-size: 11.739130434783pt;'>sql server 2000</a> <a href='/index.php/tag/sql-server-2005/' class='tag-link-327 tag-link-position-20' title='118 topics' style='font-size: 15.391304347826pt;'>sql server 2005</a> <a href='/index.php/tag/sql-server-2008/' class='tag-link-152 tag-link-position-21' title='237 topics' style='font-size: 18pt;'>sql server 2008</a> <a href='/index.php/tag/sql-server-2008-r2/' class='tag-link-548 tag-link-position-22' title='38 topics' style='font-size: 11.130434782609pt;'>sql server 2008 r2</a> <a href='/index.php/tag/sql-server-2012/' class='tag-link-1161 tag-link-position-23' title='76 topics' style='font-size: 13.739130434783pt;'>sql server 2012</a> <a href='/index.php/tag/ssis-2/' class='tag-link-501 tag-link-position-24' title='52 topics' style='font-size: 12.260869565217pt;'>ssis</a> <a href='/index.php/tag/ssms/' class='tag-link-640 tag-link-position-25' title='18 topics' style='font-size: 8.4347826086957pt;'>ssms</a> <a href='/index.php/tag/ssrs-2/' class='tag-link-557 tag-link-position-26' title='27 topics' style='font-size: 9.9130434782609pt;'>ssrs</a> <a href='/index.php/tag/syndicated/' class='tag-link-1407 tag-link-position-27' title='67 topics' style='font-size: 13.217391304348pt;'>syndicated</a> <a href='/index.php/tag/t-sql/' class='tag-link-185 tag-link-position-28' title='26 topics' style='font-size: 9.7391304347826pt;'>t-sql</a> <a href='/index.php/tag/tip/' class='tag-link-194 tag-link-position-29' title='46 topics' style='font-size: 11.826086956522pt;'>tip</a> <a href='/index.php/tag/unit-testing/' class='tag-link-162 tag-link-position-30' title='17 topics' style='font-size: 8.2608695652174pt;'>unit testing</a>	</p>
+</div>		<div class="content-sidebar-section">
+		<h2>Authors</h2>
+			<ul class="author-list dimmed">
+				<li><a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis">SQLDenis</a> <a href="/index.php/author/SQLDenis/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (597)</li><li><a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)">Ted Krueger (onpnt)</a> <a href="/index.php/author/onpnt/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (355)</li><li><a href="/index.php/author/grrlgeek/" title="Posts by Jes Borland">Jes Borland</a> <a href="/index.php/author/grrlgeek/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (202)</li><li><a href="/index.php/author/tarwn/" title="Posts by Eli Weinstock-Herman (tarwn)">Eli Weinstock-Herman (tarwn)</a> <a href="/index.php/author/tarwn/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (190)</li><li><a href="/index.php/author/koenverbeeck/" title="Posts by Koen Verbeeck">Koen Verbeeck</a> <a href="/index.php/author/koenverbeeck/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (100)</li><li><a href="/index.php/author/alexcuse/" title="Posts by Alex Ullrich">Alex Ullrich</a> <a href="/index.php/author/alexcuse/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (55)</li><li><a href="/index.php/author/gmmastros/" title="Posts by George Mastros (gmmastros)">George Mastros (gmmastros)</a> <a href="/index.php/author/gmmastros/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (45)</li><li><a href="/index.php/author/axel8s/" title="Posts by Axel Achten (axel8s)">Axel Achten (axel8s)</a> <a href="/index.php/author/axel8s/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (28)</li><li><a href="/index.php/author/naomi/" title="Posts by Naomi Nosonovsky">Naomi Nosonovsky</a> <a href="/index.php/author/naomi/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (27)</li><li><a href="/index.php/author/thirster42/" title="Posts by David Forck (thirster42)">David Forck (thirster42)</a> <a href="/index.php/author/thirster42/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (24)</li><li><a href="/index.php/author/chopstik/" title="Posts by chopstik">chopstik</a> <a href="/index.php/author/chopstik/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (20)</li><li><a href="/index.php/author/kconan/" title="Posts by Kevin Conan">Kevin Conan</a> <a href="/index.php/author/kconan/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (18)</li><li><a href="/index.php/author/robearl/" title="Posts by Rob Earl">Rob Earl</a> <a href="/index.php/author/robearl/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (14)</li><li><a href="/index.php/author/thatrickguy/" title="Posts by ThatRickGuy">ThatRickGuy</a> <a href="/index.php/author/thatrickguy/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (12)</li><li><a href="/index.php/author/sqlarcher/" title="Posts by SQLArcher">SQLArcher</a> <a href="/index.php/author/sqlarcher/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (11)</li>                <li><a href="http://lessthandot.com/Stats/BlogAuthors.php">More...</a></li>
+			</ul>
+		</div>
+				<div class="content-sidebar-section">
+		<h2>Categories</h2>
+			<ul class="categories-list">
+					<li class="cat-item cat-item-10"><a href="/index.php/category/all/" >All Blogs</a>
+</li>
+	<li class="cat-item cat-item-5"><a href="/index.php/category/architect/" >Architecture, Design and Strategy</a>
+</li>
+	<li class="cat-item cat-item-1759"><a href="/index.php/category/artificial-intelligence/" >Artificial Intelligence</a>
+</li>
+	<li class="cat-item cat-item-6"><a href="/index.php/category/datamgmt/" >Data Management</a>
+</li>
+	<li class="cat-item cat-item-7"><a href="/index.php/category/desktopdev/" >Desktop Developer</a>
+</li>
+	<li class="cat-item cat-item-8"><a href="/index.php/category/enterprisedev/" >Enterprise Developer</a>
+</li>
+	<li class="cat-item cat-item-11"><a href="/index.php/category/itprofessionals/" >IT Professionals</a>
+</li>
+	<li class="cat-item cat-item-12"><a href="/index.php/category/itstudents/" >IT Students and Researchers</a>
+</li>
+	<li class="cat-item cat-item-1743"><a href="/index.php/category/management/" >Management</a>
+</li>
+	<li class="cat-item cat-item-9"><a href="/index.php/category/sysadmins/" >System Admins</a>
+</li>
+	<li class="cat-item cat-item-1"><a href="/index.php/category/uncategorized/" >Uncategorized</a>
+</li>
+	<li class="cat-item cat-item-4"><a href="/index.php/category/webdev/" >Web Developer</a>
+</li>
+			</ul>
+		</div>
+		</div><div class="content-main">
+				<div class="post-navigation">
+				<div class="post-navigation-forward"><a href="/index.php/datamgmt/dbprogramming/how-to-refresh-the-local-intellisense-ca/" rel="next">How to refresh the local IntelliSense cache in SQL Server Management Studio</a> &raquo; </div>
+				<div class="post-navigation-back">&laquo; <a href="/index.php/datamgmt/datadesign/error-the-getbytes-function-can-only-be/" rel="prev">Error: The GetBytes function can only be used on columns of type Text, NText, or Image</a></div>
+			</div>
+			<div class="post-area instapaper_body">
+				<div class="post-title-line">
+										<h1 class="instapaper_ignore"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/" class="post-title">Removing old files with SSIS</a></h1>
+					<div class="post-byline">by <a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)" rel="author">Ted Krueger (onpnt)</a> on June 4, 2010 in category <a href="/index.php/category/datamgmt/dbadmin/" rel="category tag">Database Administration</a> <a href="/index.php/category/datamgmt/dbprogramming/" rel="category tag">Database Programming</a> <a href="/index.php/category/datamgmt/dbprogramming/mssqlserver/" rel="category tag">Microsoft SQL Server</a> <a href="/index.php/category/datamgmt/dbadmin/mssqlserveradmin/" rel="category tag">Microsoft SQL Server Admin</a>. Article views: 23,699 </div>
+				</div>
+				<div class="post-tagline"><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&text=RT @LessThanDot Blog - Removing old files with SSIS by @onpnt" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&title=Removing old files with SSIS&source=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&title=Removing old files with SSIS" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&quote=Removing old files with SSIS" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&title=Removing old files with SSIS" class="instapaper_button">Instapaper</a></div>
+
+				<div class="post-content"><p>
+This post will illustrate two methods for removing old files from directories using SSIS.  This task is often used to delete old backup files and other ETL files that are not required any longer.  We’ll step through two methods.  First method uses a script task entirely for the removal and the logging events.  This method will also have some comments in for logging and using the FireInformation method to mimic the normal logging abilities of SSIS.  The FireInformation method didn’t provide much more of a performance boost so it wasn’t used here.  Second method uses a Foreach Loop Container, Script Task for logic and a File System Task for the delete event.  SSIS Logging will be utilized with the OnPreExecute and OnPostExecute events in the second method over the System.IO method of AppendText.
+</p>
+<p>
+The use of System.IO in a script task performed much better than the use of the File System Task.
+</p>
+<p>
+Both methods were tested on folders containing 300 files with size ranging from 200MB to 1GB.  168 files were placed among the 300 in order to meet the properties that will require a delete event to fire.</p>
+<p>Deletion by System.IO and manually logging to flat files elapsed in 156 Milliseconds. </p>
+<p>Deletion by means of a Foreach Loop Container containing a Script Task to validate the file meets criteria (File System Task is limited in doing that) and then the File System Task to force the delete took a whopping 3.962 seconds!</p>
+<p>Have fun playing with this yourself and hope it comes in handy when you need to perform this type of task.
+</p>
+<p>
+If anyone has other methods or improvements to these, please feel free to comment or start a thread in the LessThanDot SQL Server forums.
+</p>
+<p><h2>Method one: Script Task</h2>
+<ol>
+<li>Bring over a Script Task into the Control Flow </li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_1.gif" alt="" title="" width="437" height="157" /></div>
+<li>Name the task, &#8220;Remove all files based on backdays&#8221;</li>
+<li>Create the following variables</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_2.gif" alt="" title="" width="343" height="137" /></div>
+<li>Double click the script task to open the editor.</li>
+<li>Add the variable to the ReadOnlyVariables area</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_3.gif" alt="" title="" width="585" height="410" /></div>
+<li>Click Edit Script</li>
+<li>Add the following code</li>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.IO</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Data</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Microsoft.SqlServer.Dts.Runtime</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Windows.Forms</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> ST_aaf20a0bd5b94ad394ab80cf5d585c41<span class="sy0">.</span><span class="me1">csproj</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span><span class="kw5">System</span><span class="sy0">.</span><span class="me1">AddIn</span><span class="sy0">.</span><span class="me1">AddIn</span><span class="br0">&#40;</span><span class="st0">&quot;ScriptMain&quot;</span>, Version <span class="sy0">=</span> <span class="st0">&quot;1.0&quot;</span>, Publisher <span class="sy0">=</span> <span class="st0">&quot;&quot;</span>, Description <span class="sy0">=</span> <span class="st0">&quot;&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">partial</span> <span class="kw4">class</span> ScriptMain <span class="sy0">:</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Tasks</span><span class="sy0">.</span><span class="me1">ScriptTask</span><span class="sy0">.</span><span class="me1">VSTARTScriptObjectModelBase</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co2">#region VSTA generated code</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">enum</span> ScriptResults
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Success <span class="sy0">=</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Runtime</span><span class="sy0">.</span><span class="me1">DTSExecResult</span><span class="sy0">.</span><span class="me1">Success</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Failure <span class="sy0">=</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Runtime</span><span class="sy0">.</span><span class="me1">DTSExecResult</span><span class="sy0">.</span><span class="me1">Failure</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co2">#endregion</span>
+&nbsp;
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Main<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> logfile <span class="sy0">=</span> Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::logfile&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; DateTime olderThanDate <span class="sy0">=</span> <span class="br0">&#40;</span>DateTime<span class="br0">&#41;</span>Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::daysback&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> folder <span class="sy0">=</span> Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::folder&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span><span class="sy0">!</span><span class="br0">&#40;</span>File<span class="sy0">.</span><span class="me1">Exists</span><span class="br0">&#40;</span>logfile<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileInfo fi <span class="sy0">=</span> <span class="kw3">new</span> FileInfo<span class="br0">&#40;</span>logfile<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileStream fstr <span class="sy0">=</span> fi<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; fstr<span class="sy0">.</span><span class="me1">Close</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ActionJackson<span class="br0">&#40;</span>folder, logfile, olderThanDate<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">catch</span> <span class="br0">&#40;</span>Exception Ex<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Dts<span class="sy0">.</span><span class="me1">Events</span><span class="sy0">.</span><span class="me1">FireError</span><span class="br0">&#40;</span><span class="nu0">1</span>, <span class="st0">&quot;&quot;</span>, <span class="st0">&quot;BOOM!!! &nbsp;&quot;</span> <span class="sy0">+</span> Ex<span class="sy0">.</span><span class="me1">Message</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="st0">&quot;&quot;</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Dts<span class="sy0">.</span><span class="me1">TaskResult</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw4">int</span><span class="br0">&#41;</span>ScriptResults<span class="sy0">.</span><span class="me1">Success</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">private</span> <span class="kw4">void</span> ActionJackson<span class="br0">&#40;</span><span class="kw4">string</span> folder, <span class="kw4">string</span> path, DateTime olderThanDate<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; DirectoryInfo dirInfo <span class="sy0">=</span> <span class="kw3">new</span> DirectoryInfo<span class="br0">&#40;</span>folder<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; TextWriter tw <span class="sy0">=</span> File<span class="sy0">.</span><span class="me1">AppendText</span><span class="br0">&#40;</span>path<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileInfo<span class="br0">&#91;</span><span class="br0">&#93;</span> files <span class="sy0">=</span> dirInfo<span class="sy0">.</span><span class="me1">GetFiles</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span>FileInfo file <span class="kw1">in</span> files<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>file<span class="sy0">.</span><span class="me1">LastWriteTime</span> <span class="sy0">&lt;</span> olderThanDate<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//or use Dts.Events.FireInformation(0, &quot;&quot;, &quot;File Deleted Succesfully&quot;, &quot;&quot;, 0, True)</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//with a logging file destination setup</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//the two methods did not vary in performance much. &nbsp;FireInformation allows for </span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//the same descriptive logging as OnPreExecute/OnPostExecute descriptions </span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; tw<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;File &quot;</span> <span class="sy0">+</span> file<span class="sy0">.</span><span class="me1">FullName</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">&quot; Deleted on &quot;</span> <span class="sy0">+</span> <span class="kw5">System</span><span class="sy0">.</span><span class="me1">DateTime</span><span class="sy0">.</span><span class="me1">Now</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; file<span class="sy0">.</span><span class="me1">IsReadOnly</span> <span class="sy0">=</span> <span class="kw1">false</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; file<span class="sy0">.</span><span class="me1">Delete</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; tw<span class="sy0">.</span><span class="me1">Close</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System;
+using System.IO;
+using System.Data;
+using Microsoft.SqlServer.Dts.Runtime;
+using System.Windows.Forms;
+
+namespace ST_aaf20a0bd5b94ad394ab80cf5d585c41.csproj
+{
+    [System.AddIn.AddIn("ScriptMain", Version = "1.0", Publisher = "", Description = "")]
+    public partial class ScriptMain : Microsoft.SqlServer.Dts.Tasks.ScriptTask.VSTARTScriptObjectModelBase
+    {
+
+        #region VSTA generated code
+        enum ScriptResults
+        {
+            Success = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Success,
+            Failure = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Failure
+        };
+        #endregion
+
+
+        public void Main()
+        {
+            try
+            {
+                string logfile = Dts.Variables["User::logfile"].Value.ToString();
+                DateTime olderThanDate = (DateTime)Dts.Variables["User::daysback"].Value;
+                string folder = Dts.Variables["User::folder"].Value.ToString();
+
+                    if (!(File.Exists(logfile)))
+                    {
+                        FileInfo fi = new FileInfo(logfile.ToString());
+                        FileStream fstr = fi.Create();
+                        fstr.Close();
+                    }
+                    ActionJackson(folder, logfile, olderThanDate);
+            }
+            catch (Exception Ex)
+            {
+                Dts.Events.FireError(1, "", "BOOM!!!  " + Ex.Message.ToString(), "", 0);
+            }
+
+            Dts.TaskResult = (int)ScriptResults.Success;
+        }
+
+        private void ActionJackson(string folder, string path, DateTime olderThanDate)
+        {
+                DirectoryInfo dirInfo = new DirectoryInfo(folder);
+                TextWriter tw = File.AppendText(path);
+
+                FileInfo[] files = dirInfo.GetFiles();
+                foreach (FileInfo file in files)
+                {
+                    if (file.LastWriteTime &lt; olderThanDate)
+                    {
+                        //or use Dts.Events.FireInformation(0, "", "File Deleted Succesfully", "", 0, True)
+                        //with a logging file destination setup
+                        //the two methods did not vary in performance much.  FireInformation allows for 
+                        //the same descriptive logging as OnPreExecute/OnPostExecute descriptions 
+                        tw.WriteLine("File " + file.FullName.ToString() + " Deleted on " + System.DateTime.Now.ToString());
+                        file.IsReadOnly = false;
+                        file.Delete();
+                    }
+                }
+                tw.Close();
+        }
+    }
+}</pre></div></div>
+
+<li>Close the code editor and click OK to the script task editor.</li>
+<li>Right click an empty space in the Control Flow and select Package Configurations</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_4.gif" alt="" title="" width="211" height="120" /></div>
+<li>Check Enable package configurations</li>
+<li>Click Add and enter C:DelConfig.xml to the specify configuration settings directly textbox</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_5.gif" alt="" title="" width="526" height="341" /></div>
+<li>Click Finish and Close to the configurations editor.  </li>
+<li>You can open the XML file to edit the folder location and the log file location now</li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_delete2_0.gif" alt="" title="" width="819" height="727" /></div>
+<li>Import the package into SSIS and execute it to run.  </li>
+</ol>
+<h2>Method two: Foreach Loop Container</h2>
+<ol>
+<li>Bring over a Foreach Loop Container in the Control Flow</li>
+<li>Create these variables</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_6.gif" alt="" title="" width="273" height="129" /></div>
+<li>Bring over a Script Task and drop it into the Foreach Loop Container</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_7.gif" alt="" title="" width="301" height="329" /></div>
+<li>Double click the Script Task and add these ReadOnly variables</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_8.gif" alt="" title="" width="628" height="378" /></div>
+<li>Click the Edit Script button and add this code</li>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Data</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.IO</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Microsoft.SqlServer.Dts.Runtime</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Windows.Forms</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> ST_216af79b563f4866bb64f6043b232b4e<span class="sy0">.</span><span class="me1">csproj</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span><span class="kw5">System</span><span class="sy0">.</span><span class="me1">AddIn</span><span class="sy0">.</span><span class="me1">AddIn</span><span class="br0">&#40;</span><span class="st0">&quot;ScriptMain&quot;</span>, Version <span class="sy0">=</span> <span class="st0">&quot;1.0&quot;</span>, Publisher <span class="sy0">=</span> <span class="st0">&quot;&quot;</span>, Description <span class="sy0">=</span> <span class="st0">&quot;&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">partial</span> <span class="kw4">class</span> ScriptMain <span class="sy0">:</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Tasks</span><span class="sy0">.</span><span class="me1">ScriptTask</span><span class="sy0">.</span><span class="me1">VSTARTScriptObjectModelBase</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co2">#region VSTA generated code</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">enum</span> ScriptResults
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Success <span class="sy0">=</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Runtime</span><span class="sy0">.</span><span class="me1">DTSExecResult</span><span class="sy0">.</span><span class="me1">Success</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Failure <span class="sy0">=</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Runtime</span><span class="sy0">.</span><span class="me1">DTSExecResult</span><span class="sy0">.</span><span class="me1">Failure</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co2">#endregion</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Main<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileInfo fi <span class="sy0">=</span> <span class="kw3">new</span> FileInfo<span class="br0">&#40;</span>Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::filefocus&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>fi<span class="sy0">.</span><span class="me1">LastWriteTime</span> <span class="sy0">&lt;</span> <span class="br0">&#40;</span>DateTime<span class="br0">&#41;</span>Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::daysback&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Dts<span class="sy0">.</span><span class="me1">TaskResult</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw4">int</span><span class="br0">&#41;</span>ScriptResults<span class="sy0">.</span><span class="me1">Success</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">catch</span> <span class="br0">&#40;</span>Exception Ex<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Dts<span class="sy0">.</span><span class="me1">Events</span><span class="sy0">.</span><span class="me1">FireError</span><span class="br0">&#40;</span><span class="nu0">1</span>, <span class="st0">&quot;&quot;</span>, <span class="st0">&quot;BOOM!!! &nbsp;&quot;</span> <span class="sy0">+</span> Ex<span class="sy0">.</span><span class="me1">Message</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="st0">&quot;&quot;</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System;
+using System.Data;
+using System.IO;
+using Microsoft.SqlServer.Dts.Runtime;
+using System.Windows.Forms;
+
+namespace ST_216af79b563f4866bb64f6043b232b4e.csproj
+{
+    [System.AddIn.AddIn("ScriptMain", Version = "1.0", Publisher = "", Description = "")]
+    public partial class ScriptMain : Microsoft.SqlServer.Dts.Tasks.ScriptTask.VSTARTScriptObjectModelBase
+    {
+
+        #region VSTA generated code
+        enum ScriptResults
+        {
+            Success = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Success,
+            Failure = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Failure
+        };
+        #endregion
+
+        public void Main()
+        {
+            try
+            {
+                FileInfo fi = new FileInfo(Dts.Variables["User::filefocus"].Value.ToString());
+
+                if (fi.LastWriteTime &lt; (DateTime)Dts.Variables["User::daysback"].Value)
+                {
+                    Dts.TaskResult = (int)ScriptResults.Success;
+                }
+            }
+            catch (Exception Ex)
+            {
+                Dts.Events.FireError(1, "", "BOOM!!!  " + Ex.Message.ToString(), "", 0);
+            }
+        }
+    }
+}</pre></div></div>
+
+<li>Close the code editor and hit OK to exit and save the script task settings.</li>
+<li>Bring over and drop a File System Task into the Foreach Loop Container</li>
+<li>Connect the Script Task to the File System Task</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_9.gif" alt="" title="" width="284" height="267" /></div>
+<li>Double click the Foreach Loop Container and go to Collection.</li>
+<li>Enter in a default folder</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_10.gif" alt="" title="" width="469" height="348" /></div>
+<li>In Variable Mappings, drop down the Variable and select the User::filefocus variable and leave the index at 0</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_11.gif" alt="" title="" width="533" height="104" /></div>
+<li>Click OK to close the editor</li>
+<li>Double click the File System Task</li>
+<li>Change Operation to Delete</li>
+<li>Change IsSourcePathVariable to True</li>
+<li>SourceVariable to User::filefocus</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_12.gif" alt="" title="" width="449" height="195" /></div>
+<li>Click OK to exit and save</li>
+<li>Add a package configurations file as an XML file</li>
+<li>Right click an empty space in the Control Flow window</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_13.gif" alt="" title="" width="413" height="135" /></div>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_14.gif" alt="" title="" width="469" height="400" /></div>
+<li>Enter FileEnumConfig.xml and click, Next</li>
+<li>Click the variables filefocus and folder</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_15.gif" alt="" title="" width="402" height="205" /></div>
+<li>Name the configuration </li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_16.gif" alt="" title="" width="419" height="372" /></div>
+<li>Click Finish and then Close to exit and save</li>
+<li>Click SSIS in the menu strip and select Logging</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_17.gif" alt="" title="" width="254" height="187" /></div>
+<li>Check container FileEnumTest</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_18.gif" alt="" title="" width="356" height="106" /></div>
+<li>Select SSIS log provider for Text Files</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_19.gif" alt="" title="" width="476" height="106" /></div>
+<li>Drop down configuration and select New Connection</li>
+<li>Select Create File and enter C:DelbyFilEnum.txt</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_20.gif" alt="" title="" width="476" height="241" /></div>
+<li>Click OK and then OK to exit and save</li>
+<li>You can open the XML file to edit the folder location and the log file location now</li>
+<li>Import the package into SSIS and execute it to run.  </li>
+</ol>
+<p>Logging from the first method appears in blocks like this</p>
+<blockquote><p>File C:TestDeleteSystemIOFile_20100603121501.trn Deleted on 6/4/2010 7:11:38 AM<br />
+File C:TestDeleteSystemIOFile_20100603123001.trn Deleted on 6/4/2010 7:11:38 AM
+</p></blockquote>
+<p>compared to the SSIS logging method of</p>
+<blockquote><p>Diagnostic,onpnt,onpnt,Delete Old File,{E4830550-A51A-46F3-A374-243888315707},{969D771F-24A9-4A57-B98D-42B025BE2573},6/4/2010 7:31:25 AM,6/4/2010 7:31:25 AM,0,(null),Trying to delete file &#8216;C:TestDeleteFileSystemTaskFile_20100603191001.trn&#8217;.<br />
+Diagnostic,onpnt,onpnt,Delete Old File,{E4830550-A51A-46F3-A374-243888315707},{969D771F-24A9-4A57-B98D-42B025BE2573},6/4/2010 7:31:25 AM,6/4/2010 7:31:25 AM,0,(null),Finished deleting file &#8216;C:TestDeleteFileSystemTaskFile_20100603191001.trn&#8217;.</p></blockquote>
+<h2>Conclusions</h2>
+<p>
+The use of the script task and going to the System.IO namespace to do the work has some benefits over the second method.  The largest was speed.  The second was the administrative and development time needed.  </p>
+<p>Both of these methods are sound and good options.  The File System Task usage removes the need for more extensive programming over the Script Task.   There are also benefits in the logging method used and the amount of information we can easily obtain during the execution progress.  Picking either method will be decided on comfort level with coding in .NET and performance requirements while giving up or gaining functionality.</p>
+<div class='rp4wp-related-posts'>
+<h3>Related Posts</h3>
+<ul>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/dbprogramming/ssis-configuration-editor/'>SQL Server Integration Services tools to have – Configuration File Editor</a><p>In a previous post, SQL Server Integration Services tools to have – Expression Editor &amp;&hellip;</p></div>
+</li>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/dbprogramming/create-xml-files-out-of-sql-server-with/'>Create XML Files Out Of SQL Server With SSIS And FOR XML Syntax</a><p>So you want to spit out some XML from SQL Server into a file, how&hellip;</p></div>
+</li>
+</ul>
+</div>
+</div>
+				<div class="post-author">
+					<div class="userInfo"><h2>About the Author</h2>Ted Krueger is a SQL Server MVP and Author that has been working in development and database administration and the owner of a successful consulting business, DataMetrics Consulting.  Specialties range from High Availability and Disaster / Recovery setup and testing methods down to custom assembly development for SQL Server Reporting Services.  Ted blogs and is also one of the founders of LessThanDot.com technology community.  Some of the articles focused on are Backup / Recovery, Security, SSIS and working on SQL Server and using all of the SQL Server features available to create stable and scalable database services.  <br style="clear: left" /><div class="bioSoc"><span class="bioSocTitle">Social Sitings</span><a href="http://twitter.com/onpnt" title="onpnt at Twitter" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Twitter" /></a><a href="http://www.facebook.com/profile.php?id=https://www.facebook.com/onpntfirearms" title="onpnt at Facebook" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Facebook" /></a><a href="http://www.linkedin.com/pub/ted-krueger/2/183/b66" title="onpnt at LinkedIn" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="LinkedIn" /></a><a href="http://www.datametricsconsulting.com/" title="onpnt at HomePage" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_homepage.png" alt="HomePage" /></a><a href="/index.php/author/onpnt/feed/" title="Blog RSS feed for onpnt" class="bioSocLink"><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="LTD RSS Feed" /></a></div></div>				</div>
+				<div class="post-foot instapaper_ignore">
+					<div class="post-tagline">
+						<div class="post-foot-views"><label>Article views:</label> 23,699 </div>
+						<div class="post-foot-more-posts">
+                            <a href="/index.php/author/onpnt/">Read More Posts by Ted Krueger (onpnt)</a>
+						</div>
+					</div>
+					<div>
+						<label>Tags:</label> <a href="/index.php/tag/delete-files/" rel="tag">delete files</a>, <a href="/index.php/tag/sql-community/" rel="tag">sql community</a>, <a href="/index.php/tag/sql-server/" rel="tag">sql server</a>, <a href="/index.php/tag/sql-server-2008/" rel="tag">sql server 2008</a>, <a href="/index.php/tag/sql-server-integration-services/" rel="tag">sql server integration services</a>, <a href="/index.php/tag/ssis-2/" rel="tag">ssis</a> 
+					</div>
+					<div class="post-tagline" style="height: auto">
+						<span class="social-button-label">Share:</span><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&text=RT @LessThanDot Blog - Removing old files with SSIS by @onpnt" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&title=Removing old files with SSIS&source=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&title=Removing old files with SSIS" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&quote=Removing old files with SSIS" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/&title=Removing old files with SSIS" class="instapaper_button">Instapaper</a>					</div>			
+				</div>
+				<div class="comments-area instapaper_ignore">
+	<h4 class="comments-title">
+		13 Comments	</h4>
+			<ol class="comments-list">
+					<li class="comment byuser comment-author-SQLDenis even thread-even depth-1" id="comment-2837">
+				<div id="div-comment-2837" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">SQLDenis</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2837">
+			June 4, 2010 at 8:45 am</a>		</div>
+
+		<p>Good post but it needs more images  🙂</p>
+<p>I prefer the script task myself&#8230;and I knew Action Jackson was you favorite movie&#8230;must be because of Vanity</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2837#respond' onclick='return addComment.moveForm( "div-comment-2837", "2837", "respond", "809" )' aria-label='Reply to SQLDenis'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-onpnt bypostauthor odd alt thread-odd thread-alt depth-1" id="comment-2838">
+				<div id="div-comment-2838" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Ted Krueger (onpnt)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2838">
+			June 4, 2010 at 9:06 am</a>		</div>
+
+		<p>LOL</p>
+<p>Was wondering how many would catch that</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2838#respond' onclick='return addComment.moveForm( "div-comment-2838", "2838", "respond", "809" )' aria-label='Reply to Ted Krueger (onpnt)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-2839">
+				<div id="div-comment-2839" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://2.gravatar.com/avatar/b7db3757f4d0db93bdb4278c2bd75916?s=64&#038;d=mm&#038;r=g' srcset='http://2.gravatar.com/avatar/b7db3757f4d0db93bdb4278c2bd75916?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn"><a href='http://toddmcdermid.blogspot.com/' rel='external nofollow' class='url'>Todd McDermid</a></cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2839">
+			June 4, 2010 at 11:57 am</a>		</div>
+
+		<p>Great walkthough &#8211; this question is asked tons of times in the forums.  Now I&#8217;ll just have to remember where this is to point people to.</p>
+<p>I think I&#8217;ll also have to blog an alternative using just the File Properties Task and File System Task &#8211; might take longer to execute, but there&#8217;d be no code&#8230;</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2839#respond' onclick='return addComment.moveForm( "div-comment-2839", "2839", "respond", "809" )' aria-label='Reply to Todd McDermid'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-onpnt bypostauthor odd alt thread-odd thread-alt depth-1" id="comment-2840">
+				<div id="div-comment-2840" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Ted Krueger (onpnt)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2840">
+			June 4, 2010 at 12:12 pm</a>		</div>
+
+		<p>Thanks Todd!  </p>
+<p>Let me know when you get a chance to blog on the File Properties Task and File System Task. I think many more would rather go that route over starting to jump into using .NET like these methods rely on.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2840#respond' onclick='return addComment.moveForm( "div-comment-2840", "2840", "respond", "809" )' aria-label='Reply to Ted Krueger (onpnt)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-chopstik even thread-even depth-1" id="comment-2841">
+				<div id="div-comment-2841" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/71ca157c955aa40109e67ef1e8c4aabd?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/71ca157c955aa40109e67ef1e8c4aabd?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">chopstik</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2841">
+			June 5, 2010 at 7:07 am</a>		</div>
+
+		<p>This would have been more useful a few weeks ago.  😉</p>
+<p>I like both examples and may well find a need for them in the future.  The script task, in particular, was a problem for me recently but your example helps me to see what I probably should have done.  When I have the opportunity, I&#8217;ll have to play with the ForEach container&#8230;  Thanks!</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2841#respond' onclick='return addComment.moveForm( "div-comment-2841", "2841", "respond", "809" )' aria-label='Reply to chopstik'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-chrissie1 odd alt thread-odd thread-alt depth-1" id="comment-2842">
+				<div id="div-comment-2842" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/70e155e88e0ead5e2bdcb3e1c57506b4?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/70e155e88e0ead5e2bdcb3e1c57506b4?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Christiaan Baes (chrissie1)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2842">
+			June 5, 2010 at 11:19 am</a>		</div>
+
+		<p>Your C# code could do with some linq. And you should name your methods better.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2842#respond' onclick='return addComment.moveForm( "div-comment-2842", "2842", "respond", "809" )' aria-label='Reply to Christiaan Baes (chrissie1)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-2843">
+				<div id="div-comment-2843" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/4786484c0da3e6063ca9947126ff7490?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/4786484c0da3e6063ca9947126ff7490?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">diana</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2843">
+			June 10, 2010 at 9:18 am</a>		</div>
+
+		<p>I am not exactly clear on the variables. What is the value for the folder value in the second method?</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2843#respond' onclick='return addComment.moveForm( "div-comment-2843", "2843", "respond", "809" )' aria-label='Reply to diana'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-onpnt bypostauthor odd alt thread-odd thread-alt depth-1" id="comment-2844">
+				<div id="div-comment-2844" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Ted Krueger (onpnt)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2844">
+			June 10, 2010 at 10:04 am</a>		</div>
+
+		<p>Apologies Diana, looks like I missed a step.  The folder variable is used in the Foreach loop container so it knows where to look to start off the interation of the script task</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2844#respond' onclick='return addComment.moveForm( "div-comment-2844", "2844", "respond", "809" )' aria-label='Reply to Ted Krueger (onpnt)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-2845">
+				<div id="div-comment-2845" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/4786484c0da3e6063ca9947126ff7490?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/4786484c0da3e6063ca9947126ff7490?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Diana</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2845">
+			June 10, 2010 at 12:16 pm</a>		</div>
+
+		<p>Thank you for the fast response. Could you clarify filefocus variable? Thanks!</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2845#respond' onclick='return addComment.moveForm( "div-comment-2845", "2845", "respond", "809" )' aria-label='Reply to Diana'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-onpnt bypostauthor odd alt thread-odd thread-alt depth-1" id="comment-2846">
+				<div id="div-comment-2846" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Ted Krueger (onpnt)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2846">
+			June 10, 2010 at 12:38 pm</a>		</div>
+
+		<p>Sure!</p>
+<p>Every time the loop will cycle, the filefocus variable will be used to hold the actual file that is focused on.  That is why the setting is required to set the index of 0 in the loop to the variable.  This will ensure that each file as it walks through them will obtain the file name.  Any object within the container can then access that variable to perform its own job</p>
+<p>In the second method, we simply use teh filefocus to keep the same type of retention of the name down and allow us to fill the FileInfo so we can access all of the things we need with that given file in the directory</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2846#respond' onclick='return addComment.moveForm( "div-comment-2846", "2846", "respond", "809" )' aria-label='Reply to Ted Krueger (onpnt)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-2848">
+				<div id="div-comment-2848" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/4786484c0da3e6063ca9947126ff7490?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/4786484c0da3e6063ca9947126ff7490?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Diana</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2848">
+			June 15, 2010 at 10:10 am</a>		</div>
+
+		<p>I did the second method and it works fine but it deletes all of files. How do I prevent this from happening? I set the daysback variable but it doesn&#8217;t seem to base it on that variable. It just deletes all of files in the folder. Help!</p>
+<p>Thank you.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2848#respond' onclick='return addComment.moveForm( "div-comment-2848", "2848", "respond", "809" )' aria-label='Reply to Diana'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-onpnt bypostauthor odd alt thread-odd thread-alt depth-1" id="comment-2849">
+				<div id="div-comment-2849" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Ted Krueger (onpnt)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2849">
+			June 15, 2010 at 4:30 pm</a>		</div>
+
+		<p>I see I flipped the check the date in the second while testing.  I corrected it and thank you for the catch 🙂</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2849#respond' onclick='return addComment.moveForm( "div-comment-2849", "2849", "respond", "809" )' aria-label='Reply to Ted Krueger (onpnt)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-2847">
+				<div id="div-comment-2847" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://2.gravatar.com/avatar/2064a6899123438b01acbb255c1e060c?s=64&#038;d=mm&#038;r=g' srcset='http://2.gravatar.com/avatar/2064a6899123438b01acbb255c1e060c?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Abhas</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comment-2847">
+			December 17, 2010 at 7:15 am</a>		</div>
+
+		<p>I am trying using 2 method to remove old files but <br />
+I want to delete files in subfolders.There is main folder and under the main folder there are 4 subfolders.And i want to delete files which are in subfolders.</p>
+<p>i am getting following error.</p>
+<p>Error: Failed to lock variable &#8220;user::filefocus&#8221; for read access with error 0xC0010001 &#8220;The variable cannot be found. This occurs when an attempt is made to retrieve a variable from the Variables collection on a container during execution of the package, and the variable is not there. The variable name may have changed or the variable is not being created.&#8221;.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/?replytocom=2847#respond' onclick='return addComment.moveForm( "div-comment-2847", "2847", "respond", "809" )' aria-label='Reply to Abhas'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		</ol>
+						<div id="respond" class="comment-respond">
+			<h3 id="reply-title" class="comment-reply-title">Leave a Reply <small><a rel="nofollow" id="cancel-comment-reply-link" href="/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#respond" style="display:none;">Cancel reply</a></small></h3>				<form action="/wp-comments-post.php" method="post" id="commentform" class="comment-form">
+					<p class="comment-notes"><span id="email-notes">Your email address will not be published.</span> Required fields are marked <span class="required">*</span></p><p class="comment-form-comment"><label for="comment">Comment</label> <textarea id="comment" name="comment" cols="45" rows="8" maxlength="65525" aria-required="true" required="required"></textarea></p><p class="comment-form-author"><label for="author">Name <span class="required">*</span></label> <input id="author" name="author" type="text" value="" size="30" maxlength="245" aria-required='true' required='required' /></p>
+<p class="comment-form-email"><label for="email">Email <span class="required">*</span></label> <input id="email" name="email" type="text" value="" size="30" maxlength="100" aria-describedby="email-notes" aria-required='true' required='required' /></p>
+<p class="comment-form-url"><label for="url">Website</label> <input id="url" name="url" type="text" value="" size="30" maxlength="200" /></p>
+<p class="form-submit"><input name="submit" type="submit" id="submit" class="submit" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='809' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='0' />
+</p><input type="hidden" id="killer_value" name="killer_value" value="c9e1074f5b3f9fc8ea15d152add07294"/><noscript>Sorry, but you are required to use a javascript enabled brower to comment here.</noscript>				</form>
+					</div><!-- #respond -->
+		</div>			</div>
+				<br style="clear: both;" />
+</div>
+		</div>
+		<div id="page-footer">
+			<div id="botnav"><a href="http://lessthandot.com/" title="LessThanDot Launchpad">Launchpad</a> | <a href="http://lessthandot.com/account.php" title="Your Account Settings">My Account</a> | <a href="http://lessthandot.com/statistics.php" title="Statistics">Statistics</a> | <a href="http://lessthandot.com/donate.php" title="Donate">Donate</a> | <a href="http://lessthandot.com/contactus.php" title="Contact Us">Contact Us</a> | <a href="http://lessthandot.com/aboutus.php" title="About the LessThanDot Team">&copy;2008 - 2019 LessThanDot, LLC</a></div>
+
+		<script type='text/javascript'>
+		var _gaq = _gaq || [];
+		_gaq.push(['_setAccount', 'UA-4471405-1']);
+		_gaq.push(['_trackPageview']);
+		_gaq.push(['_setCustomVar', 1, 'Environment', 'lessthandot.com', 3]);
+
+		(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		})();
+	  </script>			<div class="validator"><a href="http://validator.w3.org/check?uri=referer">Valid XHTML</a> | <a href="http://jigsaw.w3.org/css-validator/check/referer" title="Validate the CSS for this page at the W3C website">Valid CSS</a> | 2018-11-11 15:52</div>
+		</div>
+	</div>
+</div>
+<!-- <script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script> -->
+<script type='text/javascript' src='/wp-includes/js/wp-embed.min.js?ver=4.6.1'></script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var spam_destroyer = {"key":"159ff9dcc225580310c2de238cdd1f1a","lifetime":"3600","limit":"1552765792"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='/wp-content/plugins/spam-destroyer/kill.js?ver=1.2'></script>
+</body>
+</html>

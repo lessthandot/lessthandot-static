@@ -1,0 +1,699 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Ramireddy &#8211; LessthanDot</title>
+	<atom:link href="/index.php/author/ramireddyindia/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>What exactly is Fragment_count?</title>
+		<link>/index.php/datamgmt/datadesign/what-exactly-is-fragment_count/</link>
+		<comments>/index.php/datamgmt/datadesign/what-exactly-is-fragment_count/#comments</comments>
+		<pubDate>Sat, 16 Oct 2010 05:24:26 +0000</pubDate>
+		<dc:creator><![CDATA[Ramireddy]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/10/what-exactly-is-fragment_count/</guid>
+		<description><![CDATA[I started to think about this problem, when I saw this question asked by Sankar Reddy in SQL Server Quiz 2010. I have a fair bit of idea about Index fragmentation and defragmentation. I checked fragmentation of some of my table indexes previously and re&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I started to think about this problem, when I saw <a href="http://beyondrelational.com/quiz/SQLServer/General/2010/questions/sqlserver-quiz-general-2010-Sankar-Reddy-What-is-the-reason-for-high-index-fragmentation-even-after-rebuilding-the-clustered-index-sometimes.aspx">this</a> question asked by Sankar Reddy in SQL Server Quiz 2010. I have a fair bit of idea about Index fragmentation and defragmentation. I checked fragmentation of some of my table indexes previously and rebuilt the indexes when fragmentation percentage is too high. But I never thought about how exactly these will be calculated. But after looking at this question, I thought of finding how SQL server will calculate this. Let’s have a look at this example.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">table</span> tblNumbers
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; Id <span class="kw1">int</span> <span class="kw1">identity</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">primary</span> <span class="kw1">key</span>,
+&nbsp; &nbsp; Num <span class="kw1">int</span>
+<span class="br0">&#41;</span>
+&nbsp;
+;<span class="kw1">with</span> N <span class="kw1">as</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">as</span> Num <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">union</span> all
+&nbsp; &nbsp; <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">0</span>
+<span class="br0">&#41;</span>,
+Numbers <span class="kw1">as</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">select</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">over</span> <span class="br0">&#40;</span><span class="kw1">Order</span> <span class="kw1">by</span> <span class="br0">&#40;</span><span class="kw1">select</span> <span class="nu0">1</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">as</span> rn <span class="kw1">from</span> N N1,N N2,N N3,N N4,N N5, N N6
+<span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> tblNumbers
+<span class="kw1">select</span> rn <span class="kw1">from</span> Numbers 
+&nbsp;
+<span class="kw1">SELECT</span> page_count, fragment_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'tblnumbers'</span><span class="br0">&#41;</span>,<span class="sy0">NULL</span>, <span class="sy0">NULL</span>, <span class="st0">'detailed'</span><span class="br0">&#41;</span> 
+<span class="kw1">where</span> index_id <span class="sy0">=</span> <span class="nu0">1</span> and index_level <span class="sy0">=</span> <span class="nu0">0</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create table tblNumbers
+(
+	Id int identity(1,1) primary key,
+	Num int
+)
+
+;with N as
+(
+	select 0 as Num union all select 0 union all select 0 union all select 0 union all select 0 union all
+	select 0 union all select 0 union all select 0 union all select 0 union all select 0
+),
+Numbers as
+(
+	select ROW_NUMBER() over (Order by (select 1)) as rn from N N1,N N2,N N3,N N4,N N5, N N6
+)
+insert into tblNumbers
+select rn from Numbers 
+
+SELECT page_count, fragment_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), OBJECT_ID('tblnumbers'),NULL, NULL, 'detailed') 
+where index_id = 1 and index_level = 0</pre></div></div>
+
+<p>In the above example we are inserting 1 Million records and checking the Physical stats of the Clustered index of the table. It shows 3832 pages were allocated to the clustered index in its Leaf Level and shows Fragment count as 17. </p>
+<p>A Fragment is a collection of pages in sequence. Assume there is a page with ID 1000 is allocated to a table, and its sequences are 1001 and 495 instead of 1002, these will be considered as 2 fragments with one fragment having 1000-1001 and other fragment with 495.</p>
+<p>In one way, a Fragment can also be indicated as a part. In our example, the CI has 17 fragments and 3832 pages in Leaf Level. So, we can say, 3832 pages are occupied across 17 parts (Fragments).  Each of these parts will have its pages in sequential order. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/Fragments.jpg" alt="" title="" width="900" height="300" /></div>
+<p>Let’s try to implement this method. The idea is to first load all the pages allocated to the Clustered Index into a temporary table and assign the sequence number to those pages and join each record with next record and find out the records where the difference is not equal to 1.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+</pre></td><td class="de1"><pre class="de1"><span class="co1">-- Table to hold Pages of the CI,</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> sp_tablepages
+<span class="br0">&#40;</span>
+ID <span class="kw1">int</span> <span class="kw1">identity</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">primary</span> <span class="kw1">key</span>,
+PageFID <span class="kw1">tinyint</span>,
+PagePID <span class="kw1">int</span>,
+IAMFID <span class="kw1">tinyint</span>,
+IAMPID <span class="kw1">int</span>,
+ObjectID <span class="kw1">int</span>,
+IndexID <span class="kw1">tinyint</span>,
+PartitionNumber <span class="kw1">tinyint</span>,
+PartitionID <span class="kw1">bigint</span>,
+iam_chain_type <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">30</span><span class="br0">&#41;</span>,
+PageType <span class="kw1">tinyint</span>,
+IndexLevel <span class="kw1">tinyint</span>,
+NextPageFID <span class="kw1">tinyint</span>,
+NextPagePID <span class="kw1">int</span>,
+PrevPageFID <span class="kw1">tinyint</span>,
+PrevPagePID <span class="kw1">int</span>
+<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> sp_tablepages;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> sp_tablepages
+<span class="kw1">EXEC</span> <span class="br0">&#40;</span><span class="st0">'DBCC IND (test, tblNumbers, 1)'</span><span class="br0">&#41;</span>; &nbsp;
+&nbsp;
+<span class="co1">--delete the pages of non-leaf levels</span>
+<span class="kw1">delete</span> <span class="kw1">from</span> sp_tablepages <span class="kw1">where</span> IndexLevel <span class="sy0">&lt;&gt;</span> <span class="nu0">0</span> or IndexLevel <span class="kw1">is</span> null
+&nbsp;
+&nbsp;
+;<span class="kw1">with</span> cte <span class="kw1">as</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">select</span> PagePID,ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">over</span> <span class="br0">&#40;</span><span class="kw1">Order</span> <span class="kw1">by</span> ID<span class="br0">&#41;</span> <span class="kw1">as</span> ID <span class="kw1">from</span> sp_tablepages
+<span class="br0">&#41;</span>
+<span class="kw1">select</span> S.<span class="me1">PagepID</span> <span class="kw1">as</span> ThisFragmentEndPage,SN.<span class="me1">PagepID</span> <span class="kw1">as</span> NextFragmentBeginPage
+<span class="kw1">from</span> cte S
+<span class="kw1">inner</span> join cte &nbsp;SN <span class="kw1">on</span> SN.<span class="me1">ID</span> &nbsp;<span class="sy0">=</span> S.<span class="me1">ID</span> <span class="sy0">+</span> <span class="nu0">1</span> and SN.<span class="me1">PagePID</span> <span class="sy0">&lt;&gt;</span> S.<span class="me1">PagePID</span> <span class="sy0">+</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">-- Table to hold Pages of the CI,
+CREATE TABLE sp_tablepages
+(
+ID int identity(1,1) primary key,
+PageFID tinyint,
+PagePID int,
+IAMFID tinyint,
+IAMPID int,
+ObjectID int,
+IndexID tinyint,
+PartitionNumber tinyint,
+PartitionID bigint,
+iam_chain_type varchar(30),
+PageType tinyint,
+IndexLevel tinyint,
+NextPageFID tinyint,
+NextPagePID int,
+PrevPageFID tinyint,
+PrevPagePID int
+)
+
+TRUNCATE TABLE sp_tablepages;
+INSERT INTO sp_tablepages
+EXEC ('DBCC IND (test, tblNumbers, 1)');  
+
+--delete the pages of non-leaf levels
+delete from sp_tablepages where IndexLevel &lt;&gt; 0 or IndexLevel is null
+
+
+;with cte as
+(
+	select PagePID,ROW_NUMBER() over (Order by ID) as ID from sp_tablepages
+)
+select S.PagepID as ThisFragmentEndPage,SN.PagepID as NextFragmentBeginPage
+from cte S
+inner join cte  SN on SN.ID  = S.ID + 1 and SN.PagePID &lt;&gt; S.PagePID + 1</pre></div></div>
+
+<p>The query might not give the exact count of fragments in the table. In my tests it returned every time 1 or 2 less fragments(probably i am missing something else). This will give the Ending Page Number of the current fragment and First Page Number of Next Fragment. If you look at the values of columns &#8220;ThisFragmentEndPage&#8221;,&#8221;NextFragmentBeginPage&#8221;, for the first few rows they differ by more than 1 page, and for remaining rows, there is exactly one page difference. Interesting fact is that missing one page is actually allocated to table. You can check it in sp_tablepages table. But it is assigned to different Level. </p>
+<p>In the above example, the fragmentation is not because of Page Splits. It is based on he way SQL Storage engine allocates pages while inserting rows.</p>
+<p>1.	If Table Pages are less than 8, when requesting a new page, Storage Engine will assign a mixed extent. Once it reaches to 8 pages, then only it will start to assign Uniform extent. The reason for this behaviour is, Storage Engine wants to give importance to small tables also. Giving a uniform extent to every table will make lot of pages unused.  Small tables will fit within 2-3 pages and these will gain performance from this, when bringing a small extent into cache, will helps both tables become fast.  </p>
+<p>2.	Even assigning uniform extents will not erase the fragmentation completely. Since Index Non-Leaf Levels also increase along with Leaf Level data, suppose if Page 1000 is assigned to Level 0, if in Level 1, a new page needs to be created, then Storage Engine will assign 1001 to Level1. This will cause the Fragmentation in Level0. If storage engine tries to avoid fragmentation by  Assigning a new page from another extent for Level 1 makes the disk move forward and back, which delays the write operations. </p>
+<p>So, if the fragmentation is because of the above 2 reasons, even re-building the index also will not be useful. If the fragmentation is because of Page splits, then re-building index will be useful.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/what-exactly-is-fragment_count/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Performance implications using NewID() in Random order</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/performance-implications-with-newid/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/performance-implications-with-newid/#comments</comments>
+		<pubDate>Wed, 15 Sep 2010 17:18:19 +0000</pubDate>
+		<dc:creator><![CDATA[Ramireddy]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/09/performance-implications-with-newid/</guid>
+		<description><![CDATA[Today, I came across a question in MSDN forums “How to pick 5 random records?”. In SQL Server the only consistent way I know is to use NEWID() function in the Order By Clause. T-SQL1 &#160; &#160; &#160;select top 5 * from Orders &#160;order by NEWID&#40;&#41; select top 5 * from Orders order by NEWID() [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Today, I came across a question in MSDN forums “How to pick 5 random records?”. In SQL Server the only consistent way I know is to use NEWID() function in the Order By Clause.  </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; &nbsp;<span class="kw1">select</span> <span class="kw1">top</span> <span class="nu0">5</span> <span class="sy0">*</span> <span class="kw1">from</span> Orders &nbsp;<span class="kw1">order</span> <span class="kw1">by</span> NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">     select top 5 * from Orders  order by NEWID()</pre></div></div>
+
+<p>        This approach will always scan the entire table irrespective of number of rows requested. It retrieves each record in the table, appends a new GUID for each row, then based on that GUID it sorts the rows and presents the top 5 rows. Disadvantage here is it scans the entire table (if it’s heap) or Clustered Index. </p>
+<p>After thinking for a while, I got an idea; If the table has a Unique column and its covered by an index, we can use that column to select the required random records and then join it with the table. This is going to improve performance.<br />
+      Assume a table “Orders” with an index on column “OrderId”. In order to pick 5 random rows, we can write query like this.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">with</span> cte <span class="kw1">as</span> 
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">select</span> <span class="kw1">top</span> <span class="nu0">5</span> OrderID <span class="kw1">from</span> Orders &nbsp;<span class="kw1">order</span> <span class="kw1">by</span> NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#41;</span>
+<span class="kw1">select</span> &nbsp;t.<span class="sy0">*</span> <span class="kw1">from</span> cte c
+<span class="kw1">inner</span> join Orders t <span class="kw1">on</span> t.<span class="me1">OrderID</span> <span class="sy0">=</span> c.<span class="me1">OrderID</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;with cte as 
+(
+	select top 5 OrderID from Orders  order by NEWID()
+)
+select  t.* from cte c
+inner join Orders t on t.OrderID = c.OrderID</pre></div></div>
+
+<p>       The Inner CTE will use the index and pick the 5 random orders and outer query will get the details of those 5 random rows. By picking just the OrderIDs in CTE, we avoid the scanning of entire table. In the outer query, SQL optimizer will get the details of those rows by using lookups.</p>
+<p>The Table we used for testing,has around 1,80,000 records. Has an Clustered index and Non-Clustered Index on the Column. For Both indexes, the only common column is &#8220;ID&#8221;. The size of these indexes is listed below.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> index_type_desc,index_level,page_count <span class="kw1">from</span> sys.<span class="me1">dm_db_index_physical_stats</span><span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="kw2">object_id</span><span class="br0">&#40;</span><span class="st0">'Issues'</span><span class="br0">&#41;</span>,null,null,<span class="st0">'detailed'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select index_type_desc,index_level,page_count from sys.dm_db_index_physical_stats(DB_ID(),object_id('Issues'),null,null,'detailed')</pre></div></div>
+
+<div class="tables">
+<table cellpadding="1" cellspacing="1" border="1">
+<tr>
+<th>index_type_desc</th>
+<th>index_level</th>
+<th>page_count</th>
+</tr>
+<tr>
+<td>CLUSTERED INDEX</td>
+<td>0</td>
+<td>9899</td>
+</tr>
+<tr>
+<td>CLUSTERED INDEX</td>
+<td>1</td>
+<td>25</td>
+</tr>
+<tr>
+<td>CLUSTERED INDEX</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>NONCLUSTERED INDEX</td>
+<td>0</td>
+<td>305</td>
+</tr>
+<tr>
+<td>NONCLUSTERED INDEX</td>
+<td>1</td>
+<td>1</td>
+</tr>
+</table>
+</div>
+<p>Clustered Index  occupied total 9925 Pages across the 3 Levels</p>
+<p>Non Clustered Index occupied total 306 Pages across the 2 Levels</p>
+<p>Here are the executed queries</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="co1">-- Non CTE Version</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">5</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Issue_Dump &nbsp;<span class="kw1">ORDER</span> <span class="kw1">BY</span> NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="co1">-- CTE Version</span>
+;<span class="kw1">with</span> cte <span class="kw1">AS</span> 
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">5</span> <span class="br0">&#91;</span>CR ID<span class="br0">&#93;</span> <span class="kw1">FROM</span> Issue_Dump &nbsp;<span class="kw1">ORDER</span> <span class="kw1">BY</span> NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> &nbsp;t.<span class="sy0">*</span> <span class="kw1">FROM</span> cte c
+<span class="kw1">INNER</span> join Issue_Dump t <span class="kw1">ON</span> t.<span class="br0">&#91;</span>CR ID<span class="br0">&#93;</span> <span class="sy0">=</span> c.<span class="br0">&#91;</span>CR ID<span class="br0">&#93;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">-- Non CTE Version
+SELECT TOP 5 * FROM Issue_Dump  ORDER BY NEWID()
+
+-- CTE Version
+;with cte AS 
+(
+    SELECT TOP 5 [CR ID] FROM Issue_Dump  ORDER BY NEWID()
+)
+SELECT  t.* FROM cte c
+INNER join Issue_Dump t ON t.[CR ID] = c.[CR ID]</pre></div></div>
+
+<p>Below are the recorded statistics</p>
+<div class="tables">
+<table cellpadding="0" cellspacing="0" border="1">
+<tr>
+<th>Query</th>
+<th>Logical Reads</th>
+<th>CPU</th>
+<th>Duration</th>
+</tr>
+<tr>
+<td>CTE </td>
+<td>322</td>
+<td>234 ms</td>
+<td>696 ms</td>
+</tr>
+<tr>
+<td>Non CTE </td>
+<td>9926</td>
+<td>7281 ms</td>
+<td>10193 ms</td>
+</tr>
+</table>
+</div>
+<p>Here is the Reason behind the Difference of Reads between the queries.</p>
+<p>Non CTE Version Scans the Entire Clustered Index, whose size is 9925 Pages. So This query took 9925 reads,that is 1 Less than the no of reads recorded for Non CTE version.</p>
+<p>Coming to CTE Version, It Initially Scans the entire Non CI to retrieve only 5 Ids. As Non CI occupied 306 Pages,It requires 306 reads to fetch the 5 Random Ids. Then with those 5 Ids, it fetches the details of 5 those Ids by using Clustered Index Seek. As CI spans across 3 levels, to fetch 1 record details, it will take 3 reads. For 5 records, It will take 15 reads. So combined, it will take 321(306+15) reads, which is exactly 1 less than the reads recorded.</p>
+<p>The Extra 1 read might be because of GUIDs????</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/queryplan.png" alt="" title="" width="800" /></div>
+<p>Look at the Execution Plans of the 2 queries. The CTE query outperforms the non CTE query; the CTE query chooses the Non-Clustered Index Scan(to Retrieve 5 Random OrderIDs) and a Clustered Index seek(To retrieve details of 5 records), while our initial query settled for a Clustered Index Scan.</p>
+<p><b>Note: </b>After a discussion with Brad, There will be some exceptional cases, which optimizer will choose entire Clustered Index Scan to retrieve the records</p>
+<p>1. When the &#8220;Id&#8221; column is not covered by index  or it is not the first key column in case of index has multiple keycolumns.<br />
+2. When the Random Records Sample size is too large.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/performance-implications-with-newid/feed/</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+		</item>
+		<item>
+		<title>Calculating Nth weekday in a month</title>
+		<link>/index.php/datamgmt/dbprogramming/calculating-nth-weekday-in-a-month/</link>
+		<comments>/index.php/datamgmt/dbprogramming/calculating-nth-weekday-in-a-month/#comments</comments>
+		<pubDate>Tue, 02 Mar 2010 16:32:30 +0000</pubDate>
+		<dc:creator><![CDATA[Ramireddy]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/03/calculating-nth-weekday-in-a-month/</guid>
+		<description><![CDATA[How to calculate the Nth week day of a month? This will be useful in most of the Scheduling problems like Scheduling Jobs, Appointments etc. Let me demonstrate how we can achieve this: Let us take an example of say, 3rd Sunday in February, 2010 will come on 21st February, 2010. The solution to the [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>How to calculate the Nth week day of a month?</p>
+<p>This will be useful in most of the Scheduling problems like Scheduling Jobs, Appointments etc. </p>
+<p>Let me demonstrate how we can achieve this:</p>
+<p>Let us take an example of say, 3rd Sunday in February, 2010 will come on 21st February, 2010.<br />
+The solution to the above problem needs to satisfy 3 conditions.<br />
+1.	The date should be in the specified month and year.<br />
+2.	The date should be in the specified week number.<br />
+3.	The date should be of the specified week day.<br />
+Solving this problem comprises the following 3 steps, which logically satisfy each of the above conditions:<br />
+1.	Get the first date for the provided month and year. E.g., the first date for the specified month (February) and Year (2010) is February 1st 2010.The following query will give you the first date for provided month and year.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">MONTH</span>,@Month<span class="sy0">-</span><span class="nu0">1</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">YEAR</span>,@Year<span class="sy0">-</span><span class="nu0">1900</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    SELECT DATEADD(MONTH,@Month-1,DATEADD(YEAR,@Year-1900,0))</pre></div></div>
+
+<p>2. Get the first date on which any weekday will occur nth time in the month. i.e. ((N-1)*7+1)th day of the month will be the first date on which any weekday will occur nth time. In this case, the first date for the specified week (3) is, February 1st 2010 + (3 &#8211; 1)*7 days = February 15th 2010.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; &nbsp;<span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">DAY</span>,<span class="br0">&#40;</span>@Weekno<span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span><span class="sy0">*</span><span class="nu0">7</span> ,<span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">MONTH</span>,@Month<span class="sy0">-</span><span class="nu0">1</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">YEAR</span>,@Year<span class="sy0">-</span> &nbsp;<span class="nu0">1900</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">     SELECT DATEADD(DAY,(@Weekno-1)*7 ,DATEADD(MONTH,@Month-1,DATEADD(YEAR,@Year-  1900,0)))</pre></div></div>
+
+<p>3.	Now add the number of days required to calculate the specified weekday. This will depend on the weekday specified and the weekday of the first date that came in the above step. These will be based on the weekday specified and the weekday of the first date that came in above step.<br />
+Week day Requested is 6 (Sunday) and Weekday of first date that came in above step is 0(Monday).<br />
+So, No of days required to add are (Weekday Requested &#8211; weekday of first date ) = 6 – 0 = 6 days.<br />
+Note: If the above formula results in negative value, add 7 to the result.<br />
+You can write the above expression as<br />
+No of days to add = (7 + Weekday Requested &#8211; Weekday Of first date) % 7<br />
+In our case, the number of days required to add are 6 &#8211; 0 = 6 days. So, by adding 6 days to 15th February 2010,you will get 21st February 2010, which is 3rd Sunday of February 2010.<br />
+So, the final query will become,</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">DAY</span>,<span class="br0">&#40;</span><span class="br0">&#40;</span><span class="nu0">7</span><span class="sy0">+</span>@Weekday<span class="br0">&#41;</span><span class="sy0">-</span><span class="kw2">DATEDIFF</span><span class="br0">&#40;</span>dd,<span class="nu0">0</span>,t.<span class="me1">mydate</span><span class="br0">&#41;</span><span class="sy0">%</span>7<span class="br0">&#41;</span><span class="sy0">%</span>7,t.<span class="me1">mydate</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">DAY</span>,<span class="br0">&#40;</span>@Weekno<span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span><span class="sy0">*</span><span class="nu0">7</span> ,<span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">MONTH</span>,@Month<span class="sy0">-</span> 
+&nbsp; &nbsp; <span class="nu0">1</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">YEAR</span>,@Year<span class="sy0">-</span><span class="nu0">1900</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">AS</span> mydate <span class="br0">&#41;</span>t<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">	SELECT DATEADD(DAY,((7+@Weekday)-DATEDIFF(dd,0,t.mydate)%7)%7,t.mydate) FROM 
+	    (SELECT DATEADD(DAY,(@Weekno-1)*7 ,DATEADD(MONTH,@Month- 
+	1,DATEADD(YEAR,@Year-1900,0))) AS mydate )t)</pre></div></div>
+
+<p>Finally, the function written below is the complete solution that will be useful in calculating Nth weekday of any given month and year.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="kw1">CREATE</span> <span class="kw1">FUNCTION</span> fn_getWeekDay <span class="br0">&#40;</span>@<span class="kw1">YEAR</span> <span class="kw1">INT</span>,@<span class="kw1">MONTH</span> <span class="kw1">INT</span>,@WeekNo <span class="kw1">INT</span>,@WeekDay <span class="kw1">INT</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">RETURNS</span> <span class="kw1">DATETIME</span> 
+&nbsp; &nbsp; <span class="kw1">AS</span> 
+&nbsp; &nbsp; <span class="kw1">BEGIN</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">RETURN</span> <span class="br0">&#40;</span> &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">DAY</span>,<span class="br0">&#40;</span><span class="br0">&#40;</span><span class="nu0">7</span><span class="sy0">+</span>@Weekday<span class="br0">&#41;</span><span class="sy0">-</span><span class="kw2">DATEDIFF</span><span class="br0">&#40;</span>dd,<span class="nu0">0</span>,t.<span class="me1">mydate</span><span class="br0">&#41;</span><span class="sy0">%</span>7<span class="br0">&#41;</span><span class="sy0">%</span>7,t.<span class="me1">mydate</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">DAY</span>,<span class="br0">&#40;</span>@Weekno<span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span><span class="sy0">*</span><span class="nu0">7</span> ,<span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">MONTH</span>,@Month<span class="sy0">-</span><span class="nu0">1</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span><span class="kw1">YEAR</span>,@Year<span class="sy0">-</span><span class="nu0">1900</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">AS</span> mydate <span class="br0">&#41;</span>t<span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">	CREATE FUNCTION fn_getWeekDay (@YEAR INT,@MONTH INT,@WeekNo INT,@WeekDay INT) 
+	RETURNS DATETIME 
+	AS 
+	BEGIN 
+	    RETURN (   
+	    SELECT DATEADD(DAY,((7+@Weekday)-DATEDIFF(dd,0,t.mydate)%7)%7,t.mydate) FROM 
+	    (SELECT DATEADD(DAY,(@Weekno-1)*7 ,DATEADD(MONTH,@Month-1,DATEADD(YEAR,@Year-1900,0))) AS mydate )t) 
+	END</pre></div></div>
+
+<p>The above function takes 4 parameters: year, month, week number and weekday (Monday-0, Tuesday-1, Wednesday-2, Thursday-3, Friday-4, Saturday-5, Sunday-6)<br />
+So, in order to calculate 3rd Sunday in February 20010, you need to call the function like below.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp;<span class="kw1">SELECT</span> dbo.<span class="me1">fn_getWeekDay</span><span class="br0">&#40;</span><span class="nu0">2010</span>,<span class="nu0">2</span>,<span class="nu0">2</span>,<span class="nu0">3</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">   SELECT dbo.fn_getWeekDay(2010,2,2,3)</pre></div></div>
+
+<p>I hope my function can be useful for you and see you in my next blog.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/calculating-nth-weekday-in-a-month/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Calculating number of workdays between 2 dates</title>
+		<link>/index.php/datamgmt/dbprogramming/calculating-number-of-workdays-between-2/</link>
+		<comments>/index.php/datamgmt/dbprogramming/calculating-number-of-workdays-between-2/#comments</comments>
+		<pubDate>Thu, 25 Feb 2010 18:09:17 +0000</pubDate>
+		<dc:creator><![CDATA[Ramireddy]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/02/calculating-number-of-workdays-between-2/</guid>
+		<description><![CDATA[Today I saw someone asked a question in MSDN t-sql forums &#8220;How to calculate the number of working days between two given dates&#8221;. I found this very interesting, since we can solve this problem by using a very simple and methodical approach and by using an unorthodox approach. I will explain both the approaches. 1. [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Today I saw someone asked a question in MSDN t-sql forums <a href="http://social.msdn.microsoft.com/Forums/en-US/transactsql/thread/479b2888-f228-4154-9595-4c9e9b7a5523">&#8220;How to calculate the number of working days between two given dates&#8221;.</a> I found this very interesting, since we can solve this problem by using a very simple and methodical approach and by using an unorthodox approach. I will explain both the approaches.</p>
+<p><b>1. By Using Auxilary Calendar Table<br />
+2. Based on the weekdays of start date and end dates.<br />
+</b></p>
+<p><b>By Using Auxilary Calendar Table : </b><br />
+           This is a good and methodical approach. In this approach, the database has a table that has all the dates that we can represent using sql server. The following script will insert all the dates between 1/1/1753 (minimum date sql can recognize in sql) and 12/31/9999 (maximum date sql can recognize in sql).</p>
+<pre>create table AuxCalendarDates
+(
+	CalDate datetime
+)
+
+;with N as
+(
+	select 0 as num union all select 1 union all select 2 union all select 3 union all select 4 union all select 5 union all
+	select 6 union all select 7 union all select 8 union all select 9	
+),
+Numbers as
+(
+	select row_number() over (order by (select null)) as Number from N N,N N1,N N2,N N3,N N4,N N5,N N6
+)
+insert into AuxCalendarDates
+select dateadd(day,Number - 1,'1/1/1753') from Numbers where Number &lt;= 3012154</pre>
+<p> 3012154 is the Total number of days sql can recognize.</p>
+<p>Once, calendar table created, Solving this is fairly straight forward. It needs to satisfy the following 2 conditions.</p>
+<p>1. The Calendar date should between the 2 given dates. using a where clause like     below will do the trick.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp;<span class="kw1">where</span> caldate between @startdate and @enddate 
+&nbsp; &nbsp;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">   where caldate between @startdate and @enddate 
+   </pre></div></div>
+
+<p>2. date should be between Monday to Friday<br />
+     To find the weekday, the normal approach is using datepart(dw,date) function.<br />
+But unfortunately this function depends on the @@datefirst settings.<br />
+If we change the datefirst value, we will get an different week day. run the below code in SSMS. It will give different week numbers for different datefirst values.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">set</span> datefirst <span class="nu0">7</span>
+<span class="kw1">select</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>dw,<span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">set</span> datefirst <span class="nu0">5</span>
+<span class="kw1">select</span> <span class="kw2">datepart</span><span class="br0">&#40;</span>dw,<span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">set datefirst 7
+select datepart(dw,getdate())
+set datefirst 5
+select datepart(dw,getdate())</pre></div></div>
+
+<p>There is another way to find a weekday,<br />
+Calculating the number of days since the beginning and calculating the remainder by dividing with 7.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp;<span class="kw1">select</span> <span class="kw2">datediff</span><span class="br0">&#40;</span>dd,<span class="nu0">0</span>,<span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">%</span>7</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">   select datediff(dd,0,getdate())%7</pre></div></div>
+
+<p>The above expression will give 0 for Monday, 1 for Tuesday, 2 for Wednesday , 3 for Thursday ,4 for Friday , 5 for Saturday and 6 for Sunday.</p>
+<p>The above expression is also independent of datefirst settings.</p>
+<p>Now using the above expression, to check the weekday, </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp;<span class="kw2">datediff</span><span class="br0">&#40;</span>dd,<span class="nu0">0</span>,Caldate<span class="br0">&#41;</span><span class="sy0">%</span>7 between <span class="nu0">0</span> and <span class="nu0">4</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"> datediff(dd,0,Caldate)%7 between 0 and 4</pre></div></div>
+
+<p>finally, keeping it in a function, will make this re-usable.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">function</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>fn_NoofWorkdaysBetweenDates_Table<span class="br0">&#93;</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; @StartDate <span class="kw1">datetime</span>,
+&nbsp; &nbsp; @EndDate <span class="kw1">datetime</span>
+<span class="br0">&#41;</span>
+<span class="kw1">RETURNS</span> <span class="kw1">INT</span>
+<span class="kw1">as</span>
+<span class="kw1">BEGIN</span>
+<span class="kw1">RETURN</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">select</span> <span class="kw2">count</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">from</span> AuxCalendarDates <span class="kw1">where</span> CalDate between @startdate and @enddate
+&nbsp; &nbsp; and <span class="kw2">datediff</span><span class="br0">&#40;</span>dd,<span class="nu0">0</span>,Caldate<span class="br0">&#41;</span><span class="sy0">%</span>7 between <span class="nu0">0</span> and <span class="nu0">4</span>
+<span class="br0">&#41;</span>;
+<span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create function [dbo].[fn_NoofWorkdaysBetweenDates_Table]
+(
+	@StartDate datetime,
+	@EndDate datetime
+)
+RETURNS INT
+as
+BEGIN
+RETURN
+(
+	select count(*) from AuxCalendarDates where CalDate between @startdate and @enddate
+	and datediff(dd,0,Caldate)%7 between 0 and 4
+);
+END</pre></div></div>
+
+<p>Now i will explain the second method, which is unorthodox. This Method depends on  the pattern of week day of start date and week day of end date, and based on that finding the condition.</p>
+<p>For example, take 2 dates Feb1st2010,Feb8th2010. Feb1st 2010 is monday and Feb8th 2010 is monday. so the no of working days = 1 + ( 5 * 1) = 6 days..<br />
+ if starting day is monday, and endday is also monday, no of working days  = 1 Working day + (5 * no of finished weeks between the 2 dates)</p>
+<p>Take another example.<br />
+   Take 2 dates Feb1st2010,Feb9th2010. Feb1st 2010 is monday and Feb9th 2010 is tuesday. so the no of working days = 2 + ( 5 * 1) = 7 days..</p>
+<p>   if starting day is monday , and endday is tuesday, no of working days<br />
+= 2 working days + ( 5 * no of weeks between the 2 dates) </p>
+<p>Generalizing the above examples, the following formula can be derived.</p>
+<p>No of working dates between 2 dates =  (Additional Working days) +  (5 *  no of finished weeks between the 2 dates)</p>
+<p>In above formula, Additional Working days will varies and it depends on the week day of starting date and weekday of ending date.</p>
+<p>To get the Additional working days, below table will be useful..</p>
+<p>   0 1 2 3 4 5 6<br />
+ &#8212;&#8212;&#8212;&#8212;&#8212;&#8212;<br />
+0| 1 2 3 4 5 5 5<br />
+1| 5 1 2 3 4 4 4<br />
+2| 4 5 1 2 3 3 3<br />
+3| 3 4 5 1 2 2 2<br />
+4| 2 3 4 4 1 1 1<br />
+5| 1 2 3 4 5 0 0<br />
+6| 1 2 3 4 5 5 0 </p>
+<p>0 to 6 in row represents the week day of starting date<br />
+0 to 6 in columns represent the week day of ending date</p>
+<p>Suppose to calculate Additional working days between Tuesday and Friday,</p>
+<p>As, Tuesday, week day no is 1 and Friday Week day no is 4, checking the value in RowNo-1 against colNo-4 will give you the no of additional working days as 4.</p>
+<p>Now, to use this table in query, concatenate these all columns into single row, so, that there will be only 7 rows,and use those in the query as inline table.. based on the weekday of starting date, filtering the row and based on weekday of ending date, filtering the column..<br />
+so,  final implementation of this function will be</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Create</span> <span class="kw1">function</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>fn_NoofWorkdaysBetweenDates<span class="br0">&#93;</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; @StartDate <span class="kw1">datetime</span>,
+&nbsp; &nbsp; @EndDate <span class="kw1">datetime</span>
+<span class="br0">&#41;</span>
+<span class="kw1">RETURNS</span> <span class="kw1">INT</span>
+<span class="kw1">as</span>
+<span class="kw1">BEGIN</span>
+<span class="kw1">RETURN</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">select</span> <span class="br0">&#40;</span><span class="kw2">datediff</span><span class="br0">&#40;</span>dd,@startdate,@enddate<span class="br0">&#41;</span><span class="sy0">/</span><span class="nu0">7</span><span class="br0">&#41;</span><span class="sy0">*</span><span class="nu0">5</span> <span class="sy0">+</span> &nbsp;<span class="kw2">substring</span><span class="br0">&#40;</span>EndWk,<span class="kw2">datediff</span><span class="br0">&#40;</span>dd,<span class="nu0">0</span>,@enddate<span class="br0">&#41;</span><span class="sy0">%</span>7<span class="sy0">+</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">from</span> <span class="br0">&#40;</span> <span class="kw1">select</span> <span class="nu0">0</span> <span class="kw1">as</span> StartWk,<span class="st0">'1234555'</span> <span class="kw1">as</span> EndWK <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">1</span>,<span class="st0">'5123444'</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">2</span>,<span class="st0">'4512333'</span> <span class="kw1">union</span> all 
+&nbsp; &nbsp; <span class="kw1">select</span> <span class="nu0">3</span>,<span class="st0">'3451222'</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">4</span>,<span class="st0">'2344111'</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">5</span>,<span class="st0">'1234500'</span> <span class="kw1">union</span> all <span class="kw1">select</span> <span class="nu0">6</span>,<span class="st0">'1234550'</span><span class="br0">&#41;</span>t
+&nbsp; &nbsp; <span class="kw1">where</span> StartWk <span class="sy0">=</span> <span class="kw2">datediff</span><span class="br0">&#40;</span>dd,<span class="nu0">0</span>,@startdate<span class="br0">&#41;</span><span class="sy0">%</span>7
+<span class="br0">&#41;</span>;
+<span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Create function [dbo].[fn_NoofWorkdaysBetweenDates]
+(
+	@StartDate datetime,
+	@EndDate datetime
+)
+RETURNS INT
+as
+BEGIN
+RETURN
+(
+	select (datediff(dd,@startdate,@enddate)/7)*5 +  substring(EndWk,datediff(dd,0,@enddate)%7+1,1)
+	from ( select 0 as StartWk,'1234555' as EndWK union all select 1,'5123444' union all select 2,'4512333' union all 
+	select 3,'3451222' union all select 4,'2344111' union all select 5,'1234500' union all select 6,'1234550')t
+	where StartWk = datediff(dd,0,@startdate)%7
+);
+END</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/calculating-number-of-workdays-between-2/feed/</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+		</item>
+	</channel>
+</rss>

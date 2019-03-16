@@ -1,0 +1,901 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>partitioning &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/partitioning/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Listing tables that are truly partitioned in SQL Server</title>
+		<link>/index.php/datamgmt/dbprogramming/listing-tables-that-are-truly/</link>
+		<comments>/index.php/datamgmt/dbprogramming/listing-tables-that-are-truly/#comments</comments>
+		<pubDate>Sat, 23 Feb 2013 08:59:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[features]]></category>
+		<category><![CDATA[partitioning]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/listing-tables-that-are-truly/</guid>
+		<description><![CDATA[To list all the tables that are partitioned you can use the sys.partitions view. However be aware that all tables and indexes in SQL Server contain at least one partition, whether or not they are explicitly partitioned.
+
+If you were to do the followin&#8230;]]></description>
+				<content:encoded><![CDATA[<p>To list all the tables that are partitioned you can use the sys.partitions view. However be aware that all tables and indexes in SQL Server contain at least one partition, whether or not they are explicitly partitioned.</p>
+<p>If you were to do the following, you would get back every table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> partition_number,<span class="kw1">rows</span>,<span class="kw2">object_name</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT partition_number,rows,object_name(object_id)
+FROM sys.partitions</pre></div></div>
+
+<p>So what can you do? Let&#8217;s take a look. First we are going to create a partitioned table in case you don&#8217;t have one so that you can get the same output as me.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> SalesPartitioned<span class="br0">&#40;</span>YearCol <span class="kw1">SMALLINT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,OrderID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, SomeData <span class="kw1">UNIQUEIDENTIFIER</span> <span class="kw1">DEFAULT</span> newsequentialid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE SalesPartitioned(YearCol SMALLINT NOT NULL,OrderID INT NOT NULL, SomeData UNIQUEIDENTIFIER DEFAULT newsequentialid())
+GO</pre></div></div>
+
+<p>We are going to insert some data into the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> SalesPartitioned <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="nu0">2007</span>,number
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="nu0">2008</span>,number <span class="sy0">+</span> <span class="nu0">2048</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="nu0">2009</span>,number <span class="sy0">+</span> <span class="nu0">4096</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT SalesPartitioned (YearCol,OrderID)
+SELECT 2007,number
+FROM master..spt_values
+WHERE type = 'P'
+UNION ALL
+SELECT 2008,number + 2048
+FROM master..spt_values
+WHERE type = 'P'
+UNION ALL
+SELECT 2009,number + 4096
+FROM master..spt_values
+WHERE type = 'P'</pre></div></div>
+
+<p>We will now add a primary key</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">SalesPartitioned</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Sales <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">NONCLUSTERED</span> <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.SalesPartitioned ADD CONSTRAINT
+	PK_Sales PRIMARY KEY NONCLUSTERED (YearCol,OrderID)</pre></div></div>
+
+<p>Now it is time to create our partition function. Here is how we will do it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> PARTITION <span class="kw1">FUNCTION</span> pfFiscalYear<span class="br0">&#40;</span><span class="kw1">SMALLINT</span><span class="br0">&#41;</span>
+<span class="kw1">AS</span> RANGE <span class="kw1">RIGHT</span> <span class="kw1">FOR</span> <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">2007</span>,<span class="nu0">2008</span>,<span class="nu0">2009</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PARTITION FUNCTION pfFiscalYear(SMALLINT)
+AS RANGE RIGHT FOR VALUES(2007,2008,2009)</pre></div></div>
+
+<p>What that does is actually create 4 partitions, one for 2007, one for 2008, one for everything after 2008, and one for everything before 2006.<br />
+<=2006
+= 2007
+= 2008
+>= 2009</p>
+<p>You can verify this by using the function $partition</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="nu0">1</span> <span class="kw1">AS</span> val,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">AS</span> partition &nbsp; &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2006</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2006</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2007</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2007</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2008</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2008</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2009</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2009</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2010</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2010</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">3000</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">3000</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select 1 AS val,$partition.pfFiscalYear(1) AS partition	    UNION all
+select 2006,$partition.pfFiscalYear(2006)	UNION all
+select 2007,$partition.pfFiscalYear(2007)	UNION all
+select 2008,$partition.pfFiscalYear(2008)	UNION all
+select 2009,$partition.pfFiscalYear(2009)	UNION all
+select 2010,$partition.pfFiscalYear(2010)	UNION all
+select 3000,$partition.pfFiscalYear(3000)</pre></div></div>
+
+<p>And here is the output</p>
+<pre>val         partition
+----------- -----------
+1           1
+2006        1
+2007        2
+2008        3
+2009        4
+2010        4
+3000        4</pre>
+<p>Now that we have the partition function, we need a partition scheme. A partition scheme is used to map boundary values in partition functions to filegroups. You can have one filegroup for each year placed on a different spindle, this way you don&#8217;t have to wait for the disk if all partitions are on the same spindle. For the sake of simplicity we only have one filegroup. Here is how to create the partition scheme</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> PARTITION SCHEME psFiscalYear
+<span class="kw1">AS</span> PARTITION pfFiscalYear <span class="sy0">ALL</span> <span class="kw1">TO</span> <span class="br0">&#40;</span><span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PARTITION SCHEME psFiscalYear
+AS PARTITION pfFiscalYear ALL TO ([PRIMARY])</pre></div></div>
+
+<p><em>Partition scheme &#8216;psFiscalYear&#8217; has been created successfully. &#8216;PRIMARY&#8217; is marked as the next used filegroup in partition scheme &#8216;psFiscalYear&#8217;.</em></p>
+<p>Now we will add a clustered index and partition this on the YearCol column, the syntax looks like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_Sales <span class="kw1">ON</span> SalesPartitioned<span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">ON</span> psFiscalYear<span class="br0">&#40;</span>YearCol<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX IX_Sales ON SalesPartitioned(YearCol,OrderID)
+ON psFiscalYear(YearCol)</pre></div></div>
+
+<p>Now it is time to list all the tables that are partitioned. Here is how you do it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> partition_number,<span class="kw1">rows</span>,<span class="kw2">object_name</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span> s
+<span class="kw1">WHERE</span> <span class="sy0">EXISTS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="sy0">NULL</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> sys.<span class="me1">partitions</span> s2 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHERE</span> s.<span class="kw2">object_id</span> <span class="sy0">=</span> s2.<span class="kw2">object_id</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> partition_number <span class="sy0">&gt;</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> s.<span class="me1">index_id</span> <span class="sy0">=</span> s2.<span class="me1">index_id</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT partition_number,rows,object_name(object_id)
+FROM sys.partitions s
+WHERE EXISTS(SELECT NULL 
+				FROM sys.partitions s2 
+				WHERE s.object_id = s2.object_id 
+				AND partition_number &gt; 1
+				AND s.index_id = s2.index_id)</pre></div></div>
+
+<p>Here is the output</p>
+<pre>partition_number	rows	TableName
+1	                0	SalesPartitioned
+2	                2048	SalesPartitioned
+3	                2048	SalesPartitioned
+4	                2048	SalesPartitioned</pre>
+<p>As you can see we used WHERE EXISTS, we checked that the object had a partition_number higher than two and we also matched on index_id since a table can have more than one index</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/listing-tables-that-are-truly/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Find all the tables and indexes that have data compression</title>
+		<link>/index.php/datamgmt/datadesign/find-all-the-tables-and/</link>
+		<comments>/index.php/datamgmt/datadesign/find-all-the-tables-and/#comments</comments>
+		<pubDate>Fri, 16 Nov 2012 17:32:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[compression]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[partitioning]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/11/find-all-the-tables-and/</guid>
+		<description><![CDATA[I took a backup of one of our test databases today and gave it to someone so that it could be restored on one of their servers.
+
+I got back the following in an email from the person who tried to do the restore
+
+
+
+Date                      11/16/20&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I took a backup of one of our test databases today and gave it to someone so that it could be restored on one of their servers.</p>
+<p>I got back the following in an email from the person who tried to do the restore</p>
+<p><em></p>
+<p>Date                      11/16/2012 12:58:16 PM<br />
+Log                         SQL Server (Current &#8211; 11/16/2012 1:00:00 PM)</p>
+<p>Source                  spid76</p>
+<p>Message<br />
+Database &#8216;YourCrappyDB&#8217; cannot be started in this edition of SQL Server because part or all of object &#8216;CrappyIndexData&#8217; is enabled with data compression or vardecimal storage format. Data compression and vardecimal storage format are only supported on SQL Server Enterprise Edition.</em></p>
+<p>Okay, so they are running the standard edition of SQL Server. How can you quickly find all the tables and indexes that use compression? Let&#8217;s take a look, first we are going to create three tables, a heap, a table with a non clustered index and a table with a clustered index</p>
+<p>A table without indexes (a heap)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompress<span class="br0">&#40;</span>SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">1000</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> TestCompress
+REBUILD PARTITION <span class="sy0">=</span> <span class="sy0">ALL</span> <span class="kw1">WITH</span> <span class="br0">&#40;</span>DATA_COMPRESSION <span class="sy0">=</span> &nbsp;PAGE<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestCompress(SomeCol VARCHAR(1000))
+GO
+
+ALTER TABLE TestCompress
+REBUILD PARTITION = ALL WITH (DATA_COMPRESSION =  PAGE)</pre></div></div>
+
+<p>A table with a non clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--Non clustered index</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompress2<span class="br0">&#40;</span>SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> null<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IX_TestCompress2 
+&nbsp; &nbsp; <span class="kw1">ON</span> TestCompress2 <span class="br0">&#40;</span>SomeCol<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span> DATA_COMPRESSION <span class="sy0">=</span> <span class="kw1">ROW</span> <span class="br0">&#41;</span> ; 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--Non clustered index
+CREATE TABLE TestCompress2(SomeCol VARCHAR(100) NOT null)
+GO
+
+CREATE NONCLUSTERED INDEX IX_TestCompress2 
+    ON TestCompress2 (SomeCol)
+WITH ( DATA_COMPRESSION = ROW ) ; 
+GO</pre></div></div>
+
+<p>A table with a clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--Clustered index</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompress3<span class="br0">&#40;</span>SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> null<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_TestCompress3 
+&nbsp; &nbsp; <span class="kw1">ON</span> TestCompress3 <span class="br0">&#40;</span>SomeCol<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span> DATA_COMPRESSION <span class="sy0">=</span> <span class="kw1">ROW</span> <span class="br0">&#41;</span> ; 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--Clustered index
+CREATE TABLE TestCompress3(SomeCol VARCHAR(100) NOT null)
+GO
+
+CREATE CLUSTERED INDEX IX_TestCompress3 
+    ON TestCompress3 (SomeCol)
+WITH ( DATA_COMPRESSION = ROW ) ; 
+GO</pre></div></div>
+
+<p>Here is the query that will give you the table name, the storage type, the index name if there is one and the type of compression</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span>
+SCHEMA_NAME<span class="br0">&#40;</span>o.<span class="me1">schema_id</span><span class="br0">&#41;</span> &nbsp;<span class="sy0">+</span> <span class="st0">'.'</span> <span class="sy0">+</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>o.<span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">AS</span> TableName,
+i.<span class="me1">name</span> <span class="kw1">AS</span> IndexName,
+p.<span class="me1">data_compression_desc</span> <span class="kw1">AS</span> CompressionType,
+i.<span class="me1">type_desc</span> <span class="kw1">AS</span> StorageType
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span> &nbsp;p 
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">objects</span> o 
+<span class="kw1">ON</span> p.<span class="kw2">object_id</span> <span class="sy0">=</span> o.<span class="kw2">object_id</span> 
+<span class="sy0">JOIN</span> sys.<span class="me1">indexes</span> i 
+<span class="kw1">ON</span> p.<span class="kw2">object_id</span> <span class="sy0">=</span> i.<span class="kw2">object_id</span>
+<span class="sy0">AND</span> i.<span class="me1">index_id</span> <span class="sy0">=</span> p.<span class="me1">index_id</span>
+<span class="kw1">WHERE</span> p.<span class="me1">data_compression</span> <span class="sy0">&gt;</span> <span class="nu0">0</span> 
+<span class="sy0">AND</span> SCHEMA_NAME<span class="br0">&#40;</span>o.<span class="me1">schema_id</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> <span class="st0">'SYS'</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT DISTINCT
+SCHEMA_NAME(o.schema_id)  + '.' + OBJECT_NAME(o.object_id) AS TableName,
+i.name AS IndexName,
+p.data_compression_desc AS CompressionType,
+i.type_desc AS StorageType
+FROM sys.partitions  p 
+INNER JOIN sys.objects o 
+ON p.object_id = o.object_id 
+JOIN sys.indexes i 
+ON p.object_id = i.object_id
+AND i.index_id = p.index_id
+WHERE p.data_compression &gt; 0 
+AND SCHEMA_NAME(o.schema_id) &lt;&gt; 'SYS' </pre></div></div>
+
+<p>Here is the output of that query</p>
+<div class="tables">
+<table>
+<tr>
+<th> TableName </th>
+<th> IndexName </th>
+<th> CompressionType </th>
+<th> StorageType </th>
+</tr>
+<tr>
+<td> dbo.TestCompress </td>
+<td>NULL</td>
+<td> PAGE </td>
+<td> HEAP </td>
+</tr>
+<tr>
+<td> dbo.TestCompress2 </td>
+<td> IX_TestCompress2 </td>
+<td> ROW </td>
+<td> NONCLUSTERED </td>
+</tr>
+<tr>
+<td> dbo.TestCompress3 </td>
+<td> IX_TestCompress3 </td>
+<td> ROW </td>
+<td> CLUSTERED </td>
+</tr>
+</table>
+</div>
+<p>Now why do I have a distinct in my query? The reason is that if you have your indexes/tables partitioned you will get more than one row per index. you can add p.rows to the select portion of the queries and you will see how many rows each partition holds</p>
+<p>Hopefully this will help someone in the future</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/find-all-the-tables-and/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2011 Day 3: Partitioning</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-3/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-3/#respond</comments>
+		<pubDate>Sat, 03 Dec 2011 09:04:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[partitioning]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-3/</guid>
+		<description><![CDATA[In my Are you ready for SQL Server 2012 or are you still partying like it is 1999? post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code tha&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>In today&#8217;s post I will cover partitioning. In the SQL Server 2000 days we called this horizontal partitioning, it is actually something I have implemented with great success when I started at my current job. Fragmentation was a non issue anymore because the way I have set up the tables the inserts didn&#8217;t fragment the tables anymore. Index rebuilds were also much faster since the tables were smaller and I could rebuild more than one table at the same time.</p>
+<p>In this post I will show you how you do partitioning in SQL Server 2000 (partitioned views) and how you do it in 2005 and up. You might ask yourself why I waste my time showing you the 2000 version. This is because partitioning only works in the enterprise edition of SQL Server, if you are on the standard edition then you cannot use native partitioning. You can however still use partitioned views.</p>
+<h2>Partitioning the SQL Server 2000 way</h2>
+<p>In order to show you how to do this, we need to first create a bunch of tables. We will create a table for each year.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Sales2007 <span class="br0">&#40;</span>YearCol <span class="kw1">SMALLINT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,OrderID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, SomeData <span class="kw1">UNIQUEIDENTIFIER</span> <span class="kw1">DEFAULT</span> newsequentialid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Sales2008 <span class="br0">&#40;</span>YearCol <span class="kw1">SMALLINT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,OrderID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, SomeData <span class="kw1">UNIQUEIDENTIFIER</span> <span class="kw1">DEFAULT</span> newsequentialid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Sales2009 <span class="br0">&#40;</span>YearCol <span class="kw1">SMALLINT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,OrderID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, SomeData <span class="kw1">UNIQUEIDENTIFIER</span> <span class="kw1">DEFAULT</span> newsequentialid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Sales2007 (YearCol SMALLINT NOT NULL,OrderID INT NOT NULL, SomeData UNIQUEIDENTIFIER DEFAULT newsequentialid())
+GO
+
+CREATE TABLE Sales2008 (YearCol SMALLINT NOT NULL,OrderID INT NOT NULL, SomeData UNIQUEIDENTIFIER DEFAULT newsequentialid())
+GO
+
+
+CREATE TABLE Sales2009 (YearCol SMALLINT NOT NULL,OrderID INT NOT NULL, SomeData UNIQUEIDENTIFIER DEFAULT newsequentialid())
+GO</pre></div></div>
+
+<p>We will now insert some data into these tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Sales2007<span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="nu0">2007</span>,number
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> Sales2008<span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="nu0">2008</span>,number <span class="sy0">+</span> <span class="nu0">2048</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+&nbsp;
+<span class="kw1">INSERT</span> Sales2009<span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="nu0">2009</span>,number <span class="sy0">+</span> <span class="nu0">4096</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Sales2007(YearCol,OrderID)
+SELECT 2007,number
+FROM master..spt_values
+WHERE type = 'P'
+
+
+INSERT Sales2008(YearCol,OrderID)
+SELECT 2008,number + 2048
+FROM master..spt_values
+WHERE type = 'P'
+
+INSERT Sales2009(YearCol,OrderID)
+SELECT 2009,number + 4096
+FROM master..spt_values
+WHERE type = 'P'</pre></div></div>
+
+<p>It is time to make our tables &#8211;CELKO&#8211; approved by adding primary keys</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Sales2007</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Sales2007 <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+&nbsp; &nbsp; 
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Sales2008</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Sales2008 <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+&nbsp; &nbsp; 
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Sales2009</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Sales2009 <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.Sales2007 ADD CONSTRAINT
+	PK_Sales2007 PRIMARY KEY CLUSTERED (YearCol,OrderID)
+	
+ALTER TABLE dbo.Sales2008 ADD CONSTRAINT
+	PK_Sales2008 PRIMARY KEY CLUSTERED (YearCol,OrderID)
+	
+ALTER TABLE dbo.Sales2009 ADD CONSTRAINT
+	PK_Sales2009 PRIMARY KEY CLUSTERED (YearCol,OrderID)</pre></div></div>
+
+<p>Here is a view that will have all the tables in them</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">VIEW</span> Sales
+<span class="kw1">AS</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Sales2007
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Sales2008
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Sales2009</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE VIEW Sales
+AS
+SELECT * FROM Sales2007
+UNION ALL
+SELECT * FROM Sales2008
+UNION ALL
+SELECT * FROM Sales2009</pre></div></div>
+
+<p>Now let&#8217;s run a simple query that returns one row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> sales <span class="kw1">WHERE</span> YearCol <span class="sy0">=</span> <span class="nu0">2007</span> <span class="sy0">AND</span> orderid <span class="sy0">=</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM sales WHERE YearCol = 2007 AND orderid = 1</pre></div></div>
+
+<p>Look at the execution plan</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/PartitioningPic1.PNG?mtime=1322845836"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/PartitioningPic1.PNG?mtime=1322845836" width="561" height="326" /></a></div>
+<p>Ouch, it touches all 3 tables. </p>
+<p>
+I want to be able to insert directly into the view, this way I don&#8217;t have to worry about which table I have to reference and I also don&#8217;t want to mess around with dynamic SQL to accomplish that. Below is a simple insert statement</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> Sales
+<span class="kw1">SELECT</span> <span class="nu0">2007</span>,<span class="nu0">0</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO Sales
+SELECT 2007,0,NEWID()</pre></div></div>
+
+<p>I get a nasty error<br />
+<em>Msg 4436, Level 16, State 12, Line 1<br />
+UNION ALL view &#8216;tempdb.dbo.Sales&#8217; is not updatable because a partitioning column was not found.</em></p>
+<p>SQL Server does not know into which table you want to insert&#8230;this is also the reason the select query from before touched all 3 tables</p>
+<p>We can easily fix this by adding a constraint on each table and specifying the valid year. So on Sales2007 yearcol  can only be 2007</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> &nbsp;Sales2007 <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span> ch_2007 <span class="kw1">CHECK</span> <span class="br0">&#40;</span>yearcol <span class="sy0">=</span> <span class="nu0">2007</span><span class="br0">&#41;</span>
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> &nbsp;Sales2008 <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span> ch_2008 <span class="kw1">CHECK</span> <span class="br0">&#40;</span>yearcol <span class="sy0">=</span> <span class="nu0">2008</span><span class="br0">&#41;</span>
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> &nbsp;Sales2009 <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span> ch_2009 <span class="kw1">CHECK</span> <span class="br0">&#40;</span>yearcol <span class="sy0">=</span> <span class="nu0">2009</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE  Sales2007 ADD CONSTRAINT ch_2007 CHECK (yearcol = 2007)
+ALTER TABLE  Sales2008 ADD CONSTRAINT ch_2008 CHECK (yearcol = 2008)
+ALTER TABLE  Sales2009 ADD CONSTRAINT ch_2009 CHECK (yearcol = 2009)</pre></div></div>
+
+<p>Now if you try to insert into the view, you will succeed</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> Sales
+<span class="kw1">SELECT</span> <span class="nu0">2007</span>,<span class="sy0">-</span><span class="nu0">1</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO Sales
+SELECT 2007,-1,NEWID()</pre></div></div>
+
+<p>Congratulations, you just created your first partitioned view.</p>
+<p>How about that same select statement from before? let&#8217;s try it again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> sales <span class="kw1">WHERE</span> YearCol <span class="sy0">=</span> <span class="nu0">2007</span> <span class="sy0">AND</span> orderid <span class="sy0">=</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM sales WHERE YearCol = 2007 AND orderid = 1</pre></div></div>
+
+<p>Here is the execution plan<br />
+</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/PartitioningPic2.PNG?mtime=1322845849"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/PartitioningPic2.PNG?mtime=1322845849" width="514" height="175" /></a></div>
+<p>Look at that&#8230;because of the constraints that we have added, SQL Server knows it only needs to fetch data from the table with the 2007 data. </p>
+<p>BTW you can create partitioned views across servers. These are called federated partitioned views and you would create them by using 4 part notations. Here is a small example</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">view</span> Test
+<span class="kw1">as</span>
+<span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> DB.<span class="me1">dbo</span>.<span class="kw1">Table</span> <span class="co1">--local server</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> Server2.<span class="me1">DB</span>.<span class="me1">dbo</span>.<span class="kw1">Table</span> <span class="co1">-- linked server</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> Server3.<span class="me1">DB</span>.<span class="me1">dbo</span>.<span class="kw1">Table</span> <span class="co1">-- linked server</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create view Test
+as
+select * from DB.dbo.Table --local server
+union all
+select * from Server2.DB.dbo.Table -- linked server
+union all
+select * from Server3.DB.dbo.Table -- linked server</pre></div></div>
+
+<p>You would have a variation of the same view on all 3 servers. One bad thing is that if one of the servers is unavailable then the whole view is unavailable.</p>
+<p></p>
+<h2>Partitioning in SQL Server 2005 and up</h2>
+<p>When you use native partitioning you don&#8217;t need to create 3 tables anymore, you just have one table and SQL Server will create as many partitions as you specify. As a matter of fact every table that you create in SQL Server and up is partitioned, by default it will have one partition unless you partition it yourself into multiple partitions.</p>
+<p>Let&#8217;s mimic what we did before. Instead of three tables we now only need to create one table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> SalesPartitioned<span class="br0">&#40;</span>YearCol <span class="kw1">SMALLINT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,OrderID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, SomeData <span class="kw1">UNIQUEIDENTIFIER</span> <span class="kw1">DEFAULT</span> newsequentialid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE SalesPartitioned(YearCol SMALLINT NOT NULL,OrderID INT NOT NULL, SomeData UNIQUEIDENTIFIER DEFAULT newsequentialid())
+GO</pre></div></div>
+
+<p>We are going to insert the same data we did as in the SQL Server 2000 version</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> SalesPartitioned <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="nu0">2007</span>,number
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="nu0">2008</span>,number <span class="sy0">+</span> <span class="nu0">2048</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="nu0">2009</span>,number <span class="sy0">+</span> <span class="nu0">4096</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT SalesPartitioned (YearCol,OrderID)
+SELECT 2007,number
+FROM master..spt_values
+WHERE type = 'P'
+UNION ALL
+SELECT 2008,number + 2048
+FROM master..spt_values
+WHERE type = 'P'
+UNION ALL
+SELECT 2009,number + 4096
+FROM master..spt_values
+WHERE type = 'P'</pre></div></div>
+
+<p>We will now add a primary key</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">SalesPartitioned</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Sales <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">NONCLUSTERED</span> <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.SalesPartitioned ADD CONSTRAINT
+	PK_Sales PRIMARY KEY NONCLUSTERED (YearCol,OrderID)</pre></div></div>
+
+<p>Now it is time to create our partition function. Here is how we will do it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> PARTITION <span class="kw1">FUNCTION</span> pfFiscalYear<span class="br0">&#40;</span><span class="kw1">SMALLINT</span><span class="br0">&#41;</span>
+<span class="kw1">AS</span> RANGE <span class="kw1">RIGHT</span> <span class="kw1">FOR</span> <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">2007</span>,<span class="nu0">2008</span>,<span class="nu0">2009</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PARTITION FUNCTION pfFiscalYear(SMALLINT)
+AS RANGE RIGHT FOR VALUES(2007,2008,2009)</pre></div></div>
+
+<p>What that does is actually create 4 partitions, one for 2007, one for 2008, one for everything after 2008, and one for everything before 2006.<br />
+<=2006
+= 2007
+= 2008
+>= 2009</p>
+<p>You can verify this by using the function $partition</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="nu0">1</span> <span class="kw1">AS</span> val,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">AS</span> partition &nbsp; &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2006</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2006</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2007</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2007</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2008</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2008</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2009</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2009</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2010</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2010</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">3000</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">3000</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select 1 AS val,$partition.pfFiscalYear(1) AS partition	    UNION all
+select 2006,$partition.pfFiscalYear(2006)	UNION all
+select 2007,$partition.pfFiscalYear(2007)	UNION all
+select 2008,$partition.pfFiscalYear(2008)	UNION all
+select 2009,$partition.pfFiscalYear(2009)	UNION all
+select 2010,$partition.pfFiscalYear(2010)	UNION all
+select 3000,$partition.pfFiscalYear(3000)</pre></div></div>
+
+<p>And here is the output</p>
+<pre>val         partition
+----------- -----------
+1           1
+2006        1
+2007        2
+2008        3
+2009        4
+2010        4
+3000        4</pre>
+<p>Now that we have the partition function, we need a partition scheme. A partition scheme is used to map boundary values in partition functions to filegroups. You can have one filegroup for each year placed on a different spindle, this way you don&#8217;t have to wait for the disk if all partitions are on the same spindle. For the sake of simplicity we only have one filegroup. Here is how to create the partition scheme</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> PARTITION SCHEME psFiscalYear
+<span class="kw1">AS</span> PARTITION pfFiscalYear <span class="sy0">ALL</span> <span class="kw1">TO</span> <span class="br0">&#40;</span><span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PARTITION SCHEME psFiscalYear
+AS PARTITION pfFiscalYear ALL TO ([PRIMARY])</pre></div></div>
+
+<p><em>Partition scheme &#8216;psFiscalYear&#8217; has been created successfully. &#8216;PRIMARY&#8217; is marked as the next used filegroup in partition scheme &#8216;psFiscalYear&#8217;.</em></p>
+<p>Now we will add a clustered index and partition this on the YearCol column, the syntax looks like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_Sales <span class="kw1">ON</span> SalesPartitioned<span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">ON</span> psFiscalYear<span class="br0">&#40;</span>YearCol<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX IX_Sales ON SalesPartitioned(YearCol,OrderID)
+ON psFiscalYear(YearCol)</pre></div></div>
+
+<p>Now, let&#8217;s compare the plan for both partitioned views and partitioning in 2005 and up</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> SalesPartitioned <span class="kw1">WHERE</span> YearCol <span class="sy0">=</span> <span class="nu0">2007</span> <span class="sy0">AND</span> orderid <span class="sy0">=</span> <span class="nu0">1</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Sales <span class="kw1">WHERE</span> YearCol <span class="sy0">=</span> <span class="nu0">2007</span> <span class="sy0">AND</span> orderid <span class="sy0">=</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM SalesPartitioned WHERE YearCol = 2007 AND orderid = 1
+
+SELECT * FROM Sales WHERE YearCol = 2007 AND orderid = 1</pre></div></div>
+
+<p>
+Here is the execution plan</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/PartitioningPic3.PNG?mtime=1322845864"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/PartitioningPic3.PNG?mtime=1322845864" width="601" height="335" /></a></div>
+<p>As you can see the cost is the same for both</p>
+<p>We can do a simple insert just like before, there is no need to specify any partitions</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> SalesPartitioned
+<span class="kw1">SELECT</span> <span class="nu0">2007</span>,<span class="sy0">-</span><span class="nu0">1</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO SalesPartitioned
+SELECT 2007,-1,NEWID()</pre></div></div>
+
+<p>If you want to see how many rows each partition holds, you can use one of these two mehods</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> partition_number,<span class="kw1">rows</span> 
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span> 
+<span class="kw1">WHERE</span> <span class="kw2">object_id</span> <span class="sy0">=</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'SalesPartitioned'</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> YearCol, $PARTITION.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span>YearCol<span class="br0">&#41;</span> <span class="kw1">AS</span> Partition, 
+<span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw2">COUNT</span><span class="br0">&#93;</span> <span class="kw1">FROM</span> SalesPartitioned
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> $PARTITION.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span>YearCol<span class="br0">&#41;</span>,YearCol 
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> Partition;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT partition_number,rows 
+FROM sys.partitions 
+WHERE object_id = OBJECT_ID('SalesPartitioned')
+
+
+SELECT YearCol, $PARTITION.pfFiscalYear(YearCol) AS Partition, 
+COUNT(*) AS [COUNT] FROM SalesPartitioned
+GROUP BY $PARTITION.pfFiscalYear(YearCol),YearCol 
+ORDER BY Partition;
+GO</pre></div></div>
+
+<p>output</p>
+<pre>partition_number rows
+---------------- --------------------
+1                0
+2                2049
+3                2048
+4                2048
+
+YearCol Partition   COUNT
+------- ----------- -----------
+2007    2           2049
+2008    3           2048
+2009    4           2048</pre>
+<hr />
+<h2>Find out more</h2>
+<p>I briefly covered partitioning in this post, there is much more you can do with partitioning. I did not cover merging, deleting partitions, switching tables in and out of partitions.<br />
+Below are links to two white papers on partitioning, I highly recommend you read these before implementing partitioning.</p>
+<p><strong>Partitioned Tables and Indexes in SQL Server 2005</strong><br />
+Table-based partitioning features in SQL Server 2005 provide flexibility and performance to simplify the creation and maintenance of partitioned tables. Trace the progression of capabilities from logically and manually partitioning tables to the latest partitioning features, and find out why, when, and how to design, implement, and maintain partitioned tables using SQL Server 2005. (41 printed pages)<br />
+Get it here: http://msdn.microsoft.com/en-US/library/ms345146(v=SQL.90).aspx</p>
+<p><strong>Partitioned Table and Index Strategies Using SQL Server 2008</strong><br />
+When a database table grows in size to the hundreds of gigabytes or more, it can become more difficult to load new data, remove old data, and maintain indexes. Just the sheer size of the table causes such operations to take much longer. Even the data that must be loaded or removed can be very sizable, making INSERT and DELETE operations on the table impractical. The Microsoft SQL Server 2008 database software provides table partitioning to make such operations more manageable.</p>
+<p>Partitioning a large table divides the table and its indexes into smaller partitions, so that maintenance operations can be applied on a partition-by-partition basis, rather than on the entire table. In addition, the SQL Server optimizer can direct properly filtered queries to appropriate partitions rather than the entire table.</p>
+<p>This paper covers strategies and best practices for using partitioned tables and indexes in SQL Server 2008. It is intended for database architects, developers, and administrators of both data warehouse and OLTP systems, and the material is presented at an intermediate to advanced level. For an introduction to partitioned tables, see &#8220;Partitioned Table and Index Concepts” in SQL Server 2008 Books Online at http://msdn.microsoft.com/en-us/library/ms190787.aspx.</p>
+<p>This paper is very long (65 pages) this is why it is offered as a downloadable Microsoft Word document.</p>
+<p>Get it here: http://msdn.microsoft.com/en-us/library/dd578580(v=SQL.100).aspx</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-3/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

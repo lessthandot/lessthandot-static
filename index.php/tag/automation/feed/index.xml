@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>automation &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/automation/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Automated Deployment to Azure Hosted Services</title>
+		<link>/index.php/enterprisedev/cloud/azure/automated-deployment-to-azure-hosted-services/</link>
+		<comments>/index.php/enterprisedev/cloud/azure/automated-deployment-to-azure-hosted-services/#respond</comments>
+		<pubDate>Tue, 27 May 2014 18:50:21 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Azure]]></category>
+		<category><![CDATA[automation]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[deployment]]></category>
+		<category><![CDATA[powershell]]></category>
+
+		<guid isPermaLink="false">/?p=2644</guid>
+		<description><![CDATA[Azure Hosted Services offers several really awesome features over using physical servers or standard VM infrastructure. Two of these are the staged deployment model and management SDK, which includes a powershell module. Using these two features, we are going to build a deployment script that deploys a new set of services (servers) in Azure, using [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Azure Hosted Services offers several really awesome features over using physical servers or standard VM infrastructure. Two of these are the staged deployment model and management SDK, which includes a powershell module. Using these two features, we are going to build a deployment script that deploys a new set of services (servers) in Azure, using a Virtual IP swap to replace the existing production instances only after the new deployment is fully running. </p>
+<p>The goal of this post is to build a powershell script that will:</p>
+<ul>
+<li>Upload a compiled Package to Azure Storage</li>
+<li>Create a new Staging deployment</li>
+<li>Wait for all of the instances of the new deployment to be running</li>
+<li>Promote the new deployment to Production</li>
+<li>Stop the instances of the old production deployment and keep them handy in the Staging slot</li>
+</ul>
+<p>The sample project and script are available on github: <a href="https://github.com/tarwn/AzureHostedServiceDeploymentSample" title="tarwn/AzureHostedServiceDeploymentSample on github">tarwn/AzureHostedServiceDeploymentSample on github</a></p>
+<p>This script is not intended to be production ready. I have spent no time at all refactoring into readily re-usable methods and do not use it in a production environment myself. It will show you how to use the individual methods and give you the pieces you need to build one that fits your processes.</p>
+<h2>Initial Steps</h2>
+<p>If you would like to build a sample project of your own and follow along, here&#8217;s the steps you will need to perform first:</p>
+<ol style="margin-left:3em; line-height: 1.4em">
+<li>Create an Azure project in Visual Studio &#8211; Create/attach one or more web or worker roles</li>
+<li>Remove the Diagnostics entry in the web.config or add storage settings</li>
+<li>In the Project References, select &#8220;Microsoft.Web.Infrastructure&#8221; and set &#8220;Copy Local&#8221; to &#8220;True&#8221;</li>
+<li>Create a Hosted Service in the Azure Dashboard</li>
+<li>Create a Storage Account in the Azure Dashboard (pick the same region as prior step)</li>
+<li>Install the latest Azure SDK + Azure Powershell Module (available in Web Platform Installer)</li>
+<li>Download your publish settings from https://windows.azure.com/download/publishprofile.aspx</li>
+</ol>
+<p>If you know your way around Azure, steps 4-7 are mostly reading <a href="http://xkcd.com/" title="If we are what we eat, what could be better for our brains than a steady diet of intelligent humor? And title tags, you have to love title tags.">xkcd</a> while the installers run.</p>
+<h2>Create the Deployment Script</h2>
+<p>Now that we have a project and all the prerequisites out of the way, let&#8217;s start building the script. As a reminder, these are the steps we intend to follow:</p>
+<ul>
+<li>Upload a compiled Package to Azure Storage</li>
+<li>Create a new Staging deployment</li>
+<li>Wait for all of the instances of the new deployment to be running</li>
+<li>Promote the new deployment to Production</li>
+<li>Suspend the instances of the old production deployment and keep them handy in the Staging slot</li>
+</ul>
+<p>Let&#8217;s go!</p>
+<h3>Connect to Azure</h3>
+<p>The first thing we need to do is import the Powershell module and use the publish settings to set our subscription.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">Import<span class="sy0">-</span>Module <span class="st0">&quot;C:\Program Files (x86)\Microsoft SDKs\Windows Azure\PowerShell\ServiceManagement\Azure\Azure.psd1&quot;</span>
+&nbsp;
+Import<span class="sy0">-</span>AzurePublishSettingsFile <span class="re0">$publishSettingsPath</span>
+&nbsp;
+Set<span class="sy0">-</span>AzureSubscription <span class="re0">$subscriptionName</span> <span class="sy0">-</span>CurrentStorageAccount <span class="re0">$storageAccountName</span>
+&nbsp;
+Select<span class="sy0">-</span>AzureSubscription <span class="re0">$subscriptionName</span> <span class="sy0">-</span>Current</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Import-Module "C:\Program Files (x86)\Microsoft SDKs\Windows Azure\PowerShell\ServiceManagement\Azure\Azure.psd1"
+
+Import-AzurePublishSettingsFile $publishSettingsPath
+ 
+Set-AzureSubscription $subscriptionName -CurrentStorageAccount $storageAccountName
+
+Select-AzureSubscription $subscriptionName -Current</pre></div></div>
+
+<p><i>$publishSettingsPath, $subscriptionName, and $storageAccountName are parameters I have passed into my script</i></p>
+<p>We load the Azure module from the Microsoft SDKs folder (this is where it installs from Web PI). We then use the *.publishsettings file to &#8220;log in&#8221; to the Azure subscription, set the storage account we will be using by default, and set this subscription as the default one for our current powershell session.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn722512.aspx" title="Import-AzurePublishSettingsFile on MSDN">Import-AzurePublishSettingsFile</a> basically logs into your Azure account using the supplied publishsettings file, storing a management certificate and a subscription data file. Once we&#8217;re &#8220;logged in&#8221;, we can use the rest of the Azure cmdlets to interact with our Azure resources.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn722501.aspx" title="Set-AzureSubscription on MSDN">Set-AzureSubscription</a> sets the &#8220;current&#8221; storage account for the subscription, basically defining a default so we don&#8217;t have to specify it throughout the script. Another option would be to use <a href="http://msdn.microsoft.com/en-us/library/dn495246.aspx" title="New-AzureStorageContext on MSDN">New-AzureStorageContext</a> to create context for the Storage Account and pass this to the calls that interact with Storage.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn722499.aspx" title="Select-AzureSubscription">Select-AzureSubscription</a> does exactly what you would expect, it updates the subscription data in our Powershell context. By specifying -Current, we only update the subscription for our current session.
+</div>
+<h3>Upload a compiled Package to Azure Storage</h3>
+<p>Now that we have access to Azure, we can move on to upload the package. This package can be generated from Visual Studio by right clicking on the Cloud Project and choosing &#8220;Package&#8221;. In an automated process, we can use MSBuild to create this package before calling this script to upload and deploy it.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$container</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureStorageContainer <span class="kw5">-Name</span> <span class="re0">$containerName</span> <span class="kw5">-ErrorAction</span> SilentlyContinue
+&nbsp;
+<span class="kw3">if</span><span class="br0">&#40;</span><span class="sy0">!</span><span class="re0">$container</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; New<span class="sy0">-</span>AzureStorageContainer <span class="kw5">-Name</span> <span class="re0">$containerName</span>
+<span class="br0">&#125;</span>
+&nbsp;
+Set<span class="sy0">-</span>AzureStorageBlobContent <span class="kw4">-File</span> <span class="re0">$packagePath</span> <span class="kw5">-Container</span> <span class="re0">$containerName</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">-</span>Blob <span class="re0">$fullTargetPackageName</span> <span class="kw5">-Force</span>
+&nbsp;
+<span class="re0">$blobInfo</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureStorageBlob &nbsp;<span class="kw5">-Container</span> <span class="re0">$containerName</span> <span class="sy0">-</span>blob <span class="re0">$fullTargetPackageName</span>
+&nbsp;
+<span class="re0">$packageUri</span> <span class="sy0">=</span> <span class="re0">$blobInfo</span>.ICloudBlob.Uri</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$container = Get-AzureStorageContainer -Name $containerName -ErrorAction SilentlyContinue
+
+if(!$container){
+    New-AzureStorageContainer -Name $containerName
+}
+
+Set-AzureStorageBlobContent -File $packagePath -Container $containerName `
+                            -Blob $fullTargetPackageName -Force
+
+$blobInfo = Get-AzureStorageBlob  -Container $containerName -blob $fullTargetPackageName
+
+$packageUri = $blobInfo.ICloudBlob.Uri</pre></div></div>
+
+<p><i>$packagePath and $containerName are parameters passed to the script, $fullTargetPackageName is generated with a timestamp.</i></p>
+<p>First we create the container if it doesn&#8217;t already exist, then we upload the package (without prompting), and once that is complete we capture the blob information and extract the URL for later use in the deployment.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn495272.aspx" title="Get-AzureStorageContainer on MSDN">Get-AzureStorageContainer</a> attempts to retrieve a container with the given name. In this case I&#8217;ve used the ErrorAction of SilentlyContinue so that if it doesn&#8217;t exist I can create it.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495291.aspx" title="New-AzureStorageContainer on MSDN">New-AzureStorageContainer</a> creates a container with the given name. Since I haven&#8217;t specified permissions, the container will be created with the most restrictive rights.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495279.aspx" title="Set-AzureStorageBlobContent on MSDN">Set-AzureStorageBlobContent</a> uploads the contents of a file specified by -File to the given -Container value with a final name specified by the -Blob property. The -Force overrides any questions the command might have, like &#8220;are you sure you want to do that&#8221;.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495260.aspx" title="Get-AzureStorageBlob on MSDN">Get-AzureStorageBlob</a> retrieves the information about a given Blob, allowing us to extract the Uri property for later use.
+</div>
+<h3>Create a new Staging Deployment</h3>
+<p>Once we have the package uploaded to blob storage, we are ready to create the new Staging deployment.  </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$deployment</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw5">-ErrorAction</span> SilentlyContinue 
+&nbsp;
+<span class="kw3">if</span><span class="br0">&#40;</span><span class="re0">$deployment</span>.name <span class="kw4">-ne</span> <span class="re0">$null</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; Remove<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging <span class="kw5">-Force</span>
+<span class="br0">&#125;</span>
+&nbsp;
+New<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging <span class="sy0">-</span>Package <span class="re0">$packageUri</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">-</span>Configuration <span class="re0">$configPath</span> <span class="kw5">-Name</span> <span class="re0">$fullTargetDeploymentName</span> `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">-</span>TreatWarningsAsError</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$deployment = Get-AzureDeployment -ServiceName $serviceName -Slot Staging `
+                                  -ErrorAction SilentlyContinue 
+
+if($deployment.name -ne $null){
+    Remove-AzureDeployment -ServiceName $serviceName -Slot Staging -Force
+}
+
+New-AzureDeployment -ServiceName $serviceName -Slot Staging -Package $packageUri `
+                    -Configuration $configPath -Name $fullTargetDeploymentName `
+                    -TreatWarningsAsError</pre></div></div>
+
+<p><i>The $servicename, $fulltargetDeploymentName, and $configPath are assumed to have been provided, while the $packageUri was defined in the previous step</i></p>
+<p>Before we can create the new deployment, we check to see if there is already a deployment present in the Staging slot and delete it. We then create the new deployment, using the package we just uploaded and a local configuration (*.cscfg) file.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn495146.aspx" title="Get-AzureDeployment on MSDN">Get-AzureDeployment</a> retrieves details on the current deployment in the specified slot. I&#8217;ve used ErrorAction SilentlyContinue here because I am only making this call to determine if something is already there and don&#8217;t want to exit out if the slot turns out to be empty.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495296.aspx" title="Remove-AzureDeployment on MSDN">Remove-AzureDeployment</a> removes the deployment we have detected in the Staging slot, using -Force to again suppress any interactive questions the command might have.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495143.aspx" title="New-AzureDeployment on MSDN">New-AzureDeployment</a> creates a new deployment in the specified slot, using the supplied package URI and the configuration file path. I opted to treat warnings as errors because I&#8217;d rather clean up warnings immediately. Unfortunately this parameter does not support URLs. By default the deployment will be started, though there is a -DoNotStart parameter if you do not want this behavior.
+</div>
+<h3>Wait for all of the instances&#8230;</h3>
+<p>The new deployment has been created and told to start, but it takes time for the individual instances to be provisioned and to go through their start-up sequence. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$statusReady</span> <span class="sy0">=</span> <span class="st0">&quot;ReadyRole&quot;</span>
+<span class="re0">$statusStopped</span> <span class="sy0">=</span> <span class="st0">&quot;StoppedVM&quot;</span>
+&nbsp;
+<span class="kw3">function</span> Get<span class="sy0">-</span>AllInstancesAreStatus<span class="br0">&#40;</span><span class="re0">$instances</span><span class="sy0">,</span> <span class="re0">$targetStatus</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw3">foreach</span> <span class="br0">&#40;</span><span class="re0">$instance</span> <span class="kw3">in</span> <span class="re0">$instances</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">if</span> <span class="br0">&#40;</span><span class="re0">$instance</span>.InstanceStatus <span class="kw4">-ne</span> <span class="re0">$targetStatus</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">return</span> <span class="re0">$false</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw3">return</span> <span class="re0">$true</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="co1"># ... ... ...</span>
+&nbsp;
+<span class="re0">$deployment</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging
+&nbsp;
+<span class="re0">$waitTime</span> <span class="sy0">=</span> <span class="br0">&#91;</span>System.Diagnostics.Stopwatch<span class="br0">&#93;</span>::StartNew<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="kw3">while</span> <span class="br0">&#40;</span><span class="br0">&#40;</span>Get<span class="sy0">-</span>AllInstancesAreStatus <span class="re0">$deployment</span>.RoleInstanceList <span class="re0">$statusReady</span><span class="br0">&#41;</span> <span class="kw4">-eq</span> <span class="re0">$false</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw3">if</span><span class="br0">&#40;</span><span class="re0">$waitTime</span>.Elapsed.TotalSeconds <span class="kw4">-gt</span> <span class="re0">$instancePollLimit</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">Throw</span> <span class="st0">&quot;$instancePollLimit seconds elapsed without all the instances reaching 'ReadyRun'&quot;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">Start-Sleep</span> <span class="kw5">-Seconds</span> <span class="re0">$instancePollRate</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$deployment</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$statusReady = "ReadyRole"
+$statusStopped = "StoppedVM"
+
+function Get-AllInstancesAreStatus($instances, $targetStatus){
+    foreach ($instance in $instances)
+    {
+        if ($instance.InstanceStatus -ne $targetStatus)
+        {
+            return $false
+        }
+    }
+    return $true
+}
+
+# ... ... ...
+
+$deployment = Get-AzureDeployment -ServiceName $serviceName -Slot Staging
+
+$waitTime = [System.Diagnostics.Stopwatch]::StartNew()
+while ((Get-AllInstancesAreStatus $deployment.RoleInstanceList $statusReady) -eq $false)
+{
+    if($waitTime.Elapsed.TotalSeconds -gt $instancePollLimit){
+        Throw "$instancePollLimit seconds elapsed without all the instances reaching 'ReadyRun'"
+    }
+
+    Start-Sleep -Seconds $instancePollRate
+
+    $deployment = Get-AzureDeployment -ServiceName $serviceName -Slot Staging
+}</pre></div></div>
+
+<p><i>$serviceName is supplied as a script parameter.</i></p>
+<p>While there are any instances that are not in &#8216;ReadyRun&#8217; status, we sleep for $instancepollRate seconds and continue to check again. If more than $instancePollLimit seconds go by while waiting, we&#8217;ll throw an error that will cause our script to exit.</p>
+<p><b>This poll limit is necessary.</b> In the real world of Azure, you can have azure instances that do not boot for long periods of time. Additional logic has been added in Azure that is supposed to detect VMs not booting and replace them, but no one writes perfect code and I have experienced deployments hung for hours or more due to non-booting instances. We also can break our own code, resulting in rapidly re-booting instances that we would not want to deploy to production.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn495146.aspx" title="Get-AzureDeployment on MSDN">Get-AzureDeployment</a> gets the azure deployment details, including the list of instances with their names, current statuses, size, etc.
+</div>
+<h3>Promote the new deployment to Production, Suspend the old one</h3>
+<p>Once the staging deployment is up and running, we can promote it to the Production slot.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1">Move<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span>
+&nbsp;
+<span class="re0">$deployment</span> <span class="sy0">=</span> Get<span class="sy0">-</span>AzureDeployment <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw5">-ErrorAction</span> SilentlyContinue
+&nbsp;
+<span class="kw3">if</span><span class="br0">&#40;</span><span class="re0">$deployment</span>.DeploymentName <span class="kw4">-ne</span> <span class="re0">$null</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; Set<span class="sy0">-</span>AzureDeployment <span class="kw5">-Status</span> <span class="sy0">-</span>ServiceName <span class="re0">$serviceName</span> <span class="sy0">-</span>Slot Staging `
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">-</span>NewStatus Suspended
+<span class="br0">&#125;</span>
+&nbsp;
+Remove<span class="sy0">-</span>AzureAccount <span class="kw5">-Name</span> <span class="re0">$subscriptionName</span> <span class="kw5">-Force</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Move-AzureDeployment -ServiceName $serviceName
+
+$deployment = Get-AzureDeployment -ServiceName $serviceName -Slot Staging `
+                                  -ErrorAction SilentlyContinue
+
+if($deployment.DeploymentName -ne $null){
+    Set-AzureDeployment -Status -ServiceName $serviceName -Slot Staging `
+                        -NewStatus Suspended
+}
+
+Remove-AzureAccount -Name $subscriptionName -Force</pre></div></div>
+
+<p><i>$serviceName is a parameter passed to the script</i></p>
+<p>Performing the VIP swap is a simple command and the Powershell cmdlet turns that asynchronous method into a synchronous call for us, like so many of the others. Once the swap is complete, if we have a deployment in the Staging slot (the old Production one), we go ahead and tell it to suspend, but don&#8217;t wait for the individual instances to stop before exiting.</p>
+<div style="background-color: #eeeeee; padding: .5em 1em; margin: .5em .5em 1.5em .5em;">
+<a href="http://msdn.microsoft.com/en-us/library/dn495282.aspx" title="Move-AzureDeployment">Move-AzureDeployment</a> performs a VIP swap to swap the Staging and Production deployments.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495146.aspx" title="Get-AzureDeployment on MSDN">Get-AzureDeployment</a> gets the azure deployment details, including the list of instances with their names, current statuses, size, etc.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn495140.aspx" title="Set-AzureDeployment">Set-AzureDeployment</a> with the -Status parameter is used to change the status of a given deployment, in this case Suspending the deployment in the Staging slot.</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/dn722529.aspx" title="Remove-AzureAccount on MSDN">Remove-AzureAccount</a> is used to remove the Azure subscription data from the Powershell session, basically the &#8220;logout&#8221; equivalent to Import-AzurePublishSettingsFile&#8217;s &#8220;login&#8221;
+</div>
+<h2>And we&#8217;re deployed&#8230;</h2>
+<p>There is a full script available in the github repository here: <a href="https://github.com/tarwn/AzureHostedServiceDeploymentSample/blob/master/scripts/deployHostedService.ps1" title="/scripts/deployHostedService.ps1">/scripts/deployHostedService.ps1</a>. It is not clean and pretty, but it does have more output and error handling than the snippets above. Among other things, it does not clean out all those packages it uploads to blob storage and it most definitely should not be blindly pasted and used for your production environment.</p>
+<p>While this may not be a production-ready script, it&#8217;s not far off (and I&#8217;ve used worse). The few cmdlets above should start to show the pattern that Microsoft used with this Powershell library. There are plenty of additional cmdlets to interact with storage services, VMs, affinity groups, HDInsight, Media Services&#8230;you name it, it&#8217;s probably in there.  </p>
+<p>Writing this post, I am reminded how magical this all is. That sample project was only configured to ask for a single server, but I could just as easily have asked for 4 16-core servers and then added in additional web or worker roles, each with their own servers. And I could have done all of that without changing anything at all about this script and I would have had tons of servers deployed, load balanced, and ready to go with just a minor blip as I swapped them into production. I can remember projects with multi-hour manual deployment processes (and month or more system provisioning times), and we just replaced them with a one page script.</p>
+<p>The best part is that, unlike some Microsoft frameworks/packages, this magic doesn&#8217;t just make a great demo, it also works in real production environments. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/cloud/azure/automated-deployment-to-azure-hosted-services/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #50 &#8211; Automating Your Installs</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/t-sql-tuesday-50-automating-your-installs/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/t-sql-tuesday-50-automating-your-installs/#respond</comments>
+		<pubDate>Tue, 14 Jan 2014 20:54:32 +0000</pubDate>
+		<dc:creator><![CDATA[Brian Davis]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[automation]]></category>
+		<category><![CDATA[tsql2sday]]></category>
+
+		<guid isPermaLink="false">/?p=2255</guid>
+		<description><![CDATA[This month’s T-SQL Tuesday is being hosted by SQLChow (b &#124; t) and the topic is “Automation, how much of it is the same?”.  As SQLChow noted, automation was a topic a few years ago and now it is being revisited to see if and how it has changed over the years. I know for [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><a href="http://sqlchow.wordpress.com/2014/01/07/t-sql-tuesday-050-automation-how-much-of-it-is-the-same/" target="_blank"><img class="alignnone size-full wp-image-2241" alt="TSQL2sday" src="/wp-content/uploads/2014/01/TSQL2sday.png" width="133" height="134" /></a></p>
+<p>This month’s T-SQL Tuesday is being hosted by SQLChow (<a href="http://sqlchow.wordpress.com/" target="_blank">b</a> | <a href="https://twitter.com/sqlchow" target="_blank">t</a>) and the topic is “Automation, how much of it is the same?”.  As SQLChow noted, automation was a topic a few years ago and now it is being revisited to see if and how it has changed over the years.</p>
+<p>I know for me, over the last few years, automation has taken a larger role in many of the things I do.  I’ve automated many processes over the years using various tools such as SSIS and PowerShell and doing so has not only saved me time but my sanity as well  One of the biggest areas of automation for me over the past couple of years has been the automation my installs of SQL Server.  Everything from test and production server installs to automating the installation of the SQL Server Client Tools on developers machines and even cluster installs.</p>
+<p>I know there are a couple tools out there to help with the automation of SQL Server installs, but my tool of choice has been <a title="SQL Server FineBuild" href="http://sqlserverfinebuild.codeplex.com/" target="_blank">SQL Server FineBuild</a>.  SQL Server FineBuild is a CodePlex project that is freely available and provides a one-click install of SQL Server.  It supports all versions of SQL Server from 2005 through 2014 and is highly customizable.  Not only does it support the installation of SQL Server, it also supports service packs, cumulative updates and hotfixes as well as many 3rd party tools such as BIDS Helper.  SQL Server FinBuild gives you fine grain control over every aspect of your install from the database engine to reporting services, integration services, etc as well as configuration options such as ports, service accounts, database mail and even adding permissions for environment specific accounts or configuring the SQL Client Tools on a developers machine.  This is just a short list of what SQL Server FineBuild can automate.</p>
+<p>With SQL Server FineBuild I’ve been able to automate my installs but the benefits haven’t ended there.  If I’ve needed another server setup identical to a current server for testing, it’s very simple to take the configuration file from the original server and use it to build the test server and know that the install will be identical to the original install.  I’ve also used SQL Server FineBuild to update current installs at different patch levels to a consistent patch level across the board.</p>
+<p>Automating your installs, as with automating anything, takes some initial setup and testing time, but once complete the benefits out weigh the costs especially if you are doing a lot of installs.  Just automating the SQL Server Client Tools installation can be a large time saver as the install can then be run by almost anyone in support.  Not only that but every developer will be setup the same way and patched to the current level of your environment.</p>
+<p>If there is a repeatable process that I have to do over and over, I try my best to automate it and with this tool I’ve been able to not only automate my installs but save time as well.  If you do a lot of installs or simply want a way to quickly reinstall a server in the case of a disaster, I encourage you to look into automating your installs.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/t-sql-tuesday-50-automating-your-installs/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,2428 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>indexing &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/indexing/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Indexes in MongoDB: A quick overview</title>
+		<link>/index.php/datamgmt/dbprogramming/indexes-in-mongodb/</link>
+		<comments>/index.php/datamgmt/dbprogramming/indexes-in-mongodb/#comments</comments>
+		<pubDate>Sat, 19 Jan 2013 12:23:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[bigdata]]></category>
+		<category><![CDATA[indexes]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[mongodb]]></category>
+		<category><![CDATA[nosql]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/indexes-in-mongodb/</guid>
+		<description><![CDATA[This is my Fourth MongoDB post, in the first post we looked at how we can install MongoDB as a Windows Service, In the second post we looked at how we could do UPSERTs with MongoDB, In the third post we looked at how to sort results in MongoDB
+This pos&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This is my fourth MongoDB post, in the first post we looked at how we can <a href="/index.php/DataMgmt/DBProgramming/creating-mongodb-as-a-service">install MongoDB as a Windows Service</a>, In the second post we looked at how we could do <a href="/index.php/DataMgmt/DBProgramming/doing-upserts-in-mongodb">UPSERTs with MongoDB</a>, In the third post we looked at <a href="/index.php/DataMgmt/DBProgramming/mongodb-how-to-sort-results">how to sort results in MongoDB</a>. This post is about indexing in MongoDB, we are going to take a look at how to create indexes and how to see if the indexes are being used by MongoDB.<br />
+Every index that you create in MongoDB is a secondary index, this is because MongoDB creates the default _id index for all collections. The _id index is a unique index on the _id field, you cannot delete the index on _id.<br />
+MongoDB indexes use a B-tree data structure</p>
+<p>Besides a regular one field index, you can also create the following indexes in MongoDB</p>
+<ul>
+<li>Indexes on Embedded Fields</li>
+<li>Compound Indexes</li>
+<li>Multikey Indexes</li>
+<li>Unique Indexes</li>
+<li>Sparse Indexes</li>
+</ul>
+<p>Before you go crazy and start adding indexes on every possible field in your collection, keep in mind that just like in regular databases, the more indexes you have the slower you write operations will be. Every update and insert will be a little slower because the indexes will have to be maintained.</p>
+<p>Some limitations:<br />
+A collection can&#8217;t have more than 64 indexes.<br />
+Index keys can&#8217;t be larger than 1024 bytes. This includes the field value or values, the field name or names, and the namespace.</p>
+<p>Let&#8217;s go take a look at some of these indexes</p>
+<p>
+<h2>Creating A Simple Index in MongoDB</h2>
+<p>Let&#8217;s insert some data before we create the index</p>
+<pre>db.Indexing.insert( { name : "Denis", age : 20 } )
+db.Indexing.insert( { name : "Abe", age : 30 } )
+db.Indexing.insert( { name : "John", age : 40 } )
+db.Indexing.insert( { name : "Xavier", age : 10 } )
+db.Indexing.insert( { name : "Zen", age : 50 } )</pre>
+<p>Now let&#8217;s run a simple query that will return all rows where the name is Denis and we want to see what the engine is doing. You can use explain to return the plan</p>
+<pre>db.Indexing.find({name: "Denis"}).explain()</pre>
+<p>Here is what you get back</p>
+<pre>{
+        "cursor" : "BasicCursor",
+        "isMultiKey" : false,
+        "n" : 0,
+        "nscannedObjects" : 0,
+        "nscanned" : 0,
+        "nscannedObjectsAllPlans" : 0,
+        "nscannedAllPlans" : 0,
+        "scanAndOrder" : false,
+        "indexOnly" : false,
+        "nYields" : 0,
+        "nChunkSkips" : 0,
+        "millis" : 0,
+        "indexBounds" : {
+
+        },
+        "server" : "Denis:27017"
+}</pre>
+<p>Let&#8217;s add an index</p>
+<pre>db.Indexing.ensureIndex({name: 1});</pre>
+<p>What we did was, we created an index on name and it is sorted ascending, if you want descending, you would use -1 instead of 1</p>
+<p>Now if we add run the same command from before with explain</p>
+<pre>db.Indexing.find({name: "Denis"}).explain()</pre>
+<p>Here are the results</p>
+<pre>{
+        "cursor" : "BtreeCursor name_1",
+        "isMultiKey" : false,
+        "n" : 1,
+        "nscannedObjects" : 1,
+        "nscanned" : 1,
+        "nscannedObjectsAllPlans" : 1,
+        "nscannedAllPlans" : 1,
+        "scanAndOrder" : false,
+        "indexOnly" : false,
+        "nYields" : 0,
+        "nChunkSkips" : 0,
+        "millis" : 1,
+        "indexBounds" : {
+                "name" : [
+                        [
+                                "Denis",
+                                "Denis"
+                        ]
+                ]
+        },
+        "server" : "Denis:27017"
+}</pre>
+<p>As you can see several things are different. Instead of a BasicCursor, we now use a BtreeCursor</p>
+<p>Also instead of</p>
+<pre>"indexBounds" : {
+        
+}</pre>
+<p>we now see</p>
+<pre>"indexBounds" : {
+      "name" : [
+                 [
+                      "Denis",
+                      "Denis"
+                 ]
+               ]
+    },</pre>
+<p>
+<h2>Dropping an Index in MongoDB</h2>
+<p>You can drop an index by specifying a field in a collection</p>
+<pre>db.Indexing.dropIndex({name: 1});</pre>
+<p>Here is the output</p>
+<pre>{ "nIndexesWas" : 2, "ok" : 1 }</pre>
+<p>You can also drop all indexes for a collection in one shot</p>
+<pre>db.Indexing.dropIndexes()</pre>
+<p>Here is the output</p>
+<pre>{
+        "nIndexesWas" : 1,
+        "msg" : "non-_id indexes dropped for collection",
+        "ok" : 1
+}</pre>
+<p>As we mentioned before all _id fields have an index by default and those don&#8217;t get dropped</p>
+<p>
+<h2>Creating A Unique Index in MongoDB</h2>
+<p>Let&#8217;s now create an index on name again but this time we will make it unique., The syntax is the same as with the index we created before with the addition <em>unique: true</em><br />
+If you didn&#8217;t drop the index we created before, drop it first and then execute the following</p>
+<pre>db.Indexing.ensureIndex({name: 1}, {unique: true});</pre>
+<p>Now if we try to insert the same name again, you will see that we get an error</p>
+<pre>db.Indexing.insert( { name : "Denis", age : 20 } )</pre>
+<p>Here is the output<br />
+<em>E11000 duplicate key error index: Indexing.Indexing.$name_1  dup key: { : &#8220;Denis&#8221; }</em></p>
+<p>As you can see it is pretty easy to create a unique index</p>
+<p>
+<h2>Creating A Compound Index in MongoDB</h2>
+<p>Creating an compound index is pretty straightforward as well, you just add the other fields. So if we want to create an compound index on name and age then you would do it like this</p>
+<pre>db.Indexing.ensureIndex({name: 1, age : 1});</pre>
+<p>Just like in a regular index, you use 1 for ascending and -1 for descending</p>
+<p>To create an compound unique index, you would just add <em>unique: true</em></p>
+<pre>db.Indexing.ensureIndex({name: 1, age : 1}, {unique: true})</pre>
+<p>The same rules like in a regular RDBMS when an compound index is used apply. If you supply the first field ot the first field and subsequent fields, then the index will be used, otherwise the index will not be used. You can easily test this.</p>
+<p>Search for name which is the first field in the compound index</p>
+<pre>db.Indexing.find({name: "Denis"}).explain()</pre>
+<p>Here is the output, as you can see the index is used</p>
+<pre>{
+        "cursor" : "BtreeCursor name_1_age_1",
+        "isMultiKey" : false,
+        "n" : 1,
+        "nscannedObjects" : 1,
+        "nscanned" : 1,
+        "nscannedObjectsAllPlans" : 1,
+        "nscannedAllPlans" : 1,
+        "scanAndOrder" : false,
+        "indexOnly" : false,
+        "nYields" : 0,
+        "nChunkSkips" : 0,
+        "millis" : 0,
+        "indexBounds" : {
+                "name" : [
+                        [
+                                "Denis",
+                                "Denis"
+                        ]
+                ],
+                "age" : [
+                        [
+                                {
+                                        "$minElement" : 1
+                                },
+                                {
+                                        "$maxElement" : 1
+                                }
+                        ]
+                ]
+        },
+        "server" : "Denis:27017"
+}</pre>
+<p>Now search for name which is the second field in the index</p>
+<pre>db.Indexing.find({age: "20"}).explain()</pre>
+<p>Here is the output for that</p>
+<pre>{
+        "cursor" : "BasicCursor",
+        "isMultiKey" : false,
+        "n" : 0,
+        "nscannedObjects" : 5,
+        "nscanned" : 5,
+        "nscannedObjectsAllPlans" : 5,
+        "nscannedAllPlans" : 5,
+        "scanAndOrder" : false,
+        "indexOnly" : false,
+        "nYields" : 0,
+        "nChunkSkips" : 0,
+        "millis" : 0,
+        "indexBounds" : {
+
+        },
+        "server" : "Denis:27017"
+}</pre>
+<p>As you can see, no index was used</p>
+<p>
+<hr />
+<p>If you want to dive deeper into Indexing in MongoDB I would suggest you take a look at the documentation on the MongoDB site, they have an excellent section on Indexing with many more examples than I have given here. I didn&#8217;t cover Sparse Indexes, Indexes on Embedded Fields, Multikey Indexes, TTL Indexes, Geospatial Indexes or Geohaystack Indexes. You can find the documentation here: http://docs.mongodb.org/manual/core/indexes/</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/indexes-in-mongodb/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 21: With VLDBs it matters what you do and how you do it</title>
+		<link>/index.php/datamgmt/dbprogramming/with-vldbs-it-matters-what/</link>
+		<comments>/index.php/datamgmt/dbprogramming/with-vldbs-it-matters-what/#respond</comments>
+		<pubDate>Sat, 22 Dec 2012 00:12:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[query]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[very large databases]]></category>
+		<category><![CDATA[vldb]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/with-vldbs-it-matters-what/</guid>
+		<description><![CDATA[This is day twenty-one of the SQL Advent 2012 series of blog posts. Today we are going to look at Very Large Databases]]></description>
+				<content:encoded><![CDATA[<p>This is day twenty-one of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at why it matters how you do things when working with a VLDB </p>
+<p><strong>VLD what?</strong><br />
+VLDB stands for Very Large Database, Not too long ago the definition of VLDB was a database that occupies more than 1 terabyte or contains several billion rows. This of course will change over time, there are quite a few companies with Petabyte size databases. Servers with many CPUs and lots of RAM are required when your databases are big</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/SQLServerCPUandRAM.jpg?mtime=1356141722"><img alt="I like big databases and I cannot lie" title ="I like big databases and I cannot lie" src="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/SQLServerCPUandRAM.jpg?mtime=1356141722" width="582" height="395" /></a></div>
+<p><strong>What is the big deal with VLDB anyway, it is just bigger right?</strong><br />
+The problem with a VLDB is that you have to change your mindset and you have to change your ways how you do certain things. Think of it like driving 20 miles per hours compared to driving 160 miles per hour, when you drive very fast you can&#8217;t get away with doing stupid stuff on the road, you will crash. The same is true when working with big databases. You can&#8217;t just delete 100 million rows, you might fill up the log file, you have to do it in batches if you can&#8217;t use a truncate statement.</p>
+<p><strong>Storage</strong><br />
+While you can get away with having just one drive when dealing with smaller database, this doesn&#8217;t hold true for Very Large Databases. With Very Large Databases, ideally you want separate drives for tempdb, log file and data files. You can also put the non clustered indexes on a different spindle, separate from the heaps and clustered indexes. Also make sure that you <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/sizing-database-files">size your database files</a> correctly to improve performance.<br />
+If you have 64 GB of RAM and your database is 50 GB, it is very likely that the whole database will be in RAM at some point. When your database is 2 TB and you have only 512 GB of RAM, you cannot even have a quarter of the DB in RAM. This is where you need to have fast hard drives. A fast SAN or some Solid State Drives are worth looking into.</p>
+<p><strong>Partitioning</strong><br />
+Partitioning can help with maintenance and returning data faster, take a look at my <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-3">partitioning</a> post for more info</p>
+<p><strong>Indexes</strong><br />
+Make the indexes narrow, you want your lookups to be as efficient as possible.<br />
+If using partitions you can now rebuild just one partition of the index, this will make index maintenance easier and faster.</p>
+<p><strong>Deletes</strong><br />
+When you have a small database, you can delete all the rows from a table without a problem generally. Every now and then you will have someone do this, they will of course do this just one because after that you will have <em>THE TALK</em> with them about this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DELETE</span> HugeTable</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DELETE HugeTable</pre></div></div>
+
+<p>Instead of doing that, use truncate or do deletes in batches of 50000 for example</p>
+<p><strong>Select * from HugeTable</strong><br />
+Every now and then you will have someone execute something like the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> 
+<span class="kw1">FROM</span> HugeTable
+<span class="kw1">ORDER</span> <span class="kw1">By</span> SomeColumn</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * 
+FROM HugeTable
+ORDER By SomeColumn</pre></div></div>
+
+<p>When doing something like that SQL Server will create a worktable in tempdb, if the table is big and your tempdb is placed on a drive that doesn&#8217;t have a lot of space, you will run out of space, take a look at <a href="/index.php/DataMgmt/DataDesign/could-not-allocate-new-page-for-database">Dealing with the could not allocate new page for database &#8216;TEMPDB&#8217;. There are no more pages available in filegroup DEFAULT error message</a> how to resolve this</p>
+<p><strong>Compression</strong><br />
+Compression is great, I use it, it makes the backups smaller, it makes the restore faster. I use database compression as well as data compression, when using data compression, SQL Server will be able to store more data per page and thus you will be able to have more data in RAM</p>
+<p><strong>Testbed size</strong><br />
+When coding against Very Large Databases, you need to test with a QA or testbox that has about the same data, you will get into trouble if you don&#8217;t. Take a look at <a href="/index.php/DataMgmt/DataDesign/your-testbed-has-to-have-the-same-volume">Your testbed has to have the same volume of data as on production in order to simulate normal usage</a> to see what can happen.</p>
+<p><strong>Crappy queries</strong><br />
+Ah yes, how to bring the database to its knees, have some n00bs write some queries against your database. While you can get away with writing non-<a href="/index.php/DataMgmt/DBProgramming/sargable-queries">SARGable queries</a>, queries where the index is not used, you will suffer immensely if you do this on Very Large Databases</p>
+<p>I only touched upon a couple of key points, just keep in mind that if you do the thing I mentioned here even with smaller databases, you won&#8217;t suffer when your database starts to grow. And no, while premature optimization might be the root of all evil, I would call this best practices instead</p>
+<p>That is all for day twenty-one of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/with-vldbs-it-matters-what/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 15: Benefits of Indexes</title>
+		<link>/index.php/datamgmt/dbprogramming/benefits-of-indexes/</link>
+		<comments>/index.php/datamgmt/dbprogramming/benefits-of-indexes/#respond</comments>
+		<pubDate>Sat, 15 Dec 2012 07:30:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[query]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/benefits-of-indexes/</guid>
+		<description><![CDATA[This is day fifteen of the SQL Advent 2012 series of blog posts. Today we are going to look at indexes]]></description>
+				<content:encoded><![CDATA[<p>This is day fifteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at the benefit of indexes</p>
+<h2>So how does an index work?</h2>
+<p>How does an index work, how does it help SQL Server finding stuff faster? Here is an simple non technology explanation. If I told you to grab a cookbook and give me all the recipes in that book for cod, what would you do? There are two things yuo can do, you can read through the whole book page by page until you get to the last page looking for any cod recipes. Or&#8230;&#8230;&#8230;..take a look at the picture below</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/IMG01005-20121214-1059.jpg?mtime=1355500346"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/IMG01005-20121214-1059.jpg?mtime=1355500346" width="640" height="480" /></a></div>
+<p>See that, in one second I know exactly where to find cod recipes, it is on page 305 and 61. Which do you think is faster, looking it up in an index or scanning through the book?  </p>
+<p>SQL Server pretty much uses the same technique. There are two types of <em>basic</em> indexes in SQL Server, these are clustered and non clustered indexes.  A clustered index will contain all the data from the table as well, a non clustered index will have a pointer to the table row if there is no clustered index on that table or to the clustered index position is there is a clustered index on the table.</p>
+<p>A table with a clustered index is also called a clustered table. A table without a  clustered index is also called a heap.</p>
+<p>SQL Server also has XML, spatial, columnstore, filtered, full text indexes but we are just focusing on the basic indexes in this post.</p>
+<p>Here is what books on line has to say about the <a href="http://msdn.microsoft.com/en-us/library/ms177443(v=SQL.105).aspxhttp://msdn.microsoft.com/en-us/library/ms177443(v=SQL.105).aspx">storage of a clustered index</a></p>
+<blockquote><p><em>In SQL Server, indexes are organized as B-trees. Each page in an index B-tree is called an index node. The top node of the B-tree is called the root node. The bottom level of nodes in the index is called the leaf nodes. Any index levels between the root and the leaf nodes are collectively known as intermediate levels. In a clustered index, the leaf nodes contain the data pages of the underlying table. The root and intermediate level nodes contain index pages holding index rows. Each index row contains a key value and a pointer to either an intermediate level page in the B-tree, or a data row in the leaf level of the index. The pages in each level of the index are linked in a doubly-linked list.</em></p></blockquote>
+<p>A non clustered index is a little different since it doesn&#8217;t store the whole data pages, here is what books on line has to say about <a href="http://msdn.microsoft.com/en-us/library/ms177484(v=sql.105).aspx">the storage of a nonclustered index</a></p>
+<blockquote><p><em>Nonclustered indexes have the same B-tree structure as clustered indexes, except for the following significant differences:</p>
+<ul>
+<li>The data rows of the underlying table are not sorted and stored in order based on their nonclustered keys.</li>
+<li>The leaf layer of a nonclustered index is made up of index pages instead of data pages.</li>
+</ul>
+<p>Nonclustered indexes can be defined on a table or view with a clustered index or a heap. Each index row in the nonclustered index contains the nonclustered key value and a row locator. This locator points to the data row in the clustered index or heap having the key value.<br />
+The row locators in nonclustered index rows are either a pointer to a row or are a clustered index key for a row, as described in the following:</p>
+<ul>
+<li>If the table is a heap, which means it does not have a clustered index, the row locator is a pointer to the row. The pointer is built from the file identifier (ID), page number, and number of the row on the page. The whole pointer is known as a Row ID (RID).</li>
+<li>If the table has a clustered index, or the index is on an indexed view, the row locator is the clustered index key for the row. If the clustered index is not a unique index, SQL Server makes any duplicate keys unique by adding an internally generated value called a uniqueifier. This four-byte value is not visible to users. It is only added when required to make the clustered key unique for use in nonclustered indexes. SQL Server retrieves the data row by searching the clustered index using the clustered index key stored in the leaf row of the nonclustered index.</li>
+</ul>
+<p></em>
+</p></blockquote>
+<p>Cool, I will now just add indexes on every column. Not so fast, there are some things to consider here, for every update, insert and delete statement indexes have to be maintained. If you have a busy OLTP database, you have to find the right balance between your read and write IO. Not enough indexes and your retrieval queries will suffer, too many indexes and your inserts will be slower. Also keep in mind that indexes take up storage, the more you have the bigger your database will be.</p>
+<h2>Keep your clustered indexes narrow</h2>
+<p>Try to keep your clustered indexes as narrow as possible, if you can use something like an integer, this is only 4 bytes. The reason to keep your clustered indexes narrow is that when you have non clustered indexes, the row locator is the clustered index key for the row. In this case your non clustered index will become bigger as well and now you won&#8217;t be able to store as much data on a page. To illustrate that let&#8217;s take a look at some simple code</p>
+<p>First let&#8217;s create this table and populate it with 2048 rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test1<span class="br0">&#40;</span>id <span class="kw1">int</span>, somecol <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">36</span><span class="br0">&#41;</span>, somecol2 <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">36</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> Test1 
+<span class="kw1">SELECT</span> number,newid<span class="br0">&#40;</span><span class="br0">&#41;</span>,newid<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test1(id int, somecol char(36), somecol2 char(36))
+GO
+
+INSERT Test1 
+SELECT number,newid(),newid() 
+FROM master..spt_values
+WHERE type = 'P'</pre></div></div>
+
+<p>Add a clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> cx <span class="kw1">on</span> Test1<span class="br0">&#40;</span>id<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX cx on Test1(id)</pre></div></div>
+
+<p>Add these two non clustered indexes</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> ix1 <span class="kw1">on</span> Test1<span class="br0">&#40;</span>somecol<span class="br0">&#41;</span>
+<span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> ix2 <span class="kw1">on</span> Test1<span class="br0">&#40;</span>somecol2<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX ix1 on Test1(somecol)
+CREATE NONCLUSTERED INDEX ix2 on Test1(somecol2)</pre></div></div>
+
+<p>Let&#8217;s check how much storage is required for the non clustered indexes</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span>
+<span class="kw2">DB_NAME</span><span class="br0">&#40;</span>DATABASE_ID<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>DatabaseName<span class="br0">&#93;</span>,
+<span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="kw1">AS</span> TableName,
+SI.<span class="me1">NAME</span> <span class="kw1">AS</span> IndexName,
+<span class="sy0">IN</span>DEX_TYPE_DESC <span class="kw1">AS</span> IndexType,
+PAGE_COUNT <span class="kw1">AS</span> PageCounts
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> DPS
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span> sysindexes SI
+<span class="kw1">ON</span> DPS.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> SI.<span class="me1">ID</span> <span class="sy0">AND</span> DPS.<span class="me1">INDEX_ID</span> <span class="sy0">=</span> SI.<span class="me1">INDID</span>
+<span class="sy0">AND</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'Test1'</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT
+DB_NAME(DATABASE_ID) AS [DatabaseName],
+OBJECT_NAME(OBJECT_ID) AS TableName,
+SI.NAME AS IndexName,
+INDEX_TYPE_DESC AS IndexType,
+PAGE_COUNT AS PageCounts
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') DPS
+INNER JOIN sysindexes SI
+ON DPS.OBJECT_ID = SI.ID AND DPS.INDEX_ID = SI.INDID
+AND OBJECT_NAME(OBJECT_ID) = 'Test1'
+GO</pre></div></div>
+
+<p>Here is the output, as you can see the non clustered indexes take up 12 pages</p>
+<pre>DatabaseName	TableName	IndexName	IndexType	PageCounts
+tempdb	        Test1	        cx	      CLUSTERED INDEX	22
+tempdb	        Test1	        ix1	   NONCLUSTERED INDEX	12
+tempdb	        Test1	        ix2	   NONCLUSTERED INDEX	12</pre>
+<p>If we check the table size</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_spaceused</span> <span class="st0">'Test1'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_spaceused 'Test1'</pre></div></div>
+
+<pre>name	rows	reserved	data	index_size	unused
+Test1	2048    472 KB	       176 KB	240 KB	        56 KB</pre>
+<p>We see that it is using 240 KB for the indexes</p>
+<p>Let&#8217;s recreate the clustered index with all 3 columns now.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> cx <span class="kw1">on</span> Test1<span class="br0">&#40;</span>id,somecol,somecol2<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> DROP_EXIST<span class="sy0">IN</span>G</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX cx on Test1(id,somecol,somecol2)
+WITH DROP_EXISTING</pre></div></div>
+
+<p>Recreating the clustered index also recreated the non clustered indexes. Let&#8217;s check now how many pages a non clustered index is</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span>
+<span class="kw2">DB_NAME</span><span class="br0">&#40;</span>DATABASE_ID<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>DatabaseName<span class="br0">&#93;</span>,
+<span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="kw1">AS</span> TableName,
+SI.<span class="me1">NAME</span> <span class="kw1">AS</span> IndexName,
+<span class="sy0">IN</span>DEX_TYPE_DESC <span class="kw1">AS</span> IndexType,
+PAGE_COUNT <span class="kw1">AS</span> PageCounts
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> DPS
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span> sysindexes SI
+<span class="kw1">ON</span> DPS.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> SI.<span class="me1">ID</span> <span class="sy0">AND</span> DPS.<span class="me1">INDEX_ID</span> <span class="sy0">=</span> SI.<span class="me1">INDID</span>
+<span class="sy0">AND</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'Test1'</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT
+DB_NAME(DATABASE_ID) AS [DatabaseName],
+OBJECT_NAME(OBJECT_ID) AS TableName,
+SI.NAME AS IndexName,
+INDEX_TYPE_DESC AS IndexType,
+PAGE_COUNT AS PageCounts
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') DPS
+INNER JOIN sysindexes SI
+ON DPS.OBJECT_ID = SI.ID AND DPS.INDEX_ID = SI.INDID
+AND OBJECT_NAME(OBJECT_ID) = 'Test1'
+GO</pre></div></div>
+
+<p>Here are the results</p>
+<pre>DatabaseName	TableName	IndexName	IndexType	PageCounts
+tempdb          Test1	        cx	        CLUSTERED INDEX	22
+tempdb          Test1	        ix1	     NONCLUSTERED INDEX	21
+tempdb  	Test1	        ix2	     NONCLUSTERED INDEX	21</pre>
+<p>As you can see the non clustered indexes went from 12 to 21 pages</p>
+<p>The index size changed, if you run this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_spaceused</span> <span class="st0">'Test1'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_spaceused 'Test1'</pre></div></div>
+
+<p>Here is the result</p>
+<pre>name	rows	reserved data	index_size	unused
+Test1	2048    600 KB	 176 KB	384 KB	        40 KB</pre>
+<p>So we went from 240 KB to 384 KB for the index storage.</p>
+<p>So why does this matter you ask? SQL Server will use indexes for all kind of things, if you run a COUNT(*) it will use an index, if you do a JOIN it will use an index, it will use indexes in GROUP By queries and many more things.</p>
+<p>Let&#8217;s look at a simple example, when you do a COUNT(*), the optimizer will pick a non clustered index if there is one since it usually has less columns than the clustered index </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">ON</span>
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw2">count</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> Test1
+GO
+&nbsp;
+<span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET SHOWPLAN_TEXT ON
+GO
+
+SELECT count(*) FROM Test1
+GO
+
+SET SHOWPLAN_TEXT OFF
+GO</pre></div></div>
+
+<p>Here is the plan</p>
+<blockquote><p>  |&#8211;Compute Scalar(DEFINE:([Expr1004]=CONVERT_IMPLICIT(int,[Expr1005],0)))<br />
+       |&#8211;Stream Aggregate(DEFINE:([Expr1005]=Count(*)))<br />
+            |&#8211;Index Scan(OBJECT:([ReportServer].[dbo].[Test1].[ix2]))</p></blockquote>
+<p>Basically it had to scan through all the index pages to get the count, if your index was now still 12 pages instead of 21, SQL Server would take less time to accomplish this.</p>
+<p>I barely scratched the surface on indexing, it is a big topic and I recommend you start by navigating to the topic in Books On Line: http://msdn.microsoft.com/en-us/library/ms175049.aspx</p>
+<p>You can also take a look at the following posts written about indexing right here on this site</p>
+<p><a href="/index.php/DataMgmt/DataDesign/index-rebuild-and-reorganize-sql">Index REBUILD and REORGANIZE</a><br />
+<a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-20">Indexes with Included Columns</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/sql-advent-2011-day-19">Filtered Indexes</a><br />
+<a href="/index.php/DataMgmt/DataDesign/is-an-index-scan-always-better-or-faster">Is an index seek always better or faster than an index scan?</a><br />
+<a href="/index.php/DataMgmt/DataDesign/finding-fragmentation-of-an-index-and-fihttp:///index.php/DataMgmt/DataDesign/finding-fragmentation-of-an-index-and-fi">Finding Fragmentation Of An Index And Fixing It</a><br />
+<a href="/index.php/DataMgmt/DataDesign/how-to-get-the-selectivity-of-an-indexhttp:///index.php/DataMgmt/DataDesign/how-to-get-the-selectivity-of-an-index">How to get the selectivity of an index</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/adding-nonclustered-index-on-primary">Adding nonclustered index on primary keys</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/index-seek-on-lob-columns">Index Seek on LOB Columns</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/performance-impact-of-row-overflow">Row Overflow Pages &#8211; Index Tuning</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/columnstore-index-basics">Columnstore Index Basics</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/columnstore-index-index-statistics">Columnstore Index – Index Statistics</a></p>
+<p>That is all for day fifteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/benefits-of-indexes/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 3: Sargable Queries</title>
+		<link>/index.php/datamgmt/dbprogramming/sargable-queries/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sargable-queries/#comments</comments>
+		<pubDate>Mon, 03 Dec 2012 13:44:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[database]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[performance tuning]]></category>
+		<category><![CDATA[rdbms]]></category>
+		<category><![CDATA[sargable]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[t-sql]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/sargable-queries/</guid>
+		<description><![CDATA[This is day three of the SQL Advent 2012 series of blog posts. Today we are going to look at sargable queries. You might ask yourself, what is this weird term sargable. Sargable  comes from searchable argument, sometimes also referred as Search ARGument&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This is day three of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at sargable queries. You might ask yourself, what is this weird term sargable. Sargable  comes from searchable argument, sometimes also referred as <span class="MT_red">S</span>earch <span class="MT_red">ARG</span>ument <span class="MT_red">ABLE</span>. What that means is that the query will be able to use an index, a seek will be performed instead of a scan. In general any time you have a function wrapped around a column, an index won&#8217;t be used</p>
+<p>Some examples that are not sargable </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">WHERE</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>Name,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'S'</span>
+<span class="kw1">WHERE</span> <span class="kw1">Year</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span> <span class="sy0">=</span> <span class="nu0">2012</span>
+<span class="kw1">WHERE</span> OrderID <span class="sy0">*</span> <span class="nu0">3</span> <span class="sy0">=</span> <span class="nu0">33000</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">WHERE LEFT(Name,1) = 'S'
+WHERE Year(SomeDate) = 2012
+WHERE OrderID * 3 = 33000</pre></div></div>
+
+<p>Those three should be rewritten like this in order to become sargable </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">WHERE</span> Name <span class="sy0">LIKE</span> <span class="st0">'S%'</span>
+<span class="kw1">WHERE</span> SomeDate <span class="sy0">&gt;=</span> <span class="st0">'20120101'</span> <span class="sy0">AND</span> SomeDate <span class="sy0">&lt;</span> <span class="st0">'20130101'</span>
+<span class="kw1">WHERE</span> OrderID <span class="sy0">=</span> <span class="nu0">33000</span><span class="sy0">/</span><span class="nu0">3</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">WHERE Name LIKE 'S%'
+WHERE SomeDate &gt;= '20120101' AND SomeDate &lt; '20130101'
+WHERE OrderID = 33000/3</pre></div></div>
+
+<p>Let&#8217;s create a table, insert some data so that we can look at the execution plan<br />
+Create this simple table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test<span class="br0">&#40;</span>SomeID <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test(SomeID varchar(100))</pre></div></div>
+
+<p>Let&#8217;s insert some data that will start with a letter followed by some digits</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Test
+<span class="kw1">SELECT</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>v2.<span class="me1">type</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">+</span><span class="kw1">RIGHT</span><span class="br0">&#40;</span><span class="st0">'0000'</span> <span class="sy0">+</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">4</span><span class="br0">&#41;</span>,v1.<span class="me1">number</span><span class="br0">&#41;</span>,<span class="nu0">4</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span> v1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>type,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">AS</span> type 
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span><span class="br0">&#41;</span> v2
+<span class="kw1">WHERE</span> v1.<span class="me1">type</span> <span class="sy0">=</span> <span class="st0">'p'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Test
+SELECT LEFT(v2.type,1) +RIGHT('0000' + CONVERT(varchar(4),v1.number),4) 
+FROM master..spt_values v1
+CROSS JOIN (SELECT DISTINCT LEFT(type,1) AS type 
+FROM master..spt_values) v2
+WHERE v1.type = 'p'</pre></div></div>
+
+<p>That insert should have generated 32768 rows</p>
+<p>Now create this index on that table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> cx_test <span class="kw1">ON</span> Test<span class="br0">&#40;</span>SomeID<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX cx_test ON Test(SomeID)</pre></div></div>
+
+<p>Let&#8217;s take a look at the execution plan, hit CTRL + M, this will add the execution plan once the query is done running</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> SomeID <span class="sy0">LIKE</span> <span class="st0">'s%'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>SomeID,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'s'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM Test
+WHERE SomeID LIKE 's%'
+
+SELECT * FROM Test
+WHERE LEFT(SomeID,1) = 's'</pre></div></div>
+
+<p>Here is what the plans looks like</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/Excecutionplan.PNG?mtime=1354498760"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/Excecutionplan.PNG?mtime=1354498760" width="447" height="295" /></a></div>
+<p>As you can see it is 9% versus 91% between the two queries, that is a big difference<br />
+Hit CTRL + M again to disable the inclusion of the plan</p>
+<p>Run this codeblock, it will give you the plans in a text format</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">ON</span>
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> SomeID <span class="sy0">LIKE</span> <span class="st0">'s%'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>SomeID,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'s'</span>
+GO
+&nbsp;
+<span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET SHOWPLAN_TEXT ON
+GO
+
+SELECT * FROM Test
+WHERE SomeID LIKE 's%'
+
+SELECT * FROM Test
+WHERE LEFT(SomeID,1) = 's'
+GO
+
+SET SHOWPLAN_TEXT OFF
+GO</pre></div></div>
+
+<p>Here are the two plans</p>
+<blockquote><p>|&#8211;Clustered Index Seek(OBJECT:([master].[dbo].[Test].[cx_test]),<br />
+  SEEK:([master].[dbo].[Test].[SomeID] >= &#8216;Rþ&#8217; AND [master].[dbo].[Test].[SomeID] < 'T'),  
+  WHERE:([master].[dbo].[Test].[SomeID] like 's%') ORDERED FORWARD)
+
+    |--Clustered Index Scan(OBJECT:([master].[dbo].[Test].[cx_test]), 
+	WHERE:(substring([master].[dbo].[Test].[SomeID],(1),(1))='s'))
+</p></blockquote>
+<p>As you can see the top one while looking more complicated is actually giving you a seek</p>
+<h2>Making a case sensitive search sargable</h2>
+<p>Now let&#8217;s take a look at how we can make a case sensitive search sargable as well<br />
+In order to do a search and make it case sensitive, you have to have a case sensitive collation, if your table is not created with a case sensitive collation then you can supply it as part of the query</p>
+<p>Here is an example to demonstrate what I mean</p>
+<p>This is a simple table created without a collation</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TempCase1 <span class="br0">&#40;</span>Val <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase1 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'A'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase1 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'a'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TempCase1 (Val CHAR(1))
+INSERT TempCase1 VALUES('A')
+INSERT TempCase1 VALUES('a')</pre></div></div>
+
+<p>Running this select statement will return both rows </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TempCase1
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'A'</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TempCase1
+WHERE Val = 'A' </pre></div></div>
+
+<p>Val<br />
+&#8212;&#8211;<br />
+A<br />
+a</p>
+<p>Now create the same kind of table but with a case sensitive collation</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TempCase2 <span class="br0">&#40;</span>Val <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS<span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase2 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'A'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase2 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'a'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TempCase2 (Val CHAR(1) COLLATE SQL_Latin1_General_CP1_CS_AS)
+INSERT TempCase2 VALUES('A')
+INSERT TempCase2 VALUES('a')</pre></div></div>
+
+<p>Run the same query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TempCase2
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'A'</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TempCase2
+WHERE Val = 'A' </pre></div></div>
+
+<p>Val<br />
+&#8212;&#8211;<br />
+A</p>
+<p>As you can see you only get the one row now that matches the case</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TempCase1
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'A'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TempCase1
+WHERE Val = 'A' COLLATE SQL_Latin1_General_CP1_CS_AS</pre></div></div>
+
+<p>Val<br />
+&#8212;&#8211;<br />
+A<br />
+a</p>
+<p>Now let&#8217;s take a look at how we can make the case sensitive search sargable</p>
+<p>First create this table and insert some data</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TempCase <span class="br0">&#40;</span>Val <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'A'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'B'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'C'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'D'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'E'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'F'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'G'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TempCase <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'H'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TempCase (Val CHAR(1))
+ 
+INSERT TempCase VALUES('A')
+INSERT TempCase VALUES('B')
+INSERT TempCase VALUES('C')
+INSERT TempCase VALUES('D')
+INSERT TempCase VALUES('E')
+INSERT TempCase VALUES('F')
+INSERT TempCase VALUES('G')
+INSERT TempCase VALUES('H')</pre></div></div>
+
+<p>Now we will insert some lowercase characters</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TempCase
+<span class="kw1">SELECT</span> <span class="kw2">LOWER</span><span class="br0">&#40;</span>Val<span class="br0">&#41;</span> <span class="kw1">FROM</span> TempCase</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TempCase
+SELECT LOWER(Val) FROM TempCase</pre></div></div>
+
+<p>Now we will create our real table which will have 65536 rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> CaseSensitiveSearch <span class="br0">&#40;</span>Val <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE CaseSensitiveSearch (Val VARCHAR(50))</pre></div></div>
+
+<p>We will do a couple of cross joins to generate the data for our queries</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> CaseSensitiveSearch
+<span class="kw1">SELECT</span> t1.<span class="me1">val</span> <span class="sy0">+</span> t2.<span class="me1">val</span> <span class="sy0">+</span> t3.<span class="me1">val</span> <span class="sy0">+</span> t4.<span class="me1">val</span>
+<span class="kw1">FROM</span> TempCase t1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> TempCase t2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> TempCase t3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> TempCase t4</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT CaseSensitiveSearch
+SELECT t1.val + t2.val + t3.val + t4.val
+FROM TempCase t1
+CROSS JOIN TempCase t2
+CROSS JOIN TempCase t3
+CROSS JOIN TempCase t4</pre></div></div>
+
+<p>Create an index on the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">INDEX</span> IX_SearchVal <span class="kw1">ON</span> CaseSensitiveSearch<span class="br0">&#40;</span>Val<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE INDEX IX_SearchVal ON CaseSensitiveSearch(Val)</pre></div></div>
+
+<p>Just like before, if we run this we will get back the exact value we passed in and also all the upper case and lower case variations</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' </pre></div></div>
+
+<p>Here are the results of that query<br />
+Val<br />
+&#8212;&#8211;<br />
+AbCd<br />
+ABcd<br />
+Abcd<br />
+ABCd<br />
+aBCd<br />
+abCd<br />
+aBcd<br />
+abcd<br />
+abCD<br />
+aBcD<br />
+abcD<br />
+aBCD<br />
+ABCD<br />
+AbCD<br />
+ABcD<br />
+AbcD</p>
+<p>If you add the collation to the query, you will get only what matches your value</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS</pre></div></div>
+
+<p>Here is the result, it maches what was passed in<br />
+Val<br />
+&#8212;<br />
+ABCD</p>
+<p>The problem with the query above is that it will cause a scan. So what can we do, how can we make it perform better?  It is simple combine the two queries<br />
+First grab all case sensitive and case insensitive values and then after that filter out the case insensitive values</p>
+<p>Here is what that query will look like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+<span class="sy0">AND</span> Val <span class="sy0">LIKE</span> <span class="st0">'ABCD'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+AND Val LIKE 'ABCD'</pre></div></div>
+
+<p>AND Val LIKE &#8216;ABCD&#8217; will result in a seek, now when it also does the Val = &#8216;ABCD&#8217; COLLATE SQL_Latin1_General_CP1_CS_AS part, it only returns the row that matches your value</p>
+<p>If you run both queries, you can look at the plan difference (hit CTRL + M so that the plan is included)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+<span class="sy0">AND</span> Val <span class="sy0">LIKE</span> <span class="st0">'ABCD'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+
+
+
+SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+AND Val LIKE 'ABCD'</pre></div></div>
+
+<p>Here is the plan</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ExcecutionPlan2008.PNG?mtime=1354548699"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/ExcecutionPlan2008.PNG?mtime=1354548699" width="903" height="364" /></a></div>
+<p>As you can see, there is a big difference between the two</p>
+<p>Here is the plan in text as well</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">ON</span>
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> CaseSensitiveSearch
+<span class="kw1">WHERE</span> Val <span class="sy0">=</span> <span class="st0">'ABCD'</span> <span class="kw1">COLLATE</span> SQL_Latin1_General_CP1_CS_AS
+<span class="sy0">AND</span> Val <span class="sy0">LIKE</span> <span class="st0">'ABCD'</span>
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET SHOWPLAN_TEXT ON
+GO
+ 
+SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+
+
+
+SELECT * FROM CaseSensitiveSearch
+WHERE Val = 'ABCD' COLLATE SQL_Latin1_General_CP1_CS_AS
+AND Val LIKE 'ABCD'
+
+GO
+ 
+SET SHOWPLAN_TEXT OFF
+GO</pre></div></div>
+
+<blockquote><p>  |&#8211;Table Scan(OBJECT:([tempdb].[dbo].[CaseSensitiveSearch]),<br />
+   WHERE:(CONVERT_IMPLICIT(varchar(50),[tempdb].[dbo].[CaseSensitiveSearch].[Val],0)=CONVERT(varchar(8000),[@1],0)))</p>
+<p>    |&#8211;Index Seek(OBJECT:([tempdb].[dbo].[CaseSensitiveSearch].[IX_SearchVal]), SEEK:([tempdb].[dbo].[CaseSensitiveSearch].[Val] >= &#8216;ABCD&#8217;<br />
+     AND [tempdb].[dbo].[CaseSensitiveSearch].[Val] <= 'ABCD'), 
+      WHERE:(CONVERT_IMPLICIT(varchar(50),[tempdb].[dbo].[CaseSensitiveSearch].[Val],0)='ABCD' AND [tempdb].[dbo].[CaseSensitiveSearch].[Val] like 'ABCD') ORDERED FORWARD)</p></blockquote>
+<p>Also take a look at <a href="/index.php/DataMgmt/DataDesign/only-in-a-database-can-you-get-1000-impr">Only In A Database Can You Get 1000% + Improvement By Changing A Few Lines Of Code</a> to see how this works with dates</p>
+<p>That is all for day three of the SQL Advent 2012 series, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sargable-queries/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Find all the tables and indexes that have data compression</title>
+		<link>/index.php/datamgmt/datadesign/find-all-the-tables-and/</link>
+		<comments>/index.php/datamgmt/datadesign/find-all-the-tables-and/#comments</comments>
+		<pubDate>Fri, 16 Nov 2012 17:32:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[compression]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[partitioning]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/11/find-all-the-tables-and/</guid>
+		<description><![CDATA[I took a backup of one of our test databases today and gave it to someone so that it could be restored on one of their servers.
+
+I got back the following in an email from the person who tried to do the restore
+
+
+
+Date                      11/16/20&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I took a backup of one of our test databases today and gave it to someone so that it could be restored on one of their servers.</p>
+<p>I got back the following in an email from the person who tried to do the restore</p>
+<p><em></p>
+<p>Date                      11/16/2012 12:58:16 PM<br />
+Log                         SQL Server (Current &#8211; 11/16/2012 1:00:00 PM)</p>
+<p>Source                  spid76</p>
+<p>Message<br />
+Database &#8216;YourCrappyDB&#8217; cannot be started in this edition of SQL Server because part or all of object &#8216;CrappyIndexData&#8217; is enabled with data compression or vardecimal storage format. Data compression and vardecimal storage format are only supported on SQL Server Enterprise Edition.</em></p>
+<p>Okay, so they are running the standard edition of SQL Server. How can you quickly find all the tables and indexes that use compression? Let&#8217;s take a look, first we are going to create three tables, a heap, a table with a non clustered index and a table with a clustered index</p>
+<p>A table without indexes (a heap)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompress<span class="br0">&#40;</span>SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">1000</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> TestCompress
+REBUILD PARTITION <span class="sy0">=</span> <span class="sy0">ALL</span> <span class="kw1">WITH</span> <span class="br0">&#40;</span>DATA_COMPRESSION <span class="sy0">=</span> &nbsp;PAGE<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestCompress(SomeCol VARCHAR(1000))
+GO
+
+ALTER TABLE TestCompress
+REBUILD PARTITION = ALL WITH (DATA_COMPRESSION =  PAGE)</pre></div></div>
+
+<p>A table with a non clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--Non clustered index</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompress2<span class="br0">&#40;</span>SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> null<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IX_TestCompress2 
+&nbsp; &nbsp; <span class="kw1">ON</span> TestCompress2 <span class="br0">&#40;</span>SomeCol<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span> DATA_COMPRESSION <span class="sy0">=</span> <span class="kw1">ROW</span> <span class="br0">&#41;</span> ; 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--Non clustered index
+CREATE TABLE TestCompress2(SomeCol VARCHAR(100) NOT null)
+GO
+
+CREATE NONCLUSTERED INDEX IX_TestCompress2 
+    ON TestCompress2 (SomeCol)
+WITH ( DATA_COMPRESSION = ROW ) ; 
+GO</pre></div></div>
+
+<p>A table with a clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--Clustered index</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompress3<span class="br0">&#40;</span>SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> null<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_TestCompress3 
+&nbsp; &nbsp; <span class="kw1">ON</span> TestCompress3 <span class="br0">&#40;</span>SomeCol<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span> DATA_COMPRESSION <span class="sy0">=</span> <span class="kw1">ROW</span> <span class="br0">&#41;</span> ; 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--Clustered index
+CREATE TABLE TestCompress3(SomeCol VARCHAR(100) NOT null)
+GO
+
+CREATE CLUSTERED INDEX IX_TestCompress3 
+    ON TestCompress3 (SomeCol)
+WITH ( DATA_COMPRESSION = ROW ) ; 
+GO</pre></div></div>
+
+<p>Here is the query that will give you the table name, the storage type, the index name if there is one and the type of compression</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span>
+SCHEMA_NAME<span class="br0">&#40;</span>o.<span class="me1">schema_id</span><span class="br0">&#41;</span> &nbsp;<span class="sy0">+</span> <span class="st0">'.'</span> <span class="sy0">+</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>o.<span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">AS</span> TableName,
+i.<span class="me1">name</span> <span class="kw1">AS</span> IndexName,
+p.<span class="me1">data_compression_desc</span> <span class="kw1">AS</span> CompressionType,
+i.<span class="me1">type_desc</span> <span class="kw1">AS</span> StorageType
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span> &nbsp;p 
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">objects</span> o 
+<span class="kw1">ON</span> p.<span class="kw2">object_id</span> <span class="sy0">=</span> o.<span class="kw2">object_id</span> 
+<span class="sy0">JOIN</span> sys.<span class="me1">indexes</span> i 
+<span class="kw1">ON</span> p.<span class="kw2">object_id</span> <span class="sy0">=</span> i.<span class="kw2">object_id</span>
+<span class="sy0">AND</span> i.<span class="me1">index_id</span> <span class="sy0">=</span> p.<span class="me1">index_id</span>
+<span class="kw1">WHERE</span> p.<span class="me1">data_compression</span> <span class="sy0">&gt;</span> <span class="nu0">0</span> 
+<span class="sy0">AND</span> SCHEMA_NAME<span class="br0">&#40;</span>o.<span class="me1">schema_id</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> <span class="st0">'SYS'</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT DISTINCT
+SCHEMA_NAME(o.schema_id)  + '.' + OBJECT_NAME(o.object_id) AS TableName,
+i.name AS IndexName,
+p.data_compression_desc AS CompressionType,
+i.type_desc AS StorageType
+FROM sys.partitions  p 
+INNER JOIN sys.objects o 
+ON p.object_id = o.object_id 
+JOIN sys.indexes i 
+ON p.object_id = i.object_id
+AND i.index_id = p.index_id
+WHERE p.data_compression &gt; 0 
+AND SCHEMA_NAME(o.schema_id) &lt;&gt; 'SYS' </pre></div></div>
+
+<p>Here is the output of that query</p>
+<div class="tables">
+<table>
+<tr>
+<th> TableName </th>
+<th> IndexName </th>
+<th> CompressionType </th>
+<th> StorageType </th>
+</tr>
+<tr>
+<td> dbo.TestCompress </td>
+<td>NULL</td>
+<td> PAGE </td>
+<td> HEAP </td>
+</tr>
+<tr>
+<td> dbo.TestCompress2 </td>
+<td> IX_TestCompress2 </td>
+<td> ROW </td>
+<td> NONCLUSTERED </td>
+</tr>
+<tr>
+<td> dbo.TestCompress3 </td>
+<td> IX_TestCompress3 </td>
+<td> ROW </td>
+<td> CLUSTERED </td>
+</tr>
+</table>
+</div>
+<p>Now why do I have a distinct in my query? The reason is that if you have your indexes/tables partitioned you will get more than one row per index. you can add p.rows to the select portion of the queries and you will see how many rows each partition holds</p>
+<p>Hopefully this will help someone in the future</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/find-all-the-tables-and/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2011 Day 24: Index REBUILD and REORGANIZE</title>
+		<link>/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/</link>
+		<comments>/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/#respond</comments>
+		<pubDate>Sat, 24 Dec 2011 11:47:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/index-rebuild-and-reorganize-sql/</guid>
+		<description><![CDATA[Today we are going to look at how to recreate and defragment indexes. Back in the SQL Server 2000 days you would do a CREATE INDEX WITH DROP_EXISTING/DBCC DBREINDEX  or DBCC INDEXDEFRAG. To check fragmentation, you would use DBCC SHOWCONTIG. To check fragmentation in SQL Server 2005 and up, you now can use the Dynamic Management View sys.dm_db_index_physical_stats.  To rebuild an index, you use ALTER INDEX IndexName REBUILD; to defragment and index, you use ALTER INDEX IndexName REORGANIZE;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>This is the third indexing post in this series, we already looked at <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/sql-advent-2011-day-19">Filtered Indexes</a> and <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-20">Indexes with Included Columns</a>. Today we are going to look at how to recreate and defragment indexes. Back in the SQL Server 2000 days you would do a CREATE INDEX WITH DROP_EXISTING/DBCC DBREINDEX  or DBCC INDEXDEFRAG. To check fragmentation, you would use DBCC SHOWCONTIG. To check fragmentation in SQL Server 2005 and up, you now can use the Dynamic Management View sys.dm_db_index_physical_stats.  To rebuild an index, you use <em>ALTER INDEX IndexName REBUILD;</em> to defragment and index, you use <em>ALTER INDEX IndexName REORGANIZE</em>;</p>
+<p>Let&#8217;s write some T-SQL to see this all in action, first create this table.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestIndex <span class="br0">&#40;</span>name1 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">500</span><span class="br0">&#41;</span>not null,
+id <span class="kw1">int</span> not null,
+userstat <span class="kw1">int</span> not null,
+name2 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">500</span><span class="br0">&#41;</span> not null,
+SomeVal <span class="kw1">uniqueidentifier</span> not null<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestIndex (name1 varchar(500)not null,
+id int not null,
+userstat int not null,
+name2 varchar(500) not null,
+SomeVal uniqueidentifier not null)</pre></div></div>
+
+<p>Now insert 50000 rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestIndex
+<span class="kw1">SELECT</span> <span class="kw1">top</span> <span class="nu0">50000</span> s.<span class="me1">name</span>,s.<span class="me1">id</span>,s.<span class="me1">userstat</span>,s2.<span class="me1">name</span>,newid<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> master..<span class="me1">sysobjects</span> s
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> master..<span class="me1">sysobjects</span> s2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestIndex
+SELECT top 50000 s.name,s.id,s.userstat,s2.name,newid() 
+FROM master..sysobjects s
+CROSS JOIN master..sysobjects s2</pre></div></div>
+
+<p>Now create this index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_TestIndex_Index <span class="kw1">ON</span> TestIndex<span class="br0">&#40;</span>SomeVal<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX IX_TestIndex_Index ON TestIndex(SomeVal)</pre></div></div>
+
+<p>Now let us look at some data by using the sys.dm_db_index_physical_stats Dynamic Management View. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">Object_name</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">as</span> Tablename,s.<span class="me1">name</span> <span class="kw1">as</span> Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> d
+join sysindexes s <span class="kw1">on</span> d.<span class="kw2">object_id</span> <span class="sy0">=</span> s.<span class="me1">id</span>
+and d.<span class="me1">index_id</span> <span class="sy0">=</span> s.<span class="me1">indid</span>
+and s.<span class="me1">name</span> <span class="sy0">=</span><span class="st0">'IX_TestIndex_Index'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT Object_name(object_id) as Tablename,s.name as Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') d
+join sysindexes s on d.object_id = s.id
+and d.index_id = s.indid
+and s.name ='IX_TestIndex_Index'</pre></div></div>
+
+<p>(Result Set)
+<div class="tables">
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 0.22172949002217296
+</td>
+<td> 451
+</td>
+</tr>
+</table>
+</div>
+<p>That is good, almost no fragmentation, let&#8217;s change that shall we? You remember<a href="/index.php/DataMgmt/DBProgramming/best-practice-don-t-not-cluster-on-uniqu"> not to cluster an index on a uniqueidentifier when using the NEWID function</a> right? That will completely fragment your index because of page splits</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> TestIndex
+<span class="kw1">SET</span> SomeVal <span class="sy0">=</span> NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE TestIndex
+SET SomeVal = NEWID()</pre></div></div>
+
+<p>Okay, now you can see that the index is completely fragmented, we are also using 955 pages to store the data instead of 451<br />
+(Result Set)
+<div class="tables">
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 99.3717277486911
+</td>
+<td> 955
+</td>
+</tr>
+</table></div>
+<p>There are two ways to fix fragmentation, one is to reorganize the index and the other is to rebuild the index. REORGANIZE is an online operation while REBUILD is not unless you specify ONLINE = ON, ONLINE = ON will only work on Enterprise editions of SQL Server. If you rebuild the index with the ON option then your data is available while that is running, if it set to OFF then the data is not available while the rebuild is running. You can also stop a REORGANIZE of the index at any time.<br />
+Here is how to do a REORGANIZE</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> IX_TestIndex_Index <span class="kw1">ON</span> TestIndex
+RE<span class="sy0">OR</span>GANIZE;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX IX_TestIndex_Index ON TestIndex
+REORGANIZE;</pre></div></div>
+
+<p>(Result Set)
+<div class="tables">
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 2.8824833702882482
+</td>
+<td> 451
+</td>
+</tr>
+</table></div>
+<p>As you can see after the reorganize(DBCC INDEXDEFRAG for you SQL Server 2000 folks) fragmentation levels dropped to less than 3 percent.</p>
+<p>Just for fun let&#8217;s also rebuild (Drop and recreate/DBCC REINDEX for you SQL Server 2000 folks) the index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> IX_TestIndex_Index <span class="kw1">ON</span> TestIndex
+REBUILD;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX IX_TestIndex_Index ON TestIndex
+REBUILD;</pre></div></div>
+
+<p>(Result Set)</p>
+<div class="tables">
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 0.22222222222222221
+</td>
+<td> 450
+</td>
+</tr>
+</table></div>
+<p>As you can see the rebuild made fragmentation almost 0.</p>
+<p>You can rebuild an index ONLINE (enterprise edition only) or OFFLINE, OFFLINE is the default</p>
+<p>Here are two differences between REBUILD ONLINE = ON and REBUILD ONLINE = OFF<br />
+<strong>ON</strong><br />
+Long-term table locks are not held for the duration of the index operation. During the main phase of the index operation, only an Intent Share (IS) lock is held on the source table. This allows queries or updates to the underlying table and indexes to continue. At the start of the operation, a Shared (S) lock is very briefly held on the source object. At the end of the operation, an S lock is very briefly held on the source if a nonclustered index is being created, or an SCH-M (Schema Modification) lock is acquired when a clustered index is created or dropped online, or when a clustered or nonclustered index is being rebuilt. ONLINE cannot be set to ON when an index is being created on a local temporary table.</p>
+<p><strong>OFF</strong><br />
+Table locks are applied for the duration of the index operation. An offline index operation that creates, rebuilds, or drops a clustered, spatial, or XML index, or rebuilds or drops a nonclustered index, acquires a Schema modification (Sch-M) lock on the table. This prevents all user access to the underlying table for the duration of the operation. An offline index operation that creates a nonclustered index acquires a Shared (S) lock on the table. This prevents updates to the underlying table but allows read operations, such as SELECT statements.</p>
+<p>Of course you will not run rebuild/reorganize manually for every index in your database, Michelle Ufford from the <a href="http://sqlfool.com/" class="external text" title="http://sqlfool.com/" rel="nofollow">SQL Fool</a> blog has a nice post with just a script which can do this automatically, you can find that here: <a href="http://sqlfool.com/2011/06/index-defrag-script-v4-1/" class="external text" title="http://sqlfool.com/?p=63" rel="nofollow">Index Defrag Script</a> </p>
+<h2>Bonus, are my indexes used and is it mostly seeks or scans?. </h2>
+<p>The sys.dm_db_index_usage_stats dynamic management view is extremely helpful in a couple of ways. It can help you identify if an index is used or not. You can also find out the scan to seek ratio. Another helpful thing is the fact that the last seek and scan dates are in the view, this can help you determine if the index is still being used. Keep in mind that when you restart the SQL instance the data is wiped out. </p>
+<p>Run the query below</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span>
+TableName <span class="sy0">=</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>s.<span class="br0">&#91;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#93;</span><span class="br0">&#41;</span>,
+IndexName <span class="sy0">=</span> i.<span class="me1">name</span>,
+s.<span class="me1">last_user_seek</span>,
+s.<span class="me1">user_seeks</span>,
+<span class="kw1">CASE</span> s.<span class="me1">user_seeks</span> <span class="kw1">WHEN</span> <span class="nu0">0</span> <span class="kw1">THEN</span> <span class="nu0">0</span>
+<span class="kw1">ELSE</span> s.<span class="me1">user_seeks</span><span class="sy0">*</span><span class="nu0">1.0</span> <span class="sy0">/</span><span class="br0">&#40;</span>s.<span class="me1">user_scans</span> <span class="sy0">+</span> s.<span class="me1">user_seeks</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">100.0</span> <span class="kw1">END</span> <span class="kw1">AS</span> SeekPercentage,
+s.<span class="me1">last_user_scan</span>,
+s.<span class="me1">user_scans</span>,
+<span class="kw1">CASE</span> s.<span class="me1">user_scans</span> <span class="kw1">WHEN</span> <span class="nu0">0</span> <span class="kw1">THEN</span> <span class="nu0">0</span>
+<span class="kw1">ELSE</span> s.<span class="me1">user_scans</span><span class="sy0">*</span><span class="nu0">1.0</span> <span class="sy0">/</span><span class="br0">&#40;</span>s.<span class="me1">user_scans</span> <span class="sy0">+</span> s.<span class="me1">user_seeks</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">100.0</span> <span class="kw1">END</span> <span class="kw1">AS</span> ScanPercentage,
+s.<span class="me1">last_user_lookup</span>,
+s.<span class="me1">user_lookups</span>,
+s.<span class="me1">last_user_update</span>,
+s.<span class="me1">user_updates</span>,
+s.<span class="me1">last_system_seek</span>,
+s.<span class="me1">last_system_scan</span>,
+s.<span class="me1">last_system_lookup</span>,
+s.<span class="me1">last_system_update</span>,<span class="sy0">*</span>
+<span class="kw1">FROM</span>
+sys.<span class="me1">dm_db_index_usage_stats</span> s
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span>
+sys.<span class="me1">indexes</span> i
+<span class="kw1">ON</span>
+s.<span class="br0">&#91;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#93;</span> <span class="sy0">=</span> i.<span class="br0">&#91;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#93;</span>
+<span class="sy0">AND</span> s.<span class="me1">index_id</span> <span class="sy0">=</span> i.<span class="me1">index_id</span>
+<span class="kw1">WHERE</span>
+s.<span class="me1">database_id</span> <span class="sy0">=</span> <span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="sy0">AND</span> <span class="kw2">OBJECTPROPERTY</span><span class="br0">&#40;</span>s.<span class="br0">&#91;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#93;</span>, <span class="st0">'IsMsShipped'</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="nu0">0</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT
+TableName = OBJECT_NAME(s.[OBJECT_ID]),
+IndexName = i.name,
+s.last_user_seek,
+s.user_seeks,
+CASE s.user_seeks WHEN 0 THEN 0
+ELSE s.user_seeks*1.0 /(s.user_scans + s.user_seeks) * 100.0 END AS SeekPercentage,
+s.last_user_scan,
+s.user_scans,
+CASE s.user_scans WHEN 0 THEN 0
+ELSE s.user_scans*1.0 /(s.user_scans + s.user_seeks) * 100.0 END AS ScanPercentage,
+s.last_user_lookup,
+s.user_lookups,
+s.last_user_update,
+s.user_updates,
+s.last_system_seek,
+s.last_system_scan,
+s.last_system_lookup,
+s.last_system_update,*
+FROM
+sys.dm_db_index_usage_stats s
+INNER JOIN
+sys.indexes i
+ON
+s.[OBJECT_ID] = i.[OBJECT_ID]
+AND s.index_id = i.index_id
+WHERE
+s.database_id = DB_ID()
+AND OBJECTPROPERTY(s.[OBJECT_ID], 'IsMsShipped') = 0;</pre></div></div>
+
+<p>Note that every individual seek, scan, lookup, or update on the specified index by one query execution is counted as a use of that index and increments the corresponding counter in this view. Information is reported both for operations caused by user-submitted queries, and for operations caused by internally generated queries, such as scans for gathering statistics.</p>
+<p>The user_updates counter indicates the level of maintenance on the index caused by insert, update, or delete operations on the underlying table or view. You can use this view to determine which indexes are used only lightly all by your applications. You can also use the view to determine which indexes are incurring maintenance overhead. You may want to consider dropping indexes that incur maintenance overhead, but are not used for queries, or are only infrequently used for queries.</p>
+<p>That is it for SQL Advent 2011, come back tomorrow for the recap and I will also have a post pointing to my SQL 2012 posts so that you can look at what is coming in the next year</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/index-rebuild-and-reorganize-sql/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2011 Day 20: Indexes with Included Columns</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-20/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-20/#comments</comments>
+		<pubDate>Wed, 21 Dec 2011 00:08:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[index]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-20/</guid>
+		<description><![CDATA[Today we are going to take a look at Indexes With Included Columns
+
+SELECT * INTO Test2 FROM sys.objects
+
+
+
+CREATE INDEX ix_Test1 ON Test1(type,is_ms_shipped)
+
+
+SELECT type,is_ms_shipped 
+FROM Test1
+WHERE type = 's'
+AND is_ms_shipped = 1
+
+plan1
+
+SELECT type,is_ms_shi&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>Today we are going to take a look at <strong>Indexes With Included Columns</strong><br />
+When you use Indexes With Included Columns you can do two things that you cannot do with regular non clustered indexes<br />
+1) You can go over the 900 byte limit<br />
+2) You can use data types not allowed as index key columns</p>
+<p>By including nonkey columns, you can create nonclustered indexes that cover more queries. To learn more about covering indexes, take a look at <a href="/index.php/DataMgmt/DataDesign/sql-server-covering-indexes">SQL Server covering indexes</a> written by George Mastros</p>
+<p>Let&#8217;s get started to see what I mean, first create these two identical tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">INTO</span> Test1 <span class="kw1">FROM</span> sys.<span class="me1">objects</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">INTO</span> Test2 <span class="kw1">FROM</span> sys.<span class="me1">objects</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * INTO Test1 FROM sys.objects
+
+SELECT * INTO Test2 FROM sys.objects</pre></div></div>
+
+<p>Now create this index on the  Test1 table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">INDEX</span> ix_Test1 <span class="kw1">ON</span> Test1<span class="br0">&#40;</span>type,is_ms_shipped<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE INDEX ix_Test1 ON Test1(type,is_ms_shipped)</pre></div></div>
+
+<p>Running a simple query reveals a seek</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> type,is_ms_shipped 
+<span class="kw1">FROM</span> Test1
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'s'</span>
+<span class="sy0">AND</span> is_ms_shipped <span class="sy0">=</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT type,is_ms_shipped 
+FROM Test1
+WHERE type = 's'
+AND is_ms_shipped = 1</pre></div></div>
+
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/IncludedPlan1.PNG?mtime=1324349640"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/IncludedPlan1.PNG?mtime=1324349640" width="680" height="197" /></a></div>
+<p></p>
+<p>Now let&#8217;s add the name  column to the columns returned or to the WHERE clause</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> type,is_ms_shipped,name 
+<span class="kw1">FROM</span> Test1
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'s'</span>
+<span class="sy0">AND</span> is_ms_shipped <span class="sy0">=</span> <span class="nu0">1</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> type,is_ms_shipped 
+<span class="kw1">FROM</span> Test1
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'s'</span>
+<span class="sy0">AND</span> is_ms_shipped <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="sy0">AND</span> name <span class="sy0">LIKE</span> <span class="st0">'s%'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT type,is_ms_shipped,name 
+FROM Test1
+WHERE type = 's'
+AND is_ms_shipped = 1
+
+
+SELECT type,is_ms_shipped 
+FROM Test1
+WHERE type = 's'
+AND is_ms_shipped = 1
+AND name LIKE 's%'</pre></div></div>
+
+<p><a href="/wp-content/uploads/blogs/DataMgmt/Denis/IncludedPlan2.PNG?mtime=1324349656"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/IncludedPlan2.PNG?mtime=1324349656" width="779" height="270" /></a></p>
+<p>As you can see, we get a scan now, this is because the index is not covering the query</p>
+<p>Create the following index on the Test2 table, as you can see the only difference bwteween the index on the Test1 table is that it has the name as an included column</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">INDEX</span> ix_Test2 <span class="kw1">ON</span> Test2<span class="br0">&#40;</span>type,is_ms_shipped<span class="br0">&#41;</span> <span class="sy0">IN</span>CLUDE <span class="br0">&#40;</span>name<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE INDEX ix_Test2 ON Test2(type,is_ms_shipped) INCLUDE (name)</pre></div></div>
+
+<p>Running the first query where the name is in the WHERE clause against the Test2 and the Test1 table shows much better performance for the index with the included column, this is of course expected</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> type,is_ms_shipped 
+<span class="kw1">FROM</span> Test2
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'s'</span>
+<span class="sy0">AND</span> is_ms_shipped <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="sy0">AND</span> name <span class="sy0">LIKE</span> <span class="st0">'s%'</span>
+&nbsp;
+<span class="kw1">SELECT</span> type,is_ms_shipped 
+<span class="kw1">FROM</span> Test1
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'s'</span>
+<span class="sy0">AND</span> is_ms_shipped <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="sy0">AND</span> name <span class="sy0">LIKE</span> <span class="st0">'s%'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT type,is_ms_shipped 
+FROM Test2
+WHERE type = 's'
+AND is_ms_shipped = 1
+AND name LIKE 's%'
+
+SELECT type,is_ms_shipped 
+FROM Test1
+WHERE type = 's'
+AND is_ms_shipped = 1
+AND name LIKE 's%'</pre></div></div>
+
+<p></p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/IncludedPlan3.PNG?mtime=1324349666"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/IncludedPlan3.PNG?mtime=1324349666" width="815" height="276" /></a></div>
+<p></p>
+<p>As you can see, we get an index seek now for the table with the index that has included columns</p>
+<p>Running the second query where the name is in the WHERE clause as well as returned in the results against the Test2 and the Test1 table shows much better performance for the index with the included column, this is of course expected</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> type,is_ms_shipped,name 
+<span class="kw1">FROM</span> Test2
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'s'</span>
+<span class="sy0">AND</span> is_ms_shipped <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="sy0">AND</span> name <span class="sy0">LIKE</span> <span class="st0">'s%'</span>
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> type,is_ms_shipped,name 
+<span class="kw1">FROM</span> Test1
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'s'</span>
+<span class="sy0">AND</span> is_ms_shipped <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="sy0">AND</span> name <span class="sy0">LIKE</span> <span class="st0">'s%'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT type,is_ms_shipped,name 
+FROM Test2
+WHERE type = 's'
+AND is_ms_shipped = 1
+AND name LIKE 's%'
+
+
+
+SELECT type,is_ms_shipped,name 
+FROM Test1
+WHERE type = 's'
+AND is_ms_shipped = 1
+AND name LIKE 's%'</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/IncludedPlan4.PNG?mtime=1324349678"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/IncludedPlan4.PNG?mtime=1324349678" width="853" height="282" /></a></div>
+<p>And we get a seek as well for the table with the index that has included columns</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-20/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2011 Day 19: Filtered Indexes</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-19/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-19/#comments</comments>
+		<pubDate>Mon, 19 Dec 2011 09:38:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-19/</guid>
+		<description><![CDATA[Today we are going to take a look at Filtered Indexes. A filtered index is an optimized nonclustered index, the filtered index will be based on a WHERE clause, thus this index will cover your query if your query has the same WHERE clause]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>Today we are going to take a look at <strong>Filtered Indexes</strong>. A filtered index is an optimized nonclustered index, the filtered index is based on a WHERE clause, thus this index will cover your query if your query has the same WHERE clause</p>
+<p>We are going to create a table and populate it with 52048 rows, 50000 will be null and the rest will be numbered between 0 and 2047. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestFiltered<span class="br0">&#40;</span>id <span class="kw1">INT</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="co1">--insert numbers between 0 and 2047</span>
+<span class="kw1">INSERT</span> TestFiltered
+<span class="kw1">SELECT</span> number
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> TYPE <span class="sy0">=</span> <span class="st0">'p'</span>
+&nbsp;
+&nbsp;
+<span class="co1">-- add 50000 NULLS</span>
+<span class="kw1">INSERT</span> TestFiltered
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">50000</span> <span class="sy0">NULL</span> <span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span> s1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> s2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> s3</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestFiltered(id INT)
+GO
+
+--insert numbers between 0 and 2047
+INSERT TestFiltered
+SELECT number
+FROM master..spt_values
+WHERE TYPE = 'p'
+
+
+-- add 50000 NULLS
+INSERT TestFiltered
+SELECT TOP 50000 NULL FROM sys.sysobjects s1
+CROSS JOIN sys.sysobjects s2
+CROSS JOIN sys.sysobjects s3</pre></div></div>
+
+<p>Now we will create an identical table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">INTO</span> TestFiltered2 <span class="kw1">FROM</span> TestFiltered</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * INTO TestFiltered2 FROM TestFiltered</pre></div></div>
+
+<p>We are adding a simple non clustered index on the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> ix_TestFiltered <span class="kw1">ON</span> TestFiltered<span class="br0">&#40;</span>id<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX ix_TestFiltered ON TestFiltered(id)
+GO</pre></div></div>
+
+<p>We are adding a filtered index on the second table, notice that the create statement is almost identical, all we have added really is the WHERE clause</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> ix_TestFiltered2 <span class="kw1">ON</span> TestFiltered2<span class="br0">&#40;</span>id<span class="br0">&#41;</span>
+<span class="kw1">WHERE</span> id <span class="kw1">IS</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX ix_TestFiltered2 ON TestFiltered2(id)
+WHERE id IS NOT NULL
+GO</pre></div></div>
+
+<p>Now, let&#8217;s select all rows where the id is not null, you will get back 2048 rows for each query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestFiltered
+<span class="kw1">WHERE</span> id <span class="kw1">IS</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestFiltered2
+<span class="kw1">WHERE</span> id <span class="kw1">IS</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestFiltered
+WHERE id IS NOT NULL
+
+
+SELECT * FROM TestFiltered2
+WHERE id IS NOT NULL</pre></div></div>
+
+<p>Here is what the execution plan looks like</p>
+<div class="image_block"><a href="/wp-content/uploads/users/SQLDenis/FilteredIndex.PNG?mtime=1324242874"><img alt="" src="/wp-content/uploads/users/SQLDenis/FilteredIndex.PNG?mtime=1324242874" width="440" height="265" /></a></div>
+<p>As you can see the filtered index performs better. What if we select where it is null instead of not null?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestFiltered
+<span class="kw1">WHERE</span> id <span class="kw1">IS</span> &nbsp;<span class="sy0">NULL</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestFiltered2
+<span class="kw1">WHERE</span> id <span class="kw1">IS</span> &nbsp;<span class="sy0">NULL</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestFiltered
+WHERE id IS  NULL
+
+
+SELECT * FROM TestFiltered2
+WHERE id IS  NULL</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/users/SQLDenis/FilteredIndex2.PNG?mtime=1324244922"><img alt="" src="/wp-content/uploads/users/SQLDenis/FilteredIndex2.PNG?mtime=1324244922" width="460" height="305" /></a></div>
+<p>That plan looks a little better also.</p>
+<p>Take a look at IO, even the reads look better</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> <span class="kw1">STATISTICS</span> IO <span class="kw1">ON</span>
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestFiltered
+<span class="kw1">WHERE</span> id <span class="kw1">IS</span> &nbsp;<span class="sy0">NULL</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestFiltered2
+<span class="kw1">WHERE</span> id <span class="kw1">IS</span> &nbsp;<span class="sy0">NULL</span>
+&nbsp;
+<span class="kw1">SET</span> <span class="kw1">STATISTICS</span> IO &nbsp;<span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET STATISTICS IO ON
+GO
+
+SELECT * FROM TestFiltered
+WHERE id IS  NULL
+
+
+SELECT * FROM TestFiltered2
+WHERE id IS  NULL
+
+SET STATISTICS IO  OFF
+GO</pre></div></div>
+
+<p><em>(50000 row(s) affected)<br />
+Table &#8216;TestFiltered&#8217;. Scan count 1, logical reads <strong>114</strong></p>
+<p>(50000 row(s) affected)<br />
+Table &#8216;TestFiltered2&#8217;. Scan count 1, logical reads <strong>84</strong></em></p>
+<p>How much space does a filtered index like this use compared to a regular index. Look at the storage difference</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">exec</span> <span class="kw3">sp_spaceused</span> <span class="st0">'TestFiltered'</span>
+<span class="kw1">exec</span> <span class="kw3">sp_spaceused</span> <span class="st0">'TestFiltered2'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">exec sp_spaceused 'TestFiltered'
+exec sp_spaceused 'TestFiltered2'</pre></div></div>
+
+<pre>name		rows	reserved	data	index_size	unused
+-------------   ------  ----------  -------     -----------       -----
+TestFiltered	52048   1744 KB	     672 KB	952 KB		120 KB
+TestFiltered2	52048    768 KB	     672 KB	 64 KB		32 KB</pre>
+<p>As you can see the table with the filtered index is much smaller in size, the index is 14 times smaller</p>
+<p>An index like this is very useful when you have columns that are nullable and a large percentage of the values are NULL, when you run a report in general you want to see the values, a filtered index will be very useful with that.</p>
+<p>Here are some advantages that filtered indexes have over regular indexes according to Books On Line</p>
+<blockquote><p><strong>Filtered indexes can provide the following advantages over full-table indexes:</strong></p>
+<p><strong>Improved query performance and plan quality</strong></p>
+<p>A well-designed filtered index improves query performance and execution plan quality because it is smaller than a full-table nonclustered index and has filtered statistics. The filtered statistics are more accurate than full-table statistics because they cover only the rows in the filtered index.</p>
+<p><strong>Reduced index maintenance costs</strong></p>
+<p>An index is maintained only when data manipulation language (DML) statements affect the data in the index. A filtered index reduces index maintenance costs compared with a full-table nonclustered index because it is smaller and is only maintained when the data in the index is affected. It is possible to have a large number of filtered indexes, especially when they contain data that is affected infrequently. Similarly, if a filtered index contains only the frequently affected data, the smaller size of the index reduces the cost of updating the statistics.</p>
+<p><strong>Reduced index storage costs</strong></p>
+<p>Creating a filtered index can reduce disk storage for nonclustered indexes when a full-table index is not necessary. You can replace a full-table nonclustered index with multiple filtered indexes without significantly increasing the storage requirements.
+</p></blockquote>
+<p>Look up filtered indexes in Book On Line and play around with them to see if they will be beneficial in your database</p>
+<p>That is it for today&#8217;s post, come back tomorrow to learn about indexes with included columns.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-19/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Do you use disable index or drop index when running your ETL processes in SQL Server</title>
+		<link>/index.php/datamgmt/dbprogramming/do-you-use-disable-index-or-drop-index-w/</link>
+		<comments>/index.php/datamgmt/dbprogramming/do-you-use-disable-index-or-drop-index-w/#respond</comments>
+		<pubDate>Wed, 21 Apr 2010 15:32:40 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[question]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/04/do-you-use-disable-index-or-drop-index-w/</guid>
+		<description><![CDATA[There are certain operations where dropping an index, loading data and then again creating the index can speed up data loading. SQL server 2005 introduced a way to disable an index. Let&#8217;s take a look, first create this table T-SQL1 Create table TestIndex &#40;id int, somecol varchar&#40;20&#41;&#41; Create table TestIndex (id int, somecol varchar(20)) Insert [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>There are certain operations where dropping an index, loading data and then again creating the index can speed up data loading. SQL server 2005 introduced a way to disable an index.</p>
+<p>  Let&#8217;s take  a look, first create this table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Create</span> <span class="kw1">table</span> TestIndex <span class="br0">&#40;</span>id <span class="kw1">int</span>, somecol <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Create table TestIndex (id int, somecol varchar(20))</pre></div></div>
+
+<p>Insert a little bit of data</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="kw1">insert</span> <span class="kw1">into</span> TestIndex
+&nbsp; <span class="kw1">select</span> number,<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,<span class="kw2">getdate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="nu0">100</span><span class="br0">&#41;</span>
+&nbsp; <span class="kw1">from</span> master..<span class="me1">spt_values</span>
+&nbsp; <span class="kw1">where</span> type <span class="sy0">=</span> <span class="st0">'p'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  insert into TestIndex
+  select number,CONVERT(varchar(20),getdate(),100)
+  from master..spt_values
+  where type = 'p'</pre></div></div>
+
+<p>Create a nonclustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="kw1">create</span> <span class="kw1">index</span> ix_TestIndex <span class="kw1">on</span> TestIndex<span class="br0">&#40;</span>id,somecol<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  create index ix_TestIndex on TestIndex(id,somecol)</pre></div></div>
+
+<p>Now let&#8217;s disable this index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="kw1">ALTER</span> <span class="kw1">INDEX</span> ix_TestIndex
+&nbsp; <span class="kw1">ON</span> TestIndex
+&nbsp; DISABLE</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  ALTER INDEX ix_TestIndex
+  ON TestIndex
+  DISABLE</pre></div></div>
+
+<p>Now when we run our query against the table and look at the plan we get a table scan</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="kw1">set</span> showplan_text <span class="kw1">on</span>
+&nbsp; go
+&nbsp; <span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestIndex
+&nbsp; go
+&nbsp; <span class="kw1">set</span> showplan_text <span class="kw1">off</span>
+&nbsp; go</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  set showplan_text on
+  go
+  select * from TestIndex
+  go
+  set showplan_text off
+  go</pre></div></div>
+
+<pre>    |--Table Scan(OBJECT:([master].[dbo].[TestIndex]))
+    
+    </pre>
+<p>Now let&#8217;s rebuild the index again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="kw1">ALTER</span> <span class="kw1">INDEX</span> ix_TestIndex
+&nbsp; <span class="kw1">ON</span> TestIndex
+&nbsp; REBUILD</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  ALTER INDEX ix_TestIndex
+  ON TestIndex
+  REBUILD</pre></div></div>
+
+<p>Now we will run the same query again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp;<span class="kw1">set</span> showplan_text <span class="kw1">on</span>
+&nbsp; go
+&nbsp; <span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestIndex
+&nbsp; go
+&nbsp; <span class="kw1">set</span> showplan_text <span class="kw1">off</span>
+&nbsp; go</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">   set showplan_text on
+  go
+  select * from TestIndex
+  go
+  set showplan_text off
+  go</pre></div></div>
+
+<pre> 
+   |--Index Scan(OBJECT:([master].[dbo].[TestIndex].[ix_TestIndex]))
+    </pre>
+<p>As you can see, it uses the index again  </p>
+<p>Now let&#8217;s drop this index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="kw1">drop</span> <span class="kw1">index</span> TestIndex.<span class="me1">ix_TestIndex</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    drop index TestIndex.ix_TestIndex</pre></div></div>
+
+<p> <strong>Is there a difference how disable works between nonclustered and clustered indexes?</strong><br />
+Let&#8217;s take a look, first create this clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">clustered</span> <span class="kw1">index</span> ix_TestIndexClustered <span class="kw1">on</span> TestIndex<span class="br0">&#40;</span>id,somecol<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create clustered index ix_TestIndexClustered on TestIndex(id,somecol)</pre></div></div>
+
+<p>Now let&#8217;s disable this clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="kw1">ALTER</span> <span class="kw1">INDEX</span> ix_TestIndexClustered
+&nbsp; <span class="kw1">ON</span> TestIndex
+&nbsp; DISABLE</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  ALTER INDEX ix_TestIndexClustered
+  ON TestIndex
+  DISABLE</pre></div></div>
+
+<p>And now when we run the query from before</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="kw1">set</span> showplan_text <span class="kw1">on</span>
+&nbsp; go
+&nbsp; <span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestIndex
+&nbsp; go
+&nbsp; <span class="kw1">set</span> showplan_text <span class="kw1">off</span>
+&nbsp; go
+&nbsp; </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  set showplan_text on
+  go
+  select * from TestIndex
+  go
+  set showplan_text off
+  go
+  </pre></div></div>
+
+<p>We get this error<br />
+<em> Msg 8655, Level 16, State 1, Line 1<br />
+The query processor is unable to produce a plan because the index &#8216;ix_TestIndexClustered&#8217; on table or view &#8216;TestIndex&#8217; is disabled.</em></p>
+<p>As you can see while a clustered index is disabled the data is unavailable. Not only that, you can also not insert anything into the table,<br />
+So this query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">insert</span> <span class="kw1">into</span> TestIndex
+<span class="kw1">select</span> <span class="nu0">2</span>,<span class="st0">'Bla'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">insert into TestIndex
+select 2,'Bla'</pre></div></div>
+
+<p>Fails with the same error from before<br />
+<em>Msg 8655, Level 16, State 1, Line 1<br />
+The query processor is unable to produce a plan because the index &#8216;ix_TestIndexClustered&#8217; on table or view &#8216;TestIndex&#8217; is disabled.</em></p>
+<p>If we rebuild the clustered index again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="kw1">ALTER</span> <span class="kw1">INDEX</span> ix_TestIndexClustered
+&nbsp; <span class="kw1">ON</span> TestIndex
+&nbsp; REBUILD</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  ALTER INDEX ix_TestIndexClustered
+  ON TestIndex
+  REBUILD</pre></div></div>
+
+<p>And if we run this query again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="kw1">set</span> showplan_text <span class="kw1">on</span>
+&nbsp; go
+&nbsp; <span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> TestIndex
+&nbsp; go
+&nbsp; <span class="kw1">set</span> showplan_text <span class="kw1">off</span>
+&nbsp; go</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  set showplan_text on
+  go
+  select * from TestIndex
+  go
+  set showplan_text off
+  go</pre></div></div>
+
+<pre>  |--Clustered Index Scan(OBJECT:([master].[dbo].[TestIndex].[ix_TestIndexClustered]))</pre>
+<p>We can see that it does use the clustered index</p>
+<p><strong>My question to you.</strong><br />
+So my question to you people is, do any of you use this instead of drop and create index? One advantage I see is that you don&#8217;t need to update the code that drops and recreates the non clustered index if your index definition changes when using disable index in your ETL process. If you disable a clustered index you can also not insert into the table.</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/do-you-use-disable-index-or-drop-index-w/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL To find Out If An Index Is Clustered Or Non Clustered</title>
+		<link>/index.php/datamgmt/datadesign/t-sql-to-find-out-if-an-index-is-cluster/</link>
+		<comments>/index.php/datamgmt/datadesign/t-sql-to-find-out-if-an-index-is-cluster/#comments</comments>
+		<pubDate>Tue, 06 Oct 2009 16:41:12 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[functions]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[tip]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/10/t-sql-to-find-out-if-an-index-is-cluster/</guid>
+		<description><![CDATA[I saw this question in in Google Analytics from a Google search that hit our site. So, how can you determice if an index is clustered or not? There are two ways, you can use either the INDEXPROPERTY function or the sysindexes/sys.sysindexes system table/view To see how it works we will create a table with [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I saw this question in in Google Analytics from a Google search that hit our site.<br />
+So, how can you determice if an index is clustered or not? There are two ways, you can use either the INDEXPROPERTY function or the sysindexes/sys.sysindexes system table/view</p>
+<p>To see how it works we will create a table with one clustered and one non clustered index on it<br />
+Here is the code for that</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> tempdb
+go
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test <span class="br0">&#40;</span>id <span class="kw1">INT</span>, col1 <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">40</span><span class="br0">&#41;</span>, col2 <span class="kw1">INT</span>, col3 <span class="kw1">INT</span><span class="br0">&#41;</span>
+go
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> &nbsp;<span class="kw1">INDEX</span> ix_test <span class="kw1">ON</span> test <span class="br0">&#40;</span>id <span class="kw1">ASC</span>, col1 <span class="kw1">DESC</span>,col2 <span class="kw1">DESC</span>, col3 <span class="kw1">ASC</span><span class="br0">&#41;</span>
+go
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> &nbsp;<span class="kw1">INDEX</span> ix_test_clust <span class="kw1">ON</span> test <span class="br0">&#40;</span>id <span class="kw1">ASC</span>, col1 <span class="kw1">DESC</span><span class="br0">&#41;</span>
+go</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE tempdb
+go
+ 
+CREATE TABLE Test (id INT, col1 VARCHAR(40), col2 INT, col3 INT)
+go
+
+
+CREATE NONCLUSTERED  INDEX ix_test ON test (id ASC, col1 DESC,col2 DESC, col3 ASC)
+go
+ 
+ 
+CREATE CLUSTERED  INDEX ix_test_clust ON test (id ASC, col1 DESC)
+go</pre></div></div>
+
+<p><strong>INDEXPROPERTY</strong><br />
+To use INDEXPROPERTY you need to know the table ID, the name of the index and use IsClustered for the property. To get the table id, you use the OBJECT_ID function with the table name passed in<br />
+So for the index ix_test on table Test we will use INDEXPROPERTY(OBJECT_ID(&#8216;Test&#8217;), &#8216;ix_test&#8217;,&#8217;IsClustered&#8217;)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="st0">'ix_test'</span>,<span class="kw2">INDEXPROPERTY</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'Test'</span><span class="br0">&#41;</span>, <span class="st0">'ix_test'</span>,<span class="st0">'IsClustered'</span><span class="br0">&#41;</span>
+<span class="kw1">union</span> all
+<span class="kw1">SELECT</span> <span class="st0">'ix_test_clust'</span>,<span class="kw2">INDEXPROPERTY</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'Test'</span><span class="br0">&#41;</span>, <span class="st0">'ix_test_clust'</span>, <span class="st0">'IsClustered'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT 'ix_test',INDEXPROPERTY(OBJECT_ID('Test'), 'ix_test','IsClustered')
+union all
+SELECT 'ix_test_clust',INDEXPROPERTY(OBJECT_ID('Test'), 'ix_test_clust', 'IsClustered')</pre></div></div>
+
+<p></p>
+<pre>Output
+-------------------
+ix_test		0
+ix_test_clust	1</pre>
+<p><strong>SYSINDEXES</strong><br />
+indid holds the information needed to determine if the index is clustered or not<br />
+This info is for SQL Server 2000<br />
+<em>1 = Clustered index<br />
+>1 = Nonclustered<br />
+255 = Entry for tables that have text or image data</em></p>
+<p>This info is for SQL Server 2005 and up</p>
+<p><em>0 = Heap<br />
+1 = Clustered index<br />
+>1 = Nonclustered index</em></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> name,<span class="kw1">case</span> indid <span class="kw1">when</span> <span class="nu0">1</span> <span class="kw1">then</span> <span class="st0">'Clustered'</span> <span class="kw1">else</span> <span class="st0">'Non Clustered'</span> <span class="kw1">end</span> <span class="kw1">as</span> TypeOfIndex
+<span class="kw1">from</span> sysindexes <span class="co1">--or sys.sysindexes on sql 2005 and up</span>
+<span class="kw1">where</span> name in<span class="br0">&#40;</span> <span class="st0">'ix_test'</span>, <span class="st0">'ix_test_clust'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select name,case indid when 1 then 'Clustered' else 'Non Clustered' end as TypeOfIndex
+from sysindexes --or sys.sysindexes on sql 2005 and up
+where name in( 'ix_test', 'ix_test_clust')</pre></div></div>
+
+<p></p>
+<pre>Output
+-----------------------
+name	TypeOfIndex
+ix_test_clust	Clustered
+ix_test	Non Clustered</pre>
+<p>And of course you can combine the two methods</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name,<span class="kw2">INDEXPROPERTY</span><span class="br0">&#40;</span>id, name,<span class="st0">'IsClustered'</span><span class="br0">&#41;</span>
+<span class="kw1">from</span> sysindexes 
+<span class="kw1">where</span> name in<span class="br0">&#40;</span> <span class="st0">'ix_test'</span>, <span class="st0">'ix_test_clust'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name,INDEXPROPERTY(id, name,'IsClustered')
+from sysindexes 
+where name in( 'ix_test', 'ix_test_clust')</pre></div></div>
+
+<p></p>
+<pre>Output
+-------------
+ix_test_clust	1
+ix_test		0</pre>
+<p>As you can see it is pretty easy to determine if an index is a clustered index or a non clustered index. I prefer to use INDEXPROPERTY instead of SYSINDEXES, what about you?</p>
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/t-sql-to-find-out-if-an-index-is-cluster/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+	</channel>
+</rss>

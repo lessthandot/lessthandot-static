@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>limit &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/limit/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2011 Day 9: Dynamic TOP</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-9/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-9/#comments</comments>
+		<pubDate>Fri, 09 Dec 2011 09:01:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[limit]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[tip]]></category>
+		<category><![CDATA[top]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-9/</guid>
+		<description><![CDATA[In my Are you ready for SQL Server 2012 or are you still partying like it is 1999? post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code tha&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>Today we are going to take a look at the TOP operator and find out what has been changed in SQL Server 2005 to make it much better compared to SQL Server 2000. In SQL Server 2000 there are 2 ways you can have a query use a variable to limit the number of rows returned. You can use dynamic SQL or you can use ROWCOUNT</p>
+<p>Let&#8217;s take a look at those methods, here is our regular TOP query which limits the rows to 30</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">30</span> <span class="sy0">*</span> 
+<span class="kw1">FROM</span> sysobjects
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> name</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT TOP 30 * 
+FROM sysobjects
+ORDER BY name</pre></div></div>
+
+<p>If we just change 30 to a variable, we will get an error</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @t <span class="kw1">INT</span>
+<span class="kw1">SELECT</span> @t <span class="sy0">=</span> <span class="nu0">30</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> @t <span class="sy0">*</span> 
+<span class="kw1">FROM</span> sysobjects
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> name</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @t INT
+SELECT @t = 30
+
+SELECT TOP @t * 
+FROM sysobjects
+ORDER BY name</pre></div></div>
+
+<p>Msg 102, Level 15, State 1, Line 2<br />
+Incorrect syntax near &#8216;@t&#8217;.</p>
+<p>One way we can accomplish our goal is by using SET ROWCOUNT, run the query below and you will see that it returns the same results as our first query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @t <span class="kw1">INT</span>
+<span class="kw1">SELECT</span> @t <span class="sy0">=</span> <span class="nu0">30</span>
+&nbsp;
+<span class="kw1">SET</span> ROWCOUNT @t
+&nbsp;
+<span class="kw1">SELECT</span> &nbsp;<span class="sy0">*</span> 
+<span class="kw1">FROM</span> sysobjects
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> name
+&nbsp;
+<span class="kw1">SET</span> ROWCOUNT <span class="nu0">0</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @t INT
+SELECT @t = 30
+
+SET ROWCOUNT @t
+
+SELECT  * 
+FROM sysobjects
+ORDER BY name
+
+SET ROWCOUNT 0</pre></div></div>
+
+<p>Make sure that you set ROWCOUNT back to 0 otherwise all your queries will be limited to 30. You don&#8217;t have this problem when using TOP. Also using SET ROWCOUNT will not affect DELETE, INSERT, and UPDATE statements in the next release of SQL Server, so if you are using it with those DML statements rewrite to use TOP</p>
+<p>Dynamic SQL is another possibility to do a dynamic TOP. Below is what the query looks like, as you can see it is pretty messy.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @t <span class="kw1">int</span> 
+<span class="kw1">DECLARE</span> @<span class="kw1">SQL</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">8000</span><span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> @t <span class="sy0">=</span> <span class="nu0">30</span>
+&nbsp;
+<span class="kw1">SELECT</span> @<span class="kw1">SQL</span> <span class="sy0">=</span> <span class="st0">'SELECT TOP '</span> <span class="sy0">+</span> <span class="kw1">convert</span><span class="br0">&#40;</span><span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,@t<span class="br0">&#41;</span> <span class="sy0">+</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">' * FROM sysobjects ORDER BY name'</span>
+&nbsp;
+<span class="kw1">EXEC</span> <span class="br0">&#40;</span>@<span class="kw1">SQL</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @t int 
+DECLARE @SQL varchar(8000)
+SELECT @t = 30
+
+SELECT @SQL = 'SELECT TOP ' + convert(varchar(20),@t) + 
+			' * FROM sysobjects ORDER BY name'
+
+EXEC (@SQL)</pre></div></div>
+
+<p>
+<h2>Dynamic TOP in SQL Server 2005 and up</h2>
+<p>Okay, you moved all your code to a 2005+ instance and now you are trying to execute the query that used a variable with TOP again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @t <span class="kw1">INT</span>
+<span class="kw1">SELECT</span> @t <span class="sy0">=</span> <span class="nu0">30</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> @t <span class="sy0">*</span> 
+<span class="kw1">FROM</span> sysobjects
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> name</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @t INT
+SELECT @t = 30
+
+SELECT TOP @t * 
+FROM sysobjects
+ORDER BY name</pre></div></div>
+
+<p>Msg 102, Level 15, State 1, Line 2<br />
+Incorrect syntax near &#8216;@t&#8217;.</p>
+<p>Okay, you got the same helpful message as before&#8230;.what can you do?</p>
+<p>In order to use TOP with a variable, you need to enclose the variable in parentheses</p>
+<p>Here is how</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @t <span class="kw1">INT</span>
+<span class="kw1">SELECT</span> @t <span class="sy0">=</span> <span class="nu0">30</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="br0">&#40;</span>@t<span class="br0">&#41;</span> <span class="sy0">*</span> 
+<span class="kw1">FROM</span> sysobjects
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> name</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @t INT
+SELECT @t = 30
+
+
+SELECT TOP (@t) * 
+FROM sysobjects
+ORDER BY name</pre></div></div>
+
+<p>It is as simple as that, it is really trivial now to return a result set where the user can pass in a value for how many results he wants back</p>
+<p>Come back tomorrow for post number 10 in this series</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-9/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+	</channel>
+</rss>

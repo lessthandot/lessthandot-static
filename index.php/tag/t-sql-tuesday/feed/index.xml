@@ -1,0 +1,868 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>t-sql tuesday &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/t-sql-tuesday/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>T-SQL Tuesday #63: How do you manage security</title>
+		<link>/index.php/datamgmt/ssis/t-sql-tuesday-63-how-do-you-manage-security/</link>
+		<comments>/index.php/datamgmt/ssis/t-sql-tuesday-63-how-do-you-manage-security/#comments</comments>
+		<pubDate>Tue, 10 Feb 2015 08:11:04 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[SSIS]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[ssis]]></category>
+		<category><![CDATA[syndicated]]></category>
+		<category><![CDATA[t-sql tuesday]]></category>
+
+		<guid isPermaLink="false">/?p=3165</guid>
+		<description><![CDATA[This month’s T-SQL Tuesday is hosted by Kenneth Fisher (blog &#124; twitter) and its subject is about security. Security is one of those subjects that most DBAs have to deal with regardless of specialty. So as something we all have to work with at some point or another what are some tips you’d like to [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify"><a href="http://sqlstudies.com/2015/02/03/tsql-tuesday-63-how-do-you-manage-security/"><img style="float: left;margin: 0px 10px 0px 10px" src="/wp-content/uploads/2014/01/TSQL2sday.png" alt="TSQL2sday" width="133" height="134" /></a>This month’s T-SQL Tuesday is hosted by Kenneth Fisher (<a href="http://sqlstudies.com/">blog </a>| <a href="https://twitter.com/sqlstudent144">twitter</a>) and its subject is about security.</p>
+<p style="text-align: justify"><em>Security is one of those subjects that most DBAs have to deal with regardless of specialty. So as something we all have to work with at some point or another what are some tips you’d like to share? What’s the best security design? You’ve picked up a legacy system and the security is awful, how do you fix it? Any great tools out there you’d like to share? Hate it or love it I’m betting we all have something to say.</em></p>
+<p style="text-align: justify">Now, I’m not exactly a DBA but even ETL developers have to deal with security from time to time. In this blog post, I’d like to talk about the built-in security of the SSIS packages. You see, SSIS packages can store sensitive data inside them, such as the passwords for the connection managers for example. In order to protect that information, SSIS uses <a href="https://msdn.microsoft.com/en-us/library/ms141747.aspx">protection levels</a> which is a package-level property. These are the available protection levels:</p>
+<ul style="text-align: justify">
+<li><strong>DontSaveSensitive</strong>, which is my personal favorite as it forces you to use either configurations or parameters.</li>
+<li><strong>EncryptSensitiveWithPassword</strong>. Other people can still open the package if they don&#8217;t have the password,  but the passwords in the connection managers are lost and need to be re-entered..</li>
+<li><strong>EncryptAllWithPassword</strong>, for the paranoia people.</li>
+<li><strong>EncryptSensitiveWithUserKey</strong>, which is the default. And as usual, they choose the absolute worst choice as the default. This setting basically means only you can access the sensitive data. Real peachy when you are in a team with multiple developers. Other developers can still open the package (then ignore a few warnings) but they have to re-enter all the passwords in the connection managers.</li>
+<li><strong>EncryptAllWithUserKey</strong>, when you are really possessive over your packages.</li>
+<li><strong>ServerStorage</strong>. When you deploy a package to the server, you trust SQL Server in protecting the sensitive data. This is default when you deploy packages to the SSIS catalog with the project deployment model.</li>
+</ul>
+<p style="text-align: justify">Protection levels were really important before SSIS 2012, as they specified how sensitive data was protected. However, the default of EncryptSensitiveWithUserKey is a really crappy one. If you schedule a package with this protection level using SQL Server Agent, the package can still run if there is no actual sensitive data in the package, but a lot of unnecessary warnings are generated. It&#8217;s best to avoid this protection level at all costs.</p>
+<p style="text-align: justify">Protecting the package with a password is a good option. However, when deploying the package with the package deployment model (or every version of SSIS before 2012), you had to enter the password when you were scheduling the package with Agent. This means though that the password is stored in MSDB, so it isn&#8217;t that secure. My advice is to use DontSaveSensitive and store sensitive information inside a SQL Server configuration table.</p>
+<p style="text-align: justify">With the project deployment model however, configurations are gone. They are replaced with parameters and environments. Since parameters are configured inside the package or project, this means the sensitive data is stored inside the package again. In this case it makes sense to protect the package with a password if needed. There is no issue on the server side, since the protection level is automatically converted to ServerStorage during deployment. Keep in mind that all the packages and the project itself need to have the same protection level, otherwise you get an error when the .ispac file is built.</p>
+<p style="text-align: justify">Conclusion:</p>
+<ul style="text-align: justify">
+<li>when using earlier version of SSIS or when using the package deployment: the DontSaveSensitive protection level in combination with a configuration table is the most secure option.</li>
+<li>when using the project deployment model: use parameters and environments to replace the configurations. Protect the package with a password if you want to secure those parameters.</li>
+</ul>
+<p style="text-align: justify">Note:<br />
+when using Windows Authentication for all sources and destinations, there is almost nothing to be secured in a package. Obviously, this is even more secure.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/ssis/t-sql-tuesday-63-how-do-you-manage-security/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #54: An Interview Invitation</title>
+		<link>/index.php/uncategorized/t-sql-tuesday-52-an-interview-invitation/</link>
+		<comments>/index.php/uncategorized/t-sql-tuesday-52-an-interview-invitation/#comments</comments>
+		<pubDate>Tue, 13 May 2014 06:50:59 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Professional Development]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[interview]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[syndicated]]></category>
+		<category><![CDATA[t-sql tuesday]]></category>
+
+		<guid isPermaLink="false">/?p=2617</guid>
+		<description><![CDATA[It’s time for another T-SQL Tuesday! This month’s blog party is hosted by Boris Hristov (blog &#124; twitter) and the subject is about interviews and hiring. First I thought about writing a rant about the beginning of every interview and hiring process: recruiters. You can’t live with them and you can live without them. But [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify"><a href="http://borishristov.com/blog/t-sql-tuesday-54-interview-invitation/"><img class="alignnone size-full wp-image-2241" alt="TSQL2sday" src="/wp-content/uploads/2014/01/TSQL2sday.png" width="133" height="134" /></a></p>
+<p style="text-align: justify"><span style="line-height: 1.5em">It’s time for another T-SQL Tuesday! This month’s blog party is hosted by Boris Hristov (</span><a style="line-height: 1.5em" href="http://borishristov.com/blog/">blog</a><span style="line-height: 1.5em"> | </span><a style="line-height: 1.5em" href="https://twitter.com/BorisHristov">twitter</a><span style="line-height: 1.5em">) and the subject is about </span><a style="line-height: 1.5em" href="http://borishristov.com/blog/t-sql-tuesday-54-interview-invitation/">interviews and hiring</a><span style="line-height: 1.5em">.</span></p>
+<p style="text-align: justify">First I thought about writing a rant about the beginning of every interview and hiring process: recruiters. You can’t live with them and you can live without them. But I noticed     James Serra (<a href="http://www.jamesserra.com/">blog</a> | <a href="https://twitter.com/JamesSerra">twitter</a>) has already written extensively <a href="http://www.jamesserra.com/archive/2013/06/low-rate-recruiters-the-bane-of-my-existence/">about this subject</a>. Then I considered writing about all of those crazy job adverts that are floating around, but Thomas LaRock (<a href="http://thomaslarock.com/">blog</a> | <a href="https://twitter.com/SQLRockstar">twitter</a>) has already covered this <a href="http://thomaslarock.com/2010/09/a-better-dba-job-description-for-everyone/">nicely</a>.</p>
+<p style="text-align: justify">So I kept on thinking and finally decided to brainstorm about interview questions. More specifically, what questions would I ask if I conducted a technical interview with a potential business intelligence developer?</p>
+<p style="text-align: justify">First of all, I believe you have to adjust your questions to the expected level of the person being interviewed. If you interview a junior person, I wouldn’t start asking how they would implement partition switching in order to speed up the bulk loading of a fact table. If they claim to be senior, you can bring out the big guns after a while. Note I mentioned “after a while”. I would start asking basic questions to test their knowledge and then gradually move on to the more difficult stuff. Immediately starting with insane questions to make your conversation partner nervous or uncomfortable is just bad form in my opinion.</p>
+<p style="text-align: justify">These are the main subject areas I would test:</p>
+<ul style="text-align: justify">
+<li>SSIS (of course). Although some people think of business intelligence just as creating some dashboards and reports, the data has to be there as well. A working knowledge of SSIS is always useful. I’d start with basic questions – what is the data flow and the control flow – and then work myself up to more advanced, broader questions, such as “how would you implement custom logging or restartability in your packages?”.</li>
+<li>Data warehouses. Architectures and modelling, that kind of stuff. I don’t expect everyone to recite the differences between Kimball, Inmon and data vaults, but I do expect that there is a basic knowledge about facts, dimensions, star schema versus snowflake and so on (except for very junior people). If a person seems to be well versed in architecting data warehouses, you could go deeper such as for example on the different types of slowly changing dimensions (mini dimensions, outriggers, that kind of stuff. It should provide good discussions) or how to index a data warehouse.</li>
+<li>T-SQL. Every BI developer that calls himself worthy should know a fair bit of SQL. If it is not for the ETL process, it is for writing reports. Start with the basics (how do you remove duplicates), to more advanced (windowing functions for example). I wouldn’t go to deep here (I’m not an expert myself), but I think I would dare to give the interviewee a cursor and ask how they would optimize it.</li>
+<li>SSAS. I would stay fairly high level on this one. I think you can notice fairly quick if someone knows their way around SSAS or not. I probably would never ask about MDX, DAX or DMX. That would be cruel.</li>
+<li>SSRS. Again fairly high level questions I think. Maybe because I’m more of an ETL developer and I don’t deal with SSRS all the time. I do expect people how to work with shared data sets and shared data sources. A possible scenario to ask in the interview is to give them a slow running report and ask them to optimize it (put filters in the query instead of the report for example).</li>
+<li>Data Visualizations Tools. Microsoft has a lot of choices: Excel, SSRS, Power View and PerformancePoint. It might be a good idea to propose some scenarios and ask which tool they would use and why.</li>
+<li>SQL Server itself. It depends on the position, but usually I deal with some light SQL Server administration and development. How to use stored procedures and functions, how to create a database (and which default settings they would change), how to back up a database and so on. Another question would be how they would optimize a database to support bulk loading of data.</li>
+</ul>
+<p style="text-align: justify">If I’m in a really bad mood, I could ask about SharePoint integration <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /> Anyway, questions can test for knowledge and experience, but passion and personality are very important as well. I don&#8217;t really care if someone can&#8217;t recite all the protection levels in SSIS, these can easily be found with a search engine.<br />
+But in the end, I’ll let the interview depend on this crucial question: would you use a bar chart or a pie chart?</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/t-sql-tuesday-52-an-interview-invitation/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #44: The second chance</title>
+		<link>/index.php/itprofessionals/professionaldevelopment/t-sql-tuesday-44-the/</link>
+		<comments>/index.php/itprofessionals/professionaldevelopment/t-sql-tuesday-44-the/#comments</comments>
+		<pubDate>Tue, 09 Jul 2013 07:55:00 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Consulting]]></category>
+		<category><![CDATA[Professional Development]]></category>
+		<category><![CDATA[consulting]]></category>
+		<category><![CDATA[syndicated]]></category>
+		<category><![CDATA[t-sql tuesday]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/07/t-sql-tuesday-44-the/</guid>
+		<description><![CDATA[My contribution to T-SQL Tuesday #44.]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify;"><a href="http://www.sqlballs.com/2013/07/t-sql-tuesday-44-second-chance.html"><img style="float: left; margin-top: 0px; margin-bottom: 0px; margin-left: 10px; margin-right: 10px;" src="/wp-content/uploads/users/koenverbeeck/TSQL2sday37/TSQL2sday.PNG?mtime=1355209029" alt="" width="133" height="134" /></a></p>
+<p style="text-align: justify;">This month’s T-SQL Tuesday is hosted by Bradly Ball (<a href="http://www.sqlballs.com/">blog</a> | <a href="https://twitter.com/SQLBalls">twitter</a>) and the topic is second chances. The idea is to pick one of those moments in our career we wish we could do once again. A second chance to make it all better, or at least to make us sleep a little better at night. So here goes…</p>
+<p style="text-align: justify;"><span style="text-align: justify;">Almost 6 years ago I left the university with a fresh degree in my pocket but of course with no actual knowledge of how the world turns. I immediately started – well, after a few weeks of travelling – at my first job: I was an IT consultant! At the time I had almost no technical skills (some argue this is still the case, but I digress <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /> and at first I didn’t really felt the desire to get dirty with the technical side. So I spent some time at the business side of IT. My first project I got was at a government firm and we all know how that can be. The problem was: most of the time I didn’t have enough work to keep myself 100% occupied. Being my first real job ever, I didn’t really know how to handle the situation. Sure, it might seem “cool” to surf the net on the job, but trust me, it gets boring real fast. Needless to say, I wasted quite some time at that job not really employing myself or honing my skills and that time will never come back. It didn’t really cheer me up at the time.</span></p>
+<p style="text-align: justify;">So here’s my wish for that second chance: maybe I would like to do that time again, but with the knowledge I have today. I could be more proactive: talk to my manager about the lack of work; how I could spent my time on side-projects or trying new stuff out. I could try to get more technical as I do now with SQL Server, I could write a blog or articles like I do now, I could do so much more in order to improve myself. I know now for sure that if I ever get into a similar situation, I could be way more productive. But that time is never coming back. Am I sad about it? No. That experience was part of my learning curve. Part of my growth process and it made me what I am today and what I will become in the future. You can only appreciate the heights you achieve, if you know the depths you can go through…</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/professionaldevelopment/t-sql-tuesday-44-the/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #37: Join me in a month of Joins</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-tuesday-37-join/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-tuesday-37-join/#comments</comments>
+		<pubDate>Tue, 11 Dec 2012 05:25:00 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Oracle]]></category>
+		<category><![CDATA[joins]]></category>
+		<category><![CDATA[oracle]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[t-sql tuesday]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/t-sql-tuesday-37-join/</guid>
+		<description><![CDATA[ 
+This month’s T-SQL Tuesday is hosted by Sebastian Meine (blog &#124; twitter) and the topic is joins. He has a whole month worth of topics about joins: A Join A Day – Introduction.
+
+My blog post is about something weird I encountered while&#8230;]]></description>
+				<content:encoded><![CDATA[<p class="MsoNormal" style="text-align: justify;"><span lang="EN-US">This month’s T-SQL Tuesday is hosted by Sebastian Meine (<a href="http://sqlity.net/en/">blog</a> | <a href="https://twitter.com/sqlity">twitter</a>) and the topic is <strong>joins</strong>. He has a whole month worth of topics about joins: <a href="http://sqlity.net/en/1146/a-join-a-day-introduction/">A Join A Day – Introduction</a>.</span></p>
+<p class="MsoNormal" style="text-align: justify;"><span lang="EN-US"> </span></p>
+<div class="image_block"><a href="http://sqlity.net/en/1175/t-sql-tuesday-37-invite-to-join-me-in-a-month-of-joins/"><img style="float: left;" src="/wp-content/uploads/users/koenverbeeck/TSQL2sday37/TSQL2sday.PNG?mtime=1355209029" alt="" width="133" height="134" /></a></div>
+<p> </p>
+<p> </p>
+<p> </p>
+<p> </p>
+<p> </p>
+<p>My blog post is about something weird I encountered while I was converting some old Oracle code to T-SQL (I encounter all sorts of weird stuff in Oracle code, but let’s stay on topic). Amongst all the usual cursor-madness, I stumbled upon this query:</p>
+<pre>SELECT mt1.Column1, mt2.Column2
+FROM [dbo].[MyTable1] mt1, [dbo].[MyTable2] mt2
+WHERE      mt1.[JoinColumn1] (+)= mt2.[JoinColumn1]
+       AND mt1.[JoinColumn2] (+)= mt2.[JoinColumn2]</pre>
+<p><span style="text-align: justify;">The original query was much longer and more complex, but I kept only the necessary parts. I recognised the old-style of writing joins, also known as ANSI-89 joins (read more about them in </span><a style="text-align: justify;" href="http://sqlblog.com/blogs/aaron_bertrand/archive/2009/10/08/bad-habits-to-kick-using-old-style-joins.aspx">Bad habits to kick : using old-style JOINs</a><span style="text-align: justify;">). However, I never came across the type of join designated by a (+)=. Most likely this has something to do what my lack of experience with Oracle, which I am very proud of :). SQL Server didn’t recognise the syntax so it had to be either Oracle only, or something very outdated. I asked about this on Twitter and a few people came up with </span><a style="text-align: justify;" href="http://msdn.microsoft.com/en-us/library/cc645922.aspx">compound operators</a><span style="text-align: justify;"> which were introduced in SQL Server 2008, but luckily Mladen Prajdic (</span><a style="text-align: justify;" href="http://weblogs.sqlteam.com/mladenp/default.aspx">blog</a><span style="text-align: justify;"> | </span><a style="text-align: justify;" href="https://twitter.com/MladenPrajdic">twitter</a><span style="text-align: justify;">) vaguely remembered those could be LEFT OUTER JOINs.</span></p>
+<p class="MsoNormal"><span lang="EN-US"><em>* UPDATE:  Apparently this syntax coresponds with RIGHT OUTER JOIN. For more info, see Robs comment below *</em></span></p>
+<p class="MsoNormal"><span lang="EN-US">And he was right. After some Googling I found this Oracle doc page: <a href="http://docs.oracle.com/cd/B19306_01/server.102/b14200/queries006.htm">Joins</a>. It is described as the “Oracle join operator”. They advise not to use it, but you know, stuff like this always pops up in legacy code.</span></p>
+<p class="MsoNormal"><span lang="EN-US">So, if you’re converting some old Oracle code (we have to get rid of it once, don’t we?), now you know how to deal with this monstrosity.</span></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-tuesday-37-join/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #016 Grouping Market Data With T-SQL</title>
+		<link>/index.php/datamgmt/datadesign/t-sql-tuesday-016-grouping/</link>
+		<comments>/index.php/datamgmt/datadesign/t-sql-tuesday-016-grouping/#comments</comments>
+		<pubDate>Tue, 08 Mar 2011 10:52:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[grouping]]></category>
+		<category><![CDATA[ranking]]></category>
+		<category><![CDATA[t-sql tuesday]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/03/t-sql-tuesday-016-grouping/</guid>
+		<description><![CDATA[This month's T-SQL Tuesday is hosted by Jes Borland and it is all about grouping and aggregate functions, here is my attempt. I wrote most of this post on my way to the MVP summit in Seattle. This post is all about the stock market, charting data for In&#8230;]]></description>
+				<content:encoded><![CDATA[<p><a href="/index.php/DataMgmt/DBProgramming/come-one-come-all-to"><img src="/wp-content/uploads/blogs/DataMgmt/olap_1.gif" /></a></p>
+<p>This month&#8217;s T-SQL Tuesday is hosted by <a href="/index.php/DataMgmt/?disp=authdir&amp;author=420">Jes Borland</a> and it is all about grouping and aggregate functions, here is my attempt. I wrote most of this post on my way to the MVP summit in Seattle. This post is all about the stock market, charting data for Intraday chart and for end of day charts. This post contains a lot of code and I apologize for that, I just want you to be able to run the code, in order to do that we have to setup all the tables and data.</p>
+<p>Most people think of aggregate/grouping functions being Min, Max, Avg, Sum etc etc. To me Row_number and other ranking/windowing functions, datepart, converting to date, year() and month() can also be considered grouping<br />
+<br />
+When I say <em>intraday</em>, I mean the values that you would see for a stock if you would pull up a chart at 3 PM, in this case it would be a chart from 9:30 AM till 4PM if this was traded on for example the NYSE or NASDAQ.</p>
+<p><em>End of day values</em> are close values, so for example the close price for Apple on March 4 was $360.</p>
+<p>We are going to chart intraday in either 1 day or 5 day charts. If it is one day we will chart in minutes, if it is 5 days we will chart in 5 minute increments.<br />
+For end of day data we are going to chart daily if it is 1 month, 3 months or 6 months and weekly if it is greater than 6 months.</p>
+<p>So to start we are going to make up some tables with some fake data.</p>
+<h3>Preparing the tables and data</h3>
+<p>First we need a table of symbols (some people will call them tickers). This table is very simple, all it has is a SymbolID and a Symbol. In reality this table would look different because sometimes companies will change the symbol, when Sun Microsystems changed from SUNW to JAVA is one such example.<br />
+Here is the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Symbols <span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp;SymbolID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span> <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span>,
+&nbsp; &nbsp; &nbsp; &nbsp;Symbol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Symbols (
+       SymbolID INT NOT NULL PRIMARY KEY,
+       Symbol VARCHAR(20) NOT NULL)</pre></div></div>
+
+<p>We will insert these 4 symbols</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Symbols <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="st0">'ABC'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Symbols <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">2</span>,<span class="st0">'DEF'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Symbols <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">3</span>,<span class="st0">'MNO'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Symbols <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">4</span>,<span class="st0">'XYZ'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Symbols VALUES(1,'ABC')
+INSERT Symbols VALUES(2,'DEF')
+INSERT Symbols VALUES(3,'MNO')
+INSERT Symbols VALUES(4,'XYZ')</pre></div></div>
+
+<p>Next up is the creation of the table of numbers, this will facilitate the creation of the data later on.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Numbers <span class="br0">&#40;</span>number <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span> &nbsp;<span class="kw1">PRIMARY</span> <span class="kw1">KEY</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Numbers (number INT NOT NULL  PRIMARY KEY)
+GO</pre></div></div>
+
+<p>This will populate the table with 90000 rows.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Numbers
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">90000</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> s1.<span class="me1">id</span> <span class="br0">&#41;</span>
+<span class="kw1">FROM</span> sysobjects s1,sysobjects s2,sysobjects s3</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Numbers
+SELECT TOP 90000 ROW_NUMBER() OVER(ORDER BY s1.id )
+FROM sysobjects s1,sysobjects s2,sysobjects s3</pre></div></div>
+
+<p>Next up is a table that will hold some time information</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TempTickTime <span class="br0">&#40;</span> TickTime <span class="kw1">DATETIME</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TempTickTime ( TickTime DATETIME NOT NULL)
+GO</pre></div></div>
+
+<p>This will populate that table with 30 second intervals between 2011-02-28 09:30:30.000 and 2011-03-31 15:30:00.000 only when it is between 9:30 AM and 4 PM</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @StartTime <span class="kw1">DATETIME</span> <span class="sy0">=</span> <span class="st0">'20110228 09:30:00'</span>
+<span class="kw1">INSERT</span> TempTickTime
+<span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>s,number <span class="sy0">*</span> <span class="nu0">30</span>,@StartTime<span class="br0">&#41;</span>
+<span class="kw1">FROM</span> Numbers
+<span class="kw1">WHERE</span> &nbsp;<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">TIME</span>, <span class="kw2">DATEADD</span><span class="br0">&#40;</span>s,number <span class="sy0">*</span> <span class="nu0">30</span>,@StartTime<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="sy0">BETWEEN</span> <span class="st0">'09:30:00.0000000'</span> <span class="sy0">AND</span> <span class="st0">'16:00:00.0000000'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @StartTime DATETIME = '20110228 09:30:00'
+INSERT TempTickTime
+SELECT DATEADD(s,number * 30,@StartTime)
+FROM Numbers
+WHERE  CONVERT(TIME, DATEADD(s,number * 30,@StartTime)) BETWEEN '09:30:00.0000000' AND '16:00:00.0000000'</pre></div></div>
+
+<p>Now when you deal with global markets, some instruments trade Monday through Friday, some of them trade Sunday till Thursday and there are other variations.<br />
+From the 4 tickers we have, two will trade Monday through Friday and two will trade Sunday till Thursday</p>
+<p>Create this table and populate it as follows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TickData <span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp;SymbolID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp;TickTime <span class="kw1">DATETIME</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp;TickPrice <span class="kw1">DECIMAL</span> <span class="br0">&#40;</span><span class="nu0">20</span>,<span class="nu0">10</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SET</span> DATEFIRST <span class="nu0">1</span> <span class="co1">--Default to Sunday as 1</span>
+&nbsp;
+<span class="kw1">INSERT</span> TickData
+<span class="kw1">SELECT</span> SymbolId,tickTime,<span class="nu0">1100</span> <span class="sy0">+</span> <span class="nu0">1</span> <span class="sy0">*</span> <span class="kw2">RAND</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">FLOAT</span>,tickTime<span class="br0">&#41;</span> <span class="sy0">*</span> SymbolId<span class="sy0">/</span><span class="nu0">2.01</span>
+<span class="kw1">FROM</span> TempTickTime t
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> Symbols s
+<span class="kw1">WHERE</span> <span class="kw2">DATEPART</span><span class="br0">&#40;</span>dw,tickTime<span class="br0">&#41;</span> <span class="sy0">BETWEEN</span> <span class="nu0">2</span> <span class="sy0">AND</span> <span class="nu0">6</span> <span class="co1">--Monday till Friday</span>
+<span class="sy0">AND</span> s.<span class="me1">SymbolID</span> <span class="sy0">IN</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">2</span><span class="br0">&#41;</span>
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> tickTime
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TickData
+<span class="kw1">SELECT</span> SymbolId,tickTime,<span class="nu0">1100</span> <span class="sy0">+</span> <span class="nu0">1</span> <span class="sy0">*</span> <span class="kw2">RAND</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">FLOAT</span>,tickTime<span class="br0">&#41;</span> <span class="sy0">*</span> SymbolId<span class="sy0">/</span><span class="nu0">2.01</span>
+<span class="kw1">FROM</span> TempTickTime t
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> Symbols s
+<span class="kw1">WHERE</span> <span class="kw2">DATEPART</span><span class="br0">&#40;</span>dw,tickTime<span class="br0">&#41;</span> <span class="sy0">BETWEEN</span> <span class="nu0">1</span> <span class="sy0">AND</span> <span class="nu0">5</span> <span class="co1">--Sunday till Thursday</span>
+<span class="sy0">AND</span> s.<span class="me1">SymbolID</span> <span class="sy0">IN</span> <span class="br0">&#40;</span><span class="nu0">3</span>,<span class="nu0">4</span><span class="br0">&#41;</span>
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> tickTime</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TickData (
+       SymbolID INT NOT NULL,
+       TickTime DATETIME NOT NULL,
+       TickPrice DECIMAL (20,10) NOT NULL)
+ 
+
+SET DATEFIRST 1 --Default to Sunday as 1
+ 
+INSERT TickData
+SELECT SymbolId,tickTime,1100 + 1 * RAND() * CONVERT(FLOAT,tickTime) * SymbolId/2.01
+FROM TempTickTime t
+CROSS JOIN Symbols s
+WHERE DATEPART(dw,tickTime) BETWEEN 2 AND 6 --Monday till Friday
+AND s.SymbolID IN (1,2)
+ORDER BY tickTime
+ 
+
+INSERT TickData
+SELECT SymbolId,tickTime,1100 + 1 * RAND() * CONVERT(FLOAT,tickTime) * SymbolId/2.01
+FROM TempTickTime t
+CROSS JOIN Symbols s
+WHERE DATEPART(dw,tickTime) BETWEEN 1 AND 5 --Sunday till Thursday
+AND s.SymbolID IN (3,4)
+ORDER BY tickTime</pre></div></div>
+
+<p>What the query does is insert the SymbolID, the ticktime and then a pseudo random value that represents the price. The query also is grouping by day of week by using the DATEPART function.</p>
+<p>We are done with intraday data, next up is end of day</p>
+<p>First create this table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> EODData <span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp;SymbolID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp;SomeDate <span class="kw1">DATETIME</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp;TickPrice <span class="kw1">DECIMAL</span> <span class="br0">&#40;</span><span class="nu0">20</span>,<span class="nu0">10</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp;IsEndOfWeek <span class="kw1">tinyint</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE EODData (
+       SymbolID INT NOT NULL,
+       SomeDate DATETIME NOT NULL,
+       TickPrice DECIMAL (20,10) NOT NULL,
+       IsEndOfWeek tinyint NOT NULL)</pre></div></div>
+
+<p>In the query below we are grabbing the max time per day for a SymbolID and the associated price for that time. We are in essence grouping by SymbolId and Date, since we are ordering by TickTime  descending and we are only grabbing where the ROW value is 1, we will get the latest value for a day.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> CTE <span class="kw1">AS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="sy0">*</span>,
+ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span> <span class="br0">&#40;</span>PARTITION <span class="kw1">BY</span> SymbolId,<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DATE</span>,TickTime<span class="br0">&#41;</span> <span class="kw1">ORDER</span> <span class="kw1">BY</span> TickTime <span class="kw1">DESC</span><span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">ROW</span>
+<span class="kw1">FROM</span> TickData<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">INSERT</span> EODData
+<span class="kw1">SELECT</span> SymbolId,<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DATE</span>,TickTime<span class="br0">&#41;</span>,TickPrice,<span class="nu0">0</span> <span class="kw1">FROM</span> CTE
+<span class="kw1">WHERE</span> <span class="kw1">ROW</span> <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> SymbolID,<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DATE</span>,TickTime<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH CTE AS(SELECT *,
+ROW_NUMBER() OVER (PARTITION BY SymbolId,CONVERT(DATE,TickTime) ORDER BY TickTime DESC) AS ROW
+FROM TickData)
+ 
+INSERT EODData
+SELECT SymbolId,CONVERT(DATE,TickTime),TickPrice,0 FROM CTE
+WHERE ROW = 1
+ORDER BY SymbolID,CONVERT(DATE,TickTime)</pre></div></div>
+
+<p>Here is another way of doing the insert by grouping by SymbolId and converting the TickTime to a date and grabbing the max TickTime for that, with this derived table we join back to the TickData table and do our inserts.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--INSERT EODData</span>
+<span class="kw1">SELECT</span> t.<span class="me1">SymbolId</span>,<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DATE</span>,TickTime<span class="br0">&#41;</span>,TickPrice,<span class="nu0">0</span>
+<span class="kw1">FROM</span> TickData t
+<span class="sy0">JOIN</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">SELECT</span> SymbolId,<span class="kw2">MAX</span><span class="br0">&#40;</span>TickTime<span class="br0">&#41;</span> <span class="kw1">as</span> MaxTime
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">FROM</span> TickData
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">GROUP</span> <span class="kw1">BY</span> SymbolId,<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DATE</span>,TickTime<span class="br0">&#41;</span><span class="br0">&#41;</span> x <span class="kw1">on</span>
+t.<span class="me1">SymbolId</span> <span class="sy0">=</span> x.<span class="me1">SymbolId</span>
+and t.<span class="me1">TickTime</span> <span class="sy0">=</span> &nbsp;x.<span class="me1">MaxTime</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--INSERT EODData
+SELECT t.SymbolId,CONVERT(DATE,TickTime),TickPrice,0
+FROM TickData t
+JOIN(
+       SELECT SymbolId,MAX(TickTime) as MaxTime
+       FROM TickData
+       GROUP BY SymbolId,CONVERT(DATE,TickTime)) x on
+t.SymbolId = x.SymbolId
+and t.TickTime =  x.MaxTime</pre></div></div>
+
+<p>Here is where we do some grouping, in order to grab the last possible value for a week, we need to group by SymbolID, year, month and the week number.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> SymbolId,<span class="kw2">MAX</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span> <span class="kw1">as</span> MaxDate
+<span class="kw1">FROM</span> EODData
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> SymbolId,<span class="kw1">YEAR</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>, <span class="kw1">MONTH</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>,<span class="kw2">DATEPART</span><span class="br0">&#40;</span>wk,SomeDate<span class="br0">&#41;</span>
+<span class="kw1">order</span> <span class="kw1">by</span> SymbolID, MaxDate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT SymbolId,MAX(SomeDate) as MaxDate
+FROM EODData
+GROUP BY SymbolId,YEAR(SomeDate), MONTH(SomeDate),DATEPART(wk,SomeDate)
+order by SymbolID, MaxDate</pre></div></div>
+
+<p>That query produces the following output, as you can see it has the latest value for each week for each symbol.<br />
+</p>
+<div class="tables">
+<table>
+<tr>
+<th>SymbolId</th>
+<th>MaxDate</th>
+</tr>
+<tr>
+<td>1</td>
+<td>2011-03-05 00:00:00.000</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2011-03-12 00:00:00.000</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2011-03-19 00:00:00.000</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2011-03-26 00:00:00.000</td>
+</tr>
+<tr>
+<td>1</td>
+<td>2011-03-31 00:00:00.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2011-03-05 00:00:00.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2011-03-12 00:00:00.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2011-03-19 00:00:00.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2011-03-26 00:00:00.000</td>
+</tr>
+<tr>
+<td>2</td>
+<td>2011-03-31 00:00:00.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2011-02-28 00:00:00.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2011-03-04 00:00:00.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2011-03-11 00:00:00.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2011-03-18 00:00:00.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2011-03-25 00:00:00.000</td>
+</tr>
+<tr>
+<td>3</td>
+<td>2011-03-31 00:00:00.000</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2011-02-28 00:00:00.000</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2011-03-04 00:00:00.000</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2011-03-11 00:00:00.000</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2011-03-18 00:00:00.000</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2011-03-25 00:00:00.000</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2011-03-31 00:00:00.000</td>
+</tr>
+</table>
+</div>
+<p>
+Here is an example of how to join the grouping query to the table so that we can get all the details for the row, we will use this as the basis for our update later on</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> e.<span class="sy0">*</span> <span class="kw1">from</span> EODData e
+join <span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">SELECT</span> SymbolId,<span class="kw2">MAX</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span> <span class="kw1">as</span> MaxDate
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">FROM</span> EODData
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">GROUP</span> <span class="kw1">BY</span> SymbolId,<span class="kw1">YEAR</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>, <span class="kw1">MONTH</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>,<span class="kw2">DATEPART</span><span class="br0">&#40;</span>wk,SomeDate<span class="br0">&#41;</span><span class="br0">&#41;</span> x
+<span class="kw1">on</span> e.<span class="me1">SomeDAte</span> <span class="sy0">=</span> x.<span class="me1">MaxDate</span>
+and e.<span class="me1">SymbolId</span> <span class="sy0">=</span>x.<span class="me1">SymbolId</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT e.* from EODData e
+join (
+       SELECT SymbolId,MAX(SomeDate) as MaxDate
+       FROM EODData
+       GROUP BY SymbolId,YEAR(SomeDate), MONTH(SomeDate),DATEPART(wk,SomeDate)) x
+on e.SomeDAte = x.MaxDate
+and e.SymbolId =x.SymbolId</pre></div></div>
+
+<p>And here is how we update the IsEndOfWeek column with the value 1 for the rows that fall on the end of the week</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> &nbsp;e
+<span class="kw1">SET</span> e.<span class="me1">IsEndOfWeek</span> <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="kw1">FROM</span> EODData e
+<span class="sy0">JOIN</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> SymbolId,<span class="kw2">MAX</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span> <span class="kw1">AS</span> MaxDate
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">FROM</span> EODData
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">GROUP</span> <span class="kw1">BY</span> SymbolId,<span class="kw1">YEAR</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>, <span class="kw1">MONTH</span><span class="br0">&#40;</span>SomeDate<span class="br0">&#41;</span>,<span class="kw2">DATEPART</span><span class="br0">&#40;</span>wk,SomeDate<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="br0">&#41;</span> x
+<span class="kw1">ON</span> e.<span class="me1">SomeDate</span> <span class="sy0">=</span> x.<span class="me1">MaxDate</span>
+<span class="sy0">AND</span> e.<span class="me1">SymbolId</span> <span class="sy0">=</span>x.<span class="me1">SymbolId</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE  e
+SET e.IsEndOfWeek = 1
+FROM EODData e
+JOIN (SELECT SymbolId,MAX(SomeDate) AS MaxDate
+       FROM EODData
+       GROUP BY SymbolId,YEAR(SomeDate), MONTH(SomeDate),DATEPART(wk,SomeDate)
+       ) x
+ON e.SomeDate = x.MaxDate
+AND e.SymbolId =x.SymbolId</pre></div></div>
+
+<h3>Charting end of day values</h3>
+<p>If we chart 1,3 or 6 months we will use daily values</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> EODData
+<span class="kw1">WHERE</span> SymbolId <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> SomeDate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM EODData
+WHERE SymbolId = 1
+ORDER BY SomeDate</pre></div></div>
+
+<p>If we chart anything over 6 months we want to grab weekly values, the query for that is now really simple</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> EODData
+<span class="kw1">WHERE</span> SymbolId <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="sy0">AND</span> IsEndOfWeek <span class="sy0">=</span> <span class="nu0">1</span>
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> SomeDate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM EODData
+WHERE SymbolId = 1
+AND IsEndOfWeek = 1
+ORDER BY SomeDate</pre></div></div>
+
+<h3>Charting intraday data</h3>
+<p>If we want data for a 1 day chart then we are going to grab in 1 minute intervals, if we are going to chart 5 days we will grab in 5 minute chunks.</p>
+<p>There is going to be a lot going on in the following code snippet so I will try to explain it in the comments</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @StartDate <span class="kw1">DATETIME</span> <span class="sy0">=</span> <span class="st0">'2011-03-01 09:30:00.000'</span>
+<span class="kw1">DECLARE</span> @TimeSpan <span class="kw1">INT</span> <span class="sy0">=</span> <span class="nu0">5</span>
+<span class="co1">-- 1 &nbsp;will return 2011-03-31 00:00:00.000</span>
+<span class="co1">-- 5 &nbsp;will return 2011-03-25 00:00:00.000</span>
+&nbsp;
+<span class="co1">--Grab latest 1 or 5 days, we have to account for weekends and markets being closed, this is why we do @TimeSpan * 5</span>
+<span class="co1">-- and then we do top @TimeSpan..which can be 1 or 5</span>
+<span class="co1">-- we convert to date so that we get distinct dates</span>
+<span class="kw1">SELECT</span> &nbsp;<span class="kw1">TOP</span> <span class="br0">&#40;</span>@TimeSpan<span class="br0">&#41;</span> @StartDate <span class="sy0">=</span> Today 
+&nbsp; &nbsp; <span class="kw1">FROM</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span><span class="kw1">SELECT</span> &nbsp;<span class="kw1">DISTINCT</span> <span class="kw1">TOP</span> <span class="br0">&#40;</span>@TimeSpan <span class="sy0">*</span> <span class="nu0">5</span><span class="br0">&#41;</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DATE</span>,TickTime<span class="br0">&#41;</span> <span class="kw1">AS</span> Today
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> dbo.<span class="me1">TickData</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHERE</span> SymbolID <span class="sy0">=</span> &nbsp;<span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> TickTime <span class="sy0">&gt;</span> @StartDate 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ORDER</span> <span class="kw1">BY</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DATE</span>,TickTime<span class="br0">&#41;</span> <span class="kw1">DESC</span><span class="br0">&#41;</span> x
+&nbsp; &nbsp; <span class="kw1">ORDER</span> <span class="kw1">BY</span> Today <span class="kw1">DESC</span>
+&nbsp; &nbsp; 
+&nbsp;
+<span class="co1">--We have t and q for column names because this is being generated as JSON and we want the data to be as small as possible</span>
+<span class="kw1">SELECT</span> 
+&nbsp; &nbsp; t1.<span class="me1">TickTime</span> <span class="kw1">AS</span> t,
+&nbsp; &nbsp; t1.<span class="me1">TickPrice</span> <span class="kw1">AS</span> q
+&nbsp; &nbsp; <span class="kw1">FROM</span> dbo.<span class="me1">TickData</span> t1
+&nbsp; &nbsp; <span class="sy0">JOIN</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span><span class="kw1">SELECT</span> SymbolID, <span class="kw2">MAX</span><span class="br0">&#40;</span>TickTime<span class="br0">&#41;</span> <span class="kw1">AS</span> Ticktime,<span class="kw2">DATEPART</span><span class="br0">&#40;</span>mi,ticktime<span class="br0">&#41;</span> <span class="kw1">AS</span> TickMinute
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> dbo.<span class="me1">TickData</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHERE</span> SymbolID <span class="sy0">=</span> &nbsp;<span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> ticktime <span class="sy0">&gt;=</span> @StartDate
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">GROUP</span> <span class="kw1">BY</span> SymbolID,<span class="kw2">DATEPART</span><span class="br0">&#40;</span>hh,TickTime<span class="br0">&#41;</span>,<span class="kw2">DATEPART</span><span class="br0">&#40;</span>mi,ticktime<span class="br0">&#41;</span>,<span class="kw2">DATEPART</span><span class="br0">&#40;</span>dd,ticktime<span class="br0">&#41;</span><span class="br0">&#41;</span> x
+&nbsp; &nbsp; <span class="kw1">ON</span> x.<span class="me1">SymbolID</span> <span class="sy0">=</span> t1.<span class="me1">SymbolID</span>
+&nbsp; &nbsp; <span class="sy0">AND</span> x.<span class="me1">Ticktime</span> <span class="sy0">=</span> t1.<span class="me1">Ticktime</span>
+&nbsp; &nbsp; <span class="kw1">WHERE</span> t1.<span class="me1">SymbolID</span> <span class="sy0">=</span> <span class="nu0">1</span>
+&nbsp; &nbsp; <span class="sy0">AND</span> TickMinute <span class="sy0">%</span> &nbsp;@TimeSpan <span class="sy0">=</span> <span class="nu0">0</span> &nbsp;<span class="co1">--0nly grab the minutes what the value of @TimeSpan holds</span>
+&nbsp; &nbsp; <span class="kw1">ORDER</span> <span class="kw1">BY</span> t1.<span class="me1">TickTime</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @StartDate DATETIME = '2011-03-01 09:30:00.000'
+DECLARE @TimeSpan INT = 5
+-- 1  will return 2011-03-31 00:00:00.000
+-- 5  will return 2011-03-25 00:00:00.000
+
+--Grab latest 1 or 5 days, we have to account for weekends and markets being closed, this is why we do @TimeSpan * 5
+-- and then we do top @TimeSpan..which can be 1 or 5
+-- we convert to date so that we get distinct dates
+SELECT  TOP (@TimeSpan) @StartDate = Today 
+	FROM
+		(SELECT  DISTINCT TOP (@TimeSpan * 5) CONVERT(DATE,TickTime) AS Today
+		FROM dbo.TickData
+		WHERE SymbolID =  1
+		AND TickTime &gt; @StartDate 
+		ORDER BY CONVERT(DATE,TickTime) DESC) x
+	ORDER BY Today DESC
+	
+
+--We have t and q for column names because this is being generated as JSON and we want the data to be as small as possible
+SELECT 
+	t1.TickTime AS t,
+	t1.TickPrice AS q
+	FROM dbo.TickData t1
+	JOIN
+		(SELECT SymbolID, MAX(TickTime) AS Ticktime,DATEPART(mi,ticktime) AS TickMinute
+		FROM dbo.TickData
+		WHERE SymbolID =  1
+		AND ticktime &gt;= @StartDate
+		GROUP BY SymbolID,DATEPART(hh,TickTime),DATEPART(mi,ticktime),DATEPART(dd,ticktime)) x
+	ON x.SymbolID = t1.SymbolID
+	AND x.Ticktime = t1.Ticktime
+	WHERE t1.SymbolID = 1
+	AND TickMinute %  @TimeSpan = 0  --0nly grab the minutes what the value of @TimeSpan holds
+	ORDER BY t1.TickTime</pre></div></div>
+
+<p>Take a look at this line AND TickMinute %  @TimeSpan = 0<br />
+So basically we are aggregating in 1 or 5 minutes (really whatever @TimeSpan is, if it is 3 then it will be in 3 minute chunks). We are using the % <a href="http://msdn.microsoft.com/en-us/library/ms190279.aspx">(Modulo)</a> operator to accomplish this.</p>
+<p>&#8211;If you run the code above with @TimeSpan = 5, you get data in 5 minute intervals<br />
+DECLARE @TimeSpan INT = 5</p>
+<div class="tables">
+<table>
+<tr>
+<th>t</th>
+<th>q</th>
+</tr>
+<tr>
+<td>2011-03-31 09:30:30.000</td>
+<td>	17132.3582356171</td>
+</tr>
+<tr>
+<td>2011-03-31 09:35:30.000</td>
+<td>	17132.3596056885</td>
+</tr>
+<tr>
+<td>2011-03-31 09:40:30.000</td>
+<td>	17132.3609757598</td>
+</tr>
+<tr>
+<td>2011-03-31 09:45:30.000</td>
+<td>	17132.3623458311</td>
+</tr>
+</table>
+</div>
+<p>&#8211;If you run the code above with @TimeSpan = 1, you get data in 1 minute intervals<br />
+DECLARE @TimeSpan INT = 1</p>
+<div class="tables">
+<table>
+<tr>
+<th>t</th>
+<th>q</th>
+</tr>
+<tr>
+<td>2011-03-31 09:30:30.000</td>
+<td>	17132.3582356171</td>
+</tr>
+<tr>
+<td>2011-03-31 09:31:30.000</td>
+<td>	17132.3585096314</td>
+</tr>
+<tr>
+<td>2011-03-31 09:32:30.000</td>
+<td>	17132.3587836457</td>
+</tr>
+<tr>
+<td>2011-03-31 09:33:30.000</td>
+<td>	17132.3590576599</td>
+</tr>
+<tr>
+<td>2011-03-31 09:34:30.000</td>
+<td>	17132.3593316742</td>
+</tr>
+<tr>
+<td>2011-03-31 09:35:30.000</td>
+<td>	17132.3596056885</td>
+</tr>
+<tr>
+<td>2011-03-31 09:36:30.000</td>
+<td>	17132.3598797027</td>
+</tr>
+</table>
+</div>
+<p>That is it for this post, there is a lot of code but hopefully you can get an idea of what it all does, if you have any questions leave me a comment.</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/t-sql-tuesday-016-grouping/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #13: What the Business Says Is Not What the Business Wants</title>
+		<link>/index.php/datamgmt/datadesign/tsql-tuesday-13/</link>
+		<comments>/index.php/datamgmt/datadesign/tsql-tuesday-13/#comments</comments>
+		<pubDate>Tue, 14 Dec 2010 10:09:43 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[cubes]]></category>
+		<category><![CDATA[olap]]></category>
+		<category><![CDATA[reporting]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[t-sql tuesday]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/12/tsql-tuesday-13/</guid>
+		<description><![CDATA[Steve Jones (Twitter &#124; Blog), The Voice of the DBA, is hosting the T-SQL Tuesday blogging fest over on SQLServerCentral.com this month.  The topic is one that has been a battle between DBAs, Developers and even managers since the creation of computing in the business itself.  It causes heated arguments, career changes, and trips to your psychiatrist and worst of all, more work and over-thinking that is ever needed for some projects.  What the Business Says Is Not What the Business Wants.]]></description>
+				<content:encoded><![CDATA[<p><a href="http://www.sqlservercentral.com/blogs/steve_jones/archive/2010/12/07/t_2D00_sql-tuesday-_2300_13-_2D00_-what-the-business-says-is-not-what-the-business-wants.aspx">
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/olap_1.gif" alt="" title="" width="154" height="154" align="left" /></div>
+<p></a></p>
+<p>Steve Jones (<a href="http://twitter.com/way0utwest">Twitter</a> | <a href="http://www.sqlservercentral.com/blogs/steve_jones/default.aspx">Blog</a>), The Voice of the DBA, is hosting the T-SQL Tuesday blogging fest over on <a href="http://www.sqlservercentral.com/blogs/steve_jones/archive/2010/12/07/t_2D00_sql-tuesday-_2300_13-_2D00_-what-the-business-says-is-not-what-the-business-wants.aspx">SQLServerCentral.com</a> this month.  The topic is one that has been a battle between DBAs, Developers and even managers since the creation of computing in the business itself.  It causes heated arguments, career changes, trips to your psychiatrist and worst of all, more work and over-thinking that is ever needed for some projects.  <i>What the Business Says Is Not What the Business Wants</i>.</p>
+<p><strong>The common theme</strong></p>
+<p>Business is growing, data is growing and your reporting solutions are suffering.  The Business comes to your hard working, Grade A Senior DBA and asks, &#8220;We need cubes and cool software to fix this slow and lame reporting issue we have&#8221;.</p>
+<p>The next steps in your reply to this question are the most critical to your OLTP database servers and countless sleepless nights trying to maintain endless database server problems.</p>
+<p><strong>The Business</strong></p>
+<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/olap_2.gif" alt="" title="" width="67" height="91" align="right" /></div>
+<p>Let’s get something out of the way: Business doesn’t care what you need to do, they want it now and they want exactly what they want.  I’m not against third party reporting solutions, cube generators and so on.  In fact, some of them are brilliant, intuitive and functional tools that are extremely efficient.  I’ve been involved in  decisions to purchase some of them and implement them.  They were all good experiences and successful for the most part.</p>
+<p><strong>Not what they want</strong></p>
+<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/olap_3.gif" alt="" title="" width="160" height="126" align="left" /></div>
+<p>What the business is venturing into here is OLAP (Online Analytical Processing).  OLAP sits on a warehouse (or multiple warehouses).  A warehouse in general is a data source in which one or more OLTP (Online Transaction Processing) data sources have been taken and collected into the centralized data source.  In most cases these OLTP data sources are denormalized for enhanced performance.  Denormalization is the method in which tables that have been normalized to some degree are taken and combined into one larger table.  This is all done while still retaining some integrity in keeping the data free of corruption (or making it dirty).  In all, denormalizing creates a great deal of redundancy.  Redundancy in reporting is normal though.  OLAP database servers are meant to handle this type of design with different configurations and hardware to ensure processing is as fast as possible given the designs.</p>
+<p>Recall the business request of throwing the vendor product into the existing database landscape in order to resolve the reporting issues.  The key that is missing is the need for a warehouse to sit behind that reporting solution.  Without this critical planning and implementation stage, reporting tools will not become a solution but only worsen the already troubled situation.  Now instead of reports that were created and reading from the OLTP sources, there will be cubes processing on-demand, users pulling directly from the OLTP sources with much higher level calculations and resource consumption will start to occur at much greater levels.  </p>
+<p><strong>Give them what they want</strong></p>
+<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/olap_4.gif" alt="" title="" width="109" height="109" align="left" /></div>
+<p>Even if you are one voice in a large data team, it is your job to speak up, knowing the problems that will endure from not properly putting the data source in place that the reporting solutions should be utilizing.  Yes, implementing a warehouse will take months and a large amount of planning and work.  The fact remains, though, that without the proper planning and implementation, your nights will be longer.  As hard as it is to sometimes to remember, business looks to you as a database professional to make the right choices to better the business.  These types of implementations are a large part of that.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/tsql-tuesday-13/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

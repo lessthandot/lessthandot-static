@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>proximity &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/proximity/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Server Distance Calculation Option 3 &#8211; Using the CLR</title>
+		<link>/index.php/datamgmt/dbprogramming/sql-server-distance-calculation-option-3/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sql-server-distance-calculation-option-3/#comments</comments>
+		<pubDate>Wed, 18 Feb 2009 00:42:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[clr]]></category>
+		<category><![CDATA[proximity]]></category>
+		<category><![CDATA[search]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/02/sql-server-distance-calculation-option-3/</guid>
+		<description><![CDATA[In 2005- Version and 2008 Version George and Denis have already shown a couple of great ways to calculate distance between two pairs of latitude/longitude coordinates in SQL Server. In SQL 2005 + there is a third option (Well, it was the second option until 2008 introduced the new Geography data type). SQL 2005 was [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>In <a href="/index.php/DataMgmt/DataDesign/sql-server-zipcode-latitude-longitude-pr">2005- Version</a> and <a href="/index.php/DataMgmt/DataDesign/sql-server-2008-proximity-search-with-th">2008 Version</a> George and Denis have already shown a couple of great ways to calculate distance between two pairs of latitude/longitude coordinates in SQL Server.  In SQL 2005 + there is a third option (Well, it was the second option until 2008 introduced the new Geography data type).  SQL 2005 was the first version of SQL Server to offer CLR integration &#8211; giving developers the ability to write their own functions and stored procs as .NET assemblies.  In addition to opening a whole new world of possibilities to SQL developers, when used wisely these functions/procs will in some cases outperform standard T-SQL, especially when it comes to math and string manipulation.</p>
+<p>So, lets get down to business.  First thing to do is create a class library to hold your functions.  You can do this in C# or VB.net, I won&#8217;t judge.  But I will use C#.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Data</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Data.SqlClient</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Data.SqlTypes</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Microsoft.SqlServer.Server</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw1">partial</span> <span class="kw4">class</span> UserDefinedFunctions
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Server</span><span class="sy0">.</span><span class="me1">SqlFunction</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">double</span> clrDistCalc<span class="br0">&#40;</span><span class="kw4">double</span> long1, <span class="kw4">double</span> lat1, <span class="kw4">double</span> long2, <span class="kw4">double</span> lat2<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">double</span> EarthCircMeters <span class="sy0">=</span> <span class="nu0">40074199.82569710</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">double</span> DeltaX<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">double</span> DeltaY<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">double</span> DeltaXMeters<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">double</span> DeltaYMeters<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">double</span> MetersPerDegreeLong<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">double</span> CenterY<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//calculate distance</span>
+&nbsp; &nbsp; &nbsp; &nbsp; DeltaX <span class="sy0">=</span> Math<span class="sy0">.</span><span class="me1">Abs</span><span class="br0">&#40;</span>long2 <span class="sy0">-</span> long1<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; DeltaY <span class="sy0">=</span> Math<span class="sy0">.</span><span class="me1">Abs</span><span class="br0">&#40;</span>lat2 <span class="sy0">-</span> lat1<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; CenterY <span class="sy0">=</span> <span class="br0">&#40;</span>lat2 <span class="sy0">+</span> lat1<span class="br0">&#41;</span><span class="sy0">/</span><span class="nu0">2</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; MetersPerDegreeLong <span class="sy0">=</span> <span class="br0">&#40;</span>Math<span class="sy0">.</span><span class="me1">Cos</span><span class="br0">&#40;</span>CenterY <span class="sy0">*</span> <span class="br0">&#40;</span><span class="nu0">3.14159265</span><span class="sy0">/</span><span class="nu0">180</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="sy0">*</span> EarthCircMeters<span class="br0">&#41;</span><span class="sy0">/</span><span class="nu0">360</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; DeltaXMeters <span class="sy0">=</span> DeltaX <span class="sy0">*</span> MetersPerDegreeLong<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; DeltaYMeters <span class="sy0">=</span> DeltaY <span class="sy0">*</span> <span class="nu0">111113.519</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> Math<span class="sy0">.</span><span class="me1">Sqrt</span><span class="br0">&#40;</span>Math<span class="sy0">.</span><span class="me1">Pow</span><span class="br0">&#40;</span>DeltaXMeters, <span class="nu0">2</span><span class="br0">&#41;</span> <span class="sy0">+</span> Math<span class="sy0">.</span><span class="me1">Pow</span><span class="br0">&#40;</span>DeltaYMeters, <span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">/</span><span class="nu0">1609.344</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System;
+using System.Data;
+using System.Data.SqlClient;
+using System.Data.SqlTypes;
+using Microsoft.SqlServer.Server;
+
+public partial class UserDefinedFunctions
+{
+    [Microsoft.SqlServer.Server.SqlFunction]
+    public static double clrDistCalc(double long1, double lat1, double long2, double lat2)
+    {
+        double EarthCircMeters = 40074199.82569710;
+        double DeltaX;
+        double DeltaY;
+        double DeltaXMeters;
+        double DeltaYMeters;
+        double MetersPerDegreeLong;
+        double CenterY;
+
+        //calculate distance
+        DeltaX = Math.Abs(long2 - long1);
+        DeltaY = Math.Abs(lat2 - lat1);
+        CenterY = (lat2 + lat1)/2;
+        MetersPerDegreeLong = (Math.Cos(CenterY * (3.14159265/180)) * EarthCircMeters)/360;
+        DeltaXMeters = DeltaX * MetersPerDegreeLong;
+        DeltaYMeters = DeltaY * 111113.519;
+
+        return Math.Sqrt(Math.Pow(DeltaXMeters, 2) + Math.Pow(DeltaYMeters, 2))/1609.344;
+    }
+}</pre></div></div>
+
+<p>I&#8217;ve never tried to optimize this (it is pretty fast as is), but I am sure it is easily doable.  The important thing to notice here is the additional namespace directives (past System).  These allow you to use SQL Server types, Identify your function as a SQL Server function, and loads of other fun stuff.  I don&#8217;t actually use any of the SQL types in this function, but they do work well in most cases.  Its&#8217; easy to see the SqlFunction attribute applied to the method.</p>
+<p>Once this is done, compile that sucker!  The trickiest part here is really deploying it to your server, but even that is simple, just a lot of steps.  First, you&#8217;ll need to put the file in a location where the server can see it. On the server would be a nice easy place.  Now we need to create an assembly in SQL Server for it.  This is simple too:</p>
+<pre>CREATE ASSEMBLY DistanceCalculations FROM 'C:DistanceCalculationLibrary.dll'</pre>
+<p>Ok, we&#8217;re getting close.  Once this assembly is created, you need to enable the CLR (it is disabled by default).</p>
+<pre>exec sp_configure 'clr enabled',1
+reconfigure</pre>
+<p>And finally, create our SQL Server udf referencing the assembly.  </p>
+<pre>CREATE FUNCTION [dbo].[clrDistCalc](@long1 [float], @lat1 [float], @long2 [float], @lat2 [float])
+RETURNS [float] WITH EXECUTE AS CALLER
+AS 
+EXTERNAL NAME [DistanceCalculations].[UserDefinedFunctions].[clrDistCalc]</pre>
+<p>You can test it by writing some queries against the same table used for Denis&#8217; example (or George&#8217;s).  Here&#8217;s an example using Denis&#8217; data:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp;<span class="kw1">SELECT</span> h.<span class="sy0">*</span>
+&nbsp; &nbsp;<span class="kw1">FROM</span> zipcodes g
+&nbsp; &nbsp;<span class="kw1">INNER</span> <span class="sy0">JOIN</span> zipcodes h <span class="kw1">ON</span> g.<span class="me1">zipcode</span> <span class="sy0">&lt;&gt;</span> h.<span class="me1">zipcode</span>
+&nbsp; &nbsp;<span class="sy0">AND</span> g.<span class="me1">zipcode</span> <span class="sy0">=</span> <span class="st0">'10028'</span>
+&nbsp; &nbsp;<span class="sy0">AND</span> h.<span class="me1">zipcode</span> <span class="sy0">&lt;&gt;</span> <span class="st0">'10028'</span>
+&nbsp; &nbsp;<span class="kw1">WHERE</span> dbo.<span class="me1">clrDistCalc</span><span class="br0">&#40;</span>g.<span class="me1">Longitude</span>, g.<span class="me1">Latitude</span>, h.<span class="me1">Longitude</span>, h.<span class="me1">Latitude</span><span class="br0">&#41;</span> <span class="sy0">&lt;=</span> <span class="br0">&#40;</span><span class="nu0">20</span> <span class="sy0">*</span> <span class="nu0">1609.344</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">   SELECT h.*
+   FROM zipcodes g
+   INNER JOIN zipcodes h ON g.zipcode &lt;&gt; h.zipcode
+   AND g.zipcode = '10028'
+   AND h.zipcode &lt;&gt; '10028'
+   WHERE dbo.clrDistCalc(g.Longitude, g.Latitude, h.Longitude, h.Latitude) &lt;= (20 * 1609.344)</pre></div></div>
+
+<p>If I know those guys like I think I do, the indexes and everything will be sufficient!  </p>
+<p>That&#8217;s really all there is to it.  These CLR functions are an <strong>EXTREMELY</strong> powerful tool for any developer&#8217;s kit.  Math calculations are just scratching the surface of the great uses for this capability.  It is important to use them judiciously though, as with most powerful tools you can seriously injure yourself if not careful!  I&#8217;m not sure I&#8217;ve determined where the line is yet, but I would not even attempt using the CLR unless I was having performance issues with frequently used calculations (or they were frequently used enough that I could see the problem coming) or if I needed access to the filesystem or other resources that are awkward to access from straight T-SQL.  As developers we&#8217;re always going to need to make choices like this, and no amount of blog posts will make them for us.  So like all things, just use it wisely and you&#8217;ll be fine!  </p>
+<p>In the future we&#8217;ll put all three to the test, and do a fourth post detailing the results.  At least I hope we will, the idea of doing just that is the whole reason I blogged about this again!</p>
+<p>*** <strong>If you have a SQL Server related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sql-server-distance-calculation-option-3/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+	</channel>
+</rss>

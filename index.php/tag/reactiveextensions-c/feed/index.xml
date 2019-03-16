@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>reactiveextensions c# &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/reactiveextensions-c/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Exploring Reactive Extensions &#8211; Subscription Management</title>
+		<link>/index.php/desktopdev/mstech/exploring-reactive-extensions-subscripti/</link>
+		<comments>/index.php/desktopdev/mstech/exploring-reactive-extensions-subscripti/#respond</comments>
+		<pubDate>Tue, 07 Dec 2010 23:39:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[reactiveextensions c#]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/12/exploring-reactive-extensions-subscripti/</guid>
+		<description><![CDATA[I sat down to write a post on testing the core interfaces in the reactive library, and found myself going off onto a bit of a tangent. I made a big enough change to the way everything was set up that I didn&#8217;t really feel comfortable including it in the post on testing, but it [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I sat down to write a post on testing the core interfaces in the reactive library, and found myself going off onto a bit of a tangent.  I made a big enough change to the way everything was set up that I didn&#8217;t really feel comfortable including it in the post on testing, but it seemed worth mentioning.  So this post was born.  </p>
+<p>I started thinking about an object responsible for managing the subscription, which can be returned as the IDisposable from the observable&#8217;s Subscribe method.  I think this could help not only with usability, but testability as well.</p>
+<p>Following the reactive model, it basically holds a reference to the observable&#8217;s list of subscribers and observer involved in the subscription, and takes care of removing the observer from the list when disposed.  What&#8217;s nice about this is that it allows you to subscribe from the observer like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1">IDisposable subscription<span class="sy0">;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> Subscribe<span class="br0">&#40;</span>IObservable<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span> subject<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; subscription <span class="sy0">=</span> subject<span class="sy0">.</span><span class="me1">Subscribe</span><span class="br0">&#40;</span><span class="kw1">this</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">IDisposable subscription;
+public void Subscribe(IObservable&lt;string&gt; subject) {
+	subscription = subject.Subscribe(this);
+}</pre></div></div>
+
+<p>And the subscribe method looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> IDisposable Subscribe<span class="br0">&#40;</span>IObserver<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span> watcher<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; watchers<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span>watcher<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> <span class="kw3">new</span> Subscription<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span><span class="br0">&#40;</span>watchers, watcher<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public IDisposable Subscribe(IObserver&lt;string&gt; watcher) {
+	watchers.Add(watcher);
+	return new Subscription&lt;string&gt;(watchers, watcher);
+}</pre></div></div>
+
+<p>Then, by disposing of the unsubscriber the observer can politely remove itself from the list of objects to notify.  The unsubscriber class is pretty simple, and the way it&#8217;s being used no one ever needs to know its something besides an IDisposable.  </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">class</span> Subscription<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="sy0">:</span> IDisposable <span class="br0">&#123;</span>
+&nbsp; &nbsp; IList<span class="sy0">&lt;</span>IObserver<span class="sy0">&lt;</span>T<span class="sy0">&gt;&gt;</span> observers<span class="sy0">;</span>
+&nbsp; &nbsp; IObserver<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> observer<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> Subscription<span class="br0">&#40;</span>IList<span class="sy0">&lt;</span>IObserver<span class="sy0">&lt;</span>T<span class="sy0">&gt;&gt;</span> observers, IObserver<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> observer<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">observers</span> <span class="sy0">=</span> observers<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">observer</span> <span class="sy0">=</span> observer<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Dispose<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>observer <span class="sy0">!=</span> <span class="kw1">null</span> <span class="sy0">&amp;&amp;</span> observers<span class="sy0">.</span><span class="me1">Contains</span><span class="br0">&#40;</span>observer<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; observers<span class="sy0">.</span><span class="kw1">Remove</span><span class="br0">&#40;</span>observer<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class Subscription&lt;T&gt; : IDisposable {
+	IList&lt;IObserver&lt;T&gt;&gt; observers;
+	IObserver&lt;T&gt; observer;
+
+	public Subscription(IList&lt;IObserver&lt;T&gt;&gt; observers, IObserver&lt;T&gt; observer) {
+		this.observers = observers;
+		this.observer = observer;
+	}
+
+	public void Dispose() {
+		if (observer != null &amp;&amp; observers.Contains(observer))
+			observers.Remove(observer);
+	}
+}</pre></div></div>
+
+<p>This was really the only significant code change to the reactive way of doing things discussed in the first post.  Doing it with events is not terribly difficult, but it is different.  The observable interface is replaced by an interface exposing three events:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">interface</span> IWatched<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">event</span> EventHandler<span class="sy0">&lt;</span>DataEventArgs<span class="sy0">&lt;</span>T<span class="sy0">&gt;&gt;</span> OnNext<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">event</span> EventHandler<span class="sy0">&lt;</span>DataEventArgs<span class="sy0">&lt;</span>Exception<span class="sy0">&gt;&gt;</span> OnError<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">event</span> EventHandler OnCompleted<span class="sy0">;</span>
+&nbsp; &nbsp; IDisposable Subscribe<span class="br0">&#40;</span>IWatcher<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> watcher<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public interface IWatched&lt;T&gt; {
+	event EventHandler&lt;DataEventArgs&lt;T&gt;&gt; OnNext;
+	event EventHandler&lt;DataEventArgs&lt;Exception&gt;&gt; OnError;
+	event EventHandler OnCompleted;
+	IDisposable Subscribe(IWatcher&lt;T&gt; watcher);
+}</pre></div></div>
+
+<p>Dealing with traditional events, much more of the responsibility is left to the observer.  Using IObservable, it becomes the event source&#8217;s responsibility to call the appropriate methods on the subscribing objects.  Using events, the publisher&#8217;s only responsibility is to raise events with the appropriate data for consumption by any interested subscribers.  This feels like a much more passive approach, at least from the publisher&#8217;s end.  I know the difference isn&#8217;t huge, but when it comes to testing it <strong>feels</strong>, at least conceptually, like there is a large gap between publishers and consumers of notifications because the winforms event system sits between them.  </p>
+<p>I also think the need to send everything as EventArgs makes things a bit tougher to read, but not overly so.  It does seem like it adds unnecessary overhead to the task at hand though.  The fact that it allows you to pass normal objects is certainly an advantage of the reactive method.  </p>
+<p>Following the non-reactive approach, the Subscription object has a bit more to it.  Using this kind of interface for the subject of observation, subscribing to updates becomes an exercise in wiring up event handlers.  There is not as much to what the event source is doing using this approach, so I&#8217;m not sure how much sense it makes to store a collection of subscribers on the observable.  But we can still keep a subscribe method there.  In this case, the concept of the Unsubscriber made sense as a place to do not only the unsubscribing but also the initial subscription for all events.  It&#8217;s probably due for a rename then.  This new Subscription class will look like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">class</span> Subscription<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> <span class="sy0">:</span> IDisposable <span class="br0">&#123;</span>
+&nbsp; &nbsp; IWatched<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> subject<span class="sy0">;</span>
+&nbsp; &nbsp; EventHandler<span class="sy0">&lt;</span>DataEventArgs<span class="sy0">&lt;</span>T<span class="sy0">&gt;&gt;</span> nextHandler<span class="sy0">;</span> &nbsp; &nbsp; 
+&nbsp; &nbsp; EventHandler<span class="sy0">&lt;</span>DataEventArgs<span class="sy0">&lt;</span>Exception<span class="sy0">&gt;&gt;</span> errorHandler<span class="sy0">;</span>
+&nbsp; &nbsp; EventHandler completeHandler<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> Subscription<span class="br0">&#40;</span>IWatched<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> toWatch, 
+&nbsp; &nbsp; &nbsp; &nbsp; IWatcher<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> watcher<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">nextHandler</span> <span class="sy0">=</span> <span class="kw3">new</span> EventHandler<span class="sy0">&lt;</span>DataEventArgs<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;&gt;</span><span class="br0">&#40;</span>watcher<span class="sy0">.</span><span class="me1">OnNext</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">errorHandler</span> <span class="sy0">=</span> <span class="kw3">new</span> EventHandler<span class="sy0">&lt;</span>DataEventArgs<span class="sy0">&lt;</span>Exception<span class="sy0">&gt;&gt;</span><span class="br0">&#40;</span>watcher<span class="sy0">.</span><span class="me1">OnError</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">completeHandler</span> <span class="sy0">=</span> <span class="kw3">new</span> EventHandler<span class="br0">&#40;</span>watcher<span class="sy0">.</span><span class="me1">OnCompleted</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; subject <span class="sy0">=</span> toWatch<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; subject<span class="sy0">.</span><span class="me1">OnNext</span> <span class="sy0">+=</span> nextHandler<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; subject<span class="sy0">.</span><span class="me1">OnError</span> <span class="sy0">+=</span> errorHandler<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; subject<span class="sy0">.</span><span class="me1">OnCompleted</span> <span class="sy0">+=</span> completeHandler<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Dispose<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; subject<span class="sy0">.</span><span class="me1">OnNext</span> <span class="sy0">-=</span> nextHandler<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; subject<span class="sy0">.</span><span class="me1">OnError</span> <span class="sy0">-=</span> errorHandler<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; subject<span class="sy0">.</span><span class="me1">OnCompleted</span> <span class="sy0">-=</span> completeHandler<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; subject <span class="sy0">=</span> <span class="kw1">null</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class Subscription&lt;T&gt; : IDisposable {
+	IWatched&lt;T&gt; subject;
+	EventHandler&lt;DataEventArgs&lt;T&gt;&gt; nextHandler;		
+	EventHandler&lt;DataEventArgs&lt;Exception&gt;&gt; errorHandler;
+	EventHandler completeHandler;
+
+	public Subscription(IWatched&lt;T&gt; toWatch, 
+		IWatcher&lt;T&gt; watcher) {
+
+		this.nextHandler = new EventHandler&lt;DataEventArgs&lt;string&gt;&gt;(watcher.OnNext);
+		this.errorHandler = new EventHandler&lt;DataEventArgs&lt;Exception&gt;&gt;(watcher.OnError);
+		this.completeHandler = new EventHandler(watcher.OnCompleted);
+
+		subject = toWatch;
+
+		subject.OnNext += nextHandler;
+		subject.OnError += errorHandler;
+		subject.OnCompleted += completeHandler;
+	}
+
+	public void Dispose() {
+		subject.OnNext -= nextHandler;
+		subject.OnError -= errorHandler;
+		subject.OnCompleted -= completeHandler;
+		subject = null;
+	}
+}</pre></div></div>
+
+<p>I think it&#8217;s nice to have this stuff in a self contained object, and it certainly helps us to keep testing approaches somewhat similar.  A nice benefit of this work is that if we have pieces of the subscribe method implemented on both sides it opens up some nice options for testing.  And we can discuss them when I get to the real post <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p><em><strong>*</strong>Source code for this post can be found over at <a href="https://github.com/lessthandot/ExploringRx">github</a>, with these examples in the TestingObservable project.</em></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/exploring-reactive-extensions-subscripti/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,745 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>common table expression &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/common-table-expression/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2011 Day 5: Common Table Expressions</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-5/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-5/#comments</comments>
+		<pubDate>Mon, 05 Dec 2011 03:12:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[common table expression]]></category>
+		<category><![CDATA[cte]]></category>
+		<category><![CDATA[tables]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-5/</guid>
+		<description><![CDATA[In my Are you ready for SQL Server 2012 or are you still partying like it is 1999? post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code tha&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>In today&#8217;s post I will cover Common Table Expressions(CTEs). Common Table Expressions were introduced in SQL Server 2005 and you can think of them as a derived table in another form of a table expression.</p>
+<p>The syntax looks like this</p>
+<pre>[ WITH &lt;common_table_expression&gt; [ ,...n ] ]
+
+&lt;common_table_expression&gt;::=
+    expression_name [ ( column_name [ ,...n ] ) ]
+    AS
+    ( CTE_query_definition )
+
+&lt;/common_table_expression&gt;&lt;/common_table_expression&gt;</pre>
+<p>Here are the arguments:</p>
+<p><strong>expression_name</strong><br />
+Is a valid identifier for the common table expression. expression_name must be different from the name of any other common table expression defined in the same WITH <common_table_expression> clause, but expression_name can be the same as the name of a base table or view. Any reference to expression_name in the query uses the common table expression and not the base object.</p>
+<p><strong>column_name</strong><br />
+Specifies a column name in the common table expression. Duplicate names within a single CTE definition are not allowed. The number of column names specified must match the number of columns in the result set of the CTE_query_definition. The list of column names is optional only if distinct names for all resulting columns are supplied in the query definition.</p>
+<p><strong>CTE_query_definition</strong><br />Specifies a SELECT statement whose result set populates the common table expression. The SELECT statement for CTE_query_definition must meet the same requirements as for creating a view, except a CTE cannot define another CTE. </p>
+<p>If more than one CTE_query_definition is defined, the query definitions must be joined by one of these set operators: UNION ALL, UNION, EXCEPT, or INTERSECT.</p>
+<p>
+<hr />
+<p>With Common Table Expressions you can use two form of table aliasing; external and internal. If the columns are aliased in the query definition itself then this is an internal alias</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--inline column alias</span>
+;<span class="kw1">WITH</span> cte <span class="kw1">AS</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="nu0">1</span> <span class="kw1">AS</span> col1,<span class="nu0">2</span> <span class="kw1">AS</span> col2<span class="br0">&#41;</span> 
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> cte</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--inline column alias
+;WITH cte AS (SELECT 1 AS col1,2 AS col2) 
+
+SELECT * FROM cte</pre></div></div>
+
+<p>If you supply the column names in the parentheses right after the Common Table Expression name then this is external aliasing</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="co1">-- external column alias</span>
+;<span class="kw1">WITH</span> cte<span class="br0">&#40;</span>col1,col2<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="nu0">1</span>,<span class="nu0">2</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> cte</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">-- external column alias
+;WITH cte(col1,col2) AS (SELECT 1,2)
+
+SELECT * FROM cte</pre></div></div>
+
+<p>If you use both external and internal then the external names will show up in the result</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte<span class="br0">&#40;</span>bla,bla2<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="nu0">1</span> <span class="kw1">AS</span> col1,<span class="nu0">2</span> <span class="kw1">AS</span> col2<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> cte</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte(bla,bla2) AS (SELECT 1 AS col1,2 AS col2)
+
+SELECT * FROM cte</pre></div></div>
+
+<p>Output</p>
+<pre>bla	bla2
+-------------
+1	2</pre>
+<p></common_table_expression></p>
+<p>Every Common Table Expression has to start with WITH, the statement before it has to be terminated with a semicolon. What you can do is start your Common Table Expression with semicolon followed by WITH (;WITH) this way if someone adds some code before your Common Table Expression it won&#8217;t mess up the proc or sql script</p>
+<p>Here is an example of one Common Table Expression where the previous statement wasn&#8217;t terminated with a semicolon</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="nu0">1</span>
+<span class="kw1">WITH</span> cte <span class="kw1">AS</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="nu0">1</span> <span class="kw1">AS</span> col1,<span class="nu0">2</span> <span class="kw1">AS</span> col2<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> cte</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT 1
+WITH cte AS (SELECT 1 AS col1,2 AS col2)
+
+SELECT * FROM cte</pre></div></div>
+
+<p>And here is the error<br />
+<em>Msg 319, Level 15, State 1, Line 2<br />
+Incorrect syntax near the keyword &#8216;with&#8217;. If this statement is a common table expression, an xmlnamespaces clause or a change tracking context clause, the previous statement must be terminated with a semicolon.</em></p>
+<p>Adding the semicolon before WITH fixes that</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="nu0">1</span>
+;<span class="kw1">WITH</span> cte <span class="kw1">AS</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="nu0">1</span> <span class="kw1">AS</span> col1,<span class="nu0">2</span> <span class="kw1">AS</span> col2<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> cte</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT 1
+;WITH cte AS (SELECT 1 AS col1,2 AS col2)
+
+SELECT * FROM cte</pre></div></div>
+
+<p>Some more examples</p>
+<h2>Paging with Common Table Expressions</h2>
+<p>I will cover the windowing functions tomorrow but here is just a small example of how you can use a Common Table Expression to do paging</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> master
+GO
+&nbsp;
+;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">row</span>,<span class="sy0">*</span>
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">row</span>, name
+<span class="kw1">FROM</span> cte
+<span class="kw1">WHERE</span> <span class="kw1">row</span> <span class="sy0">BETWEEN</span> <span class="nu0">11</span> <span class="sy0">AND</span> <span class="nu0">20</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE master
+GO
+
+;WITH cte AS(SELECT ROW_NUMBER() OVER(ORDER BY name) AS row,*
+FROM sys.sysobjects)
+
+SELECT row, name
+FROM cte
+WHERE row BETWEEN 11 AND 20
+GO</pre></div></div>
+
+<p>Here are my results</p>
+<p>row	name<br />
+11	assembly_types<br />
+12	asymmetric_keys<br />
+13	availability_group_listener_ip_addresses<br />
+14	availability_group_listeners<br />
+15	availability_groups<br />
+16	availability_read_only_routing_lists<br />
+17	availability_replicas<br />
+18	backup_devices<br />
+19	certificates<br />
+20	change_tracking_databases</p>
+<p>Okay that is all fine, what if I want to also add a total count? You can reference a Common Table Expression more than once in a query so that is no problem, here is what the query looks like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">row</span>,<span class="sy0">*</span>
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">row</span>, name, <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> cte<span class="br0">&#41;</span> <span class="kw1">AS</span> TotalCount
+<span class="kw1">FROM</span> cte
+<span class="kw1">WHERE</span> <span class="kw1">row</span> <span class="sy0">BETWEEN</span> <span class="nu0">11</span> <span class="sy0">AND</span> <span class="nu0">20</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte AS(SELECT ROW_NUMBER() OVER(ORDER BY name) AS row,*
+FROM sys.sysobjects)
+
+SELECT row, name, (SELECT COUNT(*) FROM cte) AS TotalCount
+FROM cte
+WHERE row BETWEEN 11 AND 20
+GO</pre></div></div>
+
+<p>Here is another example that selects more than once from the same Common Table Expression</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">row</span>,<span class="sy0">*</span>
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">as</span> TheCount,
+&nbsp; &nbsp; <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="kw2">Min</span><span class="br0">&#40;</span><span class="kw1">row</span><span class="br0">&#41;</span> <span class="kw1">from</span> cte<span class="br0">&#41;</span> <span class="kw1">as</span> MinRow,
+&nbsp; &nbsp; <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="kw2">Max</span><span class="br0">&#40;</span><span class="kw1">row</span><span class="br0">&#41;</span> <span class="kw1">from</span> cte<span class="br0">&#41;</span> <span class="kw1">as</span> MaxRow
+<span class="kw1">FROM</span> cte</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte AS(SELECT ROW_NUMBER() OVER(ORDER BY name) AS row,*
+FROM sys.sysobjects)
+
+
+SELECT COUNT(*) as TheCount,
+	(SELECT Min(row) from cte) as MinRow,
+	(SELECT Max(row) from cte) as MaxRow
+FROM cte</pre></div></div>
+
+<p>However if you reference the Common Table Expression in more than one query you will get an error, run this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">row</span>,<span class="sy0">*</span>
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">as</span> TheCount <span class="kw1">from</span> cte
+<span class="kw1">SELECT</span> <span class="kw2">Min</span><span class="br0">&#40;</span><span class="kw1">row</span><span class="br0">&#41;</span> <span class="kw1">from</span> cte <span class="kw1">as</span> MinRow</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte AS(SELECT ROW_NUMBER() OVER(ORDER BY name) AS row,*
+FROM sys.sysobjects)
+
+
+SELECT COUNT(*) as TheCount from cte
+SELECT Min(row) from cte as MinRow</pre></div></div>
+
+<p>Msg 208, Level 16, State 1, Line 6<br />
+Invalid object name &#8216;cte&#8217;.</p>
+<p>As you can see, you got an invalid object name error.</p>
+<p>If you put a UNION in between the two queries, it will also work fine since it is considered one query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">row</span>,<span class="sy0">*</span>
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">as</span> TheCount <span class="kw1">from</span> cte
+<span class="kw1">union</span> all
+<span class="kw1">SELECT</span> <span class="kw2">Min</span><span class="br0">&#40;</span><span class="kw1">row</span><span class="br0">&#41;</span> <span class="kw1">from</span> cte <span class="kw1">as</span> MinRow</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte AS(SELECT ROW_NUMBER() OVER(ORDER BY name) AS row,*
+FROM sys.sysobjects)
+
+
+SELECT COUNT(*) as TheCount from cte
+union all
+SELECT Min(row) from cte as MinRow</pre></div></div>
+
+<p>You can also do multiple levels of recursion with Common Table Expression. Here is an example from <a href="http://msdn.microsoft.com/en-us/library/ms175972.aspx">books on line</a>. First create this table in the AdventureWorks2008R2 database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> AdventureWorks2008R2;
+GO
+&nbsp;
+<span class="co1">-- Create an Employee table.</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">MyEmployees</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; EmployeeID <span class="kw1">smallint</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; FirstName <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">30</span><span class="br0">&#41;</span> &nbsp;<span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; LastName &nbsp;<span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">40</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Title <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; DeptID <span class="kw1">smallint</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; ManagerID <span class="kw1">int</span> <span class="sy0">NULL</span>,
+&nbsp;<span class="kw1">CONSTRAINT</span> PK_EmployeeID <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> <span class="br0">&#40;</span>EmployeeID <span class="kw1">ASC</span><span class="br0">&#41;</span> 
+<span class="br0">&#41;</span>;
+<span class="co1">-- Populate the table with values.</span>
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">MyEmployees</span> <span class="kw1">VALUES</span> 
+&nbsp;<span class="br0">&#40;</span><span class="nu0">1</span>, N<span class="st0">'Ken'</span>, N<span class="st0">'Sánchez'</span>, N<span class="st0">'Chief Executive Officer'</span>,<span class="nu0">16</span>,<span class="sy0">NULL</span><span class="br0">&#41;</span>
+,<span class="br0">&#40;</span><span class="nu0">273</span>, N<span class="st0">'Brian'</span>, N<span class="st0">'Welcker'</span>, N<span class="st0">'Vice President of Sales'</span>,<span class="nu0">3</span>,<span class="nu0">1</span><span class="br0">&#41;</span>
+,<span class="br0">&#40;</span><span class="nu0">274</span>, N<span class="st0">'Stephen'</span>, N<span class="st0">'Jiang'</span>, N<span class="st0">'North American Sales Manager'</span>,<span class="nu0">3</span>,<span class="nu0">273</span><span class="br0">&#41;</span>
+,<span class="br0">&#40;</span><span class="nu0">275</span>, N<span class="st0">'Michael'</span>, N<span class="st0">'Blythe'</span>, N<span class="st0">'Sales Representative'</span>,<span class="nu0">3</span>,<span class="nu0">274</span><span class="br0">&#41;</span>
+,<span class="br0">&#40;</span><span class="nu0">276</span>, N<span class="st0">'Linda'</span>, N<span class="st0">'Mitchell'</span>, N<span class="st0">'Sales Representative'</span>,<span class="nu0">3</span>,<span class="nu0">274</span><span class="br0">&#41;</span>
+,<span class="br0">&#40;</span><span class="nu0">285</span>, N<span class="st0">'Syed'</span>, N<span class="st0">'Abbas'</span>, N<span class="st0">'Pacific Sales Manager'</span>,<span class="nu0">3</span>,<span class="nu0">273</span><span class="br0">&#41;</span>
+,<span class="br0">&#40;</span><span class="nu0">286</span>, N<span class="st0">'Lynn'</span>, N<span class="st0">'Tsoflias'</span>, N<span class="st0">'Sales Representative'</span>,<span class="nu0">3</span>,<span class="nu0">285</span><span class="br0">&#41;</span>
+,<span class="br0">&#40;</span><span class="nu0">16</span>, &nbsp;N<span class="st0">'David'</span>,N<span class="st0">'Bradley'</span>, N<span class="st0">'Marketing Manager'</span>, <span class="nu0">4</span>, <span class="nu0">273</span><span class="br0">&#41;</span>
+,<span class="br0">&#40;</span><span class="nu0">23</span>, &nbsp;N<span class="st0">'Mary'</span>, N<span class="st0">'Gibson'</span>, N<span class="st0">'Marketing Specialist'</span>, <span class="nu0">4</span>, <span class="nu0">16</span><span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE AdventureWorks2008R2;
+GO
+
+-- Create an Employee table.
+CREATE TABLE dbo.MyEmployees
+(
+	EmployeeID smallint NOT NULL,
+	FirstName nvarchar(30)  NOT NULL,
+	LastName  nvarchar(40) NOT NULL,
+	Title nvarchar(50) NOT NULL,
+	DeptID smallint NOT NULL,
+	ManagerID int NULL,
+ CONSTRAINT PK_EmployeeID PRIMARY KEY CLUSTERED (EmployeeID ASC) 
+);
+-- Populate the table with values.
+INSERT INTO dbo.MyEmployees VALUES 
+ (1, N'Ken', N'Sánchez', N'Chief Executive Officer',16,NULL)
+,(273, N'Brian', N'Welcker', N'Vice President of Sales',3,1)
+,(274, N'Stephen', N'Jiang', N'North American Sales Manager',3,273)
+,(275, N'Michael', N'Blythe', N'Sales Representative',3,274)
+,(276, N'Linda', N'Mitchell', N'Sales Representative',3,274)
+,(285, N'Syed', N'Abbas', N'Pacific Sales Manager',3,273)
+,(286, N'Lynn', N'Tsoflias', N'Sales Representative',3,285)
+,(16,  N'David',N'Bradley', N'Marketing Manager', 4, 273)
+,(23,  N'Mary', N'Gibson', N'Marketing Specialist', 4, 16);</pre></div></div>
+
+<p>Now this is the query that will give you the first two levels of the employee hierarchy</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">WITH</span> DirectReports<span class="br0">&#40;</span>ManagerID, EmployeeID, Title, EmployeeLevel<span class="br0">&#41;</span> <span class="kw1">AS</span> 
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> ManagerID, EmployeeID, Title, <span class="nu0">0</span> <span class="kw1">AS</span> EmployeeLevel
+&nbsp; &nbsp; <span class="kw1">FROM</span> dbo.<span class="me1">MyEmployees</span> 
+&nbsp; &nbsp; <span class="kw1">WHERE</span> ManagerID <span class="kw1">IS</span> <span class="sy0">NULL</span>
+&nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> e.<span class="me1">ManagerID</span>, e.<span class="me1">EmployeeID</span>, e.<span class="me1">Title</span>, EmployeeLevel <span class="sy0">+</span> <span class="nu0">1</span>
+&nbsp; &nbsp; <span class="kw1">FROM</span> dbo.<span class="me1">MyEmployees</span> <span class="kw1">AS</span> e
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> DirectReports <span class="kw1">AS</span> d
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> e.<span class="me1">ManagerID</span> <span class="sy0">=</span> d.<span class="me1">EmployeeID</span> 
+<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> ManagerID, EmployeeID, Title, EmployeeLevel 
+<span class="kw1">FROM</span> DirectReports
+<span class="kw1">WHERE</span> EmployeeLevel <span class="sy0">&lt;=</span> <span class="nu0">2</span> ;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">WITH DirectReports(ManagerID, EmployeeID, Title, EmployeeLevel) AS 
+(
+    SELECT ManagerID, EmployeeID, Title, 0 AS EmployeeLevel
+    FROM dbo.MyEmployees 
+    WHERE ManagerID IS NULL
+    UNION ALL
+    SELECT e.ManagerID, e.EmployeeID, e.Title, EmployeeLevel + 1
+    FROM dbo.MyEmployees AS e
+        INNER JOIN DirectReports AS d
+        ON e.ManagerID = d.EmployeeID 
+)
+SELECT ManagerID, EmployeeID, Title, EmployeeLevel 
+FROM DirectReports
+WHERE EmployeeLevel &lt;= 2 ;
+GO</pre></div></div>
+
+<p></p>
+<pre>ManagerID   EmployeeID Title                                    EmployeeLevel
+----------- ---------- -------------------------------------------------- ---
+NULL        1          Chief Executive Officer                            0
+1           273        Vice President of Sales                            1
+273         16         Marketing Manager                                  2
+273         274        North American Sales Manager                       2
+273         285        Pacific Sales Manager                              2</pre>
+<p>You can also limit the number of recursions by applying a hint, for example OPTION (MAXRECURSION 5), that will limit it to 5 levels.</p>
+<p>Besides just selecting from Common Table Expression you can also manipulate data through them, the underlying tables will then have the changes. See my post <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/use-common-table-expressions-to-simplify-your-updates-in-sql-server">Use common table expressions to simplify your updates in SQL Server</a> to learn more about that</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-5/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Use common table expressions to simplify your updates in SQL Server</title>
+		<link>/index.php/datamgmt/datadesign/use-common-table-expressions-to-simplify-your-updates-in-sql-server/</link>
+		<comments>/index.php/datamgmt/datadesign/use-common-table-expressions-to-simplify-your-updates-in-sql-server/#comments</comments>
+		<pubDate>Sat, 10 Sep 2011 08:40:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[common table expression]]></category>
+		<category><![CDATA[cte]]></category>
+		<category><![CDATA[data manipulation]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[updates]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/09/use-common-table-expressions-to-simplify-your-updates-in-sql-server/</guid>
+		<description><![CDATA[Someone asked two interesting questions last night
+
+1) Is there a way to construct an empty CTE?
+2) Can a CTE be modified? Can I insert rows after it has been constructed?
+
+Let's look at question number one first. Is there a way to construct an emp&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Someone asked <a href="http://stackoverflow.com/questions/7369062/three-cte-questions">two interesting questions</a> last night</p>
+<p>1) Is there a way to construct an empty CTE?<br />
+2) Can a CTE be modified? Can I insert rows after it has been constructed?</p>
+<p>Let&#8217;s look at question number one first. Is there a way to construct an empty CTE? Yes, there is, but why would you want to do this? Anyway, here is one way of having an empty CTE</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">WITH</span> Hello 
+<span class="kw1">AS</span> <span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> &nbsp;name
+<span class="kw1">FROM</span> sysobjects <span class="kw1">WHERE</span> <span class="nu0">1</span> <span class="sy0">=</span><span class="nu0">0</span>
+<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> Hello</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">WITH Hello 
+AS (
+SELECT  name
+FROM sysobjects WHERE 1 =0
+)
+SELECT * FROM Hello</pre></div></div>
+
+<p>Question number two (Can a CTE be modified? Can I insert rows after it has been constructed?) is more interesting, first let&#8217;s look at a simple example and then we will look at something that makes more sense</p>
+<p>We need to create a table first with 1 row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> testNow<span class="br0">&#40;</span>id <span class="kw1">int</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> testNow <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE testNow(id int)
+INSERT testNow VALUES(1)</pre></div></div>
+
+<p>Now run the following which will run an update statement against the CTE</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> Hello 
+<span class="kw1">AS</span> <span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> id <span class="kw1">FROM</span> testNow
+&nbsp;
+<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">UPDATE</span> Hello <span class="kw1">SET</span> id <span class="sy0">=</span> <span class="nu0">2</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH Hello 
+AS (
+SELECT id FROM testNow
+
+)
+
+UPDATE Hello SET id = 2</pre></div></div>
+
+<p>If we check the table now, we can see that the value changed from 1 to 2</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> testNow</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM testNow</pre></div></div>
+
+<p>What about inserts, can we insert into a common table expression? Sure, let&#8217;s take a look how we can do that.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> Hello 
+<span class="kw1">AS</span> <span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> id <span class="kw1">FROM</span> testNow
+&nbsp;
+<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">INSERT</span> Hello <span class="kw1">VALUES</span><span class="br0">&#40;</span> <span class="nu0">3</span> <span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH Hello 
+AS (
+SELECT id FROM testNow
+
+)
+
+INSERT Hello VALUES( 3 )</pre></div></div>
+
+<p>If we check the table now, we will see two rows in the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> testNow</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM testNow</pre></div></div>
+
+<p>So this is all, but what is the point? Really for the examples I gave there is none, you can just update the table directly instead. But, let&#8217;s look at a more interesting example</p>
+<p>First we need to create the following table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> SomeTable<span class="br0">&#40;</span>id <span class="kw1">int</span>,SomeVal <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>,SomeDate <span class="kw1">date</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> SomeTable 
+<span class="kw1">SELECT</span> null,<span class="st0">'A'</span>,<span class="st0">'20110101'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> null,<span class="st0">'A'</span>,<span class="st0">'20100101'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> null,<span class="st0">'A'</span>,<span class="st0">'20090101'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> null,<span class="st0">'B'</span>,<span class="st0">'20110101'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> null,<span class="st0">'B'</span>,<span class="st0">'20100101'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> null,<span class="st0">'C'</span>,<span class="st0">'20110101'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> null,<span class="st0">'C'</span>,<span class="st0">'20100101'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> null,<span class="st0">'C'</span>,<span class="st0">'20090101'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE SomeTable(id int,SomeVal char(1),SomeDate date)
+INSERT SomeTable 
+SELECT null,'A','20110101'
+UNION ALL
+SELECT null,'A','20100101'
+UNION ALL
+SELECT null,'A','20090101'
+UNION ALL
+SELECT null,'B','20110101'
+UNION ALL
+SELECT null,'B','20100101'
+UNION ALL
+SELECT null,'C','20110101'
+UNION ALL
+SELECT null,'C','20100101'
+UNION ALL
+SELECT null,'C','20090101'</pre></div></div>
+
+<p>Now run a simple select statement</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> SomeTable</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM SomeTable</pre></div></div>
+
+<p>Here is what is in that table</p>
+<pre>id	SomeVal	SomeDate
+NULL	A	2011-01-01
+NULL	A	2010-01-01
+NULL	A	2009-01-01
+NULL	B	2011-01-01
+NULL	B	2010-01-01
+NULL	C	2011-01-01
+NULL	C	2010-01-01
+NULL	C	2009-01-01</pre>
+<p>Now I would like to set the id to 1 for each distinct SomeVal where the date is the max date and to 0 otherwise<br />
+So my table would look like this</p>
+<pre>id	SomeVal	SomeDate
+1	A	2011-01-01
+0	A	2010-01-01
+0	A	2009-01-01
+1	B	2011-01-01
+0	B	2010-01-01
+1	C	2011-01-01
+0	C	2010-01-01
+0	C	2009-01-01</pre>
+<p>First let&#8217;s do the select statement, in order to accomplish what we set out to do we can use the row_number function, partition by SomeVal and order by SomeDate  descending</p>
+<p>Run the following statement</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span>PARTITION <span class="kw1">BY</span> SomeVal 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ORDER</span> <span class="kw1">BY</span> SomeDate <span class="kw1">DESC</span><span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">row</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">*</span> <span class="kw1">FROM</span> SomeTable<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> cte</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte AS(SELECT 
+		ROW_NUMBER() OVER(PARTITION BY SomeVal 
+				  ORDER BY SomeDate DESC) AS row,
+				* FROM SomeTable)
+SELECT * FROM cte</pre></div></div>
+
+<p>Here is our result</p>
+<pre>row	id	SomeVal	SomeDate
+1	NULL	A	2011-01-01
+2	NULL	A	2010-01-01
+3	NULL	A	2009-01-01
+1	NULL	B	2011-01-01
+2	NULL	B	2010-01-01
+1	NULL	C	2011-01-01
+2	NULL	C	2010-01-01
+3	NULL	C	2009-01-01</pre>
+<p>So where row is 1 we will make SomeVal 1 otherwise we will make it 0, we can do that with a simple case statement</p>
+<p>Here is what the update looks like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span>PARTITION <span class="kw1">BY</span> SomeVal 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ORDER</span> <span class="kw1">BY</span> SomeDate <span class="kw1">DESC</span><span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">row</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">*</span> <span class="kw1">FROM</span> SomeTable<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">UPDATE</span> cte
+<span class="kw1">SET</span> id <span class="sy0">=</span> &nbsp;<span class="kw1">CASE</span> <span class="kw1">WHEN</span> <span class="kw1">row</span> <span class="sy0">=</span> <span class="nu0">1</span> <span class="kw1">THEN</span> <span class="nu0">1</span> <span class="kw1">ELSE</span> <span class="nu0">0</span> <span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte AS(SELECT 
+		ROW_NUMBER() OVER(PARTITION BY SomeVal 
+				  ORDER BY SomeDate DESC) AS row,
+				* FROM SomeTable)
+
+UPDATE cte
+SET id =  CASE WHEN row = 1 THEN 1 ELSE 0 END</pre></div></div>
+
+<p>Now run the select against the table again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> SomeTable</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM SomeTable</pre></div></div>
+
+<p></p>
+<pre>id	SomeVal	SomeDate
+1	A	2011-01-01
+0	A	2010-01-01
+0	A	2009-01-01
+1	B	2011-01-01
+0	B	2010-01-01
+1	C	2011-01-01
+0	C	2010-01-01
+0	C	2009-01-01</pre>
+<p>And as you can see the id column was updated correctly.</p>
+<p>As you can see, using a common table expression can simplify your update statements.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/use-common-table-expressions-to-simplify-your-updates-in-sql-server/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,486 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>dml &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/dml/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>OUTPUT Clause and @@identity, scope_identity()</title>
+		<link>/index.php/datamgmt/datadesign/output-clause-and-identity-scope_identity/</link>
+		<comments>/index.php/datamgmt/datadesign/output-clause-and-identity-scope_identity/#respond</comments>
+		<pubDate>Fri, 25 May 2012 14:06:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[dml]]></category>
+		<category><![CDATA[insert]]></category>
+		<category><![CDATA[output]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/05/output-clause-and-identity-scope_identity/</guid>
+		<description><![CDATA[Axel posted a post titled Catching the OUTPUT of your DML statements earlier today. I posted something about the OUPUT clause myself as part of my SQL Advent 2011 series here: SQL Advent 2011 Day 11: DML statements with the OUTPUT clause
+
+reading Axel&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Axel posted a post titled <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/catching-the-output-of-your">Catching the OUTPUT of your DML statements</a> earlier today. I posted something about the OUPUT clause myself as part of my SQL Advent 2011 series here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-11">SQL Advent 2011 Day 11: DML statements with the OUTPUT clause</a></p>
+<p>Reading Axel&#8217;s post where he describes how he can use this instead of a trigger got me thinking about how @@identity and scope_identity() would behave. You all know that when you have an insert trigger that inserts into a table with an identity column that @@identity will give you the value of the table that the trigger inserted into, scope_identity() will give you the id of the table that the trigger fired from.</p>
+<p>Let&#8217;s see what happens with the OUTPUT clause. First create these two simple tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestOutput <span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> not null,SomeCol <span class="kw1">date</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestOutput2 <span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> not null,ID2 <span class="kw1">INT</span>, SomeCol <span class="kw1">DATE</span>, IndentityVal <span class="kw1">INT</span>, ScopeIdentityVal <span class="kw1">int</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestOutput (id int identity not null,SomeCol date)
+GO
+
+CREATE TABLE TestOutput2 (id int identity not null,ID2 INT, SomeCol DATE, IndentityVal INT, ScopeIdentityVal int)
+GO</pre></div></div>
+
+<p>Before we start make sure that this returns 1</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT @@identity, scope_identity()</pre></div></div>
+
+<p>If it doesn&#8217;t return 1, run the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> TestOutput
+<span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+<span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> TestOutput
+<span class="kw1">SELECT</span> @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">TRUNCATE TABLE TestOutput
+INSERT TestOutput VALUES('20120101')
+TRUNCATE TABLE TestOutput
+SELECT @@identity, scope_identity()</pre></div></div>
+
+<p>Now we are set to go, we are inserting one row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput 
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>, @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">INTO</span> TestOutput2
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'20120525'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput 
+OUTPUT inserted.id,inserted.SomeCol, @@identity, scope_identity() INTO TestOutput2
+VALUES ('20120525')</pre></div></div>
+
+<p>If we do a select for both tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestOutput
+SELECT * FROM TestOutput2</pre></div></div>
+
+<p>We see the following</p>
+<pre>id	SomeCol
+-----   ----------
+1	2012-05-25</pre>
+<p>And here</p>
+<pre>id	ID2	SomeCol		IndentityVal	ScopeIdentityVal
+----    -----   ------------    ------------    ----------------
+1	1	2012-05-25	1		1</pre>
+<p>Not very useful since all the values are 1 so we don&#8217;t know where @@identity and scope_identity() get their values from</p>
+<p>Let&#8217;s just insert a bunch of rows in the TestOutput table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput VALUES('20120101')
+INSERT TestOutput VALUES('20120101')
+INSERT TestOutput VALUES('20120101')
+INSERT TestOutput VALUES('20120101')</pre></div></div>
+
+<p>Now if the do the insert with the OUTPUT clause again, the values will be different</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput 
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>, &nbsp; <span class="kw1">INTO</span> TestOutput2
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'20120526'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput 
+OUTPUT inserted.id,inserted.SomeCol,   INTO TestOutput2
+VALUES ('20120526')</pre></div></div>
+
+<p>Let&#8217;s see what we have</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestOutput
+SELECT * FROM TestOutput2</pre></div></div>
+
+<p>Here is the output</p>
+<pre>id	SomeCol
+--- ----------
+1	2012-05-25
+2	2012-01-01
+3	2012-01-01
+4	2012-01-01
+5	2012-01-01
+6	2012-05-26</pre>
+<p>The max value is 6 in the TestOutput table</p>
+<pre>id	ID2	SomeCol		IndentityVal	ScopeIdentityVal
+---     ---     --------        --------------  ------------------
+1	1 	2012-05-25	1		1
+2	6	2012-05-26	5		5</pre>
+<p>In the TestOutput2 table we have the value 5</p>
+<p>The output is 2 for both. Now you are probably asking yourself why 2 was not inserted but 5 into the output2 table<br />
+Run this statement now</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT @@identity, scope_identity()</pre></div></div>
+
+<p>The output of that is what will be inserted when you run the query below next</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput 
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>, @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">INTO</span> TestOutput2
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'20120525'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput 
+OUTPUT inserted.id,inserted.SomeCol, @@identity, scope_identity() INTO TestOutput2
+VALUES ('20120525')</pre></div></div>
+
+<p>If you run that the value 3 will be inserted</p>
+<p>Here is what <a href="http://msdn.microsoft.com/en-us/library/ms177564.aspx">Books On Line</a> has to say about the population of @@identity and scope_identity()</p>
+<blockquote><p>@@IDENTITY, SCOPE_IDENTITY, and IDENT_CURRENT return identity values generated only by the nested DML statement, and not those generated by the outer INSERT statement.</p></blockquote>
+<p>In other words when you use @@IDENTITY, SCOPE_IDENTITY, and IDENT_CURRENT when inserting into a table using the OUTPUT clause which then inserts into another table, the values are for the insert that happens from the output clause, in this case it is the ID from the output2 table</p>
+<p>But as you can see @@identity and scope_identity() are actually populated with the statement that ran before the current statement, just be aware of that</p>
+<p>Here is a quick test</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestOutput3 <span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> <span class="br0">&#40;</span><span class="nu0">1000</span>,<span class="nu0">1</span><span class="br0">&#41;</span> not null,SomeCol <span class="kw1">date</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestOutput3 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput3</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestOutput3 (id int identity (1000,1) not null,SomeCol date)
+GO
+
+
+INSERT TestOutput3 VALUES('20120101')
+
+SELECT * FROM TestOutput3</pre></div></div>
+
+<p>Output</p>
+<pre>id	SomeCol
+----    -----------
+1000	2012-01-01</pre>
+<p>Now when you run this again, it will insert the value 1000</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput 
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>, @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">INTO</span> TestOutput2
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'20120525'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput 
+OUTPUT inserted.id,inserted.SomeCol, @@identity, scope_identity() INTO TestOutput2
+VALUES ('20120525')</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestOutput2</pre></div></div>
+
+<pre>id	ID2	SomeCol	     IndentityVal  ScopeIdentityVal
+-----   -----   ---------    ------------  --------------------
+1	1	2012-05-25	1	     1
+2	6	2012-05-25	5	     5
+3	7	2012-05-25	2	     2
+4	8	2012-05-25	3	     3
+5	9	2012-05-25	1000	     1000</pre>
+<p>If you do this now, you will get the value 5, the value 5 is the value of the identity column for the TestOutput2 table, we last inserted into this table via the OUTPUT clause</p>
+<p>So be aware when using @@identity and scope_identity(), they might not behave as you would expect them to behave.  The thing to remember is that @@identity and scope_identity() don&#8217;t return the values from the statement just executed but from the one that was just executed prior to the current statement. If you do use the OUTPUT clause, @@identity and scope_identity() will return the value from the table where the OUTPUT clause is inserting into. If you need the ID for the table that the OUTPUT clause inserted into, just grab @@identity or scope_identity() after the statement executed</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/output-clause-and-identity-scope_identity/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2011 Day 11: DML statements with the OUTPUT clause</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-11/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-11/#comments</comments>
+		<pubDate>Sun, 11 Dec 2011 10:11:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[delete]]></category>
+		<category><![CDATA[dml]]></category>
+		<category><![CDATA[insert]]></category>
+		<category><![CDATA[output]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-11/</guid>
+		<description><![CDATA[In my Are you ready for SQL Server 2012 or are you still partying like it is 1999? post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code tha&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>Today we are going to take a look at the OUTPUT clause as part of an INSERT, DELETE or UPDATE statement</p>
+<p>In yesterday&#8217;s post <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-10">SQL Advent 2011 Day 10: Upsert by using the Merge statement</a> I already showed the OUTPUT clause in one or two examples, in today&#8217;s post I will only focus on the OUTPUT clause</p>
+<p>First we need to create a test table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestOutput <span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> not null,SomeCol <span class="kw1">datetime</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestOutput (id int identity not null,SomeCol datetime)
+GO</pre></div></div>
+
+<p>
+<h2>OUTPUT clause and insert statements</h2>
+<p>This code uses a <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-5">Common Table Expression</a> combined with the <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-6">ROW_NUMBER</a> function to generate 10 rows. We then use the dateadd function to generate 10 different days. We insert these 10 rows into the TestOutput output table, this table has an identity column and the id will be generated by SQL Server. We use the output statement to return the id as well as the SomeCol column values. The nice thing with the OUTPUT clause compared to the SCOPE_IDENTITY function is that the OUTPUT clause will return all values, SCOPE_IDENTITY only returns the last value generated</p>
+<p>Run this code to see how it works</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">10</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> number
+<span class="kw1">from</span> sysobjects<span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestOutput
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>
+<span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>d,number,<span class="st0">'20110101'</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> CTE</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte AS(
+SELECT TOP 10 ROW_NUMBER() OVER(ORDER BY name) AS number
+from sysobjects)
+
+
+INSERT TestOutput
+OUTPUT inserted.id,inserted.SomeCol
+SELECT DATEADD(d,number,'20110101')
+FROM CTE</pre></div></div>
+
+<p>Output<br />
+
+<pre>id      SomeCol
+--      -----------------------
+1	2011-01-02 00:00:00.000
+2	2011-01-03 00:00:00.000
+3	2011-01-04 00:00:00.000
+4	2011-01-05 00:00:00.000
+5	2011-01-06 00:00:00.000
+6	2011-01-07 00:00:00.000
+7	2011-01-08 00:00:00.000
+8	2011-01-09 00:00:00.000
+9	2011-01-10 00:00:00.000
+10	2011-01-11 00:00:00.000</pre>
+<p></p>
+<p>If you check the table itself, you will see that you have exactly the same result as with the OUTPUT clause</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestOutput</pre></div></div>
+
+<p>
+<pre>id      SomeCol
+--      -----------------------
+1	2011-01-02 00:00:00.000
+2	2011-01-03 00:00:00.000
+3	2011-01-04 00:00:00.000
+4	2011-01-05 00:00:00.000
+5	2011-01-06 00:00:00.000
+6	2011-01-07 00:00:00.000
+7	2011-01-08 00:00:00.000
+8	2011-01-09 00:00:00.000
+9	2011-01-10 00:00:00.000
+10	2011-01-11 00:00:00.000</pre>
+<p></p>
+<p>Instead of outputting the results right back, you can insert them in a table, temporary table or table variable, I am showing you how to do it with a table variable</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @TableVar <span class="kw1">table</span> <span class="br0">&#40;</span>id <span class="kw1">int</span>,SomeDate <span class="kw1">datetime</span><span class="br0">&#41;</span>
+&nbsp;
+;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">10</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> number
+<span class="kw1">FROM</span> sysobjects<span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestOutput
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span> <span class="kw1">INTO</span> @TableVar
+<span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>d,number,<span class="st0">'20110101'</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> cte
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> @TableVar</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @TableVar table (id int,SomeDate datetime)
+
+;WITH cte AS(
+SELECT TOP 10 ROW_NUMBER() OVER(ORDER BY name) AS number
+FROM sysobjects)
+
+
+INSERT TestOutput
+OUTPUT inserted.id,inserted.SomeCol INTO @TableVar
+SELECT DATEADD(d,number,'20110101')
+FROM cte
+
+SELECT * FROM @TableVar</pre></div></div>
+
+<p>
+<pre>id      SomeCol
+--      -----------------------
+11	2011-01-02 00:00:00.000
+12	2011-01-03 00:00:00.000
+13	2011-01-04 00:00:00.000
+14	2011-01-05 00:00:00.000
+15	2011-01-06 00:00:00.000
+16	2011-01-07 00:00:00.000
+17	2011-01-08 00:00:00.000
+18	2011-01-09 00:00:00.000
+19	2011-01-10 00:00:00.000
+20	2011-01-11 00:00:00.000</pre>
+<h2>OUTPUT clause and delete statements</h2>
+<p>To return the rows that were deleted, you would use deleted.ColumnName instead of inserted.ColumnName.<br />
+In the code block below, we are deleting all rows that are 0 if we divide them by 5, this is accomplished by using the  modulo arithmetic operator which is % in T-SQL</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DELETE</span> TestOutput
+<span class="kw1">OUTPUT</span> deleted.<span class="me1">id</span>,deleted.<span class="me1">SomeCol</span>
+<span class="kw1">WHERE</span> id <span class="sy0">%</span> <span class="nu0">5</span> <span class="sy0">=</span> <span class="nu0">0</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DELETE TestOutput
+OUTPUT deleted.id,deleted.SomeCol
+WHERE id % 5 = 0</pre></div></div>
+
+<p>
+<pre>id      SomeCol
+--      -----------------------
+5	2011-01-06 00:00:00.000
+10	2011-01-11 00:00:00.000
+15	2011-01-06 00:00:00.000
+20	2011-01-11 00:00:00.000</pre>
+<p></p>
+<p>As you can see we get 4 rows back, if you check what is in the table now, you will see that those 4 rows are missing.</p>
+<p>
+<h2>OUTPUT clause and update statements</h2>
+<p>When you do an update statement, you will have the previous value (deleted) and the current value (inserted) available as part of the OUTPUT clause. Running the code below will output the value you had and the value that it got update to</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> TestOutput
+<span class="kw1">SET</span> SomeCol <span class="sy0">=</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>yy,<span class="nu0">1</span>,SomeCol<span class="br0">&#41;</span>
+<span class="kw1">OUTPUT</span> deleted.<span class="me1">id</span>,deleted.<span class="me1">SomeCol</span>,inserted.<span class="me1">SomeCol</span>
+<span class="kw1">WHERE</span> id in<span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">2</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE TestOutput
+SET SomeCol = dateadd(yy,1,SomeCol)
+OUTPUT deleted.id,deleted.SomeCol,inserted.SomeCol
+WHERE id in(1,2)</pre></div></div>
+
+<p>
+<pre>id      SomeCol                 SomeCol
+--      ----------------------- -----------------------
+1	2011-01-02 00:00:00.000	2012-01-02 00:00:00.000
+2	2011-01-03 00:00:00.000	2012-01-03 00:00:00.000</pre>
+<p></p>
+<p>That is all for today, come back tomorrow for another post</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-11/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

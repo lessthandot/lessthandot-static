@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>object pool &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/object-pool/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Generic Object Pool</title>
+		<link>/index.php/desktopdev/mstech/generic-object-pool/</link>
+		<comments>/index.php/desktopdev/mstech/generic-object-pool/#respond</comments>
+		<pubDate>Thu, 01 Apr 2010 23:08:41 +0000</pubDate>
+		<dc:creator><![CDATA[chaospandion]]></dc:creator>
+				<category><![CDATA[C#]]></category>
+		<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[.net]]></category>
+		<category><![CDATA[c#]]></category>
+		<category><![CDATA[object pool]]></category>
+		<category><![CDATA[sockets]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/04/generic-object-pool/</guid>
+		<description><![CDATA[Recently I was working with some socket programming using the SocketAsyncEventArgs class. When writing high performance .NET code it is a good idea to keep object creation to a minimum. Instead of creating a new SocketAsyncEventArgs instance every time an action was performed I decided to put together a simple generic object pool. I hope [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Recently I was working with some socket programming using the SocketAsyncEventArgs class. When writing high performance .NET code it is a good idea to keep object creation to a minimum. Instead of creating a new SocketAsyncEventArgs instance every time an action was performed I decided to put together a simple generic object pool. I hope you&#8217;ll try it out and leave me some feedback. </p>
+<pre>/// &lt;summary&gt;
+/// Represents a pool of objects with a size limit.
+/// &lt;/summary&gt;
+/// &lt;typeparam name="T"&gt;The type of object in the pool.&lt;/typeparam&gt;
+public sealed class ObjectPool&lt;T&gt; : IDisposable
+	where T : new()
+{
+	private readonly int size;
+	private readonly object locker;
+	private readonly Queue&lt;T&gt; queue;
+	private int count;
+
+
+	/// &lt;summary&gt;
+	/// Initializes a new instance of the ObjectPool class.
+	/// &lt;/summary&gt;
+	/// &lt;param name="size"&gt;The size of the object pool.&lt;/param&gt;
+	public ObjectPool(int size)
+	{
+        if (size &lt;= 0)
+        {
+            const string message = "The size of the pool must be greater than zero.";
+            throw new ArgumentOutOfRangeException("size", size, message);
+        }
+
+		this.size = size;
+		locker = new object();
+		queue = new Queue&lt;T&gt;();
+	}
+
+
+	/// &lt;summary&gt;
+	/// Retrieves an item from the pool. 
+	/// &lt;/summary&gt;
+	/// &lt;returns&gt;The item retrieved from the pool.&lt;/returns&gt;
+	public T Get()
+	{
+		lock (locker)
+		{
+			if (queue.Count &gt; 0)
+			{
+				return queue.Dequeue();
+			}
+
+			count++;
+			return new T();
+		}
+	}
+
+	/// &lt;summary&gt;
+	/// Places an item in the pool.
+	/// &lt;/summary&gt;
+	/// &lt;param name="item"&gt;The item to place to the pool.&lt;/param&gt;
+	public void Put(T item)
+	{
+		lock (locker)
+		{
+			if (count &lt; size)
+			{
+				queue.Enqueue(item);
+			}
+			else
+			{
+				using (item as IDisposable)
+				{
+					count--;
+				}
+			}
+		}
+	}
+
+	/// &lt;summary&gt;
+	/// Disposes of items in the pool that implement IDisposable.
+	/// &lt;/summary&gt;
+	public void Dispose()
+	{
+		lock (locker)
+		{
+            count = 0;
+			while (queue.Count &gt; 0)
+			{
+				using (queue.Dequeue() as IDisposable)
+				{
+
+				}
+			}
+		}
+	}
+}</pre>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/generic-object-pool/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

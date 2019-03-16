@@ -1,0 +1,745 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>David Forck (thirster42) &#8211; LessthanDot</title>
+	<atom:link href="/index.php/author/thirster42/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Surrogate Keys Bite Back</title>
+		<link>/index.php/datamgmt/datadesign/surrogate-keys-bite-back/</link>
+		<comments>/index.php/datamgmt/datadesign/surrogate-keys-bite-back/#respond</comments>
+		<pubDate>Wed, 15 Aug 2012 17:31:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/08/surrogate-keys-bite-back/</guid>
+		<description><![CDATA[Not too long ago I got a work order in that was requesting help with removing duplicate records out of a report.  This report, and the database it was built upon, was built solely by a co-worker that left two years ago.  This report just displayed a lis&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Not too long ago I got a work order in that was requesting help with removing duplicate records out of a report.  This report, and the database it was built upon, was built solely by a co-worker that left two years ago.  This report just displayed a list of project numbers and some data related to them.  I opened up the project table and voila!  I found some duplicate projects.  I noticed that the table had an identity field that was the primary key, but the project number didn’t have a unique index on it, leaving the table open to allow someone to put in the same project multiple times, either on purpose or accident.</p>
+<p>I dug further, and found the query that the report was running.  The query was joining several different tables together, but not on the primary keys.  Rather, the joins were on different fields in the tables that should have been unique in their respective tables, but weren’t.  This was causing reporting issues, but didn’t seem to cause any issues in the application itself, which I found interesting.</p>
+<p>So, looking through the database, I collected a list of things that were wrong:<br />
+1.	Not using the primary key column (the id column) as the foreign key in child tables<br />
+2.	Not using unique indexes on fields that obviously weren’t supposed to have duplicates in the table<br />
+3.	Joining on non-pk/fk fields expecting them to act like pk/fk fields</p>
+<p>So the takeaway from this is, if you’re going to have surrogate keys (i.e. id columns) in a table, you need to utilize them so that you get proper joining logic.  You should also have unique indexes to enforce the logic that one entity (ie a project number, employee, etc.) can only have one record.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/surrogate-keys-bite-back/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>How to create a simple cross tab report in Reporting Services 2008</title>
+		<link>/index.php/datamgmt/datadesign/how-to-create-a-simple/</link>
+		<comments>/index.php/datamgmt/datadesign/how-to-create-a-simple/#respond</comments>
+		<pubDate>Tue, 03 Jul 2012 16:13:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[SSRS]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/07/how-to-create-a-simple/</guid>
+		<description><![CDATA[I have created several cross tab reports in the last few years.  I have also seen several hacks with different ways to achieve what is actually already built into Reporting Services.  To begin, let’s define what a cross tab report is.
+
+
+According to&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I have created several cross tab reports in the last few years.  I have also seen several hacks with different ways to achieve what is actually already built into Reporting Services.  To begin, let’s define what a cross tab report is.</p>
+<p>According to Wikipedia, cross tab, or cross tabulation, means “the process of creating a contingency table from the multivariate frequency distribution of statistical variables.” To put that into laymen’s terms, you create a grid with a group of objects on the X (horizontal) axis and another group of objects on the Y (vertical) axis, and you then tally how many occurrences those two objects meet.</p>
+<p>For example, let’s say we want a cross tab of our computer inventory by department.  One axis would have our computer inventory types (desktop, laptop, tablet, smartphone) and the other axis would have our departments (IT, Finance, HR).  Here’s how it might look:</p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/crosstab/Sample Grid.png" alt="Sample Grid" title="Sample Grid" /></p>
+<p>This is a pretty simple and common problem that a lot of people have to solve.  Let’s take a look at this problem by starting with a database.  Create a new database and run this <a href="http://textsnip.com/126ac4">script</a>.  It should create and populate three tables.</p>
+<p>The key to a good report is great sql code.  This simple query will power our cross tab report:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> 
+&nbsp; &nbsp; it.<span class="me1">itName</span>,
+&nbsp; &nbsp; d.<span class="me1">depName</span>,
+&nbsp; &nbsp; <span class="kw2">count</span><span class="br0">&#40;</span>i.<span class="me1">PK_invID</span><span class="br0">&#41;</span> <span class="kw1">as</span> Total
+<span class="kw1">from</span> dbo.<span class="me1">Inventory</span> i
+&nbsp; &nbsp; <span class="kw1">inner</span> join dbo.<span class="me1">InventoryTypes</span> it
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> i.<span class="me1">FK_itID</span><span class="sy0">=</span>it.<span class="me1">PK_itID</span>
+&nbsp; &nbsp; <span class="kw1">inner</span> join dbo.<span class="me1">Departments</span> d
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> i.<span class="me1">FK_depID</span><span class="sy0">=</span>d.<span class="me1">PK_depID</span>
+<span class="kw1">group</span> <span class="kw1">by</span> it.<span class="me1">itName</span>,
+&nbsp; &nbsp; d.<span class="me1">depName</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select 
+	it.itName,
+	d.depName,
+	count(i.PK_invID) as Total
+from dbo.Inventory i
+	inner join dbo.InventoryTypes it
+		on i.FK_itID=it.PK_itID
+	inner join dbo.Departments d
+		on i.FK_depID=d.PK_depID
+group by it.itName,
+	d.depName</pre></div></div>
+
+<p>This query already exists in the stored procedure dbo.CrossTab that was created in the create script.  This is the stored procedure that our report is going to use.  If you execute the stored procedure, the numbers should look faintly like the numbers in the above grid, just laid out wrong.</p>
+<p>Now that the data is set up and we’ve got our query, we’ll create a Report Server project in BIDS.  For simplicity’s sake I’m going to assume you know how to set up a project, set up a data source, set up a new report file, and set up a new dataset (using the stored procedure dbo.CrossTab).  If any of these steps have you lost, please ask for guidance on our SQL Server forum.</p>
+<p>After getting everything set up, we should have a clean report file with a data source and data set all set up and ready to go.  We’ll start by dragging a matrix onto the report.  We’ll then set the matrix to use the data set we set up previously (I named mine dsInventory).  </p>
+<p>I then right-click the Row Group (at the bottom of the screen, this was automatically created for us when we created the matrix), select Group Properties, and set the Group On option to [itName].  I then set the Column Group to Group on [depName].  </p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/crosstab/RowGroup.png" alt="Row Group" title="Row Group" /></p>
+<p>Next, in the matrix itself where it says rows, I insert [itName].  Where Columns is I insert [depName].  After that I insert [Sum(Total)] in the data cell.  If I then preview the report I get the exact same grid as I showed earlier, except the ordering may be wrong.</p>
+<p>That’s it, that’s how much it takes to make a simple cross tab in Reporting Services.  Note that the dbo.CrossTab query actually saved us some processing time by not requiring the report to figure out the total.  We could have gotten the same results if we had just selected the raw data and let the report count each instance in the cross tab, but it’s a lot easier to figure out the totals in sql server than it is in reporting services in this instance. </p>
+<p>Also, if you need to have more than one grouping on an axis (say, Year then month) you would set up a child group using the Column or Row Groups with the parent group being the larger grouping (year) and the child group being the smaller grouping (month).  The designer should look something like this:</p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/crosstab/PS Designer.png" alt="Designer" title="Designer" /></p>
+<p>To summarize, some tasks are actually fairly simple to let reporting services do most of the work for you.  Getting this sort of result just in SQL Server is rather difficult and time consuming.  I hope you were able to follow along and learn a new trick that can save you time and effort on future projects.  If you have any questions please don&#8217;t hesitate to ask.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/how-to-create-a-simple/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Server Developer Tips and Tricks</title>
+		<link>/index.php/datamgmt/datadesign/sql-server-developer-tips-and/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-server-developer-tips-and/#comments</comments>
+		<pubDate>Mon, 23 Apr 2012 12:25:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/04/sql-server-developer-tips-and/</guid>
+		<description><![CDATA[This blog is to share and highlight some of the tips and tricks that I’ve learned while using SQL Server the last few years.  Some of these are code oriented, database design,  or performance oriented, while others focus on personal development. 
+
+You&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This blog is to share and highlight some of the tips and tricks that I’ve learned while using SQL Server the last few years.  Some of these are code oriented, database design,  or performance oriented, while others focus on personal development. Hopefully you&#8217;ll learn at least one thig from this blog.</p>
+<h2>You don’t have to type out the columns</h2>
+<p>If you’re using SQL Server Management Studios (SSMS) 2005 or higher, you can tell SSMS to script out select statements for you.  To do this, right-click the table, go to Script Table As – Select To – New Query Editor Window . You can alternatively script to the clipboard if you already have a script open and just want to paste in there .  This will open up a new window with your select statement.  </p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/DevTT/devtt1.png" alt="scritping select to" title="scripting select to" /></p>
+<p>A bonus (or down side) is that SQL Server automatically wraps each column with brackets, so if your column names have odd characters (such as spaces) this will always work.  Another bonus is consistency.  Using this method you will always be sure to have all of the columns in the table, so if you’re forgetful this method is perfect for you.</p>
+<h2>Use a spreadsheet to help build your update statement</h2>
+<p>Sometimes you need to write a very long query that follows a certain pattern.  One pattern could be an update statement comparing one table to another, and updating the destination table if there are any changes.  The query could look something like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">update</span> dbo.<span class="me1">DestinationTable</span>
+<span class="kw1">set</span>
+&nbsp; &nbsp; Column1 <span class="sy0">=</span> s.<span class="me1">Column1</span>,
+&nbsp; &nbsp; Column2 <span class="sy0">=</span> s.<span class="me1">Column2</span>,
+&nbsp; &nbsp; Column3 <span class="sy0">=</span> s.<span class="me1">Column3</span>,
+&nbsp; &nbsp; Column4 <span class="sy0">=</span> s.<span class="me1">Column4</span>,
+&nbsp; &nbsp; Column5 <span class="sy0">=</span> s.<span class="me1">Column5</span>,
+&nbsp; &nbsp; Column6 <span class="sy0">=</span> s.<span class="me1">Column6</span>,
+&nbsp; &nbsp; Column7 <span class="sy0">=</span> s.<span class="me1">Column7</span>,
+&nbsp; &nbsp; Column8 <span class="sy0">=</span> s.<span class="me1">Column8</span>,
+&nbsp; &nbsp; Column9 <span class="sy0">=</span> s.<span class="me1">Column9</span>,
+&nbsp; &nbsp; Column10 <span class="sy0">=</span> s.<span class="me1">Column10</span> &nbsp; 
+<span class="kw1">from</span> dbo.<span class="me1">DestinationTable</span> d
+&nbsp; &nbsp; <span class="kw1">inner</span> join dbo.<span class="me1">SourceTable</span> s
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> d.<span class="me1">ID</span><span class="sy0">=</span>s.<span class="me1">ID</span>&nbsp; &nbsp; 
+<span class="kw1">where</span>
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column1</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column1</span>,<span class="st0">'null'</span><span class="br0">&#41;</span>&nbsp; &nbsp; or
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column2</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column2</span>,<span class="st0">'null'</span><span class="br0">&#41;</span>&nbsp; &nbsp; or
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column3</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column3</span>,<span class="st0">'null'</span><span class="br0">&#41;</span>&nbsp; &nbsp; or
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column4</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column4</span>,<span class="st0">'null'</span><span class="br0">&#41;</span>&nbsp; &nbsp; or
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column5</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column5</span>,<span class="st0">'null'</span><span class="br0">&#41;</span>&nbsp; &nbsp; or
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column6</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column6</span>,<span class="st0">'null'</span><span class="br0">&#41;</span>&nbsp; &nbsp; or
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column7</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column7</span>,<span class="st0">'null'</span><span class="br0">&#41;</span>&nbsp; &nbsp; or
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column8</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column8</span>,<span class="st0">'null'</span><span class="br0">&#41;</span>&nbsp; &nbsp; or
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column9</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column9</span>,<span class="st0">'null'</span><span class="br0">&#41;</span>&nbsp; &nbsp; or
+&nbsp; &nbsp; isnull<span class="br0">&#40;</span>d.<span class="me1">Column10</span>,<span class="st0">'null'</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> isnull<span class="br0">&#40;</span>s.<span class="me1">Column10</span>,<span class="st0">'null'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">update dbo.DestinationTable
+set
+	Column1 = s.Column1,
+	Column2 = s.Column2,
+	Column3 = s.Column3,
+	Column4 = s.Column4,
+	Column5 = s.Column5,
+	Column6 = s.Column6,
+	Column7 = s.Column7,
+	Column8 = s.Column8,
+	Column9 = s.Column9,
+	Column10 = s.Column10	
+from dbo.DestinationTable d
+	inner join dbo.SourceTable s
+		on d.ID=s.ID	
+where
+	isnull(d.Column1,'null') &lt;&gt; isnull(s.Column1,'null')	or
+	isnull(d.Column2,'null') &lt;&gt; isnull(s.Column2,'null')	or
+	isnull(d.Column3,'null') &lt;&gt; isnull(s.Column3,'null')	or
+	isnull(d.Column4,'null') &lt;&gt; isnull(s.Column4,'null')	or
+	isnull(d.Column5,'null') &lt;&gt; isnull(s.Column5,'null')	or
+	isnull(d.Column6,'null') &lt;&gt; isnull(s.Column6,'null')	or
+	isnull(d.Column7,'null') &lt;&gt; isnull(s.Column7,'null')	or
+	isnull(d.Column8,'null') &lt;&gt; isnull(s.Column8,'null')	or
+	isnull(d.Column9,'null') &lt;&gt; isnull(s.Column9,'null')	or
+	isnull(d.Column10,'null') &lt;&gt; isnull(s.Column10,'null')</pre></div></div>
+
+<p>Building an update statement like this can get pretty tiring, especially if you’ve got several that you need to write.  A way to speed up this process is by copying the list of columns (which can be gotten using the steps outlined in “You don’t have to type out the columns”) into a premade spreadsheet that looks like this:</p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/DevTT/devtt2.png" alt="premade excel spreadsheet" title="premade excel spreadsheet" /></p>
+<p>You then copy the cells to the appropriate spots in your sql query and run a hand full of find and replace commands and voila, your update statement is done.</p>
+<h2>Filters are your friends</h2>
+<p>Again, if you are using SSMS and working in a large database, SSMS has the functionality to filter what objects you can see.  This makes working in a large database a lot easier because you can quickly find what you are looking for.  To do this, right click on either the Tables, Views, or Stored Procedures Folder, select Filter – Filter Settings</p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/DevTT/devtt3.png" alt="filters!" title="filters!" /></p>
+<p>In the screen that pops up, you can set the filter in many different ways.</p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/DevTT/devtt4.png" alt="filter settings" title="filter settings" /></p>
+<p>Play with this to find out what works best for you.  At my organization we have what are called Code Generated Stored Procedures.  All of these stored procedure’s names start with “_”.  So to only look at custom code I tell the filter to only show stored procedures that don’t contain an underscore.</p>
+<h2>Make sure your relationships are set up</h2>
+<p>One of the easiest things to do when setting up a new database is to forget to set up the relationships between tables.  In a large database or during development of an application, it’s easy to forget to set up the relationship for a new table.  LessThanDot’s SQLCop has a section for detecting missing foreign keys (as well as other nifty things).  Get it for free here: http://sqlcop.lessthandot.com/</p>
+<h2>Tools are your best friends</h2>
+<p>While SQL Server Management Studios is far and above a better tool than trying to do everything in a command prompt, it doesn’t do everything for you when it comes to managing deployments.  There are several tools out there that can do this for you.  Red Gate’s SQL Developer Bundle is a collection of their database tools.  It’s a bit pricy, but the ROI is phenomenal and is worth having for every database developer.  They even offer a free trial.  Check it out here: <a href="http://www.red-gate.com/products/sql-development/sql-developer-bundle/">SQL Developer Bundle</a></p>
+<p>Another nifty tool is SQL Sentry’s Plan Explorer.  Plan Explorer gives you a detailed layout of what’s going on with your sql query.  It’ll tell you which parts are costing the most performance wise.  There’s a free version and a version you have to purchase.  Check them out here: <a href="http://www.sqlsentry.net/plan-explorer/sql-server-query-view.asp">SQL Server Query View</a></p>
+<h3>Get a Code Generator</h3>
+<p>Gode generators are another tool that can vastly reduce the amount of time it takes to develop a database.  Where I work at one of our application developers took the time to create an in-house code generator for our databases.  It iterates through a database and creates insert, update, delete, and select statements for each table.  This internal tool has saved us a lot of time and energy by providing a consistent base to start from.  I don’t know a lot about what code generators are available, but I highly suggest trying to find one that works for you.</p>
+<h2>Don’t be afraid to ask</h2>
+<p>One of the biggest mistakes a developer can do is not ask a question, no matter how small and trivial it may seem.  There are numerous resources online for getting answer.  Here’s my personal list of where I go for answers:</p>
+<ul>
+<li>www.lessthandot.com</li>
+<li>www.stackoverflow.com</li>
+<li>www.dba.stackexchange.com</li>
+<li>www.sqlservercentral.com</li>
+<li><a href="https://twitter.com/#!/search/%23sqlhelp">#sqlhelp on twitter</a></li>
+</ul>
+<h2>Follow someone</h2>
+<p>Finding someone that you greatly enjoy listening to and reading content from can greatly improve your overall abilities and knowledge pool.  About half a year after I started database development I stumbled upon SQLDenis’ blog on LessThanDot.  I started following him on there and I’ve learned quite a bit from him.  About a year or so ago I started following Brent Ozar,  and I’ve learned more about the hardware side of SQL Server and other DBA features than I would have otherwise.  Now that Kendra Little and Jeremiah Peschka are blogging for Brent Ozar PLF, the blogs on www.brentozar.com have become even more diverse.</p>
+<p>The SQL Server community is blessed with many active community members that are more than willing to share their knowledge with the rest of the world.  Follow one of them and you’ll be thanking yourself later.</p>
+<p>Ted Krueger wrote a blog about mentors and mentoring here: <a href="/index.php/ITProfessionals/ProfessionalDevelopment/mentoring-as-i-see-it">Mentoring As I See It</a></p>
+<h2>Schemas, it’s what’s for dinner</h2>
+<p>In SQL Server 2005+, you can break out tables, views, and stored procedures into schemas.  A schema is a security object that allows you to separate objects, similar to folders on your hard drive.  You can’t nest schemas though, but they are still pretty nifty.  This leans a bit more towards administration, but I believe that database developers should know how to utilize schemas.</p>
+<p>Let’s say you’ve got a database with 10 tables, and out of those 10 tables your users can insert, update, and delete against 5 of them.  The other 5 they can only read from.  In a database where they’re all in the dbo schema, it’d look something like this:</p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/DevTT/devtt5.png" alt="tables without schemas" title="tables without schemas" /></p>
+<p>To set up proper security you’d have to assign security by table (read permissions and read/write permissions).  This is somewhat messy and doesn’t update if new tables are added.  A better way is to break the tables into two schemas, a read only schema and a read/write schema.  The following is an example of how it could look:</p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/DevTT/devtt6.png" alt="tables with schemas" title="tables with schemas" /></p>
+<p>With this set up, you can now assign security at the schema level, and every new table added now has security set up on it.  Easy, right?  Play with schemas and see how you can utilize them to your advantage.</p>
+<h2>Fine Tune SSMS Options</h2>
+<p>SQL Server Management Studios has a lot of options to play with.  One option that I have disabled is the “Use [database]” statement that you get whenever you script out a table.  To change this I went to Tools – Options.  Then went to SQL Server Object Explorer – Scripting, and changed “Script USE [database]” to false.</p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/DevTT/devtt7.png" alt="getting to the options" title="getting to the options" /></p>
+<p><img src="/wp-content/uploads/blogs/DataMgmt/thirster42/DevTT/devtt8.png" alt="options window" title="options window" /></p>
+<p>There are loads of options that you can choose from.  Some examples include:</p>
+<ul>
+<li>Hiding system objects in Object Explorer</li>
+<li>Enabling/disabling Line Numbers</li>
+<li>Advanced execution settings (set nocount, set noexec, etc.)</li>
+<li>Results to Grid, Text, or File</li>
+</ul>
+<p>That&#8217;s all that I can think of for now.  If you&#8217;ve got any tips or tricks, or a favorite person that you follow, please share it in the comments below, or even write your own blog and link us to it.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-server-developer-tips-and/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>Managing your filegroups</title>
+		<link>/index.php/datamgmt/datadesign/managing-your-filegroups/</link>
+		<comments>/index.php/datamgmt/datadesign/managing-your-filegroups/#respond</comments>
+		<pubDate>Fri, 23 Mar 2012 12:29:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/03/managing-your-filegroups/</guid>
+		<description><![CDATA[It’s 4 PM; do you know what’s in your filegroups are?
+
+I found myself having this inner monologue the other day after I pushed a database form dev to test.  On the dev server I had split the database into two filegroups, one to store the data for the&#8230;]]></description>
+				<content:encoded><![CDATA[<p>It’s 4 PM; do you know what&#8217;s in your filegroups?</p>
+<p>I found myself having this inner monologue the other day after I pushed a database form dev to test.  On the dev server I had split the database into two filegroups, one to store the data for the staging tables, and one to store the data for the end results.  The files essentially looked like this:</p>
+<p><img src="/wp-content/uploads/blogs/DataMgmt/thirster42/FG1.png" alt="Database Files" title="Database Files" /></p>
+<p>I realized that I hadn’t generated the file groups or extra files on the second server.  I created them and then used this query to find out where the tables and indexes were:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="kw1">distinct</span>
+&nbsp; &nbsp; s.<span class="me1">name</span> <span class="kw1">as</span> SchemaName,
+&nbsp; &nbsp; t.<span class="me1">name</span> <span class="kw1">as</span> TableName,
+&nbsp; &nbsp; i.<span class="me1">name</span> <span class="kw1">as</span> IndexName,
+&nbsp; &nbsp; fg.<span class="me1">name</span> <span class="kw1">as</span> FileGroupName
+<span class="kw1">from</span> sys.<span class="me1">tables</span> t
+&nbsp; &nbsp; <span class="kw1">inner</span> join sys.<span class="me1">indexes</span> i
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> t.<span class="kw2">object_id</span><span class="sy0">=</span>i.<span class="kw2">object_id</span>
+&nbsp; &nbsp; <span class="kw1">inner</span> join sys.<span class="me1">schemas</span> s
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> t.<span class="me1">schema_id</span><span class="sy0">=</span>s.<span class="me1">schema_id</span>
+&nbsp; &nbsp; <span class="kw1">inner</span> join sys.<span class="me1">filegroups</span> fg
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> i.<span class="me1">data_space_id</span><span class="sy0">=</span>fg.<span class="me1">data_space_id</span>
+<span class="kw1">order</span> <span class="kw1">by</span> s.<span class="me1">name</span>, t.<span class="me1">name</span>, fg.<span class="me1">name</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select distinct
+	s.name as SchemaName,
+	t.name as TableName,
+	i.name as IndexName,
+	fg.name as FileGroupName
+from sys.tables t
+	inner join sys.indexes i
+		on t.object_id=i.object_id
+	inner join sys.schemas s
+		on t.schema_id=s.schema_id
+	inner join sys.filegroups fg
+		on i.data_space_id=fg.data_space_id
+order by s.name, t.name, fg.name</pre></div></div>
+
+<p>In SSMS, as long as you don’t have a lot of data in the table, the tables (aka the clustered indexes) are easy to move.  Just right click- design on the table and change the filegroup (and text/image filegroup) to secondary and save.  </p>
+<p><img src="/wp-content/uploads/blogs/DataMgmt/thirster42/FG2.png" alt="Properties" title="Properties" /></p>
+<p>Behind the scenes SSMS will create a new table with the same structure on the filegroup, copy the data, drop the old table and rename the new table to the appropriate name.  Now do you see why it matters how much data you have?  If you’ve got a lot of data then you need to drop the Clustered index, move it, and then recreate the Clustered Index.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Blah</span> <span class="kw1">DROP</span> <span class="kw1">CONSTRAINT</span> PK_Blah <span class="kw1">WITH</span> <span class="br0">&#40;</span>MOVE <span class="kw1">TO</span> Secondary<span class="br0">&#41;</span>
+GO
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Blah</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span> PK_Blah <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span><span class="br0">&#40;</span>blah1<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.Blah DROP CONSTRAINT PK_Blah WITH (MOVE TO Secondary)
+GO
+ALTER TABLE dbo.Blah ADD CONSTRAINT PK_Blah PRIMARY KEY(blah1)
+GO</pre></div></div>
+
+<p>Now you can rerun the query to see where all the indexes are.  If you have any non-clustered indexes you’ll notice that they didn’t get moved to the secondary filegroup when you moved the table.  GRR! However, this could be a good thing if you want to seperate out the reeds for your non-clustered and clustered indexes.  For my purposes I chose to keep them on the same filegroup.</p>
+<p>To move the stragglers using SSMS right click-properties on the index, go to storage, change the filegroup, and click ok.  This should move the index.</p>
+<p> <img src="/wp-content/uploads/blogs/DataMgmt/thirster42/FG3.png" alt="Index Properties" title="Index Properties" /></p>
+<p>Behind the scenes SQL Server will just run a create statement, utilizing the DROP_EXISTING command to delete the index if it already exists:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> <span class="br0">&#91;</span>IDX_Blah<span class="br0">&#93;</span> <span class="kw1">ON</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Blah<span class="br0">&#93;</span> 
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>ColA<span class="br0">&#93;</span> <span class="kw1">ASC</span>
+<span class="br0">&#41;</span><span class="kw1">WITH</span> <span class="br0">&#40;</span>PAD_<span class="sy0">IN</span>DEX &nbsp;<span class="sy0">=</span> <span class="kw1">OFF</span>, STATISTICS_N<span class="sy0">OR</span>ECOMPUTE &nbsp;<span class="sy0">=</span> <span class="kw1">OFF</span>, S<span class="sy0">OR</span>T_<span class="sy0">IN</span>_TEMPDB <span class="sy0">=</span> <span class="kw1">OFF</span>, IGN<span class="sy0">OR</span>E_DUP_KEY <span class="sy0">=</span> <span class="kw1">OFF</span>, DROP_EXIST<span class="sy0">IN</span>G <span class="sy0">=</span> <span class="kw1">ON</span>, ONL<span class="sy0">IN</span>E <span class="sy0">=</span> <span class="kw1">OFF</span>, <span class="sy0">ALL</span>OW_ROW_LOCKS &nbsp;<span class="sy0">=</span> <span class="kw1">ON</span>, <span class="sy0">ALL</span>OW_PAGE_LOCKS &nbsp;<span class="sy0">=</span> <span class="kw1">ON</span>, <span class="kw1">FILLFACTOR</span> <span class="sy0">=</span> <span class="nu0">95</span><span class="br0">&#41;</span> <span class="kw1">ON</span> <span class="br0">&#91;</span>Secondary<span class="br0">&#93;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX [IDX_Blah] ON [dbo].[Blah] 
+(
+	[ColA] ASC
+)WITH (PAD_INDEX  = OFF, STATISTICS_NORECOMPUTE  = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, DROP_EXISTING = ON, ONLINE = OFF, ALLOW_ROW_LOCKS  = ON, ALLOW_PAGE_LOCKS  = ON, FILLFACTOR = 95) ON [Secondary]</pre></div></div>
+
+<p>So now you should be able to figure out what filegroups all of your objects are on and be able to move them.  For further reading on filegroups read <a href="/index.php/DataMgmt/DBAdmin/sql-server-filegroups-the-what">SQL Server Filegroups: The What, The Why and The How<br />
+</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/managing-your-filegroups/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Setting up Kerberos authentication between SQL Servers</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/setting-up-kerberos-authentication-between/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/setting-up-kerberos-authentication-between/#comments</comments>
+		<pubDate>Wed, 07 Mar 2012 12:58:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/03/setting-up-kerberos-authentication-between/</guid>
+		<description><![CDATA[Throughout the last couple of years I’ve constantly heard that using SA for linked servers is a horrible idea.  Setting up another SQL account with full rights to a server for the link is just about as bad an idea.  If only there was some way to pass th&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Throughout the last couple of years I’ve constantly heard that using SA for linked servers is a horrible idea.  Setting up another SQL account with full rights to a server for the link is just about as bad an idea.  If only there was some way to pass the user’s authentication between servers….</p>
+<p>Oh wait, there is!  Thanks to Kerberos authentication we can set up our SQL Servers to pass authentication of a user from one place to another, and now a user will never see anything that they weren’t supposed to see!</p>
+<p>Here are the steps I followed in order to get this to work for me.</p>
+<p><strong>1. SQL Service Accounts</strong><br />
+To do this you need a couple of users to be set up as your service accounts.  Generally you want a separate user for each service so that if one account is compromised/locked out not all of your instances are compromised.  These accounts will need to be set up to log on as a service.  You then go into configuration manager and set the accounts up for the services (this will require the services to restart).</p>
+<p><strong>2. Set SPN’s</strong><br />
+The service principal name is essentially what tells the servers that they trust each other.  To do this you will need domain admin privileges and to run the following commands for each server.  Also make sure that the service is off when you run these.</p>
+<p>SETSPN –A MSSQLSvc/[server name].[domain].com [domain][service account]<br />
+SETSPN –A MSSQLSvc/[server name].[domain].com:1433 [domain][service account]</p>
+<p>So an example would look like this:<br />
+SETSPN –A MSSQLSvc/sql1.thirsterdomain.com thirsterdomainsql1ServiceAccount<br />
+SETSPN –A MSSQLSvc/sql1.thirsterdomain.com:1433 thirsterdomainsql1ServiceAccount</p>
+<p><strong>3. Set up linked servers</strong><br />
+The very last thing to do is to set up the linked server on each server.  So if we had SQL1 and SQL2 we’d run the following commands:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--run this on sql2</span>
+<span class="kw1">exec</span> <span class="kw3">sp_addlinkedserver</span> @server<span class="sy0">=</span><span class="st0">'sql1'</span>, @srvproduct<span class="sy0">=</span><span class="st0">''</span>, @provider<span class="sy0">=</span><span class="st0">'SQLNCLI'</span>, &nbsp;@provstr<span class="sy0">=</span><span class="st0">'Integrated Security=SSPI'</span>
+go
+<span class="kw1">exec</span> <span class="kw3">sp_addlinkedsrvlogin</span> <span class="st0">'sql2'</span>,<span class="st0">'true'</span>
+&nbsp;
+<span class="co1">--run this on sql1</span>
+<span class="kw1">exec</span> <span class="kw3">sp_addlinkedserver</span> @server<span class="sy0">=</span><span class="st0">'sql2'</span>, @srvproduct<span class="sy0">=</span><span class="st0">''</span>, @provider<span class="sy0">=</span><span class="st0">'SQLNCLI'</span>, &nbsp;@provstr<span class="sy0">=</span><span class="st0">'Integrated Security=SSPI'</span>
+go
+<span class="kw1">exec</span> <span class="kw3">sp_addlinkedsrvlogin</span> <span class="st0">'sql2'</span>,<span class="st0">'true'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--run this on sql2
+exec sp_addlinkedserver @server='sql1', @srvproduct='', @provider='SQLNCLI',  @provstr='Integrated Security=SSPI'
+go
+exec sp_addlinkedsrvlogin 'sql2','true'
+
+--run this on sql1
+exec sp_addlinkedserver @server='sql2', @srvproduct='', @provider='SQLNCLI',  @provstr='Integrated Security=SSPI'
+go
+exec sp_addlinkedsrvlogin 'sql2','true'</pre></div></div>
+
+<p>If you have any questions or any issues with getting this working leave a comment.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/setting-up-kerberos-authentication-between/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Using multi-select parameters?  Then you might need to do this.</title>
+		<link>/index.php/datamgmt/datadesign/using-multi-select-parameters-then/</link>
+		<comments>/index.php/datamgmt/datadesign/using-multi-select-parameters-then/#respond</comments>
+		<pubDate>Mon, 20 Feb 2012 12:04:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/02/using-multi-select-parameters-then/</guid>
+		<description><![CDATA[I’ve created SQL Server Reporting Services reports with Multi-Select parameters before.  In fact it’s pretty par for the course for me now.  I recently ran into an issue with one of my reports that I had never seen before.  Every so often I’d get an err&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I’ve created SQL Server Reporting Services reports with Multi-Select parameters before.  In fact it’s pretty par for the course for me now.  I recently ran into an issue with one of my reports that I had never seen before.  Every so often I’d get an error stating “operation cannot run due to current state of the object.”  Perplexed, I did some searching.  At first I came across this <a href="http://social.msdn.microsoft.com/Forums/en-US/sqlreportingservices/thread/cb6ede72-6ed1-4379-9d3c-847c11b75b32
+">thread</a> on msdn.</p>
+<p>Sri vobilisetti basically says to go to c:program milesmicrosoft sql servermsrs10.mssqlserverreporting servicesReportManager and modify the web config file by adding  <code class="codespan">  &lt;add key=”aspnet:MaxHttpCollectionKeys” value=”10000” /&gt; </code> to the appsettings section.</p>
+<p>I tried what sri vobilisetti posted, and it fixed my issue.  But I still didn’t really understand what caused the issue, so I did some digging into what MaxHttpCollectionKeys was.  I eventually found a StackOverflow post that goes into some <a href="http://stackoverflow.com/questions/8684049/asp-net-ms11-100-how-can-i-change-the-limit-on-the-maximum-number-of-posted-for
+">detail</a>.</p>
+<p>So, from my understanding there was a .Net framework update that limited the number of variables that can be sent via a post in a website.</p>
+<p>So, basically what that means is if you have a report with multi-select parameters, and you select over a certain number of parameters to run your report on, you’ll get the error “operation cannot run due to current state of the object” because you’ve exceeded the amount of posted data the .Net framework allows.</p>
+<p>Not everyone will experience this issue.  If your multi-select parameters only have a handful of options, you shouldn&#8217;t ever run into this issue.  However, if you have parameters that contain a lot of options, then you&#8217;ll most likely want to change the default value, otherwise you run the risk of an error getting thrown.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/using-multi-select-parameters-then/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>You should be watching</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/you-should-be-watching/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/you-should-be-watching/#comments</comments>
+		<pubDate>Wed, 09 Nov 2011 13:17:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/11/you-should-be-watching/</guid>
+		<description><![CDATA[Have you been watching Brent Ozar PLF’s Technology Triage Tuesdays?  If you’re not, you should.  I’ve been watching for the last couple of months, and every web cast is a golden nugget of information.  However, don’t feel blue for missing out on this gr&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Have you been watching Brent Ozar PLF’s Technology Triage Tuesdays?  If you’re not, you should.  I’ve been watching for the last couple of months, and every web cast is a golden nugget of information.  However, don’t feel blue for missing out on this great opportunity because Brent, Jeremiah, Kendra, and Tim record each webcast and post it on their site, <a href="http://www.brentozar.com/">BrentOzar.com</a>.</p>
+<p>Here’s a few of the ones that I’ve watched that I’ve enjoyed and learned a lot:<br />
+<a href="http://www.brentozar.com/archive/2011/11/theres-something-about-nolock-webcast-video/">There&#8217;s something about nolock</a><br />
+<a href="http://www.brentozar.com/archive/2011/11/how-tell-when-tempdb-problem-webcast-video/">How to tell when tempdb is a problem</a><br />
+<a href="http://www.brentozar.com/archive/2011/09/how-plan-sql-server-virtualization-project/">How to plan a sql server virtualization project</a><br />
+<a href="http://www.brentozar.com/archive/2011/09/kendra-little-explains-how-design-smarter-indexes/">How to design smarter indexes</a></p>
+<p>They also have an easy list of free training videos, but they’re not always as adamant to keep this list up to date with the Tech Triage Tuesday videos.  It can be found here:  http://www.brentozar.com/sql-server-training-videos/</p>
+<p>Their upcoming web casts can be found here: https://brentozarevents.webex.com/mw0306ld/mywebex/default.do?siteurl=brentozarevents</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/you-should-be-watching/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Database space use</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/database-space-use/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/database-space-use/#comments</comments>
+		<pubDate>Mon, 24 Oct 2011 18:46:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/10/database-space-use/</guid>
+		<description><![CDATA[I was doing some research on my SQL Servers and wanted to know just how much disk space an instance's database were taking up.  Since the databases on this instance are across a couple of different arrays and backups and other stuff exist on the server,&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I was doing some research on my SQL Servers and wanted to know just how much disk space an instance&#8217;s database were taking up.  Since the databases on this instance are across a couple of different arrays and backups and other stuff exist on the server, I figured i&#8217;d write some t-sql to figure out this question.  Here&#8217;s what I wrote:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">SUM</span><span class="br0">&#40;</span><span class="kw1">SIZE</span><span class="sy0">*</span><span class="nu0">8</span><span class="br0">&#41;</span><span class="sy0">/</span><span class="nu0">1024.0</span><span class="sy0">/</span><span class="nu0">1024.0</span> 
+<span class="kw1">FROM</span> master.<span class="me1">sys</span>.<span class="me1">sysaltfiles</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT SUM(SIZE*8)/1024.0/1024.0 
+FROM master.sys.sysaltfiles</pre></div></div>
+
+<p>That select statement shows me exactly how much space an entire instance (2005+) is taking up (save for any database in any state besides just online).  This isn&#8217;t just the size of the data, but rather the space that the database files have taken up.</p>
+<p>One particular use I have for this is determining how much junk is on my server taking up space and gives me a reason to grumble at people.</p>
+<p>So, what&#8217;s your biggest instance?  Mine&#8217;s currently 268gb.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/database-space-use/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>Red Gate SQL Toolbelt Review</title>
+		<link>/index.php/datamgmt/dbadmin/red-gate-sql-server-database/</link>
+		<comments>/index.php/datamgmt/dbadmin/red-gate-sql-server-database/#comments</comments>
+		<pubDate>Mon, 08 Aug 2011 13:32:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/08/red-gate-sql-server-database/</guid>
+		<description><![CDATA[So I’ve had Redgate’s SQL Toolbelt for about a year now, but up until recently I hadn’t used most of the tools available to me.  But with the current push we’re making with trying to straighten out our processes I’ve been playing with everything to get&#8230;]]></description>
+				<content:encoded><![CDATA[<p>So I’ve had Redgate’s <a href="http://www.red-gate.com/products/sql-development/sql-toolbelt/" target="_new">SQL Toolbelt</a> for about a year now, but up until recently I hadn’t used most of the tools available to me.  But with the current push we’re making with trying to straighten out our processes I’ve been playing with everything to get a feel for how they work and if I want to actually use them.  So far I’ve been fairly impressed with every piece of software provided by Redgate.  Here’s my quick review of the SQL Toolbelt</p>
+<p><strong>SQL Compare</strong><br />
+This is the tool that I primarily had my eyes on when I first started asking for the SQL Toolbelt, and I’ve loved it ever since.  Before we got SQL Compare I was manually creating scripts to copy data down from prod/test, creating backups, then copying and restarting from the backups to push changes to test/prod.  Now I just back up the database, do a sql compare, and run the script that’s generated.  Out of all of the tools, this is the one that I’d recommend the most.</p>
+<p><strong>SQL Data Compare</strong><br />
+SQL Data Compare has saved me so much time since we’ve gotten it that it probably pays for the entire license for the SQL Toolbelt in a year.  It allows me to compare the data between two databases on the same server or different servers, script the difference, and then copy and paste the script to the target.  I now no longer have to manually create scripts to copy any data, and I no longer have to move around backups.  This is a must if you prefer updating your test and dev data with what’s in production.</p>
+<p><strong>SQL Dependency Tracker</strong><br />
+SQL Dependency Track is a very interesting tool, and is a life saver on complicated databases, because when you need to make a change to a table you can find exactly which views, sps, etc. will be effected by the update.  A great time saver and a great investment.</p>
+<p><strong>SQL Comparison SDK</strong><br />
+Something that I haven’t played with.</p>
+<p><strong>SQL Packager</strong><br />
+Another tool that I haven’t gotten to play with.</p>
+<p><strong>SQL Prompt</strong><br />
+SQL Prompt is the one tool that I’ve had rounds with.  It sometimes has a mind of its own, but once you get used to it it’s a great utility to have when you’re writing new scripts or modifying old ones.  The fact that you can set up your own custom way of formatting sql and then just hit a keystroke to format what’s on the screen is worth the price of admission (and pain), especially if you’re working on old code that’s not formatted at all.</p>
+<p><strong>SQL Doc</strong><br />
+SQL Doc is a pretty neat tool.  It allows you to connect to a database and it presents you with all of the objects in the database.  You can then make remarks on different parts of the object, and it then saves those remarks in the database in extended properties.  So what that means is that if you manage to lose your SQL Doc project, all you have to do is reconnect to the database with SQL Doc and voila! You’ve got all of your documentation back.  The other neat part is that if you use SQL Compare the documentation gets pushed to your test and dev servers (assuming you do your documentation on your dev server first). It’s a great tool for anyone that has to do any sort of database validation, or just needs to document their database.</p>
+<p><strong>SQL Backup</strong><br />
+I have all of my backups scheduled in SQL Server via maintenance plans and jobs. I’ve got several servers that I’m backing up.  This tool allows me to add of my servers and track the backups.  The only gripe I’ve got is that I can’t zoom out past a couple of days to see the whole week.  Great tool for those managing backups on multiple servers.</p>
+<p><strong>SQL Monitor</strong><br />
+I got to play with SQL Monitor for a while with it installed on my local machine, and it was pretty awesome.  I had so much data on my servers that I literally didn’t know where to start.  I was able to quickly figure everything out though, and it even helped me avert a couple of crisis.  Sadly I haven’t been able to get licenses to let me monitor every server I have.  I highly recommend this for any DBA, or any dev house that doesn’t have a dedicated DBA.</p>
+<p><strong>SQL Multi Script</strong><br />
+I understand the use of this tool, but I haven’t really had a need for it, so it’s gone overlooked for now.</p>
+<p><strong>SQL Data Generator</strong><br />
+This is another tool that I haven’t really had a need to use.  With the databases/applications that we work on we typically have a source of data that’s going into the database.  I look forward to testing this tool though when the time comes for it.</p>
+<p><strong>SQL Object Level Recovery Native</strong><br />
+I haven’t gotten around to playing with this tool.</p>
+<p><strong>SQL Source Control</strong><br />
+I’ll admit it, I hate having Visual Studios open if I don’t need to.  I’ll also admit that I love me a user interface to create a database instead of writing scripts.  Enter SQL Source Control.  It integrates with Management Studios and whatever source control you have set up, so now you can commit changes from Management Studios after you make changes to the database, instead of having to go into VS and update the scripts and then deploy.  A great tool for developers wanting to source control their databases.</p>
+<p><strong>SQL Search</strong><br />
+A search engine for you database.  Great for those days when you just can’t remember the full name of the stored procedure you were working on.</p>
+<p>Overall the SQL Toolbelt from Red Gate is more than worth what Red Gate’s charging for it, and with every update they push they just get better and better.  I highly recommend it for anyone doing development work in SQL Server, or DBA’s needing to track development work.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/red-gate-sql-server-database/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Saving Table Space (Quick And Dirty)</title>
+		<link>/index.php/datamgmt/datadesign/saving-table-space-quick-and/</link>
+		<comments>/index.php/datamgmt/datadesign/saving-table-space-quick-and/#comments</comments>
+		<pubDate>Mon, 13 Jun 2011 21:07:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/06/saving-table-space-quick-and/</guid>
+		<description><![CDATA[One of the quickest and easiest ways to make a database more performant is to reduce how much space the data takes up.  Here’s a script that I wrote that’ll find each table in a database (run it in the context of the database).  This script determines h&#8230;]]></description>
+				<content:encoded><![CDATA[<p>One of the quickest and easiest ways to make a database more performant is to reduce how much space the data takes up.  Here’s a script that I wrote that’ll find each table in a database (run it in the context of the database).  This script determines how many rows of data each table has (in kilobytes), determines the size of the data in the table, and then gives you a ratio of data per row.  The higher a data/row ratio the more likely there is a chance of reducing the amount of space   (note that I’m not looking at table indexes or fill factors, those are another topic to cover).</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @tables <span class="kw1">table</span> <span class="br0">&#40;</span>name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span>, ID <span class="kw1">int</span> <span class="kw1">identity</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span>, cnt <span class="kw1">int</span>, <span class="kw1">size</span> <span class="kw1">int</span><span class="br0">&#41;</span>
+<span class="kw1">declare</span> @i <span class="kw1">int</span>, @<span class="kw2">count</span> <span class="kw1">int</span>, @name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span>, @<span class="kw1">sql</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">insert</span> <span class="kw1">into</span> @tables
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span>name<span class="br0">&#41;</span>
+<span class="kw1">select</span> 
+TABLE_SCHEMA <span class="sy0">+</span> <span class="st0">'.'</span> <span class="sy0">+</span> TABLE_NAME
+<span class="kw1">from</span> <span class="sy0">IN</span>F<span class="sy0">OR</span>MATION_SCHEMA.<span class="me1">tables</span>
+<span class="kw1">where</span> TABLE_TYPE<span class="sy0">=</span><span class="st0">'base table'</span>
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">select</span> @<span class="kw2">count</span><span class="sy0">=</span><span class="kw2">count</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">from</span> @tables
+<span class="kw1">set</span> @i<span class="sy0">=</span><span class="nu0">1</span>
+&nbsp;
+<span class="kw1">while</span> @i<span class="sy0">&amp;</span>lt;<span class="sy0">=</span>@<span class="kw2">count</span>
+<span class="kw1">begin</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">create</span> <span class="kw1">table</span> #temp
+&nbsp; &nbsp; <span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">rows</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; reserved <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">data</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; index_size <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; unused <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">select</span> @name<span class="sy0">=</span>name <span class="kw1">from</span> @tables <span class="kw1">where</span> ID<span class="sy0">=</span>@i
+&nbsp; &nbsp; <span class="kw1">insert</span> <span class="kw1">into</span> #temp
+&nbsp; &nbsp; <span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; name, <span class="kw1">rows</span>, reserved, <span class="kw1">data</span>, index_size, unused
+&nbsp; &nbsp; <span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">exec</span> <span class="kw3">sp_spaceused</span> @name
+&nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">update</span> @tables
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">set</span> <span class="kw1">size</span><span class="sy0">=</span><span class="kw1">left</span><span class="br0">&#40;</span><span class="kw1">data</span>,<span class="kw2">len</span><span class="br0">&#40;</span><span class="kw1">data</span><span class="br0">&#41;</span><span class="sy0">-</span><span class="nu0">3</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; cnt<span class="sy0">=</span><span class="kw1">rows</span>
+&nbsp; &nbsp; <span class="kw1">from</span> #temp a
+&nbsp; &nbsp; &nbsp; &nbsp; cross join @tables b
+&nbsp; &nbsp; <span class="kw1">where</span> b.<span class="me1">id</span><span class="sy0">=</span>@i
+&nbsp;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">drop</span> <span class="kw1">table</span> #temp
+&nbsp; &nbsp; <span class="kw1">set</span> @i<span class="sy0">=</span>@i<span class="sy0">+</span><span class="nu0">1</span>
+<span class="kw1">end</span>
+&nbsp;
+&nbsp;
+<span class="kw1">select</span> <span class="sy0">*</span>,
+<span class="br0">&#40;</span><span class="kw1">size</span><span class="sy0">*</span><span class="nu0">1.0</span><span class="br0">&#41;</span><span class="sy0">/</span>cnt <span class="kw1">as</span> Ratio
+<span class="kw1">from</span> @tables
+<span class="kw1">where</span> cnt<span class="sy0">&amp;</span>gt;<span class="nu0">0</span>
+<span class="kw1">order</span> <span class="kw1">by</span> <span class="br0">&#40;</span><span class="kw1">size</span><span class="sy0">*</span><span class="nu0">1.0</span><span class="br0">&#41;</span><span class="sy0">/</span>cnt <span class="kw1">desc</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @tables table (name varchar(max), ID int identity(1,1), cnt int, size int)
+declare @i int, @count int, @name varchar(max), @sql varchar(max)
+
+insert into @tables
+        (name)
+select 
+TABLE_SCHEMA + '.' + TABLE_NAME
+from INFORMATION_SCHEMA.tables
+where TABLE_TYPE='base table'
+
+ 
+
+select @count=count(*) from @tables
+set @i=1
+
+while @i&amp;lt;=@count
+begin
+
+	create table #temp
+	(
+		name varchar(max),
+		rows varchar(max),
+		reserved varchar(max),
+		data varchar(max),
+		index_size varchar(max),
+		unused varchar(max)
+	)
+
+	select @name=name from @tables where ID=@i
+	insert into #temp
+	(
+		name, rows, reserved, data, index_size, unused
+	)
+	exec sp_spaceused @name
+	
+	update @tables
+		set size=left(data,len(data)-3),
+		cnt=rows
+	from #temp a
+		cross join @tables b
+	where b.id=@i
+
+
+	drop table #temp
+	set @i=@i+1
+end
+
+
+select *,
+(size*1.0)/cnt as Ratio
+from @tables
+where cnt&amp;gt;0
+order by (size*1.0)/cnt desc</pre></div></div>
+
+<p>So after this runs on a database the first row will be the table that has the highest ratio.  Here are some quick ways to reduce your data size:<br />
+•	Change nvarchar to varchar<br />
+•	Reduce decimal precision<br />
+•	Change unnecessary chars to varchars (and update the data to get rid of the extra spacing)<br />
+•	Change ints to bits (when applicable)<br />
+•	Change datetimes to dates<br />
+•	Remove unnecessary columns<br />
+•	Remove dead rows<br />
+•       Reduce big int > int > small int > tinyint</p>
+<p>Now I know some people might be thinking that some of these seem like very small changes, but one byte multiplied by 1k is still 1 kb of data.  If you can effectively remove 10 bytes per row (which isn’t that hard depending on the data types), in a 1k table you can effectively save 10kb of data.  That’s 10kb less of data that has to be accessed in memory, accessed from the hard drive, sent over the wire, backed up, or possibly stored in index/es, all on just one table!</p>
+<p>Remember to always research your changes and test everything first before pushing changes to a production system; you never know when something might need that extra piece of data.</p>
+<p>One way that you might be interested in modifying the script is by changing the where clause to have a ratio of >=8.  This is signifigant because sql server stores data on 8k pages, and if you&#8217;re completely filling, or going over that, you could have additional speed and space issues.  You could also set the count minimum to something like 10 or so to get rid of any small lookup tables you may have.</p>
+<p>For more information on data types and sizes, look <a href="http://msdn.microsoft.com/en-us/library/ms187752.aspx">here</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/saving-table-space-quick-and/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,1011 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>compression &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/compression/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Find all the tables and indexes that have data compression</title>
+		<link>/index.php/datamgmt/datadesign/find-all-the-tables-and/</link>
+		<comments>/index.php/datamgmt/datadesign/find-all-the-tables-and/#comments</comments>
+		<pubDate>Fri, 16 Nov 2012 17:32:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[compression]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[partitioning]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/11/find-all-the-tables-and/</guid>
+		<description><![CDATA[I took a backup of one of our test databases today and gave it to someone so that it could be restored on one of their servers.
+
+I got back the following in an email from the person who tried to do the restore
+
+
+
+Date                      11/16/20&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I took a backup of one of our test databases today and gave it to someone so that it could be restored on one of their servers.</p>
+<p>I got back the following in an email from the person who tried to do the restore</p>
+<p><em></p>
+<p>Date                      11/16/2012 12:58:16 PM<br />
+Log                         SQL Server (Current &#8211; 11/16/2012 1:00:00 PM)</p>
+<p>Source                  spid76</p>
+<p>Message<br />
+Database &#8216;YourCrappyDB&#8217; cannot be started in this edition of SQL Server because part or all of object &#8216;CrappyIndexData&#8217; is enabled with data compression or vardecimal storage format. Data compression and vardecimal storage format are only supported on SQL Server Enterprise Edition.</em></p>
+<p>Okay, so they are running the standard edition of SQL Server. How can you quickly find all the tables and indexes that use compression? Let&#8217;s take a look, first we are going to create three tables, a heap, a table with a non clustered index and a table with a clustered index</p>
+<p>A table without indexes (a heap)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompress<span class="br0">&#40;</span>SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">1000</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> TestCompress
+REBUILD PARTITION <span class="sy0">=</span> <span class="sy0">ALL</span> <span class="kw1">WITH</span> <span class="br0">&#40;</span>DATA_COMPRESSION <span class="sy0">=</span> &nbsp;PAGE<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestCompress(SomeCol VARCHAR(1000))
+GO
+
+ALTER TABLE TestCompress
+REBUILD PARTITION = ALL WITH (DATA_COMPRESSION =  PAGE)</pre></div></div>
+
+<p>A table with a non clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--Non clustered index</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompress2<span class="br0">&#40;</span>SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> null<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IX_TestCompress2 
+&nbsp; &nbsp; <span class="kw1">ON</span> TestCompress2 <span class="br0">&#40;</span>SomeCol<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span> DATA_COMPRESSION <span class="sy0">=</span> <span class="kw1">ROW</span> <span class="br0">&#41;</span> ; 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--Non clustered index
+CREATE TABLE TestCompress2(SomeCol VARCHAR(100) NOT null)
+GO
+
+CREATE NONCLUSTERED INDEX IX_TestCompress2 
+    ON TestCompress2 (SomeCol)
+WITH ( DATA_COMPRESSION = ROW ) ; 
+GO</pre></div></div>
+
+<p>A table with a clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--Clustered index</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompress3<span class="br0">&#40;</span>SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> null<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_TestCompress3 
+&nbsp; &nbsp; <span class="kw1">ON</span> TestCompress3 <span class="br0">&#40;</span>SomeCol<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span> DATA_COMPRESSION <span class="sy0">=</span> <span class="kw1">ROW</span> <span class="br0">&#41;</span> ; 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--Clustered index
+CREATE TABLE TestCompress3(SomeCol VARCHAR(100) NOT null)
+GO
+
+CREATE CLUSTERED INDEX IX_TestCompress3 
+    ON TestCompress3 (SomeCol)
+WITH ( DATA_COMPRESSION = ROW ) ; 
+GO</pre></div></div>
+
+<p>Here is the query that will give you the table name, the storage type, the index name if there is one and the type of compression</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span>
+SCHEMA_NAME<span class="br0">&#40;</span>o.<span class="me1">schema_id</span><span class="br0">&#41;</span> &nbsp;<span class="sy0">+</span> <span class="st0">'.'</span> <span class="sy0">+</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>o.<span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">AS</span> TableName,
+i.<span class="me1">name</span> <span class="kw1">AS</span> IndexName,
+p.<span class="me1">data_compression_desc</span> <span class="kw1">AS</span> CompressionType,
+i.<span class="me1">type_desc</span> <span class="kw1">AS</span> StorageType
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span> &nbsp;p 
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">objects</span> o 
+<span class="kw1">ON</span> p.<span class="kw2">object_id</span> <span class="sy0">=</span> o.<span class="kw2">object_id</span> 
+<span class="sy0">JOIN</span> sys.<span class="me1">indexes</span> i 
+<span class="kw1">ON</span> p.<span class="kw2">object_id</span> <span class="sy0">=</span> i.<span class="kw2">object_id</span>
+<span class="sy0">AND</span> i.<span class="me1">index_id</span> <span class="sy0">=</span> p.<span class="me1">index_id</span>
+<span class="kw1">WHERE</span> p.<span class="me1">data_compression</span> <span class="sy0">&gt;</span> <span class="nu0">0</span> 
+<span class="sy0">AND</span> SCHEMA_NAME<span class="br0">&#40;</span>o.<span class="me1">schema_id</span><span class="br0">&#41;</span> <span class="sy0">&lt;&gt;</span> <span class="st0">'SYS'</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT DISTINCT
+SCHEMA_NAME(o.schema_id)  + '.' + OBJECT_NAME(o.object_id) AS TableName,
+i.name AS IndexName,
+p.data_compression_desc AS CompressionType,
+i.type_desc AS StorageType
+FROM sys.partitions  p 
+INNER JOIN sys.objects o 
+ON p.object_id = o.object_id 
+JOIN sys.indexes i 
+ON p.object_id = i.object_id
+AND i.index_id = p.index_id
+WHERE p.data_compression &gt; 0 
+AND SCHEMA_NAME(o.schema_id) &lt;&gt; 'SYS' </pre></div></div>
+
+<p>Here is the output of that query</p>
+<div class="tables">
+<table>
+<tr>
+<th> TableName </th>
+<th> IndexName </th>
+<th> CompressionType </th>
+<th> StorageType </th>
+</tr>
+<tr>
+<td> dbo.TestCompress </td>
+<td>NULL</td>
+<td> PAGE </td>
+<td> HEAP </td>
+</tr>
+<tr>
+<td> dbo.TestCompress2 </td>
+<td> IX_TestCompress2 </td>
+<td> ROW </td>
+<td> NONCLUSTERED </td>
+</tr>
+<tr>
+<td> dbo.TestCompress3 </td>
+<td> IX_TestCompress3 </td>
+<td> ROW </td>
+<td> CLUSTERED </td>
+</tr>
+</table>
+</div>
+<p>Now why do I have a distinct in my query? The reason is that if you have your indexes/tables partitioned you will get more than one row per index. you can add p.rows to the select portion of the queries and you will see how many rows each partition holds</p>
+<p>Hopefully this will help someone in the future</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/find-all-the-tables-and/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Compressing files with NTFS compression by running compact from the command line</title>
+		<link>/index.php/sysadmins/os/windows/vista/compressing-files-with-ntfs-compression/</link>
+		<comments>/index.php/sysadmins/os/windows/vista/compressing-files-with-ntfs-compression/#respond</comments>
+		<pubDate>Wed, 22 Jun 2011 14:11:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[2003 Server]]></category>
+		<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[Vista]]></category>
+		<category><![CDATA[Windows 7]]></category>
+		<category><![CDATA[XP]]></category>
+		<category><![CDATA[compression]]></category>
+		<category><![CDATA[ntfs]]></category>
+		<category><![CDATA[zip]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/06/compressing-files-with-ntfs-compression/</guid>
+		<description><![CDATA[You know that you can right click on a file/folder, select properties, click advanced and then compress contents to save disk space(see image).
+
+
+
+
+Did you know that you can call this from the command line also? I just saw this on  Raymond Chen's b&#8230;]]></description>
+				<content:encoded><![CDATA[<p>You know that you can right click on a file/folder, select properties, click advanced and then compress contents to save disk space(see image).</p>
+<p><a href="http://www.flickr.com/photos/denisgobo/5860004203/" title="compress by Denis Gobo, on Flickr"><img src="http://farm6.static.flickr.com/5277/5860004203_c847a70cac.jpg" width="394" height="300" alt="compress" /></a></p>
+<p>Did you know that you can call this from the command line also? I just saw this on  Raymond Chen&#8217;s blog today: http://blogs.msdn.com/b/oldnewthing/archive/2011/06/22/10177613.aspx</p>
+<p>I decided to try it out</p>
+<p>The command is compact , here are all the switches</p>
+<pre>C:UsersSQLDenis&gt;compact /?
+Displays or alters the compression of files on NTFS partitions.
+
+COMPACT [/C | /U] [/S[:dir]] [/A] [/I] [/F] [/Q] [filename [...]]
+
+  /C        Compresses the specified files.  Directories will be marked
+            so that files added afterward will be compressed.
+  /U        Uncompresses the specified files.  Directories will be marked
+            so that files added afterward will not be compressed.
+  /S        Performs the specified operation on files in the given
+            directory and all subdirectories.  Default "dir" is the
+            current directory.
+  /A        Displays files with the hidden or system attributes.  These
+            files are omitted by default.
+  /I        Continues performing the specified operation even after errors
+            have occurred.  By default, COMPACT stops when an error is
+            encountered.
+  /F        Forces the compress operation on all specified files, even
+            those which are already compressed.  Already-compressed files
+            are skipped by default.
+  /Q        Reports only the most essential information.
+  filename  Specifies a pattern, file, or directory.
+
+  Used without parameters, COMPACT displays the compression state of
+  the current directory and any files it contains. You may use multiple
+  filenames and wildcards.  You must put spaces between multiple
+  parameters.</pre>
+<p>I have a temp folder on my C drive, first I want to see if anything is compressed, I will run <strong>compact /Q</strong> to get some information</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="dos"><thead><tr><td colspan="2"  class="head">DOS</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1">c:Temp<span class="sy0">&gt;</span>compact /Q
+&nbsp;
+&nbsp;Listing c:Temp
+&nbsp;New files added to this directory will <span class="kw2">not</span> be compressed.
+&nbsp;
+&nbsp;
+Of 8 files within 1 directories
+0 are compressed and 8 are <span class="kw2">not</span> compressed.
+1,833,822 total bytes of data are stored <span class="kw1">in</span> 1,833,822 bytes.
+The compression ratio is 1.0 to 1.</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">c:Temp&gt;compact /Q
+
+ Listing c:Temp
+ New files added to this directory will not be compressed.
+
+
+Of 8 files within 1 directories
+0 are compressed and 8 are not compressed.
+1,833,822 total bytes of data are stored in 1,833,822 bytes.
+The compression ratio is 1.0 to 1.</pre></div></div>
+
+<p>Now, I want to compress those files, I will do that with the <strong>compact /C</strong> command</p>
+<pre>c:Temp&gt;compact /C
+
+ Setting the directory c:Temp to compress new files [OK]
+
+ Compressing files in c:Temp
+
+ChartingUsage.abf      352256 :    143360 = 2.5 to 1 [OK]
+ipconfig.txt            28482 :      8192 = 3.5 to 1 [OK]
+Test.pcf.vpn              982 :       982 = 1.0 to 1 [OK]
+test.csv                 8375 :      4096 = 2.0 to 1 [OK]
+test.htm                25204 :      8192 = 3.1 to 1 [OK]
+test2.csv                8375 :      4096 = 2.0 to 1 [OK]
+TestDB.BAK            1395200 :    258048 = 5.4 to 1 [OK]
+tshoot.txt              14948 :      8192 = 1.8 to 1 [OK]
+
+9 files within 2 directories were compressed.
+1,833,822 total bytes of data are stored in 435,158 bytes.
+The compression ratio is 4.2 to 1.</pre>
+<p>Now I can run <strong>compact /Q</strong> again to get some information</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="dos"><thead><tr><td colspan="2"  class="head">DOS</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1">c:Temp<span class="sy0">&gt;</span>compact /Q
+&nbsp;
+&nbsp;Listing c:Temp
+&nbsp;New files added to this directory will be compressed.
+&nbsp;
+&nbsp;
+Of 8 files within 1 directories
+8 are compressed and 0 are <span class="kw2">not</span> compressed.
+1,833,822 total bytes of data are stored <span class="kw1">in</span> 435,158 bytes.
+The compression ratio is 4.2 to 1.</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">c:Temp&gt;compact /Q
+
+ Listing c:Temp
+ New files added to this directory will be compressed.
+
+
+Of 8 files within 1 directories
+8 are compressed and 0 are not compressed.
+1,833,822 total bytes of data are stored in 435,158 bytes.
+The compression ratio is 4.2 to 1.</pre></div></div>
+
+<p>As you can see, the files are compressed and the ratio is 4.2 to 1</p>
+<p>Hopefully this will be useful for some of you that copy files and then want to compress files after the copy process is done</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/vista/compressing-files-with-ntfs-compression/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Do You Get A Benefit From Compressing Backups If You Already Have Compressed Data?</title>
+		<link>/index.php/datamgmt/datadesign/do-you-get-a-benefit-from-compressing-ba/</link>
+		<comments>/index.php/datamgmt/datadesign/do-you-get-a-benefit-from-compressing-ba/#comments</comments>
+		<pubDate>Tue, 02 Mar 2010 16:07:27 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[backups]]></category>
+		<category><![CDATA[compression]]></category>
+		<category><![CDATA[restores]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/03/do-you-get-a-benefit-from-compressing-ba/</guid>
+		<description><![CDATA[Do you benefit from compressed backups if your data is compressed already? This was a question that was asked recently; I thought that the question was interesting and decided to do some testing. Here is what we will do; we will create two databases with only one table. In one database we will use page [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Do you benefit from compressed backups if your data is compressed already? This was a question that was asked recently; I thought that the question was interesting and decided to do some testing.</p>
+<p>Here is what we will do; we will create two databases with only one table. In one database we will use page level compression and in the other database we won&#8217;t use compression. After that we will backup each database twice, once with backup compression and once without backup compression. After that, we will do restore from these backups. After doing all these, we will find out if data compression makes backup compression faster. We will also find out if using backup compression on a database that uses data compression will result in a smaller backup file. At the bottom of this post you will see a table that has all these numbers in one spot.</p>
+<p>
+<h1>Setup scripts</h1>
+<p>Let&#8217;s get started, first we will create the database that will not use compression</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>master<span class="br0">&#93;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestUncompressed<span class="br0">&#93;</span> <span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestUncompressed_Data'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:DbTestTestUncompressed_Data.mdf'</span> &nbsp; <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestUncompressed_Log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:DbTestTestUncompressed_Log.ldf'</span> &nbsp;<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestUncompressed<span class="br0">&#93;</span> <span class="kw1">SET</span> RECOVERY &nbsp;SIMPLE
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [master]
+GO
+
+CREATE DATABASE [TestUncompressed] ON  PRIMARY 
+( NAME = N'TestUncompressed_Data', FILENAME = N'C:DbTestTestUncompressed_Data.mdf'   )
+ LOG ON 
+( NAME = N'TestUncompressed_Log', FILENAME = N'C:DbTestTestUncompressed_Log.ldf'  )
+GO
+
+ALTER DATABASE [TestUncompressed] SET RECOVERY  SIMPLE
+GO</pre></div></div>
+
+<p>Now we will create the database that will use data compression</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>master<span class="br0">&#93;</span>
+GO
+<span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestCompressed<span class="br0">&#93;</span> <span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestCompressed_Data'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:DbTestTestCompressed_Data.mdf'</span> &nbsp; <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestCompressed_Log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:DbTestTestCompressed_Log.ldf'</span> &nbsp;<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestCompressed<span class="br0">&#93;</span> <span class="kw1">SET</span> RECOVERY &nbsp;SIMPLE
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [master]
+GO
+CREATE DATABASE [TestCompressed] ON  PRIMARY 
+( NAME = N'TestCompressed_Data', FILENAME = N'C:DbTestTestCompressed_Data.mdf'   )
+ LOG ON 
+( NAME = N'TestCompressed_Log', FILENAME = N'C:DbTestTestCompressed_Log.ldf'  )
+GO
+
+ALTER DATABASE [TestCompressed] SET RECOVERY  SIMPLE
+GO</pre></div></div>
+
+<p>The following block of code will create a table with 3 million rows in the database that will not use compression</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>TestUncompressed<span class="br0">&#93;</span>
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test <span class="br0">&#40;</span>SomeCol <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SomeDate <span class="kw1">DATETIME</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SomeChar <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">30</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SomeGuid <span class="kw1">UNIQUEIDENTIFIER</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> ci_test <span class="kw1">ON</span> Test<span class="br0">&#40;</span>SomeCol, SomeDate, SomeChar<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> Test <span class="br0">&#40;</span>SomeCol, SomeDate, SomeChar, SomeGuid<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> x.<span class="me1">Number</span>, 
+&nbsp; &nbsp; <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DATE</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span>mi,Number,<span class="st0">'20100101'</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="kw2">DATENAME</span><span class="br0">&#40;</span><span class="kw1">MONTH</span>,<span class="br0">&#40;</span><span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DATE</span>,<span class="kw2">DATEADD</span><span class="br0">&#40;</span>hh,Number,<span class="st0">'20100101'</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">'2010'</span>,
+&nbsp; &nbsp; NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp;<span class="kw1">FROM</span> <span class="br0">&#40;</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">3000000</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span> <span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> s.<span class="me1">id</span><span class="br0">&#41;</span> <span class="kw1">AS</span> Number
+&nbsp;<span class="kw1">FROM</span> master..<span class="me1">sysobjects</span> s 
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> master..<span class="me1">sysobjects</span> s2<span class="br0">&#41;</span> x</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [TestUncompressed]
+GO
+
+
+CREATE TABLE Test (SomeCol INT NOT NULL,
+					SomeDate DATETIME NOT NULL,
+					SomeChar CHAR(30) NOT NULL,
+					SomeGuid UNIQUEIDENTIFIER NOT NULL)
+					
+					
+GO
+
+CREATE CLUSTERED INDEX ci_test ON Test(SomeCol, SomeDate, SomeChar)
+GO
+
+INSERT Test (SomeCol, SomeDate, SomeChar, SomeGuid)
+SELECT x.Number, 
+	CONVERT(DATE,DATEADD(mi,Number,'20100101')),
+	DATENAME(MONTH,(CONVERT(DATE,DATEADD(hh,Number,'20100101')))) + '2010',
+	NEWID()
+	
+	 FROM (					
+SELECT TOP 3000000 ROW_NUMBER() OVER (ORDER BY s.id) AS Number
+ FROM master..sysobjects s 
+CROSS JOIN master..sysobjects s2) x</pre></div></div>
+
+<p>The following block of code will create a table with 3 million rows in the database that will use data compression</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> <span class="br0">&#91;</span>TestCompressed<span class="br0">&#93;</span>
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test <span class="br0">&#40;</span>SomeCol <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SomeDate <span class="kw1">DATETIME</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SomeChar <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">30</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SomeGuid <span class="kw1">UNIQUEIDENTIFIER</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>
+GO
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+<span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> ci_test <span class="kw1">ON</span> Test<span class="br0">&#40;</span>SomeCol, SomeDate, SomeChar<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DATA_COMPRESSION <span class="sy0">=</span> PAGE<span class="br0">&#41;</span>
+GO
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp;
+<span class="kw1">INSERT</span> Test <span class="br0">&#40;</span>SomeCol, SomeDate, SomeChar, SomeGuid<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> <span class="br0">&#91;</span>TestUncompressed<span class="br0">&#93;</span>..<span class="me1">Test</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE [TestCompressed]
+GO
+
+
+CREATE TABLE Test (SomeCol INT NOT NULL,
+					SomeDate DATETIME NOT NULL,
+					SomeChar CHAR(30) NOT NULL,
+					SomeGuid UNIQUEIDENTIFIER NOT NULL)
+GO
+					
+CREATE CLUSTERED INDEX ci_test ON Test(SomeCol, SomeDate, SomeChar)
+WITH (DATA_COMPRESSION = PAGE)
+GO
+					
+					
+
+INSERT Test (SomeCol, SomeDate, SomeChar, SomeGuid)
+SELECT * FROM [TestUncompressed]..Test</pre></div></div>
+
+<p>
+<h1>Backups</h1>
+<p>Now it is time to do the backups, we will do 4 backups. Each database will be backed up compressed and uncompressed. Here is the code that will do that. I use the <em>C:DbTest</em> folder, if you want to run this, code make sure that you create that folder.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> TestCompressed <span class="kw1">TO</span> <span class="kw1">DISK</span><span class="sy0">=</span><span class="st0">'C:DbTestTestCompressedBackupCompressed.bak'</span> 
+<span class="kw1">WITH</span> &nbsp;COMPRESSION
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> TestCompressed <span class="kw1">TO</span> <span class="kw1">DISK</span><span class="sy0">=</span><span class="st0">'C:DbTestTestCompressedBackupUnCompressed.bak'</span> 
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> TestUncompressed <span class="kw1">TO</span> <span class="kw1">DISK</span><span class="sy0">=</span><span class="st0">'C:DbTestTestUncompressedBackupCompressed.bak'</span> 
+<span class="kw1">WITH</span> &nbsp;COMPRESSION
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> TestUncompressed <span class="kw1">TO</span> <span class="kw1">DISK</span><span class="sy0">=</span><span class="st0">'C:DbTestTestUncompressedBackupUnCompressed.bak'</span> 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BACKUP DATABASE TestCompressed TO DISK='C:DbTestTestCompressedBackupCompressed.bak' 
+WITH  COMPRESSION
+GO
+
+
+BACKUP DATABASE TestCompressed TO DISK='C:DbTestTestCompressedBackupUnCompressed.bak' 
+GO
+
+
+BACKUP DATABASE TestUncompressed TO DISK='C:DbTestTestUncompressedBackupCompressed.bak' 
+WITH  COMPRESSION
+GO
+
+
+BACKUP DATABASE TestUncompressed TO DISK='C:DbTestTestUncompressedBackupUnCompressed.bak' 
+GO</pre></div></div>
+
+<p>Here are the times that each backup took.<br />
+<span class="MT_smaller"><em>Processed 11640 pages FOR DATABASE &#8216;TestCompressed&#8217;, FILE &#8216;TestCompressed_Data&#8217; ON FILE 1.<br />
+Processed 2 pages FOR DATABASE &#8216;TestCompressed&#8217;, FILE &#8216;TestCompressed_Log&#8217; ON FILE 1.<br />
+<strong>BACKUP DATABASE successfully processed 11642 pages IN 5.483 seconds (16.587 MB/sec).</strong></p>
+<p>Processed 11640 pages FOR DATABASE &#8216;TestCompressed&#8217;, FILE &#8216;TestCompressed_Data&#8217; ON FILE 1.<br />
+Processed 1 pages FOR DATABASE &#8216;TestCompressed&#8217;, FILE &#8216;TestCompressed_Log&#8217; ON FILE 1.<br />
+<strong>BACKUP DATABASE successfully processed 11641 pages IN 6.461 seconds (14.076 MB/sec).</strong></p>
+<p>Processed 25496 pages FOR DATABASE &#8216;TestUncompressed&#8217;, FILE &#8216;TestUncompressed_Data&#8217; ON FILE 1.<br />
+Processed 2 pages FOR DATABASE &#8216;TestUncompressed&#8217;, FILE &#8216;TestUncompressed_Log&#8217; ON FILE 1.<br />
+<strong>BACKUP DATABASE successfully processed 25498 pages IN 9.167 seconds (21.729 MB/sec).</strong></p>
+<p>Processed 25496 pages FOR DATABASE &#8216;TestUncompressed&#8217;, FILE &#8216;TestUncompressed_Data&#8217; ON FILE 1.<br />
+Processed 1 pages FOR DATABASE &#8216;TestUncompressed&#8217;, FILE &#8216;TestUncompressed_Log&#8217; ON FILE 1.<br />
+<strong>BACKUP DATABASE successfully processed 25497 pages IN 14.243 seconds (13.985 MB/sec).</strong><br />
+</em></span></p>
+<p>Here is also a chart showing you the backup times in seconds.<br />
+<img src="/wp-content/uploads/blogs/DataMgmt//BackupChart4.PNG" alt="" title="" width="554" height="409" /><br />
+<em>1 = TestCompressedBackupCompressed.bak<br />
+2 = TestCompressedBackupUnCompressed.bak<br />
+3 = TestUncompressedBackupCompressed.bak<br />
+4 = TestUncompressedBackupUnCompressed.bak</em></p>
+<p>Below is an image showing the sizes of the backups. As you can see, the compressed backup is only a third of the size of the uncompressed backup from the database that had the uncompressed table. When using a compressed backup against a table that was already using data compression the size of the backup drops from 90MB to 60MB. in this case the size is 66% of the uncompressed size.</p>
+<p><img src="/wp-content/uploads/blogs/DataMgmt//CompressedSizes.PNG" alt="" title="" width="445" height="152" /></p>
+<p>
+<h1>Restores</h1>
+<p>Now let&#8217;s do the restores.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> master 
+GO
+&nbsp;
+<span class="kw1">RESTORE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestCompressed<span class="br0">&#93;</span> 
+<span class="kw1">FROM</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'C:DbTestTestCompressedBackupCompressed.bak'</span> 
+<span class="kw1">WITH</span> &nbsp;<span class="kw1">FILE</span> <span class="sy0">=</span> <span class="nu0">1</span>, &nbsp;NOUNLOAD, &nbsp;<span class="kw2">REPLACE</span>, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">10</span>
+GO
+&nbsp;
+<span class="co1">--RESTORE DATABASE successfully processed 11642 pages in 22.601 seconds (4.024 MB/sec).</span>
+&nbsp;
+<span class="kw1">RESTORE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestCompressed<span class="br0">&#93;</span> 
+<span class="kw1">FROM</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'C:DbTestTestCompressedBackupUnCompressed.bak'</span> 
+<span class="kw1">WITH</span> &nbsp;<span class="kw1">FILE</span> <span class="sy0">=</span> <span class="nu0">1</span>, &nbsp;NOUNLOAD, &nbsp;<span class="kw2">REPLACE</span>, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">10</span>
+GO
+&nbsp;
+<span class="co1">--RESTORE DATABASE successfully processed 11641 pages in 23.593 seconds (3.854 MB/sec).</span>
+&nbsp;
+&nbsp;
+<span class="kw1">RESTORE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestUncompressed<span class="br0">&#93;</span> 
+<span class="kw1">FROM</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'C:DbTestTestUncompressedBackupCompressed.bak'</span> 
+<span class="kw1">WITH</span> &nbsp;<span class="kw1">FILE</span> <span class="sy0">=</span> <span class="nu0">1</span>, &nbsp;NOUNLOAD, &nbsp;<span class="kw2">REPLACE</span>, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">10</span>
+GO
+<span class="co1">--RESTORE DATABASE successfully processed 25498 pages in 29.337 seconds (6.789 MB/sec)</span>
+&nbsp;
+<span class="kw1">RESTORE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestUncompressed<span class="br0">&#93;</span> 
+<span class="kw1">FROM</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'C:DbTestTestUncompressedBackupUnCompressed.bak'</span> 
+<span class="kw1">WITH</span> &nbsp;<span class="kw1">FILE</span> <span class="sy0">=</span> <span class="nu0">1</span>, &nbsp;NOUNLOAD, &nbsp;<span class="kw2">REPLACE</span>, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">10</span>
+GO
+<span class="co1">--RESTORE DATABASE successfully processed 25497 pages in 32.358 seconds (6.155 MB/sec).</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE master 
+GO
+
+RESTORE DATABASE [TestCompressed] 
+FROM  DISK = N'C:DbTestTestCompressedBackupCompressed.bak' 
+WITH  FILE = 1,  NOUNLOAD,  REPLACE,  STATS = 10
+GO
+
+--RESTORE DATABASE successfully processed 11642 pages in 22.601 seconds (4.024 MB/sec).
+
+RESTORE DATABASE [TestCompressed] 
+FROM  DISK = N'C:DbTestTestCompressedBackupUnCompressed.bak' 
+WITH  FILE = 1,  NOUNLOAD,  REPLACE,  STATS = 10
+GO
+
+--RESTORE DATABASE successfully processed 11641 pages in 23.593 seconds (3.854 MB/sec).
+
+
+RESTORE DATABASE [TestUncompressed] 
+FROM  DISK = N'C:DbTestTestUncompressedBackupCompressed.bak' 
+WITH  FILE = 1,  NOUNLOAD,  REPLACE,  STATS = 10
+GO
+--RESTORE DATABASE successfully processed 25498 pages in 29.337 seconds (6.789 MB/sec)
+
+RESTORE DATABASE [TestUncompressed] 
+FROM  DISK = N'C:DbTestTestUncompressedBackupUnCompressed.bak' 
+WITH  FILE = 1,  NOUNLOAD,  REPLACE,  STATS = 10
+GO
+--RESTORE DATABASE successfully processed 25497 pages in 32.358 seconds (6.155 MB/sec).</pre></div></div>
+
+<p>As you can see from the times in the comments in the code block above, the restores are faster when you use compression.</p>
+<p>Here is a chart with the restore times in seconds.</p>
+<p><img src="/wp-content/uploads/blogs/DataMgmt//BackupChart3.PNG" alt="" title="" width="554" height="409" /></p>
+<p><em>1 = TestCompressedBackupCompressed.bak<br />
+2 = TestCompressedBackupUnCompressed.bak<br />
+3 = TestUncompressedBackupCompressed.bak<br />
+4 = TestUncompressedBackupUnCompressed.bak</em></p>
+<p>
+<h2>Conclusion</h2>
+<p>To finish up, here is a table that shows all restore and backup times for the 4 different backups</p>
+<div style="border:5px dotted red;">
+<table cellpadding="5" cellspacing="2">
+<tr>
+<td><strong>Name&nbsp;</strong></td>
+<td><strong>Backup time&nbsp;</strong></td>
+<td><strong>Backup MB/sec&nbsp;</strong></td>
+<td><strong>Restore time</strong></td>
+<td><strong>Restore MB/sec&nbsp;</strong></td>
+<td><strong>File size&nbsp;</strong></td>
+</tr>
+<tr>
+<td><strong>TestCompressedBackupCompressed</strong></td>
+<td>5.483</td>
+<td>16.587 MB/sec</td>
+<td>22.601</td>
+<td>4.024 MB/sec</td>
+<td>65,646 kb</td>
+</tr>
+<tr>
+<td><strong>TestCompressedBackupUnCompressed</strong></td>
+<td>6.461</td>
+<td>14.076 MB/sec</td>
+<td>23.593</td>
+<td>3.854 MB/sec</td>
+<td>93,484 kb</td>
+</tr>
+<tr>
+<td><strong>TestUncompressedBackupCompressed</strong></td>
+<td>9.167</td>
+<td>21.729 MB/sec</td>
+<td>29.337</td>
+<td>6.789 MB/sec</td>
+<td>65,679 kb</td>
+</tr>
+<tr>
+<td><strong>TestUncompressedBackupUnCompressed</strong></td>
+<td>14.243</td>
+<td>13.985 MB/sec</td>
+<td>32.358</td>
+<td>6.155 MB/sec</td>
+<td>205,108 kb</td>
+</tr>
+</table>
+</div>
+<p>As you can see compression is a great way to keep your backups small and it also makes your backup and restore process finish faster as well.</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/do-you-get-a-benefit-from-compressing-ba/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>Testing backup compression in SQL Server 2008</title>
+		<link>/index.php/datamgmt/dbadmin/testing-backup-compression-in-sql-server-2008/</link>
+		<comments>/index.php/datamgmt/dbadmin/testing-backup-compression-in-sql-server-2008/#comments</comments>
+		<pubDate>Sun, 22 Nov 2009 16:15:40 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[backups]]></category>
+		<category><![CDATA[compression]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/11/testing-backup-compression-in-sql-server-2008/</guid>
+		<description><![CDATA[I got a brand new SQL Server 2008 test server and decided to test backup compression. I picked 2 databases to do this test; the smaller database is 4.8GB in size the bigger database is about 44 GB in size.
+Let's start with the smaller database.
+First&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I got a brand new SQL Server 2008 test server and decided to test backup compression. I picked 2 databases to do this test; the smaller database is 4.8GB in size the bigger database is about 44 GB in size.<br />
+Let&#8217;s start with the smaller database.<br />
+First I backed the database up, one backup used compression while the other one did not.</p>
+<p>Let&#8217;s look at some code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>SmallDB<span class="br0">&#93;</span> <span class="kw1">TO</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'V:SmallDB_Compressed.BAK'</span> 
+<span class="kw1">WITH</span> NOF<span class="sy0">OR</span>MAT, NO<span class="sy0">IN</span>IT, &nbsp;
+NAME <span class="sy0">=</span> N<span class="st0">'SmallDB-Full Database Backup'</span>, SKIP, N<span class="sy0">OR</span>EW<span class="sy0">IN</span>D, NOUNLOAD, COMPRESSION, &nbsp;
+STATS <span class="sy0">=</span> <span class="nu0">2</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BACKUP DATABASE [SmallDB] TO  DISK = N'V:SmallDB_Compressed.BAK' 
+WITH NOFORMAT, NOINIT,  
+NAME = N'SmallDB-Full Database Backup', SKIP, NOREWIND, NOUNLOAD, COMPRESSION,  
+STATS = 2
+GO</pre></div></div>
+
+<p>The compressed backup took 34.313 seconds (138.881 MB/sec) to complete.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>SmallDB<span class="br0">&#93;</span> <span class="kw1">TO</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'V:SmallDB_UnCompressed.BAK'</span> 
+<span class="kw1">WITH</span> NOF<span class="sy0">OR</span>MAT, NO<span class="sy0">IN</span>IT, &nbsp;
+NAME <span class="sy0">=</span> N<span class="st0">'SmallDB-Full Database Backup'</span>, SKIP, N<span class="sy0">OR</span>EW<span class="sy0">IN</span>D, NOUNLOAD, &nbsp; 
+STATS <span class="sy0">=</span> <span class="nu0">2</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BACKUP DATABASE [SmallDB] TO  DISK = N'V:SmallDB_UnCompressed.BAK' 
+WITH NOFORMAT, NOINIT,  
+NAME = N'SmallDB-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,   
+STATS = 2
+GO</pre></div></div>
+
+<p>The uncompressed backup took 41.716 seconds (114.235 MB/sec) to complete.</p>
+<p>As you can see the compressed backup was a little faster. The size of the backup was 1.25 GB for the compressed backup and 4.8 GB for the uncompressed backup</p>
+<p>After I did the backups I decided to do the restores.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">RESTORE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>SmallDB<span class="br0">&#93;</span> 
+<span class="kw1">FROM</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'V:SmallDB_Compressed.BAK'</span> 
+<span class="kw1">WITH</span> &nbsp;<span class="kw1">FILE</span> <span class="sy0">=</span> <span class="nu0">1</span>, &nbsp;NOUNLOAD, &nbsp;<span class="kw2">REPLACE</span>, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">1</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">RESTORE DATABASE [SmallDB] 
+FROM  DISK = N'V:SmallDB_Compressed.BAK' 
+WITH  FILE = 1,  NOUNLOAD,  REPLACE,  STATS = 1
+GO</pre></div></div>
+
+<p>RESTORE DATABASE successfully processed 609980 pages in 23.524 seconds (202.578 MB/sec).</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">RESTORE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>SmallDB<span class="br0">&#93;</span> 
+<span class="kw1">FROM</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'V:SmallDB_UnCompressed.BAK'</span> 
+<span class="kw1">WITH</span> &nbsp;<span class="kw1">FILE</span> <span class="sy0">=</span> <span class="nu0">1</span>, &nbsp;NOUNLOAD, &nbsp;<span class="kw2">REPLACE</span>, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">1</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">RESTORE DATABASE [SmallDB] 
+FROM  DISK = N'V:SmallDB_UnCompressed.BAK' 
+WITH  FILE = 1,  NOUNLOAD,  REPLACE,  STATS = 1
+GO</pre></div></div>
+
+<p>RESTORE DATABASE successfully processed 609977 pages in 38.951 seconds (122.344 MB/sec).</p>
+<p>The restores had a bigger difference in time than the backups.</p>
+<p>After I was done with the small database I decided to take a bigger database, this database is 44 GB, I wanted to see if using a bigger database would make a bigger or a smaller difference when using compressed backups compared to uncompressed backups.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> MediumDB <span class="kw1">TO</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'V:MediumDB_Compressed.BAK'</span> 
+<span class="kw1">WITH</span> NOF<span class="sy0">OR</span>MAT, NO<span class="sy0">IN</span>IT, &nbsp;
+NAME <span class="sy0">=</span> N<span class="st0">'MediumDB-Full Database Backup'</span>, SKIP, N<span class="sy0">OR</span>EW<span class="sy0">IN</span>D, NOUNLOAD, COMPRESSION, &nbsp;
+STATS <span class="sy0">=</span> <span class="nu0">2</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BACKUP DATABASE MediumDB TO  DISK = N'V:MediumDB_Compressed.BAK' 
+WITH NOFORMAT, NOINIT,  
+NAME = N'MediumDB-Full Database Backup', SKIP, NOREWIND, NOUNLOAD, COMPRESSION,  
+STATS = 2
+GO</pre></div></div>
+
+<p>The compressed backup took 303.113 seconds (142.845 MB/sec) to complete.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> MediumDB <span class="kw1">TO</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'V:MediumDB_UnCompressed.BAK'</span> 
+<span class="kw1">WITH</span> NOF<span class="sy0">OR</span>MAT, NO<span class="sy0">IN</span>IT, &nbsp;
+NAME <span class="sy0">=</span> N<span class="st0">'MediumDB-Full Database Backup'</span>, SKIP, N<span class="sy0">OR</span>EW<span class="sy0">IN</span>D, NOUNLOAD, &nbsp; 
+STATS <span class="sy0">=</span> <span class="nu0">2</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BACKUP DATABASE MediumDB TO  DISK = N'V:MediumDB_UnCompressed.BAK' 
+WITH NOFORMAT, NOINIT,  
+NAME = N'MediumDB-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,   
+STATS = 2
+GO</pre></div></div>
+
+<p>The uncompressed backup took 395.740 seconds (109.410 MB/sec) to complete.</p>
+<p>Just as before with the small database, the compressed backup was a little faster. The size of the backup was 9.725 GB for the compressed backup and 44.338 GB for the uncompressed backup</p>
+<p>Now let&#8217;s take a look at the restore.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">RESTORE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>MediumDB<span class="br0">&#93;</span> 
+<span class="kw1">FROM</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'V:MediumDB_Compressed.BAK'</span> 
+<span class="kw1">WITH</span> &nbsp;<span class="kw1">FILE</span> <span class="sy0">=</span> <span class="nu0">1</span>, &nbsp;NOUNLOAD, &nbsp;<span class="kw2">REPLACE</span>, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">1</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">RESTORE DATABASE [MediumDB] 
+FROM  DISK = N'V:MediumDB_Compressed.BAK' 
+WITH  FILE = 1,  NOUNLOAD,  REPLACE,  STATS = 1
+GO</pre></div></div>
+
+<p>RESTORE DATABASE successfully processed 5542183 pages in 215.319 seconds (201.089 MB/sec).</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">RESTORE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>MediumDB<span class="br0">&#93;</span> 
+<span class="kw1">FROM</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'V:MediumDB_UnCompressed.BAK'</span> 
+<span class="kw1">WITH</span> &nbsp;<span class="kw1">FILE</span> <span class="sy0">=</span> <span class="nu0">1</span>, &nbsp;NOUNLOAD, &nbsp;<span class="kw2">REPLACE</span>, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">1</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">RESTORE DATABASE [MediumDB] 
+FROM  DISK = N'V:MediumDB_UnCompressed.BAK' 
+WITH  FILE = 1,  NOUNLOAD,  REPLACE,  STATS = 1
+GO</pre></div></div>
+
+<p>RESTORE DATABASE successfully processed 5542177 pages in 456.590 seconds (94.829 MB/sec)</p>
+<p>The restore of the compressed backup took less than half the time of the uncompressed backup</p>
+<p>To sum it all up:</p>
+<ol>
+<li>Backups are faster if you use compression</li>
+<li>Restore are significantly faster if you restore from a compressed backup</li>
+<li>Since the files are small you can store a lot more backups on the server and if you have to move it to another server it will be much faster also.</li>
+</ol>
+<p>Another good thing is that with SQL Server 2008 R2 backup compression will be available in the standard edition as well, until now backup compression was only an Enterprise Edition feature</p>
+<p>All in all I was impressed with backup compression and I can&#8217;t see a reason why you would not want to use it. It does use more CPU to backup when using compression but I am more RAM bound than CPU bound.</p>
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/testing-backup-compression-in-sql-server-2008/feed/</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+		</item>
+	</channel>
+</rss>

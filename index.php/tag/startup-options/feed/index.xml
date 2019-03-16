@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>startup options &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/startup-options/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>An easier way to get SQL Server startup parameters: the sys.dm_server_registry dmv</title>
+		<link>/index.php/datamgmt/dbadmin/an-easier-way-to-get/</link>
+		<comments>/index.php/datamgmt/dbadmin/an-easier-way-to-get/#comments</comments>
+		<pubDate>Sun, 24 Feb 2013 22:51:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[dmv]]></category>
+		<category><![CDATA[dynamic management view]]></category>
+		<category><![CDATA[registry]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[startup options]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/an-easier-way-to-get/</guid>
+		<description><![CDATA[When you install SQL Server, Setup will write a set of default startup options to the Windows registry. You can use the startup options to specify an alternate master database file, master database log file, or error log file.
+
+Here is what the defaul&#8230;]]></description>
+				<content:encoded><![CDATA[<p>When you install SQL Server, Setup will write a set of default startup options to the Windows registry. You can use the startup options to specify an alternate master database file, master database log file, or error log file.</p>
+<p>Here is what the default options are according to Books on line</p>
+<div class="tables">
+<table>
+<tr>
+<th>Default startup options</th>
+<th>Description</th>
+</tr>
+<tr>
+<td>
+<p><strong>-d </strong><span class="parameter">master_file_path</span></p>
+</td>
+<td>
+<p>The fully qualified path for the master database file (typically, C:Program FilesMicrosoft SQL ServerMSSQL.<span class="parameter">n</span>MSSQLDatamaster.mdf). If you do not provide this option, the existing registry parameters are used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p><strong>-e </strong><span class="parameter">error_log_path</span></p>
+</td>
+<td>
+<p>The fully qualified path for the error log file (typically, C:Program FilesMicrosoft SQL ServerMSSQL.<span class="parameter">n</span>MSSQLLOGERRORLOG). If you do not provide this option, the existing registry parameters are used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p><strong>-l </strong><span class="parameter">master_log_path</span></p>
+</td>
+<td>
+<p>The fully qualified path for the master database log file (typically C:Program FilesMicrosoft SQL ServerMSSQL.<span class="parameter">n</span>MSSQLDatamastlog.ldf). If you do not specify this option, the existing registry parameters are used.</p>
+</td>
+</tr>
+</table>
+</div>
+<p>If you want to get the startup parameters for SQL Server, you can either read the registry or open up SQL Server Configuration Manager and look at the Startup Parameters tab, here is what it looks like on my laptop</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/StartupParameters.PNG?mtime=1361752440"><img alt="SQL Server Configuration Manager: Startup Parameters" title="SQL Server Configuration Manager: Startup Parameters" src="/wp-content/uploads/blogs/DataMgmt/Denis/StartupParameters.PNG?mtime=1361752440" width="417" height="481" /></a></div>
+<p>Did you know that you can do this in an easier way on SQL Server 2012? No, I am not talking about using the undocumented <code>xp_regread </code>stored procedure. A new dynamic management view was introduced, this view is sys.dm_server_registry.</p>
+<p>Now if I want to see the parameters, all I need is</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> registry_key, value_name, value_data
+<span class="kw1">FROM</span> sys.<span class="me1">dm_server_registry</span>
+<span class="kw1">WHERE</span> registry_key <span class="sy0">LIKE</span> N<span class="st0">'%MSSQLServerParameters'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT registry_key, value_name, value_data
+FROM sys.dm_server_registry
+WHERE registry_key LIKE N'%MSSQLServerParameters';</pre></div></div>
+
+<p>Output will be something like the following, I made value_data shorter and left out registry_key from the output so that it would fit on one line</p>
+<pre>value_name	value_data
+SQLArg0	        -dC:MSSQLDATAmaster.mdf
+SQLArg1	        -eC:MSSQLLogERRORLOG
+SQLArg2	        -lC:MSSQLDATAmastlog.ldf</pre>
+<p>There is more that you can do, let&#8217;s see I want to know some stuff about SQL agent</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;value_name, value_data
+<span class="kw1">FROM</span> sys.<span class="me1">dm_server_registry</span>
+<span class="kw1">WHERE</span> registry_key <span class="sy0">LIKE</span> N<span class="st0">'%SQLServerAgent%'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  value_name, value_data
+FROM sys.dm_server_registry
+WHERE registry_key LIKE N'%SQLServerAgent%';</pre></div></div>
+
+<p>output</p>
+<pre>value_name	        value_data
+ObjectName	        NT ServiceSQLSERVERAGENT
+ImagePath	        "C:MSSQLBinnSQLAGENT.EXE" -i MSSQLSERVER
+Start	                2
+DependOnService	        MSSQLSERVER 
+ErrorLoggingLevel	3
+JobHistoryMaxRows	1000
+JobHistoryMaxRowsPerJob	100
+WorkingDirectory	C:MSSQLJOBS</pre>
+<p>To see all that this dmv returns, execute the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> registry_key, value_name, value_data
+<span class="kw1">FROM</span> sys.<span class="me1">dm_server_registry</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT registry_key, value_name, value_data
+FROM sys.dm_server_registry</pre></div></div>
+
+<p>It returns 99 rows on my laptop, most of the stuff is TCP/IP related.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/an-easier-way-to-get/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

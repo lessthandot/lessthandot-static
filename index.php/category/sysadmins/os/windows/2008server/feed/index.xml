@@ -1,0 +1,1048 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>2008 Server &#8211; LessthanDot</title>
+	<atom:link href="/index.php/category/sysadmins/os/windows/2008server/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Getting remote Mount Point information with PowerShell</title>
+		<link>/index.php/sysadmins/os/windows/getting-remote-mount-point-information/</link>
+		<comments>/index.php/sysadmins/os/windows/getting-remote-mount-point-information/#comments</comments>
+		<pubDate>Thu, 29 Nov 2012 11:27:00 +0000</pubDate>
+		<dc:creator><![CDATA[Axel Achten (axel8s)]]></dc:creator>
+				<category><![CDATA[2003 Server]]></category>
+		<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[2012 Server]]></category>
+		<category><![CDATA[Windows]]></category>
+		<category><![CDATA[diskspace]]></category>
+		<category><![CDATA[mount point]]></category>
+		<category><![CDATA[powershell]]></category>
+		<category><![CDATA[remote]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/11/getting-remote-mount-point-information/</guid>
+		<description><![CDATA[In a previous post I showed how to get remote disk information with PowerShell. The script works nice untill you execute it on a server with Mount Points. When executing the following script on a server with Mount Points:
+
+Get-WmiObject win32_logicald&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In a previous post I showed how to <a href="/index.php/SysAdmins/OS/Windows/getting-remote-disk-information-with">get remote disk information with PowerShell</a>. The script works nice until you execute it on a server with Mount Points. When executing the following script on a server with Mount Points:</p>
+<pre>Get-WmiObject win32_logicaldisk -computer &lt;computername&gt; | 
+select-object DeviceID, VolumeName, @{Name="Size";Expression={$_.Size/1GB}},@{Name="FreeSpace";Expression={$_.FreeSpace/1GB}},
+@{Name="PCTFreeSpace";Expression={
+$_.FreeSpace/$_.Size*100}}|Sort-Object -descending PCTfreespace|format-table</pre>
+<p>I get the following result:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/SysAdmins/FSMP1.JPG?mtime=1354195164"><img alt="" src="/wp-content/uploads/blogs/SysAdmins/FSMP1.JPG?mtime=1354195164" width="977" height="144" /></a></div>
+<p>Knowing the sizes of my databases, I knew the numbers were wrong. So I opened a RDP session to the server and found this picture in Disk Management:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/SysAdmins/FSMP2.JPG?mtime=1354195179"><img alt="" src="/wp-content/uploads/blogs/SysAdmins/FSMP2.JPG?mtime=1354195179" width="810" height="530" /></a></div>
+<p>At that moment I realized I wasn&#8217;t getting the information from the Mount Points, just from the Disks that had a drive letter assigned to them.<br />
+So let&#8217;s find out how we can get that information with Windows PowerShell. I still need the wmiobject but instead of the win32_logicaldisk I&#8217;m going to use the win32_volume. I also replace the DeviceID and VolumeName objects with Name and Label:</p>
+<pre>get-wmiobject win32_volume -computer &lt;computername|
+select name, label, driveletter</pre>
+<p>The result looks like this:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/SysAdmins/FSMP3.JPG?mtime=1354195191"><img alt="" src="/wp-content/uploads/blogs/SysAdmins/FSMP3.JPG?mtime=1354195191" width="733" height="200" /></a></div>
+<p>As you can see, the drive letter properties are empty for my Mount Points and in the name column I can find the file and folder where they are mounted.<br />
+So let&#8217;s find the space, free space and percentage free space of the volumes. I can use the calculations from my previous script only Size needs to be replaced with Capacity:</p>
+<pre>get-wmiobject win32_volume -computer &lt;computername|
+select name, label, @{Name="Capacity (GB)";Expression={$_.Capacity/1GB}},@{Name="FreeSpace (GB)";Expression={$_.FreeSpace/1GB}},
+@{Name="FreeSpace (PCT)";Expression={$_.FreeSpace/$_.Capacity*100}} |
+format-table</pre>
+<p>The result now shows the drives and Mount Points with all the requested information:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/SysAdmins/FSMP4.JPG?mtime=1354195223"><img alt="" src="/wp-content/uploads/blogs/SysAdmins/FSMP4.JPG?mtime=1354195223" width="964" height="186" /></a></div>
+<p>To be able to reuse the script I do what I did in the other two PowerShell post:</p>
+<pre>param(
+	[string] $compname = $(Throw "Provide a Server name as first parameter")
+)
+Get-WmiObject win32_volume -computer $compname |
+select name, label, @{Name="Capacity (GB)";Expression={$_.Capacity/1GB}},
+@{Name="FreeSpace (GB)";Expression={$_.FreeSpace/1GB}},
+@{Name="FreeSpace (PCT)";Expression={$_.FreeSpace/$_.Capacity*100}} |
+format-table</pre>
+<p>End that&#8217;s it, the next request for free disk space is a matter of seconds again.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/getting-remote-mount-point-information/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+		<item>
+		<title>Compressing files with NTFS compression by running compact from the command line</title>
+		<link>/index.php/sysadmins/os/windows/vista/compressing-files-with-ntfs-compression/</link>
+		<comments>/index.php/sysadmins/os/windows/vista/compressing-files-with-ntfs-compression/#respond</comments>
+		<pubDate>Wed, 22 Jun 2011 14:11:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[2003 Server]]></category>
+		<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[Vista]]></category>
+		<category><![CDATA[Windows 7]]></category>
+		<category><![CDATA[XP]]></category>
+		<category><![CDATA[compression]]></category>
+		<category><![CDATA[ntfs]]></category>
+		<category><![CDATA[zip]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/06/compressing-files-with-ntfs-compression/</guid>
+		<description><![CDATA[You know that you can right click on a file/folder, select properties, click advanced and then compress contents to save disk space(see image).
+
+
+
+
+Did you know that you can call this from the command line also? I just saw this on  Raymond Chen's b&#8230;]]></description>
+				<content:encoded><![CDATA[<p>You know that you can right click on a file/folder, select properties, click advanced and then compress contents to save disk space(see image).</p>
+<p><a href="http://www.flickr.com/photos/denisgobo/5860004203/" title="compress by Denis Gobo, on Flickr"><img src="http://farm6.static.flickr.com/5277/5860004203_c847a70cac.jpg" width="394" height="300" alt="compress" /></a></p>
+<p>Did you know that you can call this from the command line also? I just saw this on  Raymond Chen&#8217;s blog today: http://blogs.msdn.com/b/oldnewthing/archive/2011/06/22/10177613.aspx</p>
+<p>I decided to try it out</p>
+<p>The command is compact , here are all the switches</p>
+<pre>C:UsersSQLDenis&gt;compact /?
+Displays or alters the compression of files on NTFS partitions.
+
+COMPACT [/C | /U] [/S[:dir]] [/A] [/I] [/F] [/Q] [filename [...]]
+
+  /C        Compresses the specified files.  Directories will be marked
+            so that files added afterward will be compressed.
+  /U        Uncompresses the specified files.  Directories will be marked
+            so that files added afterward will not be compressed.
+  /S        Performs the specified operation on files in the given
+            directory and all subdirectories.  Default "dir" is the
+            current directory.
+  /A        Displays files with the hidden or system attributes.  These
+            files are omitted by default.
+  /I        Continues performing the specified operation even after errors
+            have occurred.  By default, COMPACT stops when an error is
+            encountered.
+  /F        Forces the compress operation on all specified files, even
+            those which are already compressed.  Already-compressed files
+            are skipped by default.
+  /Q        Reports only the most essential information.
+  filename  Specifies a pattern, file, or directory.
+
+  Used without parameters, COMPACT displays the compression state of
+  the current directory and any files it contains. You may use multiple
+  filenames and wildcards.  You must put spaces between multiple
+  parameters.</pre>
+<p>I have a temp folder on my C drive, first I want to see if anything is compressed, I will run <strong>compact /Q</strong> to get some information</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="dos"><thead><tr><td colspan="2"  class="head">DOS</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1">c:Temp<span class="sy0">&gt;</span>compact /Q
+&nbsp;
+&nbsp;Listing c:Temp
+&nbsp;New files added to this directory will <span class="kw2">not</span> be compressed.
+&nbsp;
+&nbsp;
+Of 8 files within 1 directories
+0 are compressed and 8 are <span class="kw2">not</span> compressed.
+1,833,822 total bytes of data are stored <span class="kw1">in</span> 1,833,822 bytes.
+The compression ratio is 1.0 to 1.</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">c:Temp&gt;compact /Q
+
+ Listing c:Temp
+ New files added to this directory will not be compressed.
+
+
+Of 8 files within 1 directories
+0 are compressed and 8 are not compressed.
+1,833,822 total bytes of data are stored in 1,833,822 bytes.
+The compression ratio is 1.0 to 1.</pre></div></div>
+
+<p>Now, I want to compress those files, I will do that with the <strong>compact /C</strong> command</p>
+<pre>c:Temp&gt;compact /C
+
+ Setting the directory c:Temp to compress new files [OK]
+
+ Compressing files in c:Temp
+
+ChartingUsage.abf      352256 :    143360 = 2.5 to 1 [OK]
+ipconfig.txt            28482 :      8192 = 3.5 to 1 [OK]
+Test.pcf.vpn              982 :       982 = 1.0 to 1 [OK]
+test.csv                 8375 :      4096 = 2.0 to 1 [OK]
+test.htm                25204 :      8192 = 3.1 to 1 [OK]
+test2.csv                8375 :      4096 = 2.0 to 1 [OK]
+TestDB.BAK            1395200 :    258048 = 5.4 to 1 [OK]
+tshoot.txt              14948 :      8192 = 1.8 to 1 [OK]
+
+9 files within 2 directories were compressed.
+1,833,822 total bytes of data are stored in 435,158 bytes.
+The compression ratio is 4.2 to 1.</pre>
+<p>Now I can run <strong>compact /Q</strong> again to get some information</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="dos"><thead><tr><td colspan="2"  class="head">DOS</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1">c:Temp<span class="sy0">&gt;</span>compact /Q
+&nbsp;
+&nbsp;Listing c:Temp
+&nbsp;New files added to this directory will be compressed.
+&nbsp;
+&nbsp;
+Of 8 files within 1 directories
+8 are compressed and 0 are <span class="kw2">not</span> compressed.
+1,833,822 total bytes of data are stored <span class="kw1">in</span> 435,158 bytes.
+The compression ratio is 4.2 to 1.</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">c:Temp&gt;compact /Q
+
+ Listing c:Temp
+ New files added to this directory will be compressed.
+
+
+Of 8 files within 1 directories
+8 are compressed and 0 are not compressed.
+1,833,822 total bytes of data are stored in 435,158 bytes.
+The compression ratio is 4.2 to 1.</pre></div></div>
+
+<p>As you can see, the files are compressed and the ratio is 4.2 to 1</p>
+<p>Hopefully this will be useful for some of you that copy files and then want to compress files after the copy process is done</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/vista/compressing-files-with-ntfs-compression/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Windows 7 SP1 RTM available for MSDN and TechNet customers</title>
+		<link>/index.php/sysadmins/os/windows/2008server/windows-7-sp1-rtm-available/</link>
+		<comments>/index.php/sysadmins/os/windows/2008server/windows-7-sp1-rtm-available/#respond</comments>
+		<pubDate>Wed, 16 Feb 2011 16:30:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[Windows 7]]></category>
+		<category><![CDATA[patches]]></category>
+		<category><![CDATA[security]]></category>
+		<category><![CDATA[service pack]]></category>
+		<category><![CDATA[window server 2008 r2]]></category>
+		<category><![CDATA[windows 7]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/02/windows-7-sp1-rtm-available/</guid>
+		<description><![CDATA[If you are a TechNet or MSDN subscriber then you can download Windows 7 Service Pack 1 or Window Server 2008 R2 Service Pack 1 today. 
+
+Below is an image of what is available
+
+
+ 
+
+If you have been patching your Windows 7 machine then you already&#8230;]]></description>
+				<content:encoded><![CDATA[<p>If you are a TechNet or MSDN subscriber then you can download Windows 7 Service Pack 1 or Window Server 2008 R2 Service Pack 1 today. </p>
+<p>Below is an image of what is available</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/SysAdmins/ServicePack1.PNG?mtime=1297880666"><img alt="" src="/wp-content/uploads/blogs/SysAdmins/ServicePack1.PNG?mtime=1297880666" width="934" height="647" /></a></div>
+<p>If you are a not a TechNet or MSDN subscriber, you have to wait until February 22nd  to download yours. </p>
+<p>If you have been patching your Windows 7 machine then you already have most of what is in the service pack, the service pack is just a rollup of all the patches that have been issued since Windows 7 was released. It is still handy if you have a new machine since you don&#8217;t need to then download all the patches</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/2008server/windows-7-sp1-rtm-available/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Virtual Lab Tip: Notifications from Windows Event Log</title>
+		<link>/index.php/sysadmins/os/windows/virtual-lab-tip-notifications-from-windo/</link>
+		<comments>/index.php/sysadmins/os/windows/virtual-lab-tip-notifications-from-windo/#respond</comments>
+		<pubDate>Fri, 22 Oct 2010 10:18:47 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[Windows]]></category>
+		<category><![CDATA[Windows 7]]></category>
+		<category><![CDATA[virtual lab]]></category>
+		<category><![CDATA[windows 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/10/virtual-lab-tip-notifications-from-windo/</guid>
+		<description><![CDATA[There are a number of environments or situations where large-scale systems monitoring is either not cost effective or simply not available. Windows 7 and 2008 include a feature for sending notifications when specific events occur in the event log.]]></description>
+				<content:encoded><![CDATA[<div class="acc_header">
+There are a number of environments or situations where large-scale systems monitoring is either not cost effective or simply not available. Windows 7 and 2008 include a feature for sending notifications when specific events occur in the event log.<br />
+<br />
+<label>Technical Area:</label> Accidental Systems Administrator,  Accidental Database Administrator<br />
+<label class="diff">Level of Difficulty: </label><img src="http://tiernok.com/LTDBlog/dr_intermediate.png" alt="Intermediate Difficulty" /><br />
+<label>Additional Articles:</label><a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="View the wiki entry">Virtual Lab entry on the LTD Wiki</a>
+</div>
+<p></p>
+<h2>Using the Built-In Email</h2>
+<p>Windows Vista, 7, and 2008 have a built-in option that allows us to attach actions to events from the event log. These actions take the form of Tasks, similar to scheduled tasks with the exception that they are trigger by events rather than time. The services infrastructure in windows logs startup and shutdown events for services and many applications use the event log rather than a custom logging format. We can take advantage of these messages to create a notification that emails us when certain events occur.</p>
+<p>First we need an example of the event and, being lazy, I&#8217;m going to generate one the easy way. Shutting down a SQL Server service generates the first event I want to track (and makes SQL admins everywhere cringe a little, mission accomplished). Later in the post we&#8217;ll cover creating tasks without restarting our server, since people tend to get upset when we do things like that in production.</p>
+<p>When we open the Event Log from Administrative Tools menu in Windows, there are several logs available. SQL Server and other service log entries are logged to the Application log. To create my new event-driven task, I locate the entry I just created, right click it, and select &#8220;Attach Task to This Event&#8230;&#8221;.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/EventMonitor/orig/01_screen.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/EventMonitor/01_screen.png" alt="Attach Task to Event Dialog" /></a><br />
+	Attach Task to Event &#8211; Dialog
+</div>
+<p>The Task creation option presents us with a fairly simple dialog. To be consistent and build good habits, we fill in a descriptive name and description for the task. </p>
+<div class="hint">
+Filling in descriptive names and descriptions for items like tasks may seem like a waste of time, but it&#8217;s 20s of content now that will save a whole lot of digging around 4 years from now when you need to change it. Also, if I ever visit your shop I will make fun of you for not using a descriptive name <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" />
+</div>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/EventMonitor/orig/02_screen.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/EventMonitor/02_screen.png" alt="Names are Important" /></a><br />
+	Names are Important
+</div>
+<p>The second step doesn&#8217;t require (or allow) an input and the third step presents us with the simple decision of sending an email, launching an executable, or displaying a message. We are here to send an email, so the choice should be obvious (but I still pressed the wrong one the second time through). </p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/EventMonitor/orig/03_screen.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/EventMonitor/03_screen.png" alt="Email Info" /></a><br />
+	Information for Email
+</div>
+<p>After filling the email options out we continue to the last tab to review the task information before finishing. At this point we will want to check the &#8220;open properties&#8221; checkbox and press &#8220;Finish&#8221;.</p>
+<p>After completing the wizard, we now have the full properties dialog for the task. Perhaps the most critical item here is to change the radio selection on the first tab to &#8220;Run whether user is logged in or not&#8221;. There is also an OS configuration box that I changed to Windows 2008 R2/Windows 7, but I am not sure whether this provides an addition features or simply satisfaction from making such an important decision.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/EventMonitor/orig/04_screen.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/EventMonitor/04_screen.png" alt="Change Summary - Finished" /></a><br />
+Summary before Finishing
+</div>
+<p>I have enough of the task filled in now that we can now press the OK button and try it out. We open Server Manager from the pinned icon on the taskbar (or via the search mechanism in the Start menu). On expanding &#8220;Configuration/Task Scheduler/Task Scheduler Libary&#8221; and selecting &#8220;Event Viewer Tasks&#8221; we should see the task we created. Right clicking the task and pressing &#8220;Run&#8221; will force the task to run once (again, just like testing a scheduled task). We can select the History tab to see the details of the run or wait patiently for an email to show up in our inbox.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/EventMonitor/orig/05_screen.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/EventMonitor/05_screen.png" alt="Event Viewer Tasks view" /></a><br />
+Event Viewer Tasks view
+</div>
+<p>And there we have it, an email each time our service stops.</p>
+<h2>Alignment of the Stars</h2>
+<p>If your mail server is like mine then it probably doesn&#8217;t allow anonymous relaying. If you are using Exchange and you are sending from the same account that you configured the task for (or the user is allowed to send for other users), then you may have received an email. Checking the alignment of the stars may also be of assistance. </p>
+<p>Even if the email did work, it is going to be rather tedious to create individual tasks for each of the potential events (SQL Server start/stop, SQL Agent Start/Stop, etc) that you are interested in.</p>
+<p>Rather than build a hard-coded email task for each possible event, there is an option to run an executable. Tie that to Cscript.exe and a VBScript (or maybe a powershell script?) and you have a lot more flexibility to send emails. </p>
+<p>If you decide to go this route, you will probably want to edit your tasks to carry some additional information (like which event is firing). This will allow you to create a single script and task for multiple events:<br />
+http://blogs.technet.com/b/otto/archive/2007/11/09/find-the-event-that-triggered-your-task.aspx</p>
+<h2>Not Perfect</h2>
+<p>This method of reporting from windows does not replace an external monitoring system. There is a wide range of errors that services and executables can generate. Covering them all would be extremely difficult even if we ignored errors that cause the box to lose communications or freeze entirely. However, if you have no budget at all, setting up some of these alerts will only cost you time and it will at least get you one step closer to knowing about problems before the phone rings.</p>
+<p><label>Additional Articles:</label><a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="View the wiki entry">Virtual Lab entry on the LTD Wiki</a></p>
+<style>
+.mylab, .hint{
+   margin: .5em 2em;
+   padding: 1em 1em 1em 90px;
+}
+.mylab{
+   border: 2px solid #CCEECC;
+   background-color: #DDFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/mylab.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.hint{
+   border: 2px solid #EEEECC;
+   background-color: #FFFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/tip.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.screenshot{
+   text-align: center;
+   font-size: .8em;
+   margin-bottom: 1em;
+}
+.acc_header{ position: relative; }
+.acc_header label{ float: left; width: 150px; font-weight: bold;}
+.acc_header br{  clear: left; }
+.acc_header .diff{ margin-top: 3px; }
+</style>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/virtual-lab-tip-notifications-from-windo/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Windows Server 2008 &#8211; How To Enable Telnet</title>
+		<link>/index.php/sysadmins/os/windows/2008server/windows-server-2008-how-to-enable-telnet/</link>
+		<comments>/index.php/sysadmins/os/windows/2008server/windows-server-2008-how-to-enable-telnet/#comments</comments>
+		<pubDate>Fri, 24 Sep 2010 08:08:21 +0000</pubDate>
+		<dc:creator><![CDATA[ca8msm]]></dc:creator>
+				<category><![CDATA[2008 Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/09/windows-server-2008-how-to-enable-telnet/</guid>
+		<description><![CDATA[By default, Telnet is disabled on a Windows Server 2008 installation and if you try to run it you will see an error something along the lines of:
+
+
+
+So, here's a very simple walk-through of the steps I had to follow in order to enable Telnet on a Wi&#8230;]]></description>
+				<content:encoded><![CDATA[<p>By default, Telnet is disabled on a Windows Server 2008 installation and if you try to run it you will see an error something along the lines of:</p>
+<p><img src="/wp-content/uploads/blogs/SysAdmins/telnet/telnet_notinstalled.jpg" alt="" title="" width="668" height="331" /></p>
+<p>So, here&#8217;s a very simple walk-through of the steps I had to follow in order to enable Telnet on a Windows Server 2008 box:</p>
+<p>1. Open the Server Manager:</p>
+<p><img src="/wp-content/uploads/blogs/SysAdmins/telnet/telnet_servermanager.jpg" alt="" title="" width="453" height="528" /></p>
+<p>2. Select &#8220;Features&#8221; from the left TreeView pane and then click &#8220;Add Features&#8221; from the right-hand pane:</p>
+<p><img src="/wp-content/uploads/blogs/SysAdmins/telnet/telnet_features.jpg" alt="" title="" width="716" height="379" /></p>
+<p>3. Select &#8220;Telnet Server&#8221; from the list of available features and click Next followed by Install:</p>
+<p><img src="/wp-content/uploads/blogs/SysAdmins/telnet/telnet_server.jpg" alt="" title="" width="780" height="587" /></p>
+<p>4. Wait for what seems ages (it was probably only 5 minutes but it seemed like a long time!) whilst it installs the server:</p>
+<p><img src="/wp-content/uploads/blogs/SysAdmins/telnet/telnet_installing.jpg" alt="" title="" width="777" height="583" /></p>
+<p>5. When it is complete, open a command prompt, type &#8220;telnet&#8221; and you should be presented with the following screen:</p>
+<p><img src="/wp-content/uploads/blogs/SysAdmins/telnet/telnet_installed.jpg" alt="" title="" width="668" height="331" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/2008server/windows-server-2008-how-to-enable-telnet/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Virtual Lab: 2008 R2 Domain Controller &#8211; Basic Tasks</title>
+		<link>/index.php/sysadmins/security/virtual-lab-2008-r2-domain-controller-ba/</link>
+		<comments>/index.php/sysadmins/security/virtual-lab-2008-r2-domain-controller-ba/#comments</comments>
+		<pubDate>Thu, 17 Jun 2010 09:51:38 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[Security]]></category>
+		<category><![CDATA[Windows]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/virtual-lab-2008-r2-domain-controller-ba/</guid>
+		<description><![CDATA[In the previous article we covered the creation of a basic Domain Controller for our Virtual Lab. Using this basic domain controller and a basic SQL Server machine, we will look at the creation of a basic user account, creating a service account, and ad&#8230;]]></description>
+				<content:encoded><![CDATA[<div class="acc_header">
+In the <a href="/index.php/SysAdmins/OS/Windows/2008Server/virtual-lab-creating-a-2008-r2-domain-co" target="_blank" title="Virtual Lab: Creating a 2008 R2 Domain Controller">previous article</a> we covered the creation of a basic Domain Controller for our Virtual Lab. Using this basic domain controller and a basic SQL Server machine, we will look at the creation of a basic user account, creating a service account, and addition of a system to the domain.<br />
+<br />
+<label>Technical Area:</label> Accidental Systems Administrator<br />
+<label class="diff">Level of Difficulty: </label><img src="http://tiernok.com/LTDBlog/dr_basic.png" alt="Basic Difficulty" /><br />
+<label>Additional Articles:</label><a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="View the wiki entry">Virtual Lab entry on the LTD Wiki</a>
+</div>
+<p>This post picks up where the <a href="/index.php/All/?p=845">Virtual Lab: Creating a 2008 R2 Domain Controller</a> post left off. Now that we have a new domain up and running we need to add some systems and users.</p>
+<h2>Creating Accounts</h2>
+<p>After installing the Active Directory Directory Services role, there are several new tools available from the Administrative Tools section of the Start menu. Throughout the remainder of the article we will be working through the &#8220;Active Directory Users and Computers&#8221; tool.</p>
+<h3>Domain Administrator Account</h3>
+<p>The first account we are going to create on the new domain is a Domain Administrator account. Even though this is a virtual lab environment, we don&#8217;t want to get in the habit of using the built-in administrator account. </p>
+<p>Open the &#8220;Active Directory User and Computers&#8221; screen and explore the default groups that have been created. As this is our first visit, there are no custom folders in our tree.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/0_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/0_config.png" alt="AD Users and Computers" /></a><br />
+	AD &#8211; Users and Computers
+</div>
+<p>To add a new user to the default &#8220;Users&#8221; folder we will right-click on the folder, select &#8220;New&#8221;, and select &#8220;User&#8221;. This provides us with a dialog to enter the basic user information.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/1_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/1_config.png" alt="AD Adding a User" /></a><br />
+	AD &#8211; Adding a User
+</div>
+<p>After entering the general user information and pressing next, we are presented with a request for the user&#8217;s password and password options. As we have not yet configured the password policy, the <a href="http://technet.microsoft.com/en-us/library/cc264456.aspx" title="Windows 2008 Password Policy Settings" target="_blank">default policy</a> is still in place.</p>
+<p>Completing the wizard gives us a brand new member with basic Domain User permissions.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/2_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/2_config.png" alt="AD Adding a User" /></a><br />
+	AD &#8211; Adding a User
+</div>
+<p>To elevate the permissions of the user across the domain, we will assign them membership to the Domain Admins group. Open the user&#8217;s properties panel (right-clicking the user and select &#8220;Properties&#8221;) and select the &#8220;Member Of&#8221; tab.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/3_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/3_config.png" alt="AD Configuring a User" /></a><br />
+	AD &#8211; Configuring a User
+</div>
+<div class="hint">
+	There are several default groups created when you install AD DS with default levels of permissions across the domain. There is a pretty good reference on the default groups available <a href="http://ss64.com/nt/syntax-security_groups.html" title="AD Security Groups" target="_blank">here</a>.
+</div>
+<p>Pressing the &#8220;Add&#8221; button brings up the search dialog. Enter &#8220;Domain Admins&#8221; and press &#8220;Check Names&#8221; to quickly find and select the Domain Admins group.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/4_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/4_config.png" alt="AD Configuring a User" /></a><br />
+	AD &#8211; Configuring a User
+</div>
+<p>Press Ok twice and the user is now part of the Domain Admins group.</p>
+<h3>Service Accounts</h3>
+<p>Service accounts are an important part of a network. Many companies will rely on common accounts, like the built-in Administrator account, when they are setting up services on the Domain that require domain permissions. There are numerous reasons this is a bad idea:
+<ul>
+<li>Greater Impact &#8211; a change to a single user account suddenly has a much wider impact then is intended, potentially causing service outages in disparate places acros the network</li>
+<li>Greater Impact, Frequently &#8211; how about password changes? Using one accuont for a wide range of services requires a wider set of work when a single password has to change</li>
+<li>Documentation &#8211; using a single account for multiple services requires either good documentation, good guessing, or a lot of overtime</li>
+<li>Security &#8211; providing an account with too much security is a potential security hole, a virus that uses a single application as an entry point suddenly has rights to everything on the network</li>
+</ul>
+<p>In order to make management of service accounts (and services) clearer, I suggest each service account only have the level of permission on the domain it absolutely needs and that it only be used for a single service or application. This requires more work up front, as you have to not only create individual accounts for each application and service, but more importantly determine what &#8220;minimum requirements&#8221; means for each one. On the other hand, minimizing planned and unplanned system outages in the future is worth a little extra time.</p>
+<div class="hint">
+Sometimes multiple services need access to a common resource, or a common service needs a few different permission profiles based on the use of the system (for instance, qa versus production SQL Server instances). Rather than add these permissions to each individual service account, consider creating a group that outlines the permissions and then give the service accounts membership in the group. Our goal is to minimize the number of configuration changes we will have to make when that configuration needs to change in the future.
+</div>
+<h4>Creating the Service User Account</h4>
+<p>Our guinea pig in this section will be the basic SQL install from a <a href="/index.php/All/?p=845">previous article</a>. We are going to create a service account for the database server that has limited domain permissions but local administrative permissions. We will be using a middle-of-the-road configuration to create a single user account for all SQL Server services on our domain to run unser, what I would consider to be the minimum level of implementation.</p>
+<div class="hint">
+Larger networks may want to create groups to handle permissions and then create accounts for individual servers and assign them the correct group membership. This second route reduces risk but heightens the level of work necessary to manage the accounts. In this situation, I would suggest using Managed Service accounts rather than standard user accounts, as they can be assigned the same types of group permissions but reduce a portion of the overhead in administering the accounts.
+</div>
+<p>On the AD DS server open the &#8220;Active Directory User and Computers&#8221; screen again. While there is a &#8220;Users&#8221; container already available in the interface, we&#8217;re going to create a new Organizational Unit (OU) named &#8220;Service Accounts&#8221; to store these accounts.</p>
+<p>To create the new OU, we right-click the Domain (in my case <em>avl.local</em>) and select New -&gt; Organizational Unit. In the dialog we enter the name, in my case &#8220;Service Accounts&#8221;, and press Ok.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/5_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/5_config.png" alt="Creating a new OU" /></a><br />
+	AD &#8211; Creating a new OU
+</div>
+<p>Right clicking the new &#8220;Service Accounts&#8221; container and selecting New &gt; User opens the new user dialog.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/6_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/6_config.png" alt="Creating a new Service User" /></a><br />
+	AD &#8211; Creating a new Service User
+</div>
+<p>As this is the domain account for our SQL Server services, I have chosen the name &#8220;SQL Server Service Account&#8221; and a username of &#8220;sqladmin&#8221;.</p>
+<p>On the next step we will also ensure that our password won&#8217;t expire in the middle of the night by verifying the checked defaults and modifying a few.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/7_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/7_config.png" alt="Creating a new Service User" /></a><br />
+	AD &#8211; Creating a new Service User
+</div>
+<p>After viewing the summary in the final step, we press Ok and create the new user. As the user is not going to have any special, domain-wide permissions we do not need to modify their group memberships or other settings. In fact we are done with the account creation until we bring our database server onto the domain and set up the local permissions for the user on that server.</p>
+<h2>Joining the Domain</h2>
+<p>Joining a server to the domain is a fairly straightforward process. In this case we will join our database server from <a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="See the list of prior articles" target="_blank">prior articles</a> and then we will configure our domain account from the previous section to serve as the administrative account for the database services.</p>
+<p>The first step will be to change the network properties of the virtual server. When we first created it we used DHCP and that means that it received a dynamic address and DNS entries other than our new controller. </p>
+<div class="mylab">
+In my personal lab I am still serving DHCP requests from my core switch and have not configured it to direct DNS requests at my virtual DC because there is no guarantee that the DC will be on and later on it will be moved behind a virtual firewall and will be inaccessible to the other physical systems on my network.
+</div>
+<p>On the SQL Server machine we open the network settings for our adapter, select the &#8220;Internet Protocol Version 4 (TCP/IPv4)&#8221; value, and press &#8220;Properties&#8221;. </p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/8_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/8_config.png" alt="SQL Server VM - Network Settings" /></a><br />
+	SQL Server VM &#8211; Network Settings
+</div>
+<p>Assign the server a static IP address on the network and point the DNS settings to the DC. At this point it would also be a good idea to check the &#8220;Validate&#8221; button to let Windows test the settings when you press Ok.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/9_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/9_config.png" alt="SQL Server VM - Network Settings" /></a><br />
+	SQL Server VM &#8211; Network Settings
+</div>
+<p>In my server the validation resulted in a message indicating that Windows couldn&#8217;t identify the problem, this translates to &#8220;Yes It Works&#8221;.</p>
+<p>Next we will open the System Properties. </p>
+<div class="hint">
+One of the 90 ways you can get to the System Properties panel is to press the &#8220;Server Manager&#8221; icon that is pinned to the toolbar, then in the console highlight &#8220;Server manager&#8221; in the left side to display the high level dashboard on the right, followed by selecting &#8220;Change System Properties&#8221; on the right side of that dash.
+</div>
+<p>Now we want to press the &#8220;Change&#8221; button on the &#8220;Computer Name&#8221; tab. Select the &#8220;Domain&#8221; radio button and type in the name of the domain from your domain controller.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/10_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/10_config.png" alt="SQL Server VM - Join Domain" /></a><br />
+	SQL Server VM &#8211; Join Domain
+</div>
+<p>On pressing &#8220;Ok&#8221; we are asked to enter domain credentials with permission to join the network. </p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/11_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/11_config.png" alt="SQL Server VM - Join Domain" /></a><br />
+	SQL Server VM &#8211; Join Domain
+</div>
+<p>Once we enter our credentials and press &#8220;Ok&#8221; the system is accepted to the Domain and provides us with the customary reboot request.</p>
+<p>back on the Domain Controller in the &#8220;Users and Computers&#8221; console, the server has been automatically added under the &#8220;Computers&#8221; container. This being a simple setup, we have not created our own containers to store our servers in, so we will leave it in the default one (for now).</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/12_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/12_config.png" alt="SQL Server VM - Join Domain" /></a><br />
+	SQL Server VM &#8211; Join Domain
+</div>
+<p>When the SQL Server has finished rebooting we will log in for the first time with our Domain credentials. In the &#8220;Server Manager&#8221; we now see that the full computer name and Domain entries reflect the name of the domain.</p>
+<h2>Applying the SQL Service Account</h2>
+<p>The last step after adding a database server to the domain is to reconfigure it&#8217;s services to use the domain service account we created above. This will allow us to later create domain resourcs that all of our SQL Server systems need to access without having to manage each one individually.</p>
+<p>Currently our service account has no permissions on the server, other than as a basic Domain User (and for some of you, it may not even have that level). So the first step is to provide that domain account with local administrator permissions on our database server.</p>
+<div class="hint">
+Before continuing further make sure you log into the server once with the service account above. Several folders and files are created when the account logs in and not doing so (or not manually doing some trickery with the Users sub-directory and an NTLog file) appears to upset WMI when your assigning users to the services. Don&#8217;t stay logged in as this user, as you will then end up battling UAC the rest of the day.
+</div>
+<p>From the open &#8220;Server Manager&#8221; console, expand the &#8220;Configuration&#8221; and then &#8220;Local Users and Groups&#8221; containers, selecting the &#8220;Groups&#8221; folder. Right click the &#8220;Administartors&#8221; group on the right side and select &#8220;Properties&#8221;.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/13_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/13_config.png" alt="SQL Server VM - Service Account" /></a><br />
+	SQL Server VM &#8211; Service Account
+</div>
+<p>We enter the name of the domain account (in this case AVLsqladmin) and press the &#8220;Check Names&#8221; button to ensure the account could be found.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/14_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/14_config.png" alt="SQL Server VM - Service Account" /></a><br />
+	SQL Server VM &#8211; Service Account
+</div>
+<p>Press &#8220;Ok&#8221; and &#8220;Ok&#8221; and we are back in the Server Manager again.</p>
+<p>The last step is to configure our services to use the Domain account, however this is done a little differently for SQL Server than you might expect.</p>
+<div class="hint">
+While it is technically possible to change the service accounts directly from the Windows &#8220;Services&#8221; console, there are a number of extra steps that have to be completed in order for it to work properly, as there are also various registry and application settings that have to be set outside of the Services console. Microsoft has published a <a href="http://support.microsoft.com/kb/283811" title="Read the KB article" target="_blank">knowledge base article</a> on this for 2005, I have not been able to locate a similar document for 2008.
+</div>
+<p>Open the &#8220;SQL Server Configuration Manager&#8221; from the Start Menu (this would also be a good time to pin it to the taskbar).</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/15_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/15_config.png" alt="SQL Server VM - Service Account" /></a><br />
+	SQL Server VM &#8211; Service Account
+</div>
+<div class="hint">
+Ah, the wonders of UAC. Don&#8217;t get me wrong, I actually like the concept, unfortunately the implementation leaves a little to be desired in Enterprise or Domain setups. Accounts in the Domain Admins (and a few others?) groups don&#8217;t receive the level of rights you would expect and, in fact, it doesn&#8217;t seem possible to grant them the abilities of the built-in administrator, which has strange and mystical powers that are turned on by default and can only be turned off in the policy settings, not applied to other accounts. You will receive a number of errors when you try to escalate with a variety of different settings, and all of the recommendations [I have found] end with either turning off UAC, using the Right-Click &#8220;Run As Administrator&#8221;, or appear to have been written by people logged in as a Local Administrator.<br />
+To make matters worse, file access escalation (if it works) creates a mess of local folder permissions, so it&#8217;s highly suggested that you read <a href="http://blog.akinstech.com/understanding-windows-7-and-2008-r2-uac-and-permissions" title="Read this post on making your own Local Admin group for file access" target="_blank">this workaround</a>.
+</div>
+<p>In the <a href="/index.php/All/?p=840" title="Review the Basic SQL Virtual Machine post">Basic SQL Server Virtual Lab post</a> we only installed a few services and configured SQL Server and SQL Agent to use a local account.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/16_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/16_config.png" alt="SQL Server VM - Service Account" /></a><br />
+	SQL Server VM &#8211; Server Configuration Manager
+</div>
+<p>Right-click on each service and select Properties to open the properties panel. Enter the domain account we created above in the Service Accounts section and it&#8217;s password, then press Apply. The system will then warn us that a restart to the services is required to continue.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/17_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/17_config.png" alt="SQL Server VM - Service Account" /></a><br />
+	SQL Server VM &#8211; Changing the Account
+</div>
+<p>Follow the same instructions for each of the services and we son have all of our services running under the DOmain account.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/18_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/18_config.png" alt="SQL Server VM - Service Account" /></a><br />
+	SQL Server VM &#8211; Finished
+</div>
+<h2>Wrapping Up</h2>
+<p>Now that we have the Domain Controller running, we&#8217;ve created some accounts, and we have joined our first database server to the domain, it&#8217;s time to switch focus back to our database server for a while. Upcoming weeks will focus on some administrative tasks, such as configuring database mail and alerts and building out some scripts to monitor current state and state-over-time values for a few critical performance indicators.</p>
+<p><label>Additional Articles:</label><a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="View the wiki entry">Virtual Lab entry on the LTD Wiki</a></p>
+<style>
+.mylab, .hint{
+   margin: .5em 2em;
+   padding: 1em 1em 1em 90px;
+}
+.mylab{
+   border: 2px solid #CCEECC;
+   background-color: #DDFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/mylab.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.hint{
+   border: 2px solid #EEEECC;
+   background-color: #FFFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/tip.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.screenshot{
+   text-align: center;
+   font-size: .8em;
+   margin-bottom: 1em;
+}
+.acc_header{ position: relative; }
+.acc_header label{ float: left; width: 150px; font-weight: bold;}
+.acc_header br{  clear: left; }
+.acc_header .diff{ margin-top: 3px; }
+</style>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/security/virtual-lab-2008-r2-domain-controller-ba/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Virtual Lab: Creating a 2008 R2 Domain Controller</title>
+		<link>/index.php/sysadmins/os/windows/virtual-lab-creating-a-2008-r2-domain-co/</link>
+		<comments>/index.php/sysadmins/os/windows/virtual-lab-creating-a-2008-r2-domain-co/#comments</comments>
+		<pubDate>Fri, 28 May 2010 16:38:15 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[Windows]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/virtual-lab-creating-a-2008-r2-domain-co/</guid>
+		<description><![CDATA[A virtual domain controller (DC) can be both a powerful and lightweight addition to your virtual lab. A central AD implementation not only gives you another set of services to work with, it also provides a more realistic environment with the power of do&#8230;]]></description>
+				<content:encoded><![CDATA[<div class="acc_header">
+A virtual domain controller (DC) can be both a powerful and lightweight addition to your virtual lab. A central AD implementation not only gives you another set of services to work with, it also provides a more realistic environment with the power of domain accounts and policies that will be useful when you start working with multi-server setups. This article will walk through the creation of a basic 2008 R2 Domain Controller.<br />
+<br />
+<label>Technical Area:</label> Accidental Systems Administrator<br />
+<label class="diff">Level of Difficulty: </label><img src="http://tiernok.com/LTDBlog/dr_basic.png" alt="Basic Difficulty" /><br />
+<label>Additional Articles:</label><a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="View the wiki entry">Virtual Lab entry on the LTD Wiki</a>
+</div>
+<p></p>
+<h2>Terminology</h2>
+<p>There are some terms that are commonly used in relation to AD or a Domain Controller that will appear in this and other documents:</p>
+<dl>
+<dt>Domain Controller</dt>
+<dd>The server or servers responsible for handling authentication and informational requests for users/systems on the domain</dd>
+<dt>Forest</dt>
+<dd>Domains are represented as trees of directory information, a forest is the group of all trees in the organization</dd>
+<dt>Kerberos</dt>
+<dd>Kerberos is an authentication protocol used to allow systems on an un-trusted network a method to prove their identity to one another</dd>
+<dt>FQDN</dt>
+<dd>Fully Qualified Domain Name &#8211; the fully spelled out domain name for a domain, for example mydomain.com</dd>
+</dl>
+<div class="hint">
+There has been a critical change to this article due to a new piece of information that I didn&#8217;t previously know. Rather than use the base windows image as the DC for your lab you should go ahead and install this machine from scratch to ensure it doesn&#8217;t have a duplicate SID. In prior versions we could (sort-of) change a SID but that&#8217;s not really the case anymore. This is really only a big deal for the DC because the SIDs for users from the DC (domain accounts) need to not match SIDs for local users/groups/etc.<br />
+More details can around duplicate SIDs, 2008 R2, and similar topics are available in <a href="http://blogs.technet.com/b/markrussinovich/archive/2009/11/03/3291024.aspx" target="_blank">this article from Mark Russinovich</a>.
+</div>
+<h2>Setting up VM</h2>
+<p>First we need to create a virtual machine to house the future domain controller (DC). In the <a href="/index.php/SysAdmins/OS/building-the-virtual-lab-vmware-and-2008" title="Building the Virtual Lab: VMWare and MS Windows 2008 R2">first article</a> we walked through the process of creating a basic VM. We will follow those same steps to create the VM for our DC except once we have Windows installed we will customize it further than we did with the original VM.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/0_AddVirtualMachine.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/0_AddVirtualMachine.png" alt="Add Virtual Machine, Step 0" /></a><br />
+	Creating the Virtual Machine
+</div>
+<p>For the time being this system is going to be connected to the Host via the existing Bridged connection. At a later point in time we will look at creating virtual networks in VMWare and build out a more defined network. </p>
+<div class="mylab">
+	Because I don&#8217;t intend on having a heavy workload on this server or installing any additional services beyond AD and DNS, I have only allocated 512MB of memory to the server. If it becomes noticeably sluggish servicing my tiny domain then I will bump it up to 1024.
+</div>
+<h2>Configuring the OS</h2>
+<p>Once the virtual machine is created, configured in VMWare, and Windows has been installed, it&#8217;s time to move on to the Windows configuration. Some of these will be the same as our prior article and several will be new additions to prep the server for Active Directory.</p>
+<p>First we will want to configure the server name and then assign it a new static IP Address on the local network.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/1_startup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/1_startup.png" alt="Changing the System Name" /></a><br />
+	Changing the System Name
+</div>
+<p>After changing the name we&#8217;ll open the network settings by either selecting the &#8220;Configure Networking&#8221; link on the Initial Configuration dashboard (above) or clicking the network icon in the tool tray at the bottom right, followed by &#8220;Open Network and Sharing&#8221;, and then &#8220;Change adapter settings&#8221; near the top right of the screen. With the &#8220;Network Connections&#8221; screen open we can right click the network adapter and enter the &#8220;Properties&#8221; pane. Select the &#8220;Internet Protocol Version 4&#8221; item from the list and press properties to access the IP configuration panel. </p>
+<p>At this point we need to select a static IP address that isn&#8217;t already in use on our network and isn&#8217;t in the DHCP range for our network. After selecting an IP Address we enter the static IP address, enter the gateway server or switches address, and then enter the servers address as the primary DNS entry and our switch or external DNS as the secondary one.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/2_startup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/2_startup.png" alt="Configuring the IP Address" /></a><br />
+	Configuring the IP Address
+</div>
+<div class="mylab">
+	My home network has defined ranges and already has a DNS server, so these servers will all receive addresses in the 51-99 range and they will have the non-virtual DNS server listed as a secondary DNS.
+</div>
+<div class="hint">
+It is possible to install Active Directory and the DNS server on a system without a static IP address and trust that it will assign itself the same address over time, but I don&#8217;t recommend it as your clients will eventually not be able to find their DNS server and than pain and suffering will ensue.
+</div>
+<p>The last step to preparing your server for Active Directory is planning. In a non-lab installation we would want to put some forethought into how many clients we intend to support with Directory Services, whether there will be secondary DCs on the network, etc. I have an older link for <a href="http://technet.microsoft.com/en-us/library/cc739022%28WS.10%29.aspx" title="Assess Hardware for AD on Windows 2003">capacity planning for AD on Windows 2003</a>, but unfortunately I have not been able to find a comparable article for 2008 yet.</p>
+<h2>Installing Active Directory</h2>
+<p>In Windows 2008, Active Directory has expanded to take on a wider range of roles and capabilities. The portion we formerly considered to be AD, directory management and communications, is now called Active Directory Domain Services (AD DS). Other services include Active Directory Certificate Services (AD CS), Active Directory Federation Services (AD FS), Active Directory Lightweight Directory Services (AD LDS), and Active Directory Rights Management Services (AD RMS). Today we will be concentrating on AD DS, though I will continue to refer to as AD throughout the rest of the post due to bad habits and years of practice.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/0_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/0_setup.png" alt="Assigning Server Roles" /></a><br />
+	Assigning Server Roles
+</div>
+<p>To start the installation and setup process, we will refer back to the Initial Configuration dashboard (click the pinned shortcut on the taskbar if you closed it already). Under section 3 there is a &#8220;Roles&#8221; category that will allow us to easily assign the necessary roles to our server.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/1_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/1_setup.png" alt="Assigning Server Roles" /></a><br />
+	Assigning Server Roles
+</div>
+<h3>Installing the Active Directory Role</h3>
+<p>The first page of the &#8220;Add Roles Wizard&#8221; presents us with some friendly reminders to set a static IP Address (check), ensure the Administrator account has a strong password (check), and make sure the server is up to date on Windows Updates (check). </p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/2_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/2_setup.png" alt="Assigning Server Roles" /></a><br />
+	Assigning Server Roles
+</div>
+<p>Next we move on to the Roles selection page. As promised, we see a number of active directory services listed, the option for today being AD DS.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/3_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/3_setup.png" alt="Installing AD DS" /></a><br />
+	Installing AD DS
+</div>
+<p>On selecting the AD DS option the wizard runs a quick validation and notices that our server does not appear to have a necessary component, in this case .Net Framework 3.5. </p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/4_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/4_setup.png" alt="Installing AD DS" /></a><br />
+	Installing AD DS &#8211; Prerequisites
+</div>
+<p>After choosing to install the prerequisite (a difficult and time consuming decision, or perhaps not) and pressing next on the main screen, we are provided with a list of &#8220;Things to Note&#8221; as well as links to additional information, saving me the time of writing and linking them up myself.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/5_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/5_setup.png" alt="Installing AD DS" /></a><br />
+	Installing AD DS &#8211; Things to Note
+</div>
+<p>A short confirmation displays the items we are installing, including the noted prerequisite above and a reminder that directory services won&#8217;t truly be functional until we run &#8220;dcpromo&#8221;.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/6_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/6_setup.png" alt="Installing AD DS" /></a><br />
+	Installing AD DS &#8211; Confirmation
+</div>
+<p>After the installation and verification is complete, we are presented a handy link to launch dcpromo.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/7_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/7_setup.png" alt="Installing AD DS" /></a><br />
+	Installing AD DS &#8211; Wizard Complete
+</div>
+<div class="hint">
+	If you accidentally close the window before pressing the link or need to access dcpromo later, the start menu&#8217;s run input will recognize &#8220;dcpromo&#8221; and find the requisite shortcut for you.
+</div>
+<h3>AD DS Installation Wizard (DCPromo)</h3>
+<p>The dcpromo wizard will complete the installation of AD DS on the server. </p>
+<p>On the first step we are presented with the option to &#8220;Use Advanced Mode Setup&#8221;. This option will cause several additional wizard windows to appear throughout the process that would have defaulted behind the scenes if it were not checked. Press the &#8220;advanced mode installation&#8221; hyperlink to get a help document about the additional options presented in advanced mode.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/7_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/7_setup.png" alt="DCPromo" /></a><br />
+	DCPromo &#8211; Beginning
+</div>
+<p>After an informational screen about the suggested cryptography option and systems that may not support it, we are presented with the option to add a domain to an existing forest or to create a new domain under a new forest. This being our first DC in the virtual lab, we will be creating a new forest for our domain.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/8_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/8_setup.png" alt="DCPromo" /></a><br />
+	DCPromo &#8211; New Forest and Domain
+</div>
+<p>Next type the fully qualified domain name (FQDN) for your domain. After typing this name the wizard will then scan to ensure the name is not already in use.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/9_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/9_setup.png" alt="DCPromo" /></a><br />
+	DCPromo &#8211; FQDN Entry
+</div>
+<p>The wizard then prompts us to enter a Domain NetBIOS name, with a suggestion based on the name from the prior step.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/10_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/10_setup.png" alt="DCPromo" /></a><br />
+	DCPromo &#8211; NetBIOS Name
+</div>
+<p>Next we&#8217;ll set the functional level of our forest. The functional level defines the maximum level (and feature set) that our forest will support. When installing additional DCs in an existing forest or creating a business domain that you intend to support over the next ten years, this needs to be a well thought out decision. When installing in a virtual lab we will of course pick the highest possible level in less time than it took to write this paragraph.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/11_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/11_setup.png" alt="DCPromo" /></a><br />
+	DCPromo &#8211; Functional Level
+</div>
+<div class="hint">
+	One of the best reasons for using 2008 R2 mode is the new &#8220;Recycle Bin&#8221; option. This option keeps deleted entries in memory and provides an option to restore them, providing a bit of a safety net and reducing the potential for having to use the AD Recovery Mode to recover a deleted set of accounts or objects.
+</div>
+<div class="mylab">
+Actually the Recycle Bin option worries me. I like admins (and myself) to be a little scared of their tools and nothing says scared like remembering that time you accidentally deleted something and spent recovering it manually. Oh well.
+</div>
+<p>After another quick scan of the network will tell us if DNS is available and supports the necessary capabilities for the domain controller. In this case, since we are installing a primary DC, I&#8217;m going to suggest we install DNS on the same server.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/12_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/12_setup.png" alt="DCPromo" /></a><br />
+	DCPromo &#8211; DNS
+</div>
+<p>After selecting to install the DNS server we receive a warning that a delegation for the DNS server cannot be created because the authoritative parent zone for the domain name I entered earlier could not be found. Translated, this means that the server went looking for an authoritative DNS entry for the <i>avl.local</i> domain name I entered and determined that no one had ever heard of it. Since we are just now installing the DNS server that will recognize that name, this is to be expected and can be safely ignored. </p>
+<p>The next step is to provide a location for the database and files that will be used by AD DS. In a non-lab setup this needs to be carefully planned to ensure enough capacity is available ahead of time. This being a virtual lab, we will be accepting the defaults and allowing it to carve out space from the primary drive.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/13_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/13_setup.png" alt="DCPromo" /></a><br />
+	DCPromo &#8211; Database and File Locations
+</div>
+<p>The Directory Services Restore password is used only when major restoration activities need to be undertaken. After entering the password we will add it to our password safe so it won&#8217;t be forgotten. This password will hopefully never be needed (especially in a lab environment), but not writing it down will pretty much ensure our first, future restoration step will be getting past the lack of a password.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/14_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/14_setup.png" alt="DCPromo" /></a><br />
+	DCPromo &#8211; Restore Password
+</div>
+<p>After a brief summary of the selected configurations and the option to export these settings for an unattended installation, we are ready to let the server start installing.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/15_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/15_setup.png" alt="DCPromo" /></a><br />
+	DCPromo &#8211; Installing
+</div>
+<p>The installer wraps up with the common Finish screen and a request to reboot.</p>
+<p>After rebooting, our &#8220;Initial Configuration Tasks&#8221; window confirms our new roles have been installed. </p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/BasicDC/16_setup.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/BasicDC/16_setup.png" alt="DCPromo" /></a><br />
+	Initial Configuration Tasks &#8211; Roles
+</div>
+<h2>Managing the Domain</h2>
+<p>Our next post will cover basic administration topics for the domain, as we add our first SQL Server system to the domain, create a new administrative user, and create a service account for our SQL Server services.</p>
+<p><label>Additional Articles:</label><a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="View the wiki entry">Virtual Lab entry on the LTD Wiki</a></p>
+<style>
+.mylab, .hint{
+   margin: .5em 2em;
+   padding: 1em 1em 1em 90px;
+}
+.mylab{
+   border: 2px solid #CCEECC;
+   background-color: #DDFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/mylab.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.hint{
+   border: 2px solid #EEEECC;
+   background-color: #FFFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/tip.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.screenshot{
+   text-align: center;
+   font-size: .8em;
+   margin-bottom: 1em;
+}
+.acc_header{ position: relative; }
+.acc_header label{ float: left; width: 150px; font-weight: bold;}
+.acc_header br{  clear: left; }
+.acc_header .diff{ margin-top: 3px; }
+</style>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/virtual-lab-creating-a-2008-r2-domain-co/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>Building the Virtual Lab: VMWare and MS Windows 2008 R2</title>
+		<link>/index.php/sysadmins/os/building-the-virtual-lab-vmware-and-2008/</link>
+		<comments>/index.php/sysadmins/os/building-the-virtual-lab-vmware-and-2008/#comments</comments>
+		<pubDate>Tue, 11 May 2010 12:41:54 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[Operating Systems]]></category>
+		<category><![CDATA[Windows]]></category>
+		<category><![CDATA[installation]]></category>
+		<category><![CDATA[virtual lab]]></category>
+		<category><![CDATA[vmware]]></category>
+		<category><![CDATA[windows server 2008 r2]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/building-the-virtual-lab-vmware-and-2008/</guid>
+		<description><![CDATA[Asking me what I do for living could net you different answers, depending on what day you ask. Over the years, and through the course of several jobs, I have had a wide range of responsibilities that often stretched well beyond my current organizational&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Asking me what I do for living could net you different answers, depending on what day you ask. Over the years, and through the course of several jobs, I have had a wide range of responsibilities that often stretched well beyond my current organizational role. I like to call these opportunities.</p>
+<p>Recently I was considering the idea of building a virtual lab, as I&#8217;ve been worried that some of the varied experiences or skills I&#8217;ve picked up would rust away. While in Wisconsin visiting Ted Krueger (<a href="http://twitter.com/onpnt" title="Ted on Twitter">twitter</a> | <a href="/index.php/All/?disp=authdir&amp;author=68" title="Ted's blogs here">blog</a>) for <a href="/index.php/ITProfessionals/EthicsIT/my-singing-not-so-good" title="SQL Saturday Chicago article">SQL Saturday Chicago</a>, I realized that the lab could serve two purposes. I could use it to not only regain or sharpen aging skills, but I could also use it to start blogging on more technical matters. Don&#8217;t get me wrong, I love process and personal improvement topics, but I need my tech fix too.</p>
+<p>So here we are. If you don&#8217;t already have a virtual lab at work or home then I invite you to follow along with me as I build one. Each blog entry will have a general level of difficulty, from basic installation <img src="http://tiernok.com/LTDBlog/dr_beanie.png" alt="propeller beanie" /> to advanced administration <img src="http://tiernok.com/LTDBlog/dr_wizard.png" alt="wizard's hat" />. As the lab grows we will be installing a wide number of systems then later configuring and tuning them to meet different circumstances and needs. </p>
+<p>Lets get started.</p>
+<style>
+.mylab, .hint{
+   margin: .5em 2em;
+   padding: 1em 1em 1em 90px;
+}
+.mylab{
+   border: 2px solid #CCEECC;
+   background-color: #DDFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/mylab.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.hint{
+   border: 2px solid #EEEECC;
+   background-color: #FFFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/tip.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.acc_header{ position: relative; }
+.acc_header label{ float: left; width: 150px; font-weight: bold;}
+.acc_header br{  clear: left; }
+.acc_header .diff{ margin-top: 3px; }
+</style>
+<div class="acc_header">
+<h2>Virtual Lab: Building the First Windows 2008 R2 Virtual Machine</h2>
+<p>The purpose of today&#8217;s article is to create a basic windows virtual machine that can serve as a template for later virtual machines. Having a basic image or set of images on hand can dramatically speed up production and non-production roll-outs as well as ensure standardization of systems across your environment.<br />
+<br />
+<label>Technical Area:</label> Accidental Systems Administrator<br />
+<label class="diff">Level of Difficulty: </label><img src="http://tiernok.com/LTDBlog/dr_basic.png" alt="Basic Difficulty" /><br />
+<label>Additional Articles:</label><a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="View the wiki entry">Virtual Lab entry on the LTD Wiki</a></p>
+</div>
+<h2>Building the Lab Environment</h2>
+<p>Building your own lab can be both fun and a learning experience. A virtual lab provides you a safe place to try new technologies and configurations. When you create a really horrendous set of configurations in your lab, your halls are going to be remarkably free of end users with torches and pitchforks. The risks you should never take in production environments, even production development systems, are fair game here. But first we have to build it.</p>
+<h3>Environment</h3>
+<p>First we should determine what type of environment we want to run and what types of technologies or systems we would like to play with. Some of you will be planning no working with just development software and/or database servers, some will be want to create a virtual business environment (DC, Exchange, AD, etc), and some will even want to play with a mixed operating system setup. Identifying some general requirements will also help when your lab (or the market) grows past the current list of technologies you want to try.</p>
+<p>Here is a sample set of questions you should consider:</p>
+<ol style="margin-left: 2em;">
+<li>What OS&#8217;s are you intending to run? Desktop, Server, Windows, Unix, Linux ?</li>
+<li>What major software packages or technical areas are you intended to explore in the lab?</li>
+<li>Will any of the systems be used for active development (ie, results will be ported directly to production)?</li>
+<li>Will any of the systems potentially move to production?</li>
+<li>Will any of the systems need to travel with you (between sites, work and home, or to conferences)?</li>
+<li>Will your systems need to run only some of the time, all the time, or a mix?</li>
+<li>Will they require network access to the outside world?</li>
+<li>Will the outside world be allowed to access your lab resources?</li>
+<li>Will you need a private network in your lab or can they coexist on your existing network?</li>
+<li>Will there be interdependencies? (for instance, Server A is running DNS and Active Directory and has to be on for Server B to work properly)</li>
+</ol>
+<div class="mylab">
+And some of the answers for my lab:</p>
+<ul>
+<li>My lab will be running multiple Windows servers and 1-2 linux systems</li>
+<li>Software packages: SQL Server (of course), TFS, Active Directory, Sharepoint, potentially a DC, possibly Exchange, &#8230;pretty much anything in Microsoft&#8217;s catalog or that comes in as a user request is fair game</li>
+<li>None of these systems will go to a production environment or be accessed by active development environments</li>
+<li>The only environments that may need to travel are the SQL Server ones</li>
+<li>None of the systems will need to run all of the time</li>
+<li>The lab systems will be on a private network with limited external access</li>
+</ul>
+</div>
+<h3>Platform Selection</h3>
+<p>Once we have an idea what we our lab will be used for, we need to determine what type of platform to use. If this is a home lab or you have limited space for equipment, you will probably want to go with a virtualization platform. Using a virtualization platform allows us to have a smaller physical (and electrical) footprint and multi-purpose our equipment, since many of our test servers will not need to be running when we aren&#8217;t directly using them. Virtualization also allows us to move systems to upgraded hosts if we later find ourselves having performance problems.</p>
+<p>The hardware you use will depend on the types of answers you provided to the questions above. Using an old desktop might be a acceptable solution or you may need to incorporate higher end systems or even spare servers. My last setup (2007-2009) used an off-the-shelf Dell Precision work station as the host without any extra equipment or over-the-top upgrades. The system performed well as a low budget SQL Server and Windows server platform. On the other hand my new environment will need to support a far wider range and number of systems, so it will require higher performance hardware.</p>
+<div class="mylab">
+	Here is the current hardware setup for the lab:</p>
+<ul>
+<li>CPU: A Intel i7 920 quad-core</li>
+<li>Memory: 10 GB of DDR3 RAM w/ room to upgrade up to 24GB</li>
+<li>Storage #1: Raid 10 Array &#8211; (4) SATA2 7200RPM 500GB drives, mixed manufacturers</li>
+<li>Storage #2: <a href="http://www.amazon.com/Vantec-NST-360SU-BK-3-5-Inch-External-Enclosure/dp/B000EDKO04/ref=sr_1_1?ie=UTF8&amp;s=electronics&amp;qid=1272804217&amp;sr=8-1" title="View at Amazon">Vantec external enclosure</a> w/ 500GB SATA2 drive (USB2/eSata) &#8211; raw storage for some backups, MSDN images, and other purchased software</li>
+<li>Storage #3: <a href="http://www.amazon.com/TWO-BAY-SATA-DOCKING-STATION/dp/B001UHQFVA/ref=sr_1_5?ie=UTF8&amp;s=electronics&amp;qid=1272804276&amp;sr=1-5" title="View at amazon">Bytecc two-bay docking station</a>  (USB2/eSata) &#8211; more disk (will be critical in a later article)</li>
+</ul>
+<p>	I have selected VMWare for my virtualization platform. There are a number of reasons for this (for instance, Microsoft hard-blocking virtual server installations on Windows 7) and I actually would have preferred MS Virtual Server, but such is life.
+</p></div>
+<h2>Installing our First Virtual Server</h2>
+<p>From this point forward we will be working from the comfort of my home lab, so examples will be based on VMWare Server 2.1 and I will point out versions for other software as it is introduced. The purpose of this first virtual machine is to serve as a template for later machines, allowing me to build out one image that with a standard base configuration, installs all common services, then apply all the outstanding Windows updates. Though I will be using the term &#8216;template&#8217; in the article, this shouldn&#8217;t be confused with the template capability in VMware&#8217;s vSphere. </p>
+<div class="hint">
+In a production environment it is extremely helpful to have a basic server image already pre-configured and up to date. Not only does it provide a faster alternative to building each server from scratch, but it ensures that each server goes out with all of the required services and configurations and does so without adding a checklist to your process. Not that I am a <a href="/index.php/ITProfessionals/ITServiceManagement/there-is-never-time-for-part-3" title="Or maybe I am">process improvement fan</a> or anything.
+</div>
+<p>Though the software is different, many of the concepts will be similar if your lab is going to be based on Microsoft Virtual Server 2005 and I have successfully followed almost the same exact steps through Virtual Server in the past.</p>
+<h3>Build the Server</h3>
+<p>First we need to build our virtual machine. Opening the VMWare Server Host and logging in with administrative credentials, we are presented with a dashboard view of our system.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/vmware_beginning.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/vmware_beginning.png" title="VMWare, Freshly Installed" /></a><br />
+	VMWare, Freshly Installed
+	</div>
+<p>Clicking the &#8220;Virtual Machine&#8221; menu provides an option to &#8220;Create Virtual Machine&#8221; and a wizard to walk us through the creation of our virtual machine.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/vmware_create_vm.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/vmware_create_vm.png" title="VMWare Menu, Create VM" /></a><br />
+	Create a new VM
+	</div>
+<p>While it isn&#8217;t critical to pick a good name at this point, it couldn&#8217;t hurt either. Later as we create servers for specific purposes the VM names will reflect the actual names of their servers.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/vm_step1.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/vm_step1.png" title="Creating a new VM, Step 1" /></a><br />
+	New VM &#8211; Provide a Name
+	</div>
+<p>In my case I intend to use Windows 2008 R2 as my main server environment, so this basic image will reflect that in it&#8217;s name and I will choose the Windows 2008 option from the operating systems tab. Before choosing the 64-bit image I made sure to run the <a href="http://downloads.vmware.com/d/info/datacenter_downloads/vmware_server/2_0#drivers_tools" title="Available from VMWare Server Tools section">64-bit compatibility check</a> offered by VMWare to ensure I could run a 64-bit guest on my host. If you are using Virtual Server 2005 then you will be limited to 32-bit guests so be sue you buy/download the correct versions.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/vm_step2.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/vm_step2.png" title="Creating a new VM, Step 2" /></a><br />
+	New VM &#8211; OS Selection
+	</div>
+<p>For this first server I am going to allocate 4GB of RAM for use during the installation process. When making later copies of the system we will tune these values accordingly. As I intend to use these systems in a lab environment and may need the images to be portable to another single core system, I&#8217;m going to select the 1 CPU option. For later articles we may create 2- or 4-CPU options, but for most of our non-production needs a 1-CPU system will be sufficient. While technically it would be possible to &#8220;tune&#8221; the CPU setting at a later time, since we really only care about the hard-drive file at this point, changing CPU architectures on a system after installation ranges from tricky to absurdly-painful-with-no-hope-of-working.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/vm_step3.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/vm_step3.png" title="Creating a new VM, Step 2" /></a><br />
+	New VM &#8211; RAM and CPU Settings
+	</div>
+<p>The final lasting decision (though not the last step) is how large we want to make the virtual drive and whether we want to allocate the space ahead of time or use a growth model. In my last environment I pre-allocated space for my base windows installation and then attached or created secondary drives for the installed applications. In this case, Microsoft is suggesting <a href="http://www.microsoft.com/windowsserver2008/en/us/system-requirements.aspx" title="Windows 2008 R2 Requirements">a minimum of 32GB of space</a> and, while I don&#8217;t want to give up the space, I&#8217;ve decided to use pre-allocation again to simplify the process.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/vm_step4.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/vm_step4.png" title="Creating a new VM, Step 3" /></a><br />
+	New VM &#8211; Drive Settings
+	</div>
+<p>The final options, optical drive access and network method, are only going to be used for this image during the Windows installation process. Later copies will again have values assigned based on the project or technology that&#8217;s being installed. For the purposes of the installation we will use an ISO file for the optical drive and bridged networking.</p>
+<div class="hint">When you install VMWare initially it will ask for a folder for your standard store (default is &#8220;C:Virtual Machines&#8221; on Windows). ISOs placed in this folder will be available for mounting in VMWare or you can create a new store that points to a folder elsewhere. Having a dedicated drive for software storage, I created an &#8216;MSDN Library&#8217; store and pointed it to that location.</div>
+<div class="hint">
+VMWare Gotchas:<br />
+Firefox 3.6 is documented as not working with the console viewer right now, so you are going to have to downgrade or switch to IE. 3-3.5 also had issue at one point but there are either fixes or workarounds for this.
+</div>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/vm_setup_done.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/vm_setup_done.png" title="Setup is Complete" /></a><br />
+	VM Setup Complete
+	</div>
+<h3>Install the OS</h3>
+<p>We are now ready to turn our machine on for the first time and install Windows. This part is actually fairly boring, which is yet another reason that we want to limit how many times we have to do it.</p>
+<div class="mylab">
+This is the point I ran into an issue with VMWare&#8217;s console. VMWare continued to present me with a black screen when I opened the console. I believe the change that fixed this issue was setting the DNS address on the vmnet1 network connection, but it could just as easily have been the firewall being turned off when VMWare started or the couple changes I made to IE&#8217;s trusted sites. An excellent, practical example of why you should always make one change at a time and write down what you changed when you are troubleshooting a systems problem.
+</div>
+<p>The first decision the installer requires is selection between the various versions of Windows. Based on the options available, the trade-offs outlined in <a href="http://www.microsoft.com/windowsserver2008/en/us/r2-editions-overview.aspx" title="See the feature comparison">the feature comparison</a>, and the fact that I have already written down my MSDN Enterprise key, I will be installing Enterprise edition. I&#8217;m not actually sure how long the installation took, I wandered off and found something else to do for a while (Peanut butter jelly time, peanut b&#8230;oh). I&#8217;ve installed windows a few more times than your average developer, so my bet is on 39 minutes. <img src="https://s.w.org/images/core/emoji/2/72x72/1f609.png" alt="😉" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div class="hint">
+The default Windows password policy is probably going to annoy you if you haven&#8217;t run into it before. It will not tell you what the policy is when your password fails and the policy itself is well-defined. In a production environment one of our first steps would likely be to change it to meet our business needs or current setup.</p>
+<p>Official policy information can be found <a href="http://technet.microsoft.com/en-us/library/cc264456.aspx" title="Windows 2008 Password Policy Settings">here</a>
+</div>
+<p>After the initial login there are a couple key things we should do prior to starting the update cycle. First we are going to install the VMWare tools to make the interface easier to use and second, we are going to increase the screen resolution.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/vmtools_host.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/vmtools_host.png" title="Host Server - Installing VMWare Tools" /></a><br />
+	Installing VMWare tools &#8211; Server OS View
+	</div>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/vmtools_guest.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/vmtools_guest.png" title="Guest Server - Installing VMWare Tools" /></a><br />
+	Installing VMWare tools &#8211; Guest OS View
+	</div>
+<p>After these two tasks we will begin by applying service packs (none for Windows 2008 R2 at this time) and then windows updates. Windows 2008 offers a handy dashboard to manage these tasks on the first install and, being lazy, I&#8217;m not going to turn it down.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/setup_dashboard.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/setup_dashboard.png" title="Server Dashboard" /></a><br />
+	Windows Server &#8220;Configuration&#8221; Dashboard
+	</div>
+<div class="hint">
+If you haven&#8217;t worked with server much in the past you may be surprised by a strange dialog when you attempt to restart your system. When you shutdown or reboot a server it asks you to provide a reason and note, I advise that you get in the habit of always typing up a short note on why you are shutting down or rebooting. It only takes a few seconds and one day it&#8217;s going to save you hours because these notes are entered into the event log before the system shuts down.
+</div>
+<p>Next I am going to glance through the features and see if there any others that I would want installed on all of my servers. In this case the only one I can see if SNMP, so a quick installation and configuration and we are ready to move on.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/snmp_setup.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/snmp_setup.png" title="Server Features - Configuring SNMP" /></a><br />
+	Server Features &#8211; Configuring SNMP
+	</div>
+<div class="hint">
+Installing SNMP services as part of your basic image gives you the opportunity to ensure you have consistent coverage and passwords across all your systems, which in turn makes deployment easier when it comes time to point your network or systems monitoring software at the new server.
+</div>
+<p>The step we might normally move on to in a production or corporate environment is installation of base antivirus, client license, or and inventory management software client. This is an excellent time to install software packages that are part of your standard or that can be pre-installed and updated later. Another consideration would be whether you need to set up VNC, RDP, or another remoting technology.</p>
+<p>The last item on my personal setup list is to assign a background image and set up BGInfo. Having a common background and system information on every server is extremely handy and helps show critical information at a glance (like disk usage or IP addresses). An easy solution is a utility called BGInfofrom SysInternals. BGInfo is <a href="http://technet.microsoft.com/en-us/sysinternals/bb897557.aspx" title="BGInfo at Technet">a free download</a> and there are many examples and articles available on the internet for setting it up.</p>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/bginfo_background.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/bginfo_background.png" title="Server Dashboard" /></a><br />
+	Windows Server &#8220;Configuration&#8221; Dashboard
+	</div>
+<div class="mylab">
+Once upon a time I had scripts and standard layouts to add other interesting information to the background (such as uptime counters and such), but that can wait for another day. For this initial example I have grouped the information in a way that is meaningful for me, but haven&#8217;t done anything fancy.
+</div>
+<div class="hint">
+If you run into difficulties on 2008 R2 with permissions then follow the instructions posted near the bottom by prrawls here: <a href="http://forum.sysinternals.com/printer_friendly_posts.asp?TID=17427" title="View the post about BGInfo on 2008 R2">SysInternals Forum Post</a>
+</div>
+<div style="text-align: center; font-size: .8em; margin-bottom: 1em;">
+	<a href="http://www.tiernok.com/LTDBlog/labsetup/orig/done.png" target="_new"><img src="http://www.tiernok.com/LTDBlog/labsetup/done.png" title="Last Shutdown of the Basic Image" /></a><br />
+	Last Shutdown of the Basic Image
+	</div>
+<h2>Basic Image Done</h2>
+<p>The basic server is complete and ready to serve as the foundation for the rest of the lab. In coming weeks we will use this basic image to create more systems, such as a basic database server and a domain controller.</p>
+<p>Additional Links:<br />
+<a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/virtual-lab-creating-a-basic-sql-2008-r2" title="Head to the Basic SQL 2008 R2 Install">Virtual Lab: Basic SQL 2008 R2 Virtual Machine</a><br />
+<a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="View the wiki entry">Virtual Lab entry on the LTD Wiki</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/building-the-virtual-lab-vmware-and-2008/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Windows 7 and Windows Server 2008 R2 Released To Manufacturing</title>
+		<link>/index.php/sysadmins/os/windows/windows-7-and-windows-server-2008-r2-rel/</link>
+		<comments>/index.php/sysadmins/os/windows/windows-7-and-windows-server-2008-r2-rel/#comments</comments>
+		<pubDate>Wed, 22 Jul 2009 21:54:48 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[Windows]]></category>
+		<category><![CDATA[windows 7]]></category>
+		<category><![CDATA[windows server 2008 r2]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/07/windows-7-and-windows-server-2008-r2-rel/</guid>
+		<description><![CDATA[Windows 7 and Windows Server 2008 R2 have both RTMed!! Build 7600 was declared as RTM Below is a picture of Steve Ballmer and Steven Sinofsky. Steve Ballmer is holding the gold disk, he must be feeling relieved. When will you get Windows 7 RTM? That is the big question isn&#8217;t it? Developers with MSDN [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Windows 7 and Windows Server 2008 R2 have both RTMed!! Build 7600 was declared as RTM</p>
+<p>Below is a picture of Steve Ballmer and Steven Sinofsky. Steve Ballmer is holding the gold disk, he must be feeling relieved.</p>
+<p><img src="http://imgur.com/1wXCH.png" alt="Steve Ballmer and Steven Sinofsky" /></p>
+<p></p>
+<p><strong>When will you get Windows 7 RTM?</strong><br />
+That is the big question isn&#8217;t it? Developers with MSDN Subscriptions will be able to download Windows 7 RTM in English on August 6th and remaining languages by October 1st.<br />
+More answers are here: http://windowsteamblog.com/blogs/windows7/archive/2009/07/21/when-will-you-get-windows-7-rtm.aspx</p>
+<p>Let&#8217;s see if on August 6th msdn and technet hold up under the load</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/windows/windows-7-and-windows-server-2008-r2-rel/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Using Windows Server 2008 as a Desktop OS</title>
+		<link>/index.php/sysadmins/os/using-windows-server-2008-as-a-desktop-o/</link>
+		<comments>/index.php/sysadmins/os/using-windows-server-2008-as-a-desktop-o/#comments</comments>
+		<pubDate>Thu, 07 May 2009 12:17:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[2008 Server]]></category>
+		<category><![CDATA[Operating Systems]]></category>
+		<category><![CDATA[Windows]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/05/using-windows-server-2008-as-a-desktop-o/</guid>
+		<description><![CDATA[I recently built a new PC, and I needed to get a 64 bit operating system. I had a copy of Server 2008 sitting around from MSDN, so I thought why not use that? If I did, I could run Hyper-V and some of the other cool server gadgets, and the tradeoff in user experience [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I recently built a new PC, and I needed to get a 64 bit operating system.  I had a copy of Server 2008 sitting around from MSDN, so I thought why not use that?  If I did, I could run Hyper-V and some of the other cool server gadgets, and the tradeoff in user experience would be minimal.  With some guidance from a friend I soon realized that I could do this with no sacrifice in the user experience at all.</p>
+<p>The first thing to do is install the Windows Experience feature from Server Manager.  This was pretty painless, but it did require a restart.  This gives you things like &#8220;Windows Media Player, desktop themes, and photo management&#8221; according to the description.  It also gives you Windows Defender.</p>
+<p>Once this is done, you need to decide whether you want to run Aero or not.  I rather like the look of it, so I decided in favor.  To enable this you need to open services.msc and go to the properties for the &#8220;themes&#8221; service.  Set the startup type to &#8220;Automatic&#8221;, start the service, and hit OK/Apply to save.  You can then go to Personalize -> Window Color and Appearance and the Aero color scheme will be available.  </p>
+<p>Next is turn off the enhanced security in Internet Explorer.  Again, pretty simple.  From server manager, choose &#8220;Configure IE ESC&#8221;.  In my case I had to turn it off for both Administrators and Users.  </p>
+<p>Finally, the last thing I did was change the password policy.  To do this start up secpol.msc and look under Account Policies->Password Policy.  I set the Maximum password age to 0 so that passwords would not expire.  Then disabled the &#8220;Password must meet complexity requirements&#8221; option.</p>
+<p>That was really all there was to it, I was kind of surprised it was so easy.  But now I have a computer with all the server goodies that I would like to play with that my girlfriend will not want to kill me every time she uses.  Well she might want to kill me but at least not because of how I set up the computer <img src="https://s.w.org/images/core/emoji/2/72x72/1f600.png" alt="😀" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/sysadmins/os/using-windows-server-2008-as-a-desktop-o/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

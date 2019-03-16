@@ -1,0 +1,1323 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>cloud computing &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/cloud-computing/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>The Cloud as a Make-It-Finish-Sooner Dial</title>
+		<link>/index.php/desktopdev/mstech/the-cloud-as-a-make/</link>
+		<comments>/index.php/desktopdev/mstech/the-cloud-as-a-make/#respond</comments>
+		<pubDate>Wed, 23 May 2012 10:10:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud]]></category>
+		<category><![CDATA[cloud computing]]></category>
+		<category><![CDATA[paas]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/05/the-cloud-as-a-make/</guid>
+		<description><![CDATA[There's been a lot of buzz about the cloud over the past years, with a lot of that attention going to IaaS and SaaS platforms, but there's a revolution (or re-revolution) that is of even more importance, and that's PaaS. What PaaS brings us is the ability to scale horizontally and treat CPU, memory, and storage as pools of resources that are as deep as our checkbooks allow.]]></description>
+				<content:encoded><![CDATA[<p>There&#8217;s been a lot of buzz about the cloud over the past years, with a lot of that attention going to IaaS and SaaS platforms, but there&#8217;s a revolution (or re-revolution) that is of even more importance, and that&#8217;s PaaS. What PaaS brings us is the ability to scale horizontally and treat CPU, memory, and storage as pools of resources that are as deep as our checkbooks allow. </p>
+<p>Forget about virtual servers. Remember that 60 hour job with a 24 hour deadline? Built on a PaaS platform and equipped with a couple hundred dollars, you won&#8217;t even be staying late today.</p>
+<p>Today&#8217;s post is going to share highlights from a basic file processing application. Something you would find (hopefully better written) in any random enterprise IT shop or SaaS company. It offers a web page that lets you upload files, a button to process files, a basic and poorly written list of the processed and unprocessed files, and an unattended worker. The trick is that this application was written on top of Windows Azure, so I can play tricks with time just by twisting the dial from one file processor to twenty.</p>
+<h2>The Basic File Processor</h2>
+<p>The file processing in the sample application is intended to be a sample workload. It consists of reading files completely into memory and passing them around, spinning through them one character at a time, replacing each character in the line with it&#8217;s upper case variant. Very critical stuff, very performant.</p>
+<p>In addition to running the process via the website, I also need an unattended application that will can run the same processing function. If I owned the server, this would be a scheduled task or service. As an Azure Worker the code will be remarkably similar.</p>
+<div style="text-align: center; color: #666666; font-size: 90%">
+   <img src="http://tiernok.com/LTDBlog/CloudFileProcessor.png" alt="Cloud Processor Architecture" style="margin-bottom: 5px" /><br />
+   Architecture of the Processor
+</div>
+<p>The two front-ends access common logic in the Core library, which is responsible for both the processing logic and interacting with storage resources. This being sample code, it is certified as working on my machine and is definitely not production ready. That being said, I did write this in a few evenings, so writing a production-ready service doesn&#8217;t have to take that long in normal workdays.</p>
+<h3>The Web Site</h3>
+<p>The website has a single MVC controller with 3 actions:</p>
+<ul>
+<li>~/Home/Index: Displays the list of processed and unprocessed items and buttons for upload and processing</li>
+<li>~/Home/AddFile: The post address for file uploads</li>
+<li>~/Home/ProcessNextItem: An action to process the next queued file</li>
+</ul>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">class</span> HomeController <span class="sy0">:</span> Controller <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; IStorageLocator _storageLocator<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> HomeController<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _storageLocator <span class="sy0">=</span> <span class="kw3">new</span> StorageManager<span class="br0">&#40;</span><span class="st0">&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> ActionResult Index<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> store <span class="sy0">=</span> <span class="kw3">new</span> ItemStore<span class="br0">&#40;</span>_storageLocator<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> model <span class="sy0">=</span> <span class="kw3">new</span> StatusViewModel<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ProcessedItems <span class="sy0">=</span> store<span class="sy0">.</span><span class="me1">GetProcessedList</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; UnprocessedItems <span class="sy0">=</span> store<span class="sy0">.</span><span class="me1">GetUnprocessedList</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; ViewData<span class="br0">&#91;</span><span class="st0">&quot;file&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> TempData<span class="br0">&#91;</span><span class="st0">&quot;file&quot;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> View<span class="br0">&#40;</span>model<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>HttpPost<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> ActionResult AddFile<span class="br0">&#40;</span>HttpPostedFileBase file<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>file <span class="sy0">!=</span> <span class="kw1">null</span> <span class="sy0">&amp;&amp;</span> file<span class="sy0">.</span><span class="me1">ContentLength</span> <span class="sy0">&gt;</span> <span class="nu0">0</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> item <span class="sy0">=</span> <span class="kw3">new</span> FullItem<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ResourceId <span class="sy0">=</span> Guid<span class="sy0">.</span><span class="me1">NewGuid</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Received <span class="sy0">=</span> DateTime<span class="sy0">.</span><span class="me1">Now</span><span class="sy0">.</span><span class="me1">ToUniversalTime</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; IsProcessed <span class="sy0">=</span> <span class="kw1">false</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileName <span class="sy0">=</span> file<span class="sy0">.</span><span class="me1">FileName</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; item<span class="sy0">.</span><span class="me1">ReadFileFromStream</span><span class="br0">&#40;</span>file<span class="sy0">.</span><span class="me1">InputStream</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">new</span> ItemStore<span class="br0">&#40;</span>_storageLocator<span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">AddNewItem</span><span class="br0">&#40;</span>item<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; TempData<span class="br0">&#91;</span><span class="st0">&quot;file&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> file<span class="sy0">.</span><span class="me1">FileName</span> <span class="sy0">+</span> <span class="st0">&quot; uploaded and queued for processing.&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">else</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; TempData<span class="br0">&#91;</span><span class="st0">&quot;file&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> <span class="st0">&quot;Processor ignores empty files, sorry.&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> RedirectToAction<span class="br0">&#40;</span><span class="st0">&quot;Index&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>HttpGet<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> ActionResult ProcessNextItem<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> store <span class="sy0">=</span> <span class="kw3">new</span> ItemStore<span class="br0">&#40;</span>_storageLocator<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">new</span> ItemProcessor<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ProcessNextItem</span><span class="br0">&#40;</span>store<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> RedirectToAction<span class="br0">&#40;</span><span class="st0">&quot;Index&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class HomeController : Controller {
+
+	IStorageLocator _storageLocator;
+
+	public HomeController() {
+		_storageLocator = new StorageManager("Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString");
+	}
+
+	public ActionResult Index() {
+		var store = new ItemStore(_storageLocator);
+		var model = new StatusViewModel() {
+			ProcessedItems = store.GetProcessedList(),
+			UnprocessedItems = store.GetUnprocessedList()
+		};
+
+		ViewData["file"] = TempData["file"];
+
+		return View(model);
+	}
+
+	[HttpPost]
+	public ActionResult AddFile(HttpPostedFileBase file) {
+		if (file != null &amp;&amp; file.ContentLength &gt; 0) {
+			var item = new FullItem() {
+				ResourceId = Guid.NewGuid(),
+				Received = DateTime.Now.ToUniversalTime(),
+				IsProcessed = false,
+				FileName = file.FileName
+			};
+			item.ReadFileFromStream(file.InputStream);
+
+			new ItemStore(_storageLocator).AddNewItem(item);
+			TempData["file"] = file.FileName + " uploaded and queued for processing.";
+		}
+		else {
+			TempData["file"] = "Processor ignores empty files, sorry.";
+		}
+
+		return RedirectToAction("Index");
+	}
+
+	[HttpGet]
+	public ActionResult ProcessNextItem() {
+		var store = new ItemStore(_storageLocator);
+		new ItemProcessor().ProcessNextItem(store);
+
+		return RedirectToAction("Index");
+	}
+}</pre></div></div>
+
+<p>The key to all of these methods is the ItemStore and ItemProcessor class, all of the rest of the logic is basic presentation layer logic.</p>
+<h3>The Worker Role</h3>
+<p>The worker role consists of a roughly 6 line while(true) statement that asks the ItemStore to process the next item in the queue, then sleeps for 1 second.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> Run<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">while</span> <span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> storageLocator <span class="sy0">=</span> <span class="kw3">new</span> StorageManager<span class="br0">&#40;</span><span class="st0">&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> store <span class="sy0">=</span> <span class="kw3">new</span> ItemStore<span class="br0">&#40;</span>storageLocator<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">new</span> ItemProcessor<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ProcessNextItem</span><span class="br0">&#40;</span>store<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">Sleep</span><span class="br0">&#40;</span><span class="nu0">1000</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;Working&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public override void Run() {
+	while (true) {
+		var storageLocator = new StorageManager("Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString");
+		var store = new ItemStore(storageLocator);
+		new ItemProcessor().ProcessNextItem(store);
+		Thread.Sleep(1000);
+		Trace.WriteLine("Working", "Information");
+	}
+}</pre></div></div>
+
+<p>Once again, the magic happens in the ItemStore and ItemProcessor instances.</p>
+<h3>The ItemStore</h3>
+<p>The ItemStore class exposes the basic methods we need execute our process:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">void</span> AddNewItem<span class="br0">&#40;</span>FullItem item<span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> FullItem RetrieveForProcessing<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw4">void</span> StoreFinishedItem<span class="br0">&#40;</span>FullItem item<span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public void AddNewItem(FullItem item) { /* More Code */ }
+
+public FullItem RetrieveForProcessing() { /* More Code */ }
+
+public void StoreFinishedItem(FullItem item) { /* More Code */ }</pre></div></div>
+
+<p>And a pair of methods for visibility:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> IEnumerable<span class="sy0">&lt;</span>ItemBase<span class="sy0">&gt;</span> GetUnprocessedList<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> IEnumerable<span class="sy0">&lt;</span>ItemBase<span class="sy0">&gt;</span> GetProcessedList<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public IEnumerable&lt;ItemBase&gt; GetUnprocessedList() { /* More Code */ }
+
+public IEnumerable&lt;ItemBase&gt; GetProcessedList() { /* More Code */ }</pre></div></div>
+
+<p>Windows Azure offers a number of storage options, each with their own benefits and constraints. For this process I decided to use <a href="http://www.windowsazure.com/en-us/develop/net/how-to-guides/table-services/" title="Table storage on WindowsAzure.com">table storage</a> to track the summary level information about each file processing job, <a href="http://www.windowsazure.com/en-us/develop/net/how-to-guides/blob-storage/" title="Blob storage on WindowsAzure.com">blob storage</a> to store the actual file, and the <a href="http://www.windowsazure.com/en-us/develop/net/how-to-guides/queue-service/" title="Queue service on WindowsAzure.com">queue service</a> for managing task execution. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">class</span> ItemStore <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> RAW_BLOB_NAME <span class="sy0">=</span> <span class="st0">&quot;RawItems&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> FINISHED_BLOB_NAME <span class="sy0">=</span> <span class="st0">&quot;FinishedItems&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> QUEUE_NAME <span class="sy0">=</span> <span class="st0">&quot;ToBeProcessed&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> TABLE_NAME <span class="sy0">=</span> <span class="st0">&quot;Items&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; ITableStore _table<span class="sy0">;</span>
+&nbsp; &nbsp; IBlobStore _rawBlob, _finishedBlob<span class="sy0">;</span>
+&nbsp; &nbsp; IQueueStore _queue<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> ItemStore<span class="br0">&#40;</span>IStorageLocator storageLocator<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _table <span class="sy0">=</span> storageLocator<span class="sy0">.</span><span class="me1">GetTable</span><span class="br0">&#40;</span>TABLE_NAME<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _rawBlob <span class="sy0">=</span> storageLocator<span class="sy0">.</span><span class="me1">GetBlob</span><span class="br0">&#40;</span>RAW_BLOB_NAME<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _finishedBlob <span class="sy0">=</span> storageLocator<span class="sy0">.</span><span class="me1">GetBlob</span><span class="br0">&#40;</span>FINISHED_BLOB_NAME<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _queue <span class="sy0">=</span> storageLocator<span class="sy0">.</span><span class="me1">GetQueue</span><span class="br0">&#40;</span>QUEUE_NAME<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> AddNewItem<span class="br0">&#40;</span>FullItem item<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _rawBlob<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">ResourceId</span>, item<span class="sy0">.</span><span class="me1">File</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _queue<span class="sy0">.</span><span class="me1">Enqueue</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">AsSummary</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _table<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">AsSummary</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> IEnumerable<span class="sy0">&lt;</span>ItemBase<span class="sy0">&gt;</span> GetUnprocessedList<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> _table<span class="sy0">.</span><span class="me1">GetUnprocessedItems</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToList</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> IEnumerable<span class="sy0">&lt;</span>ItemBase<span class="sy0">&gt;</span> GetProcessedList<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ?</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> _table<span class="sy0">.</span><span class="me1">GetProcessedItems</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToList</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> FullItem RetrieveForProcessing<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; FullItem rawItem <span class="sy0">=</span> <span class="kw1">null</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> item <span class="sy0">=</span> _queue<span class="sy0">.</span><span class="me1">Dequeue</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>item <span class="sy0">!=</span> <span class="kw1">null</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; rawItem <span class="sy0">=</span> <span class="kw3">new</span> FullItem<span class="br0">&#40;</span>item<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; rawItem<span class="sy0">.</span><span class="me1">File</span> <span class="sy0">=</span> _rawBlob<span class="sy0">.</span><span class="me1">Retrieve</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">ResourceId</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> rawItem<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> StoreFinishedItem<span class="br0">&#40;</span>FullItem item<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _finishedBlob<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">ResourceId</span>, item<span class="sy0">.</span><span class="me1">File</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _rawBlob<span class="sy0">.</span><span class="me1">Delete</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">ResourceId</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _table<span class="sy0">.</span><span class="me1">Update</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">AsSummary</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class ItemStore {
+
+	public static string RAW_BLOB_NAME = "RawItems";
+	public static string FINISHED_BLOB_NAME = "FinishedItems";
+	public static string QUEUE_NAME = "ToBeProcessed";
+	public static string TABLE_NAME = "Items";
+
+	ITableStore _table;
+	IBlobStore _rawBlob, _finishedBlob;
+	IQueueStore _queue;
+
+	public ItemStore(IStorageLocator storageLocator) {
+		_table = storageLocator.GetTable(TABLE_NAME);
+		_rawBlob = storageLocator.GetBlob(RAW_BLOB_NAME);
+		_finishedBlob = storageLocator.GetBlob(FINISHED_BLOB_NAME);
+		_queue = storageLocator.GetQueue(QUEUE_NAME);
+	}
+
+	public void AddNewItem(FullItem item) {
+		_rawBlob.Create(item.ResourceId, item.File);
+		_queue.Enqueue(item.AsSummary());
+		_table.Create(item.AsSummary());
+	}
+
+	public IEnumerable&lt;ItemBase&gt; GetUnprocessedList() {
+		return _table.GetUnprocessedItems().ToList();
+	}
+
+	public IEnumerable&lt;ItemBase&gt; GetProcessedList() {
+		// ?
+		return _table.GetProcessedItems().ToList();
+	}
+
+	public FullItem RetrieveForProcessing() {
+		FullItem rawItem = null;
+
+		var item = _queue.Dequeue();
+		if (item != null) {
+			rawItem = new FullItem(item);
+			rawItem.File = _rawBlob.Retrieve(item.ResourceId);
+		}
+		return rawItem;
+	}
+
+	public void StoreFinishedItem(FullItem item) {
+		_finishedBlob.Create(item.ResourceId, item.File);
+		_rawBlob.Delete(item.ResourceId);
+		_table.Update(item.AsSummary());
+	}
+}</pre></div></div>
+
+<p>The ItemStore class is built to interact with interfaces for each of these resources, using a single IStorageLocator interface to get instances of those resource interfaces. The class (and application) was driven by the small set of unit tests that helped me define how i wanted the process to work and interact with the resources above.</p>
+<h3>Configurations</h3>
+<p>With all of the pieces defined, we use a pair of configurations to tell Azure how we want to deploy everything. </p>
+<p>The first configuration defines the services we intend to package and deploy as well as the instance size and any endpoints:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;ServiceDefinition</span> <span class="re0">name</span>=<span class="st0">&quot;CloudFileProcessorService&quot;</span> <span class="re0">xmlns</span>=<span class="st0">&quot;http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;WebRole</span> <span class="re0">name</span>=<span class="st0">&quot;Processor_WebRole&quot;</span> <span class="re0">vmsize</span>=<span class="st0">&quot;Small&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Sites<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Site</span> <span class="re0">name</span>=<span class="st0">&quot;Web&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Bindings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Binding</span> <span class="re0">name</span>=<span class="st0">&quot;Endpoint1&quot;</span> <span class="re0">endpointName</span>=<span class="st0">&quot;Endpoint1&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Bindings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Site<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Sites<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Endpoints<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;InputEndpoint</span> <span class="re0">name</span>=<span class="st0">&quot;Endpoint1&quot;</span> <span class="re0">protocol</span>=<span class="st0">&quot;http&quot;</span> <span class="re0">port</span>=<span class="st0">&quot;80&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Endpoints<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Imports<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Import</span> <span class="re0">moduleName</span>=<span class="st0">&quot;Diagnostics&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Imports<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/WebRole<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;WorkerRole</span> <span class="re0">name</span>=<span class="st0">&quot;Processor_WorkerRole&quot;</span> <span class="re0">vmsize</span>=<span class="st0">&quot;Small&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Imports<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Import</span> <span class="re0">moduleName</span>=<span class="st0">&quot;Diagnostics&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Imports<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/WorkerRole<span class="re2">&gt;</span></span></span>
+<span class="sc3"><span class="re1">&lt;/ServiceDefinition<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;ServiceDefinition name="CloudFileProcessorService" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition"&gt;
+  &lt;WebRole name="Processor_WebRole" vmsize="Small"&gt;
+    &lt;Sites&gt;
+      &lt;Site name="Web"&gt;
+        &lt;Bindings&gt;
+          &lt;Binding name="Endpoint1" endpointName="Endpoint1" /&gt;
+        &lt;/Bindings&gt;
+      &lt;/Site&gt;
+    &lt;/Sites&gt;
+    &lt;Endpoints&gt;
+      &lt;InputEndpoint name="Endpoint1" protocol="http" port="80" /&gt;
+    &lt;/Endpoints&gt;
+    &lt;Imports&gt;
+      &lt;Import moduleName="Diagnostics" /&gt;
+    &lt;/Imports&gt;
+  &lt;/WebRole&gt;
+  &lt;WorkerRole name="Processor_WorkerRole" vmsize="Small"&gt;
+    &lt;Imports&gt;
+      &lt;Import moduleName="Diagnostics" /&gt;
+    &lt;/Imports&gt;
+  &lt;/WorkerRole&gt;
+&lt;/ServiceDefinition&gt;</pre></div></div>
+
+<p>The second configuration is applied when we deploy the instances above and tells Azure that I want to deploy 1 Processor_WebRole instance and 2 Processor_WorkerRole instances:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;ServiceConfiguration</span> <span class="re0">serviceName</span>=<span class="st0">&quot;CloudFileProcessorService&quot;</span> <span class="re0">xmlns</span>=<span class="st0">&quot;http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceConfiguration&quot;</span> <span class="re0">osFamily</span>=<span class="st0">&quot;1&quot;</span> <span class="re0">osVersion</span>=<span class="st0">&quot;*&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;Role</span> <span class="re0">name</span>=<span class="st0">&quot;Processor_WebRole&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Instances</span> <span class="re0">count</span>=<span class="st0">&quot;1&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;ConfigurationSettings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Setting</span> <span class="re0">name</span>=<span class="st0">&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot;</span> <span class="re0">value</span>=<span class="st0">&quot;UseDevelopmentStorage=true&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/ConfigurationSettings<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/Role<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;Role</span> <span class="re0">name</span>=<span class="st0">&quot;Processor_WorkerRole&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Instances</span> <span class="re0">count</span>=<span class="st0">&quot;2&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;ConfigurationSettings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Setting</span> <span class="re0">name</span>=<span class="st0">&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot;</span> <span class="re0">value</span>=<span class="st0">&quot;UseDevelopmentStorage=true&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/ConfigurationSettings<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/Role<span class="re2">&gt;</span></span></span>
+<span class="sc3"><span class="re1">&lt;/ServiceConfiguration<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;ServiceConfiguration serviceName="CloudFileProcessorService" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceConfiguration" osFamily="1" osVersion="*"&gt;
+  &lt;Role name="Processor_WebRole"&gt;
+    &lt;Instances count="1" /&gt;
+    &lt;ConfigurationSettings&gt;
+      &lt;Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="UseDevelopmentStorage=true" /&gt;
+    &lt;/ConfigurationSettings&gt;
+  &lt;/Role&gt;
+  &lt;Role name="Processor_WorkerRole"&gt;
+    &lt;Instances count="2" /&gt;
+    &lt;ConfigurationSettings&gt;
+      &lt;Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="UseDevelopmentStorage=true" /&gt;
+    &lt;/ConfigurationSettings&gt;
+  &lt;/Role&gt;
+&lt;/ServiceConfiguration&gt;</pre></div></div>
+
+<p>Note that I&#8217;m telling it to use the local development storage, which is supported by a local storage emulator. In a production configuration I would enter the service location and a generated token.</p>
+<h2>So Where&#8217;s the Magic?</h2>
+<p>So where&#8217;s the magic that makes this a distribute application instead of 3 days of overtime? It&#8217;s sprinkled throughout the system.</p>
+<p>The architecture of this system would work just as well outside of Azure, provided I offered it stand-ins for the 3 storage resources and deployed the instances and any necessary settings accordingly. Instead of worrying about how to manage deployments and what to use for centralized queueing and storage, I can focus on building an application that simply assumes those resources are available. Is there headroom for performance improvements? Sure, but I can also choose to throw another $15/month server at it, push data to CDNs and blob storage, add caching, or even a SQL Azure instance. </p>
+<p>This application may be fairly basic, but nothing stops us from following this same pattern for much larger applications. PaaS has removed some of the constraints we take for granted. Even applications that have to run in-house in order to standardize against a database can now consider uploading a subset of that lookup data to a table store, performing most of the heavy lifting in the cloud, then produce a few files to import back into the on-premise system. The total execution time would be longer, but being able to scale part of the job across numerous parallel instances means the actual elapsed time can actually be much shorter.</p>
+<p>And it means when we have a 60 hour task that&#8217;s due in 24, it&#8217;s no longer an impossible situation.</p>
+<p><i>The source code is available <a href="https://github.com/tarwn/AzureFileProcessorSample" title="AzureFileProcessorSample on github">on github</a> along with requirements and links for setting up the emulators locally.</i></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/the-cloud-as-a-make/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Azure How To Rebuild A Clustered Index</title>
+		<link>/index.php/datamgmt/datadesign/sql-azure-how-to-rebuild/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-azure-how-to-rebuild/#respond</comments>
+		<pubDate>Thu, 03 May 2012 23:52:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud computing]]></category>
+		<category><![CDATA[fragmentation]]></category>
+		<category><![CDATA[sql azure]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/05/sql-azure-how-to-rebuild/</guid>
+		<description><![CDATA[In yesterday's post A couple of things to be aware of when working with tables in SQL Azure I showed you some things to be aware of in regards to tables. Today let's talk about how to rebuild an index
+
+Let's say you have a table with a clustered index&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In yesterday&#8217;s post <a href="/index.php/DataMgmt/DataDesign/a-couple-of-things-to">A couple of things to be aware of when working with tables in SQL Azure</a> I showed you some things to be aware of in regards to tables. Today let&#8217;s talk about how to rebuild an index</p>
+<p>Let&#8217;s say you have a table with a clustered index on a uniqueidentifier column, you know that you have to use newid() instead of newsequentialid() since newsequentialid() is not supported. Clustering with newid() is not recommended because you will get page splits. Let&#8217;s take a look at how we can recreate the index</p>
+<p>First create the following table with a clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test<span class="br0">&#40;</span>bla <span class="kw1">uniqueidentifier</span> <span class="kw1">default</span> newid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> ix_Test_bla <span class="kw1">on</span> Test<span class="br0">&#40;</span>bla<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test(bla uniqueidentifier default newid())
+
+CREATE CLUSTERED INDEX ix_Test_bla on Test(bla)
+GO</pre></div></div>
+
+<p>Now run the following block of code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> CTE <span class="kw1">AS</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="nu0">1</span> <span class="kw1">AS</span> A 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">2</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">3</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">4</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">5</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">6</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Test
+<span class="kw1">SELECT</span> newid<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> CTE a
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> CTE b
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> CTE c
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> CTE d
+GO <span class="nu0">5</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH CTE AS (SELECT 1 AS A 
+			UNION ALL SELECT 2 
+			UNION ALL SELECT 3 
+			UNION ALL SELECT 4 
+			UNION ALL SELECT 5
+			UNION ALL SELECT 6)
+INSERT Test
+SELECT newid() 
+FROM CTE a
+CROSS JOIN CTE b
+CROSS JOIN CTE c
+CROSS JOIN CTE d
+GO 5</pre></div></div>
+
+<p>Beginning execution loop</p>
+<p>(1296 row(s) affected)</p>
+<p>(1296 row(s) affected)</p>
+<p>(1296 row(s) affected)</p>
+<p>(1296 row(s) affected)</p>
+<p>(1296 row(s) affected)<br />
+Batch execution completed 5 times.</p>
+<p>Let&#8217;s see how fragmented the index is</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">Object_name</span><span class="br0">&#40;</span>s.<span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">as</span> Tablename,s.<span class="me1">name</span> <span class="kw1">as</span> Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> d
+join sys.<span class="me1">indexes</span> s <span class="kw1">on</span> d.<span class="kw2">object_id</span> <span class="sy0">=</span> s.<span class="kw2">object_id</span>
+and d.<span class="me1">index_id</span> <span class="sy0">=</span> s.<span class="me1">index_id</span>
+and s.<span class="me1">name</span> <span class="sy0">=</span> <span class="st0">'ix_Test_bla'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT Object_name(s.object_id) as Tablename,s.name as Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') d
+join sys.indexes s on d.object_id = s.object_id
+and d.index_id = s.index_id
+and s.name = 'ix_Test_bla'</pre></div></div>
+
+<p>
+<pre>Tablename	Indexname	index_type_desc	avg_fragmentation_in_percent	page_count
+Test	        ix_Test_bla	CLUSTERED INDEX	34.4827586206897                 58</pre>
+<p>Now it is time to &#8216;fix&#8217; the index, we can either defragment/reorganize or rebuild the index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> ix_Test_bla <span class="kw1">ON</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Test<span class="br0">&#93;</span> RE<span class="sy0">OR</span>GANIZE</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX ix_Test_bla ON [dbo].[Test] REORGANIZE</pre></div></div>
+
+<p><em>Msg 40517, Level 16, State 1, Line 1<br />
+Keyword or statement option &#8216;REORGANIZE&#8217; is not supported in this version of SQL Server.</em></p>
+<p>Okay, so SQL Azure does not support reorganizing the index<br />
+What if we drop the index and then create it again?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">INDEX</span> <span class="br0">&#91;</span>ix_Test_bla<span class="br0">&#93;</span> <span class="kw1">ON</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Test<span class="br0">&#93;</span> 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP INDEX [ix_Test_bla] ON [dbo].[Test] 
+GO</pre></div></div>
+
+<p><em>Msg 40054, Level 16, State 2, Line 1<br />
+Tables without a clustered index are not supported in this version of SQL Server. Please create a clustered index and try again.<br />
+The statement has been terminated.</em></p>
+<p>Mmmm, not supported either, let&#8217;s try creating the index with the drop_existing clause</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> <span class="br0">&#91;</span>ix_Test_bla<span class="br0">&#93;</span> <span class="kw1">ON</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>bla<span class="br0">&#93;</span> <span class="kw1">ASC</span>
+<span class="br0">&#41;</span><span class="kw1">WITH</span> <span class="br0">&#40;</span>DROP_EXIST<span class="sy0">IN</span>G <span class="sy0">=</span> <span class="kw1">ON</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX [ix_Test_bla] ON [dbo].[Test]
+(
+	[bla] ASC
+)WITH (DROP_EXISTING = ON)
+GO</pre></div></div>
+
+<p>That worked, let&#8217;s check fragmentation again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">Object_name</span><span class="br0">&#40;</span>s.<span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">as</span> Tablename,s.<span class="me1">name</span> <span class="kw1">as</span> Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> d
+join sys.<span class="me1">indexes</span> s <span class="kw1">on</span> d.<span class="kw2">object_id</span> <span class="sy0">=</span> s.<span class="kw2">object_id</span>
+and d.<span class="me1">index_id</span> <span class="sy0">=</span> s.<span class="me1">index_id</span>
+and s.<span class="me1">name</span> <span class="sy0">=</span> <span class="st0">'ix_Test_bla'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT Object_name(s.object_id) as Tablename,s.name as Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') d
+join sys.indexes s on d.object_id = s.object_id
+and d.index_id = s.index_id
+and s.name = 'ix_Test_bla'</pre></div></div>
+
+<p>
+<pre>Tablename	Indexname	index_type_desc	avg_fragmentation_in_percent	page_count
+Test	        ix_Test_bla	CLUSTERED INDEX	4.76190476190476                21</pre>
+<p>Mmmm, didn&#8217;t get rid of all the fragmentation. What happens if we try to do the same again?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> <span class="br0">&#91;</span>ix_Test_bla<span class="br0">&#93;</span> <span class="kw1">ON</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>bla<span class="br0">&#93;</span> <span class="kw1">ASC</span>
+<span class="br0">&#41;</span><span class="kw1">WITH</span> <span class="br0">&#40;</span>DROP_EXIST<span class="sy0">IN</span>G <span class="sy0">=</span> <span class="kw1">ON</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX [ix_Test_bla] ON [dbo].[Test]
+(
+	[bla] ASC
+)WITH (DROP_EXISTING = ON)
+GO</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">Object_name</span><span class="br0">&#40;</span>s.<span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">as</span> Tablename,s.<span class="me1">name</span> <span class="kw1">as</span> Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> d
+join sys.<span class="me1">indexes</span> s <span class="kw1">on</span> d.<span class="kw2">object_id</span> <span class="sy0">=</span> s.<span class="kw2">object_id</span>
+and d.<span class="me1">index_id</span> <span class="sy0">=</span> s.<span class="me1">index_id</span>
+and s.<span class="me1">name</span> <span class="sy0">=</span> <span class="st0">'ix_Test_bla'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT Object_name(s.object_id) as Tablename,s.name as Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') d
+join sys.indexes s on d.object_id = s.object_id
+and d.index_id = s.index_id
+and s.name = 'ix_Test_bla'</pre></div></div>
+
+<p>
+<pre>Tablename	Indexname	index_type_desc	avg_fragmentation_in_percent	page_count
+Test	        ix_Test_bla	CLUSTERED INDEX	9.52380952380952                 21</pre>
+<p>Still didn&#8217;t get rid of all fragmentation<br />
+Let&#8217;s try something else, first we are going to add some more data</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> CTE <span class="kw1">AS</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="nu0">1</span> <span class="kw1">AS</span> A 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">2</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">3</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">4</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">5</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span> <span class="kw1">SELECT</span> <span class="nu0">6</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Test
+<span class="kw1">SELECT</span> newid<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> CTE a
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> CTE b
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> CTE c
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> CTE d
+go <span class="nu0">5</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH CTE AS (SELECT 1 AS A 
+			UNION ALL SELECT 2 
+			UNION ALL SELECT 3 
+			UNION ALL SELECT 4 
+			UNION ALL SELECT 5
+			UNION ALL SELECT 6)
+INSERT Test
+SELECT newid() 
+FROM CTE a
+CROSS JOIN CTE b
+CROSS JOIN CTE c
+CROSS JOIN CTE d
+go 5</pre></div></div>
+
+<p>Let&#8217;s check fragmentation</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">Object_name</span><span class="br0">&#40;</span>s.<span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">as</span> Tablename,s.<span class="me1">name</span> <span class="kw1">as</span> Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> d
+join sys.<span class="me1">indexes</span> s <span class="kw1">on</span> d.<span class="kw2">object_id</span> <span class="sy0">=</span> s.<span class="kw2">object_id</span>
+and d.<span class="me1">index_id</span> <span class="sy0">=</span> s.<span class="me1">index_id</span>
+and s.<span class="me1">name</span> <span class="sy0">=</span> <span class="st0">'ix_Test_bla'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT Object_name(s.object_id) as Tablename,s.name as Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') d
+join sys.indexes s on d.object_id = s.object_id
+and d.index_id = s.index_id
+and s.name = 'ix_Test_bla'</pre></div></div>
+
+<p>
+<pre>Tablename	Indexname	index_type_desc	avg_fragmentation_in_percent	page_count
+Test	        ix_Test_bla	CLUSTERED INDEX	72.8395061728395                 81</pre>
+<p>Oh yeah, that is real bad</p>
+<p>Now let&#8217;s rebuild the index instead</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> ix_Test_bla <span class="kw1">ON</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Test<span class="br0">&#93;</span> REBUILD</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX ix_Test_bla ON [dbo].[Test] REBUILD</pre></div></div>
+
+<p>Check fragmentation again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">Object_name</span><span class="br0">&#40;</span>s.<span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">as</span> Tablename,s.<span class="me1">name</span> <span class="kw1">as</span> Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> d
+join sys.<span class="me1">indexes</span> s <span class="kw1">on</span> d.<span class="kw2">object_id</span> <span class="sy0">=</span> s.<span class="kw2">object_id</span>
+and d.<span class="me1">index_id</span> <span class="sy0">=</span> s.<span class="me1">index_id</span>
+and s.<span class="me1">name</span> <span class="sy0">=</span> <span class="st0">'ix_Test_bla'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT Object_name(s.object_id) as Tablename,s.name as Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') d
+join sys.indexes s on d.object_id = s.object_id
+and d.index_id = s.index_id
+and s.name = 'ix_Test_bla'</pre></div></div>
+
+<p>
+<pre>Tablename	Indexname	index_type_desc	avg_fragmentation_in_percent	page_count
+Test	        ix_Test_bla	CLUSTERED INDEX	0                               41</pre>
+<p>And just like that all the fragmentation is gone&#8230;..good times</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-azure-how-to-rebuild/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>New 100MB database option and lower pricing across the board for SQL Azure</title>
+		<link>/index.php/datamgmt/datadesign/new-100mb-database-option-and/</link>
+		<comments>/index.php/datamgmt/datadesign/new-100mb-database-option-and/#respond</comments>
+		<pubDate>Tue, 14 Feb 2012 15:37:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud computing]]></category>
+		<category><![CDATA[sql azure]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/02/new-100mb-database-option-and/</guid>
+		<description><![CDATA[The cloud just go a whole lot cheaper for SQL Azure customers
+
+
+To meet evolving customer needs across both ends of the database size spectrum, Microsoft announced that they are lowering the price of SQL Azure and introducing a 100MB database option&#8230;]]></description>
+				<content:encoded><![CDATA[<p>The cloud just got a whole lot cheaper for SQL Azure customers</p>
+<p>To meet evolving customer needs across both ends of the database size spectrum, Microsoft announced that they are lowering the price of SQL Azure and introducing a 100MB database option at $5 per month.  Customers will realize 48% to 75% savings for databases larger than 1GB.  The 100MB DB option enables customers to get started using SQL Azure at half of the previous price</p>
+<p>Here is what the pricing looks like, you can also see the percentage of the decrease</p>
+<div class="tables">
+<table>
+<tr>
+<th>GB</th>
+<th>Previous Pricing</th>
+<th>New Pricing</th>
+<th>New Price/GB</th>
+<th>Total % Decrease</th>
+</tr>
+<tr>
+<td>5</td>
+<td>$49.95</td>
+<td>$25.99</td>
+<td>$5.20</td>
+<td>48%</td>
+</tr>
+<tr>
+<td>10</td>
+<td>$99.99</td>
+<td>$45.99</td>
+<td>$4.60</td>
+<td>54%</td>
+</tr>
+<tr>
+<td>25</td>
+<td>$299.97</td>
+<td>$75.99</td>
+<td>$3.04</td>
+<td>75%</td>
+</tr>
+<tr>
+<td>50</td>
+<td>$499.95</td>
+<td>$125.99</td>
+<td>$2.52</td>
+<td>75%</td>
+</tr>
+<tr>
+<td>100</td>
+<td>$499.95</td>
+<td>$175.99</td>
+<td>$1.76</td>
+<td>65%</td>
+</tr>
+<tr>
+<td>150</td>
+<td>$499.95*</td>
+<td>$225.99</td>
+<td>$1.51</td>
+<td>55%</td>
+</tr>
+<table></table>
+</table>
+</div>
+<p>*Previous prices 50GB and larger reflect price cap of $499.95 announced December 12, 2011.</p>
+<p>As you can see some of these prices decreased by 75%, that is great news for customers.</p>
+<p>More details can be found here: https://www.windowsazure.com/en-us/pricing/details/#database</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/new-100mb-database-option-and/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Azure Compatibility Assessment service released</title>
+		<link>/index.php/datamgmt/datadesign/sql-azure-compatibility-assessment-service/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-azure-compatibility-assessment-service/#comments</comments>
+		<pubDate>Wed, 04 Jan 2012 08:42:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud computing]]></category>
+		<category><![CDATA[sql azure]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/01/sql-azure-compatibility-assessment-service/</guid>
+		<description><![CDATA[If you are considering moving your SQL Server databases to SQL Azure, you can use the SQL Azure Compatibility Assessment to check if your database schema is compatible with SQL Azure. This service is very easy to use and does not require an Azure accoun&#8230;]]></description>
+				<content:encoded><![CDATA[<p>If you are considering moving your SQL Server databases to SQL Azure, you can use the SQL Azure Compatibility Assessment to check if your database schema is compatible with SQL Azure. This service is very easy to use and does not require an Azure account.</p>
+<p>To use this service, you need a Live ID and a .dacpac extracted from your database, you do not need to have an Azure account or have Azure knowledge</p>
+<p>In order to use the SQL Azure Compatibility Assessment you need to prepare a .dacpac of your database and go to the service portal: https://assess.sql.azure.com/ to use the service.</p>
+<p>There is a 2 minute and 52 seconds video available here: http://www.microsoft.com/en-us/showcase/details.aspx?uuid=6302dccd-3a20-483e-8ec7-5ff5ad72c2c2</p>
+<p>The SQL Azure Compatibility Assessment will give you a report of things that are not supported (like full text indexes) or things you need to fix (like adding a clustered index if you want to do inserts)</p>
+<p>More information about SQL Azure Compatibility Assessment can be found in this TechNet wiki article: http://social.technet.microsoft.com/wiki/contents/articles/6246.aspx</p>
+<p>Happy cloud computing  <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-azure-compatibility-assessment-service/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Windows Azure Tools for Microsoft Visual Studio 1.1 Released</title>
+		<link>/index.php/desktopdev/mstech/windows-azure-tools-for-microsoft-visual/</link>
+		<comments>/index.php/desktopdev/mstech/windows-azure-tools-for-microsoft-visual/#respond</comments>
+		<pubDate>Tue, 02 Feb 2010 00:04:02 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[C#]]></category>
+		<category><![CDATA[General Purpose Languages]]></category>
+		<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[VB.NET]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud computing]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/02/windows-azure-tools-for-microsoft-visual/</guid>
+		<description><![CDATA[Microsoft has released Windows Azure Tools for Microsoft Visual Studio 1.1 today. 
+Windows Azure Tools for Microsoft Visual Studio extend Visual Studio 2008 and the upcoming Visual Studio 2010 RC to enable the creation, configuration, building, debuggi&#8230;]]></description>
+				<content:encoded><![CDATA[<div class="image_block"><img src="/wp-content/uploads/blogs/EnterpriseDev//windows_azure_small.jpg" alt="" title="" width="300" height="169" /></div>
+<p>Microsoft has released Windows Azure Tools for Microsoft Visual Studio 1.1 today.<br />
+Windows Azure Tools for Microsoft Visual Studio extend Visual Studio 2008 and the upcoming Visual Studio 2010 RC to enable the creation, configuration, building, debugging, running and packaging of scalable web applications and services on Windows Azure. Installation includes the Windows Azure SDK. (For VS 2010 Beta 2 please use the November 2009 release)</p>
+<p><strong>Windows Azure Tools for Microsoft Visual Studio 1.1 includes the following</strong><br />
+C# and VB Project creation support for creating a Windows Azure Cloud Service solution with multiple roles.</p>
+<p>Tools to add and remove roles from the Cloud Service.</p>
+<p>Tools to configure each Role.</p>
+<p>Integrated local development via the Development Fabric and Development Storage services.</p>
+<p>Running and Debugging a Cloud Service in the Development Fabric.</p>
+<p>Building and packaging of Cloud Service Packages.</p>
+<p>Browsing to the Windows Azure Developer Portal.</p>
+<p><strong>New for version 1.1:</strong><br />
+Windows Azure Drive: Enable a Windows Azure application to use existing NTFS APIs to access a durable drive. This allows the Windows Azure application to mount a page blob as a drive letter, such as X:, and enables easy migration of existing NTFS applications to the cloud.</p>
+<p>OS Version Support: Allows a Windows Azure application to choose the appropriate Guest OS to run on in the cloud.</p>
+<p>There are also some bug fixes in this release.</p>
+<p>Download it here: http://www.microsoft.com/downloads/details.aspx?displaylang=en&amp;FamilyID=5664019e-6860-4c33-9843-4eb40b297ab6 and get your cloud going</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/windows-azure-tools-for-microsoft-visual/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Azure CTP Testers Can Upgrade Their Accounts To Paid Commercial Subscriptions Starting Today</title>
+		<link>/index.php/datamgmt/datadesign/sql-azure-ctp-testers-can-upgrade-their/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-azure-ctp-testers-can-upgrade-their/#respond</comments>
+		<pubDate>Mon, 04 Jan 2010 17:17:39 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud computing]]></category>
+		<category><![CDATA[sql azure]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/01/sql-azure-ctp-testers-can-upgrade-their/</guid>
+		<description><![CDATA[According to a post on the SQL Azure Team Blog you can upgrade your CTP accounts to a paid commercial subscription starting today, below is an excerpt from that post Starting today you will be able to upgrade your Community Technology Preview (CTP) account to a paid commercial subscriptions. If you upgrade your CTP accounts [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>According to a post on the <a href="http://blogs.msdn.com/ssds/archive/2010/01/04/9943474.aspx">SQL Azure Team Blog</a> you can upgrade your CTP accounts to a paid commercial subscription starting today, below is an excerpt from that post</p>
+<blockquote><p>Starting today you will be able to upgrade your Community Technology Preview (CTP) account to a paid commercial subscriptions. If you upgrade your CTP accounts during the month of January, 2010, all Windows Azure platform usage incurred during this month will be at no charge. You will also have full visibility during this month to your Windows Azure platform usage. Billing and SLAs for all commercial accounts will begin on February 1st, 2010</p></blockquote>
+<p>Pricing is also announced, here is for example the Windows Azure Platform Introductory Special</p>
+<p><em>
+<p><strong>Included each month at no charge:</strong></p>
+<ul>
+<li>Windows Azure</li>
+<ul>
+<li>25 hours of a small compute instance</li>
+<li>500 MB of storage</li>
+<li>10,000 storage transactions</li>
+</ul>
+<li>SQL Azure</li>
+<ul>
+<li>1 Web Edition database (available for first 3 months only)</li>
+</ul>
+<li>AppFabric</li>
+<ul>
+<li>100,000 Access Control and Service Bus message operations*</li>
+</ul>
+<li>Data Transfers (per region**)</li>
+<ul>
+<li>500 MB in</li>
+<li>500 MB out</li>
+</ul>
+</ul>
+<p><strong>Standard Rates:</strong></p>
+<p>Windows Azure</p>
+<ul>
+<li>Compute</li>
+<ul>
+<li>Small instance (default): $0.12 per hour</li>
+<li>Medium instance: $0.24 per hour</li>
+<li>Large instance: $0.48 per hour</li>
+<li>Extra large instance: $0.96 per hour</li>
+</ul>
+<li>Storage</li>
+<ul>
+<li>$0.15 per GB stored per month</li>
+<li>$0.01 per 10,000 storage transactions</li>
+</ul>
+<li>Content Delivery Network (CDN)</li>
+<ul>
+<li>Service currently available as a Community Technology Preview (CTP) at no charge</li>
+</ul>
+</ul>
+<p>SQL Azure</p>
+<ul>
+<li>Web Edition – Up to 1 GB relational database</li>
+<ul>
+<li>$9.99 per database per month</li>
+</ul>
+<li>Business Edition – Up to 10 GB relational database</li>
+<ul>
+<li>$99.99 per database per month </li>
+</ul>
+</ul>
+<p>AppFabric</p>
+<ul>
+<li>Access Control</li>
+<ul>
+<li>$0.15 per 100,000 message operations*</li>
+</ul>
+<li>Service Bus</li>
+<ul>
+<li>$0.15 per 100,000 message operations*</li>
+</ul>
+</ul>
+<p>Data Transfers</p>
+<ul>
+<li>North America and Europe** regions</li>
+<ul>
+<li>$0.10 per GB in</li>
+<li>$0.15 per GB out</li>
+</ul>
+<li>Asia Pacific** Region</li>
+<ul>
+<li>$0.30 per GB in</li>
+<li>$0.45 per GB out</li>
+</ul>
+<li>Inbound data transfers during off-peak times through June 30, 2010 are at no charge.  Prices revert to our normal inbound data transfer rates after June 30, 2010.</li>
+</ul>
+<p> </em></p>
+<p>You can get all the other pricing information here: http://www.microsoft.com/windowsazure/offers/</p>
+<p>Now SQL Azure makes sense for some people and for some people it does not. In my case it does not since my databases are much bigger than what SQL Azure currently supports.</p>
+<p>If you are thinking of migrating to SQL Azure I encourage you to listen to the following podcast on dotnetrocks: <a href="http://www.dotnetrocks.com/default.aspx?showNum=512">Huey and Wegner Migrate Us to SQL Azure</a>. in this podcast a lot of things that will not work in SQL Azure but do work in SQL Server will be examined.</p>
+<p><strong>SQL Azure Migration Wizard </strong><br />
+Before you migrate to SQL Azure for SQL Server I encourage you to check out the SQL Azure Migration Wizard. Here is what the SQL Azure Migration Wizard does</p>
+<p>The SQL Azure Migration Wizard helps you migrate your local SQL Server 2005 / 2008 databases into SQL Azure. The wizard walks you through the selection of your SQL objects, creates SQL scripts suitable for SQL Azure, and allows you to migrate your data.</p>
+<p><b>Project Details</b><br />The SQL Azure Migration Wizard (SQLAzureMW) gives you the options to analyzes, generates scripts, and migrate data (via BCP) from: </p>
+<ol>
+<li>SQL Server to SQL Azure</li>
+<li>SQL Azure to  SQL Server</li>
+<li>SQL Azure to SQL Azure</li>
+</ol>
+<p>It will also analyze SQL Profiler trace files and TSQL script for compatibility issues with SQL Azure. </p>
+<ol>
+<li>If your source is a SQL Server database, SQLAzureMW will list all of the object types (i.e. Tables, Stored Procedures, Views, etc.) and let you decide which ones you want analyzed / scripted. Using the “Advanced” options you can tell SQLAzureMW which compatibility checks to perform and if the data should be migrated.</li>
+<li>If your source is a file containing TSQL, then you will be given the option to have SQLAzureMW check the TSQL for incompatibilities and fix where possible or just run the script without any compatibility checking.</li>
+<li>You can specify a SQL Profiler trace file for analysis.</li>
+</ol>
+<p></p>
+<p>You can download the SQL Azure Migration Wizard on CodePlex here: http://sqlazuremw.codeplex.com/</p>
+<p>*** <strong>Remember, if you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-azure-ctp-testers-can-upgrade-their/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Microsoft Enterprise Developer Conference Overview</title>
+		<link>/index.php/enterprisedev/appserver/microsoft-enterprise-developer-conferenc/</link>
+		<comments>/index.php/enterprisedev/appserver/microsoft-enterprise-developer-conferenc/#respond</comments>
+		<pubDate>Thu, 07 May 2009 11:13:16 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Application Server]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud computing]]></category>
+		<category><![CDATA[sql server data services]]></category>
+		<category><![CDATA[ssds]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/05/microsoft-enterprise-developer-conferenc/</guid>
+		<description><![CDATA[This is the second time that I went to the Enterprise Developer Conference. Due to the downturn Microsoft merged the financial and health/live sciences conferences into one. Last years main focus was High Computing, this years main focus was......tada..&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This is the second time that I went to the Enterprise Developer Conference. Due to the downturn Microsoft merged the financial and health/live sciences conferences into one. Last years main focus was High Computing, this years main focus was&#8230;&#8230;tada&#8230;..drumroll&#8230;..Cloud Computing. No big surprise of course. There were always 5 sessions at the same time so I can only report on the ones that I attended. The SQL Server Data Services session was in my opinion the best one but then again I am biased. You can actually watch all the session at the following site <a href="http://entdevcon.telligent.com/sessions/">entdevcon.com</a> Right now only the day 1 sessions are up there</p>
+<p><strong>The Keynote</strong><br />
+The keynote was all about Azure and Cloud Services. Explained was the roadmap that led to Azure, what Azure is and where it is going. I have to agree for the most part that it really doesn&#8217;t make a whole lot of sense to manage your own infrastructure. Have it done by someone who can provide this with a nice SLA and you have a lot less headaches and costs</p>
+<p><strong>Azure</strong><br />
+What is this Azure thing and how do you pronounce it? Azure is nothing else but hosted applications, instead of deploying to a server you deploy to the cloud. Developing Azure apps compared to traditional apps is very similar. It will be interesting how many apps will end up in the cloud, if you want to get rid of some of those machines that have one app on them that the whole department uses then this is a great way to consolidate. It all depends on pricing of course but it would be very strange if Azure turns out to be more expensive</p>
+<p><strong>SQL Server Data Services</strong><br />
+SQL Server in the cloud completely changed from the first version, while in the beginning it was just value pair key data, the version now is completely relational. On the picture that I snapped at the session you can see what is implemented and what is not. So if you have been using CLR in SQL Server or are using data types that are .NET data types like georaphy and geometry spatial data types then you are out of luck. Microsoft analyzed all the data from the customers who are in the Beta program and found out that 90% of them had a database that was less than 2GB. This is also the reason that they will cap it at 10GB per database. Microsoft also noticed that 95% of the apps that were in the beta program would run without a problem on SSDS by just switching the connection string to point to the cloud</p>
+<p>You will get special DMVs that will tell you how large your database is, how much bandwith you have used so far etc. All other DMVs are disabled as well as sp_who and similar procs since your database might be on the same server as other customers databases.</p>
+<p>The data will be replicated across different data centers and perhaps across continents as well. You can specify in your SLA that your data has to be stored in the US for example, in that case it will be in multiple data centers in the US</p>
+<p>Your SLA will also determine downtime and if you want the data to be replicated, the cheapest plan will presumably not include geo replication etc</p>
+<p>Pricing for SSDS will be announced in July so then you can figure out if it make economic sense for you to move the database in the cloud</p>
+<p>If you are just using plain SQL and everything that is supported by SSDS then all you have to do is change the severname in your connection string for it to work, even SQL Server Management Studio just works. That said you can not look at execution plans or do a SET SHOWPLAN TEXT which is a bummer. How will you performance tune your query?<br />
+Below is a picture showing all the things that are available and not available in the V1 release<br />
+<a href="http://www.flickr.com/photos/denisgobo/3509561219/" title="SQL Server Data Services Compatibility by Denis Gobo, on Flickr"><img src="http://farm4.static.flickr.com/3645/3509561219_61a9e5d3ac.jpg" width="500" height="388" alt="SQL Server Data Services Compatibility" /></a></p>
+<p>Watch the presentation here: <a href="http://entdevcon.istreamplanet.com/video.asp?v=36">SQL Data Services:A Relational Database in the Cloud-Microsoft</a></p>
+<p><strong>Surface</strong><br />
+There were 2 surface tables on display both Infusion and 49Labs had one. I took a short video of a card game so that you can see how it looks, if you actually bang on the chips with your hand they pop up just like in real life.</p>
+<p><object width="425" height="344"><param name="movie" value="http://www.youtube.com/v/N5X5Y8KeifQ&amp;hl=en&amp;fs=1" /><param name="allowFullScreen" value="true" /><param name="allowscriptaccess" value="always" /><embed src="http://www.youtube.com/v/N5X5Y8KeifQ&amp;hl=en&amp;fs=1" type="application/x-shockwave-flash" width="425" height="344"></embed></object></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/appserver/microsoft-enterprise-developer-conferenc/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Server Application and Multi-Server Management Private CTP</title>
+		<link>/index.php/datamgmt/datadesign/sql-server-application-and-multi-server/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-server-application-and-multi-server/#respond</comments>
+		<pubDate>Tue, 02 Dec 2008 21:43:35 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[cloud computing]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/12/sql-server-application-and-multi-server/</guid>
+		<description><![CDATA[There are some cool things announced by Microsoft SQL Server Application and Multi-server Private CTP &#8211; Registration As part of SQL Server &#8220;Kilimanjaro&#8221;, we have announced baseline investments for application and multi-server management. We are recruiting customers to participate in a private CTP with SQL Server Engineering. Registration for the Private CTP will take place [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>There are some cool things announced by Microsoft</p>
+<p><em><strong>SQL Server Application and Multi-server Private CTP &#8211; Registration</strong></p>
+<p>As part of SQL Server &#8220;Kilimanjaro&#8221;, we have announced baseline investments for application and multi-server management. We are recruiting customers to participate in a private CTP with SQL Server Engineering. Registration for the Private CTP will take place until December 15, 2008 and the 4-5 week Private CTP will begin in mid-January. Microsoft is looking for participants in entities with at least 1 DBA, more than 25 PCs, and SQL Server installations across their organization. Register today!</p>
+<p><strong>Microsoft SQL Server 2008 Free Trial Offer</strong></p>
+<p>Dell, MaximumASP, and PASS, the Professional Association for SQL Server have partnered to bring you a Microsoft® SQL Server 2008® trial account, absolutely free. Try it out online in a secure hosted environment – you don’t have to download or install a thing – and your feedback will influence the final release.</p>
+<p>From the basic capabilities needed for a shared-hosting platform requiring support for Microsoft .NET and PHP technologies, to Hyper-V based virtual servers, to the sophisticated needs of a dedicated server, SQL Server 2008 can accommodate and grow with your data-management needs.</p>
+<p>Sign up for a FREE Microsoft SQL Server 2008 account and experience and test Microsoft&#8217;s newest, most intelligent data platform in a MaximumASP hosting environment.</p>
+<p><strong>Your SQL Server 2008 trial accounts includes:</strong><br />
+Hyper-V Image<br />
+Reporting and Analysis Services<br />
+Integration Services<br />
+Full System Admin Rights</em></p>
+<p>All the details and URLs are here: http://www.sqlpass.org/hostedtrial/</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-server-application-and-multi-server/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Windows Azure From A Developer&#8217;s Perspective Post</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/windows-azure-from-a-developer-s-perspec/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/windows-azure-from-a-developer-s-perspec/#respond</comments>
+		<pubDate>Tue, 04 Nov 2008 14:00:53 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud computing]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/11/windows-azure-from-a-developer-s-perspec/</guid>
+		<description><![CDATA[Dare Obesanjo has made an excellent post: Windows Azure from a Developer&#8217;s Perspective To try out Azure you need to be running Windows Server 2008 or Windows Vista with a bunch of prerequisites you can get from running the Microsoft Web Platform installer. Once you have the various prerequisites installed (SQL Server, IIS 7, .NET [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Dare Obesanjo has made an excellent post: <a href="http://www.25hoursaday.com/weblog/2008/11/03/WindowsAzureFromADevelopersPerspective.aspx">Windows Azure from a Developer&#8217;s Perspective </a></p>
+<blockquote><p>To try out Azure you need to be running Windows Server 2008 or Windows Vista with a bunch of prerequisites you can get from running the Microsoft Web Platform installer. Once you have the various prerequisites installed (SQL Server, IIS 7, .NET Framework 3.5, etc) you should then grab the Windows Azure SDK. Users of Visual Studio will also benefit from grabbing the Windows Azure Tools for Visual Studio.</p>
+<p>After this process, you should be able to fire up Visual Studio and see the option to create a Cloud Service if you go to File->New->Project.</p></blockquote>
+<p>Very interesting stuff, check out the post here: <a href="http://www.25hoursaday.com/weblog/2008/11/03/WindowsAzureFromADevelopersPerspective.aspx">Windows Azure from a Developer&#8217;s Perspective </a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/windows-azure-from-a-developer-s-perspec/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Azure Services Platform Is In CTP</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/azure-services-platform-is-in-ctp/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/azure-services-platform-is-in-ctp/#respond</comments>
+		<pubDate>Mon, 27 Oct 2008 13:56:25 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud computing]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/10/azure-services-platform-is-in-ctp/</guid>
+		<description><![CDATA[The Azure Services Platform is in CTP, here are some details: What is the Azure Services Platform? The Azure Services Platform (Azure) is an internet-scale cloud services platform hosted in Microsoft data centers, which provides an operating system and a set of developer services that can be used individually or together. Azure’s flexible and interoperable [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>The Azure Services Platform is in CTP, here are some details:</p>
+<p><strong>What is the Azure Services Platform?</strong><br />
+The Azure Services Platform (Azure) is an internet-scale cloud services platform hosted in Microsoft data centers, which provides an operating system and a set of developer services that can be used individually or together. Azure’s flexible and interoperable platform can be used to build new applications to run from the cloud or enhance existing applications with cloud-based capabilities. Its open architecture gives developers the choice to build web applications, applications running on connected devices, PCs, servers, or hybrid solutions offering the best of online and on-premises.</p>
+<p>Azure reduces the need for up-front technology purchases, and it enables developers to quickly and easily create applications running in the cloud by using their existing skills with the Microsoft Visual Studio development environment and the Microsoft .NET Framework. In addition to managed code languages supported by .NET, Azure will support more programming languages and development environments in the near future. Azure simplifies maintaining and operating applications by providing on-demand compute and storage to host, scale, and manage web and connected applications. Infrastructure management is automated with a platform that is designed for high availability and dynamic scaling to match usage needs with the option of a pay-as-you-go pricing model. Azure provides an open, standards-based and interoperable environment with support for multiple internet protocols, including HTTP, REST, SOAP, and XML.</p>
+<p>Microsoft also offers cloud applications ready for consumption by customers such as Windows Live™, Microsoft Dynamics™, and other Microsoft Online Services for business such as Microsoft Exchange Online and SharePoint® Online. The Azure Services Platform lets developers provide their own unique customer offerings by offering the foundational components of compute, storage, and building block services to author and compose applications in the cloud.</p>
+<p><b>Windows Azure</b> </p>
+<p>Windows® Azure is a cloud services operating system that serves as the development, service hosting and service management  environment for the Azure Services Platform. Windows Azure provides developers with on-demand compute and storage to host, scale, and manage internet or cloud applications.  Windows Azure supports a consistent development experience through its integration with Visual Studio.  In the early stages of CTP, .NET managed applications built using Visual Studio will be supported. Windows Azure is an open platform that will support both Microsoft and non-Microsoft languages and environments. Windows Azure welcomes third party tools and languages such as Eclipse, Ruby, PHP, and Python.</p>
+<p>                    <a href="http://www.microsoft.com/azure/windowsazure.mspx">Learn more about Windows Azure</a>.</p>
+<p><b>Live Services</b>
+<p>Live Services is a set of building blocks within the Azure Services Platform for handling user data and application resources. Live Services provides  developers with an easy on-ramp to build rich social applications and experiences, across a range of digital devices that can connect with one of the largest audiences on the Web.</p>
+<p><a href="http://dev.live.com/" target="_blank">Learn more about Live Services</a></p>
+<p><b>Microsoft SQL Services</b>
+<p>Microsoft SQL Services extends the capabilities of Microsoft SQL Server into the cloud as a Web-based, distributed relational database. It provides Web services that enable relational queries, search, and data synchronization with mobile users, remote offices and business partners. It can store and retrieve structured, semi-structured, and unstructured data.</p>
+<p><a href="http://www.microsoft.com/azure/sql.mspx">Learn more about SQL Services</a></p>
+<p><b>Microsoft .NET Services</b>
+<p>Microsoft .NET Services make developing loosely coupled cloud-based applications easier. .NET Services includes access control to help secure your applications, a service bus for communicating across applications and services, and hosted workflow execution. These hosted services allow you to easily create federated applications that span from on-premises environments to the cloud. </p>
+<p><a href="http://www.microsoft.com/azure/netservices.mspx">Learn more about .NET Services</a></p>
+<p><b>Microsoft® SharePoint® Services &amp; Dynamics® CRM Services </b>
+<p>In the future, developers will have access to SharePoint &amp; CRM functionality for collaboration and building stronger customer relationships. With the flexibility to use familiar developer tools like Visual Studio, developers will be able to rapidly build applications that utilize SharePoint and CRM capabilities as developer services for their own applications. Developers can expect a breadth of SharePoint &amp; CRM capabilities across the spectrum of on-premises, online &amp; the Azure Services Platform.</p>
+<p><strong>Register for Azure Services Platform here: http://www.microsoft.com/azure/register.mspx</strong></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/azure-services-platform-is-in-ctp/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

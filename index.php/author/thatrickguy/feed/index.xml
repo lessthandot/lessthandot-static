@@ -1,0 +1,840 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>ThatRickGuy &#8211; LessthanDot</title>
+	<atom:link href="/index.php/author/thatrickguy/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Silverlight, RIA, Datagrids, and Joins</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/silverlight-ria-datagrids-and-joins/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/silverlight-ria-datagrids-and-joins/#respond</comments>
+		<pubDate>Tue, 03 Aug 2010 13:16:43 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[binding]]></category>
+		<category><![CDATA[entity framework]]></category>
+		<category><![CDATA[ria]]></category>
+		<category><![CDATA[silverlight]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/08/silverlight-ria-datagrids-and-joins/</guid>
+		<description><![CDATA[Lately we&#8217;ve been playing around with RIA services for Silverlight. Using them we lose the use of our stack, but the speed of development with them is quite impressive. Watch and Learn If you are unfamiliar with RIA in Silverlight, I would recommend this video: http://www.silverlight.net/learn/videos/all/net-ria-services-intro/. It is a complete walk through of creating a [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Lately we&#8217;ve been playing around with RIA services for Silverlight. Using them we lose the use of our stack, but the speed of development with them is quite impressive. </p>
+<h2>Watch and Learn</h2>
+<p>If you are unfamiliar with RIA in Silverlight, I would recommend this video: <a href="http://www.silverlight.net/learn/videos/all/net-ria-services-intro/">http://www.silverlight.net/learn/videos/all/net-ria-services-intro/</a>. It is a complete walk through of creating a demo from the &#8216;Business Application&#8217; template in Visual Studio for SL 3. If you are working in SL4, be sure to check the comments in the video for the breaking changes.</p>
+<h2>What&#8217;s the Skinny?</h2>
+<p>It&#8217;s pretty fancy stuff. You make an Entity Framework model, based on your database. Then when you compile, the template generates a whole bunch of code for you. First, on the server it generates a Service and a Metadata class to expose your data entities and basic CRUD functionality to the client. Then in the client, another class is generated that handles the serialization and exposing of those server classes client side. One of the most impressive things about this interaction though, is that the return objects from the server are IQueriable, not arrays. Which gives you the ability to perform LINQ and deferred execution from the client!</p>
+<h2>So Why the Fuss?</h2>
+<p>Watch the video, play around with it. I&#8217;m not going to go through the whole thing here, but I will show you something I ran into.</p>
+<p>I have a relational database, in this case I am looking at the <em>League</em> and <em>Player</em> tables. <em>League</em> has an OwnerPlayer_ID field that links to the <em>Player</em> table. The problem though, by using the RIA services and bindings out of the box, is that while the League class has a .Player property, it will never be populated. And showing people that a League is owned by Player #5237 isn&#8217;t nearly as helpful as showing them the Player&#8217;s name. We have to make 2 changes to get this to work correctly.</p>
+<h2>Reprimanding that Lazy EF</h2>
+<p>On the server side, find your service class. It should be called something like &#8216;MyApplicationDomainService1&#8217; and be in the &#8216;Services&#8217; folder by default. In that class look for a method called &#8216;GetMyObjects&#8217; where MyObjects is the collection you are binding to on the client side. It should contain something like &#8216;Return (Me.ObjectContext.MyObjects)&#8217;. Change it to:<br />
+<code =VB>Return (Me.ObjectContext.MyObjects.Include("MyChildObject")</code><br />
+In my case this was the &#8216;GetLeagues&#8217; method and it contains: &#8216;Return (Me.ObjectContext.Leagues.Include(&#8220;Player&#8221;))&#8217;</p>
+<p>This will tell the Entity Framework model that it should Eager Load the .Player property. But before we rejoice and rebuild, wait, there&#8217;s more!</p>
+<h2>Getting RIA up off the Couch</h2>
+<p>Next up, right next to the DomainService1 file should be a file called MyApplicationDomainService1.metadata. In this file we need to find the class that represents what we are querying (The &#8220;MyObject&#8221; from the previous step). In that class you should see the property you want to load (The &#8220;MyChildObject&#8221; from above). On this property, you want to prepend the &lt;Include()&gt; attribute. This will tell the RIA services that it should include this property in the serialization and transmission of the query results. </p>
+<p>In my case of League and Owner Player, it looks like this:</p>
+<pre>    Friend NotInheritable Class LeagueMetadata
+             
+        '...
+
+        &lt;Include()&gt;
+        &lt;Display(AutoGenerateField:=False)&gt;
+        Public Property Player As Player
+        '...
+    End Class</pre>
+<h2>And the Grid?</h2>
+<p>Now that the EF is loading the data we want, and the RIA services are returning the data we want, all we have to do is bind it! And this is the easiest part. It is just like they show in the video, with one minor change. Instead of just binding on the primary object&#8217;s property, we use dot notation to get at the child object&#8217;s property. Shown here as the &#8220;Player.Name&#8221; binding</p>
+<pre>&lt;sdk:DataGrid x:Name="grdLeagues" Margin="4,20,4,4" Grid.Row="1" ItemsSource="{Binding ElementName=LeagueDomainDataSource, Path=Data}" AutoGenerateColumns="False"&gt;
+    &lt;sdk:DataGrid.Columns&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=Name}" Header="Name" /&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=Player.Name, Mode=OneWay}" Header="Organizer" /&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=Province}" Header="State" /&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=City}" Header="City" /&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=LGS}" Header="Game Store" /&gt;
+    &lt;/sdk:DataGrid.Columns&gt;
+&lt;/sdk:DataGrid&gt;</pre>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/silverlight-ria-datagrids-and-joins/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Solving Sudoku in Silverlight</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/solving-sudoku-in-silverlight/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/solving-sudoku-in-silverlight/#comments</comments>
+		<pubDate>Fri, 09 Apr 2010 14:37:24 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[silverlight sudoku vb.net]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/04/solving-sudoku-in-silverlight/</guid>
+		<description><![CDATA[Long ago I came across OldSchoolDotNet&#8217;s Silverlight Sudoku client. It&#8217;s a great interface to a classic brain game. I especially enjoy the &#8220;Hard&#8221; difficulty level as it is pretty consistently solvable with out reverting to guessing. The &#8220;Expert&#8221; level though requires you to guess. And as a logic guy, I hate guessing. Not quite so [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Long ago I came across  <a href="http://oldschooldotnet.blogspot.com/2009/03/sudoku-in-silverlight.html">OldSchoolDotNet&#8217;s Silverlight Sudoku client</a>. </p>
+<p>It&#8217;s a great interface to a classic brain game. I especially enjoy the &#8220;Hard&#8221; difficulty level as it is pretty consistently solvable with out reverting to guessing. The &#8220;Expert&#8221; level though requires you to guess. And as a logic guy, I hate guessing. </p>
+<p>Not quite so long ago, in the <a href="http://forum.lessthandot.com/viewforum.php?f=102">Programmer&#8217;s Puzzles forum</a>, we had a &#8220;Follow the Clues&#8221; challenge. I approached this problem just as I do Sudoku. Writing out the possibilities and eliminating the incorrect answers as I went through the rules list over and over. But just solving the problem isn&#8217;t enough, the goal, seeing as how most of us are coders of one sort or another, is to write a software solution. So I put together a system that given an array of possibilities and a set of rules, would iterate through the rules and grid filtering out all impossible answers till only the correct ones existed.</p>
+<p>It was a fun project, but it made me think. I was solving that problem in roughly the same way I approach Sudoku. So why not improve my solution to be able to solve Sudoku challenges as well?</p>
+<p>There are a set number of rules to Sudoku, and a number of patterns that we can see that make solving them easier. So it was just a matter of coding out these rules and inferences, and applying them to a 3-dimensional array of Boolean values (column, row, index).</p>
+<p>My initial attempts worked perfectly for anything up to the &#8220;Hard&#8221; level from OldSchoolDotNet&#8217;s Sudoku client. But on the &#8220;Expert&#8221; level, it would get through all of the known steps and then stop. Adam came up with an idea for how to handling the guesses in a tree like branching method. And after a few attempts, I managed to come up with a decent solution.</p>
+<p>It isn&#8217;t cleaned up at all, but if you&#8217;re stuck on a sudoku puzzle, it may be of use to you. Each click of the &#8220;Apply Rules&#8221; button will perform one pass of each rule (horizontal, vertical, block) on each square in the board. With out guessing, most puzzles can be solved in about 6-10 passes. </p>
+<p>With guessing, it&#8217;ll take a while. My last solving of an &#8220;Expert&#8221; puzzle wound up fielding over 18,000 branches. As the number of active branches increases, performance will degrade. But once you get through the bulk of them, the performance will increase as more and more branches are closed.</p>
+<p>So, if you&#8217;re a Sudoku fan, check it out <a href="http://ringdev.com.web10.reliabledomainspace.com/code/sodukusolver/index.html">Here</a>.</p>
+<p>Code is available <a href="http://ringdev.com.web10.reliabledomainspace.com/code/sodukusolver/SodukuSolver.zip">Here</a></p>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/solving-sudoku-in-silverlight/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Detecting Property Changes in an Observable Collection</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/detecting-property-changes-in-an-observa/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/detecting-property-changes-in-an-observa/#comments</comments>
+		<pubDate>Wed, 07 Apr 2010 19:16:01 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[binding]]></category>
+		<category><![CDATA[silverlight]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/04/detecting-property-changes-in-an-observa/</guid>
+		<description><![CDATA[A quick and simple demo on how to set up a custom ObservableCollection to raise PropertyChanged events from the items it contains.]]></description>
+				<content:encoded><![CDATA[<h3>Work, Work, Work</h3>
+<p>I was working on a new interface this week for a rather complex item selection system. It deals with hierarchies and mandatory selections, multi-selects and single-selects. In order to make it easier for users to see what items were already selected, there was also a list of just the selected items.</p>
+<h3>Oh ObservableCollection, I See You!</h3>
+<p>I toyed around with a few different options, and debated some of them out with Adam, and finally decided to run with binding and an Observable Collection.</p>
+<h3>Everything is better with LINQ</h3>
+<p>One of the great things about observable collections is that you can pass them around like candy, make a change to it from any number of locations, and it will update all of the controls bound to it. Mix in a little LINQ and you&#8217;ve got some awesome functionality with very little code.</p>
+<h3>What Do You Mean CollectionChanged Doesn&#8217;t Fire?</h3>
+<p>One of the things I needed to do though, was to detect when the user selected an item from the collection. When the IsChecked flag was flipped, I needed to go to the server to get any child items. But the Observable Collection does not expose property changed events, which started me down this path. </p>
+<h3>The User Interface</h3>
+<p>For this demo app, the UI is pretty simple. I just have two list boxes. Each list box has a DataTemplate with a CheckBox in it. The CheckBox has its Content bound to the &#8220;Text&#8221; member and IsChecked is bound to a like named member. The IsChecked property is also set to TwoWay mode. This means that when the user changes its checked state, it will update the underlying collection.</p>
+<pre>        &lt;ListBox x:Name="lst1" Grid.Column="0" &gt;
+            &lt;ListBox.ItemTemplate &gt;
+                &lt;DataTemplate&gt;
+                    &lt;CheckBox Content="{Binding Text}" IsChecked="{Binding IsChecked, Mode=TwoWay}" /&gt;
+                &lt;/DataTemplate&gt;
+            &lt;/ListBox.ItemTemplate&gt;
+        &lt;/ListBox&gt;</pre>
+<h3>On to the Items</h3>
+<p>For the most part the Item class just contains our properties, but we have to beef it up just a bit. First, it needs <code class="codespan">Implements System.ComponentModel.INotifyPropertyChanged</code>. INotifyPropertyChanged will create a public event called &#8220;PropertyChanged&#8221;. In order to save ourselves a bit of repeating code, we can make a method called <em>onPropertyChanged</em> that raises that event for us:</p>
+<pre>        Private Sub onPropertyChanged(ByVal PropertyName As String)
+            RaiseEvent PropertyChanged(Me, New System.ComponentModel.PropertyChangedEventArgs(PropertyName))
+        End Sub</pre>
+<p> Also in the item class we need to tweak the properties a bit. For instance:</p>
+<pre>        Private _IsChecked As Boolean
+        Public Property IsChecked() As Boolean
+            Get
+                Return _IsChecked
+            End Get
+            Set(ByVal value As Boolean)
+                If value &lt;&gt; _IsChecked Then
+                    _IsChecked = value
+                    onPropertyChanged("IsChecked")
+                End If
+            End Set
+        End Property</pre>
+<p>Note that we are only calling the onPropertyChanged event when the value has indeed changed. Also, ensure that the underlying value has changed BEFORE you call the onPropertyChanged, otherwise you&#8217;ll wind up with some really interesting behavior.</p>
+<h3>The Collection</h3>
+<p>The Observable collection doesn&#8217;t expose the PropertyChanged event by default, so we have to bubble it up ourselves. That means we need to make a new class that inherits from ObservableCollection. In order to get a handler on the Items PropertyChanged events, we need to override the InsertItem and RemoveItem methods. Inside them we Add and Remove an event handler for the Property Changed event. And in the procedure that handles that event, all we need to do is to raise our new public event.</p>
+<h3>Back to the MainPage</h3>
+<p>In the code of the main page, we need an instance of the collection, using the WithEvents keyword will make it exceptionally easy to attach to our events. In the constructor, we can set the ItemSource of both of our list boxes to that collection. And if you check the objects/events drop downs, you should see that our collection now exposes both a CollectionChanged and ItemPropertyChanged event. Put a message box or break point in each and fire up the app.</p>
+<h3>Running</h3>
+<p>When you run it, you should see a number of identical items in each list box. When you click on the check boxes of either list, you should see the ItemPropertyChanged event fire, after which both list boxes should reflect the new value in the collection.</p>
+<h3>Show me the Demo</h3>
+<p>
+        <object data="data:application/x-silverlight-2," type="application/x-silverlight-2" width="100%" height="150px"><param name="source" value="http://ringdev.com.web10.reliabledomainspace.com/code/bindingdemo/trainingdemo2.xap" /><param name="onError" value="onSilverlightError" /><param name="background" value="white" /><param name="minRuntimeVersion" value="3.0.40624.0" /><param name="autoUpgrade" value="true" /><a href="http://go.microsoft.com/fwlink/?LinkID=149156&amp;v=3.0.40624.0" style="text-decoration:none"><br />
+ 			  <img src="http://go.microsoft.com/fwlink/?LinkId=108181" alt="Get Microsoft Silverlight" style="border-style:none" /><br />
+		  </a></object></p>
+<h3>Show Me the Code</h3>
+<p>Working VS 2008 solution can be downloaded from <a href="http://ringdev.com.web10.reliabledomainspace.com/code/bindingdemo/trainingdemo2.zip">here</a>.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/detecting-property-changes-in-an-observa/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+		<item>
+		<title>Binding to Custom Properties in Silverlight</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/binding-to-custom-members-in-silverlight/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/binding-to-custom-members-in-silverlight/#comments</comments>
+		<pubDate>Mon, 22 Mar 2010 12:52:17 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[silverlight binding]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/03/binding-to-custom-members-in-silverlight/</guid>
+		<description><![CDATA[The Binding system is Silverlight is pretty cool. It lets us easily bind property values of UI Elements to all sorts of good stuff. But, if you want to create your own custom bind-able properties, it takes a bit more effort than the usual Property="{Binding=Field}" in XAML.]]></description>
+				<content:encoded><![CDATA[<p>The Binding system is Silverlight is pretty cool. It lets us easily bind property values of UI Elements to all sorts of good stuff. But, if you want to create your own custom bind-able properties, it takes a bit more effort than the usual Property=&#8221;{Binding=Field}&#8221; in XAML.</p>
+<p>For example, I have a datagrid. One of the columns in that data grid holds a control that displays and icon and a tool tip based on the content of some data.</p>
+<p>So you would start with a control like this:</p>
+<pre>Imports System
+Imports System.Windows
+Imports System.Windows.Controls
+Imports System.Windows.Media
+Imports System.Windows.Media.Animation
+Imports System.Windows.Shapes
+
+Partial Public Class CommentIndicator 
+	Inherits UserControl
+
+	Public Sub New()
+		' Required to initialize variables
+		InitializeComponent()
+	End Sub
+
+    Public Overrides Function ToString() As String
+        Return MyToolTip
+    End Function
+
+    Public Property MyToolTip() As String
+        Get
+            Dim o As Object = Me.GetValue(ToolTipService.ToolTipProperty)
+            Dim sReturn As String = String.Empty
+            If Not o Is Nothing Then
+                sReturn = o.ToString
+            End If
+            Return sReturn
+        End Get
+        Set(ByVal value As String)
+            Me.SetValue(ToolTipService.ToolTipProperty, value)
+        End Set
+    End Property
+End Class</pre>
+<p>Then, in the XAML of the data grid:</p>
+<pre>&lt;data:DataGrid.Columns&gt;
+	&lt;data:DataGridTextColumn x:Name="dgcOrderNumber" CanUserReorder="False" CanUserSort="True" Header="Order Number" SortMemberPath="OrderNumber" Binding="{Binding OrderNumber}" Width="118"/&gt;
+	&lt;data:DataGridTextColumn CanUserReorder="False" CanUserSort="True" Header="Request Date" SortMemberPath="RequestDate" Binding="{Binding RequestDate, Converter={StaticResource DateConverter}}" Width="110"/&gt;
+	&lt;data:DataGridTextColumn CanUserReorder="False" CanUserSort="True" Header="Status" SortMemberPath="Status" Binding="{Binding Status}" Width="100"/&gt;
+	&lt;data:DataGridTemplateColumn CanUserSort="True" CanUserReorder="False" IsReadOnly="True" SortMemberPath="Comment" Width="26" &gt;
+		&lt;data:DataGridTemplateColumn.CellTemplate&gt; 
+			&lt;DataTemplate&gt; 
+                        	&lt;Local:CommentIndicator MyToolTip="{Binding Comment}"  Width="15" Height="17"  /&gt;
+			&lt;/DataTemplate&gt; 
+		&lt;/data:DataGridTemplateColumn.CellTemplate&gt; 
+	&lt;/data:DataGridTemplateColumn&gt;               
+&lt;/data:DataGrid.Columns&gt;</pre>
+<p>Everything looks good, but running the app will pop one of Silverlight completely unenlightening errors.</p>
+<p>What we need to do is to set up MyToolTip as a dependency property. We just have to add a bit of code to the custom control:</p>
+<pre>    Public Shared ReadOnly _MyToolTipProperty As DependencyProperty = DependencyProperty.Register("MyToolTip", GetType(String), GetType(CommentIndicator), New PropertyMetadata(New PropertyChangedCallback(AddressOf MyToolTipCallback)))
+    Private Shared Sub MyToolTipCallback(ByVal d As DependencyObject, ByVal e As DependencyPropertyChangedEventArgs)
+        d.SetValue(ToolTipService.ToolTipProperty, e.NewValue)
+    End Sub</pre>
+<p>And that fixes that. Why this wasn&#8217;t just handled behind the scenes I don&#8217;t know. I&#8217;ve heard that they have done a lot of work on the Binding system for SL4, so maybe this will not be a requirement once the next update rolls out. </p>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/binding-to-custom-members-in-silverlight/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Silverlight Spinner</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/silverlight-spinner/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/silverlight-spinner/#comments</comments>
+		<pubDate>Fri, 19 Mar 2010 14:27:48 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[UI Development]]></category>
+		<category><![CDATA[Web Design, Graphics and Styling]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/03/silverlight-spinner/</guid>
+		<description><![CDATA[Every week in my shop we do cross training. Someone brings in something they are working on, some system that people are unfamiliar with, some new technology, basically anything related to any of our jobs as developers and maintainers of applications. Often enough I do presentations on Silverlight and Blend, introducing my coworkers to different tools and options that we have available to us. This blog is a write up of one such training presentation. I give you, the Silverlight Spinner.]]></description>
+				<content:encoded><![CDATA[<p><script type="text/javascript">
+        function onSilverlightError(sender, args) {
+            var appSource = "";
+            if (sender != null &amp;&amp; sender != 0) {
+              appSource = sender.getHost().Source;
+            }</p>
+<p>            var errorType = args.ErrorType;
+            var iErrorCode = args.ErrorCode;</p>
+<p>            if (errorType == "ImageError" || errorType == "MediaError") {
+              return;
+            }</p>
+<p>            var errMsg = "Unhandled Error in Silverlight Application " +  appSource + "n" ;</p>
+<p>            errMsg += "Code: "+ iErrorCode + "    n";
+            errMsg += "Category: " + errorType + "       n";
+            errMsg += "Message: " + args.ErrorMessage + "     n";</p>
+<p>            if (errorType == "ParserError") {
+                errMsg += "File: " + args.xamlFile + "     n";
+                errMsg += "Line: " + args.lineNumber + "     n";
+                errMsg += "Position: " + args.charPosition + "     n";
+            }
+            else if (errorType == "RuntimeError") {
+                if (args.lineNumber != 0) {
+                    errMsg += "Line: " + args.lineNumber + "     n";
+                    errMsg += "Position: " +  args.charPosition + "     n";
+                }
+                errMsg += "MethodName: " + args.methodName + "     n";
+            }</p>
+<p>            throw new Error(errMsg);
+        }
+    </script></p>
+<h3>Introduction</h3>
+<p>Every week in my shop we do cross training. Someone brings in something they are working on, some system that people are unfamiliar with, some new technology, basically anything related to any of our jobs as developers and maintainers of applications. Often enough I do presentations on Silverlight and Blend, introducing my coworkers to different tools and options that we have available to us. This blog is a write up of one such training presentation. I give you, the <em>Silverlight Spinner</em>.</p>
+<p><span id="more-731"></span><br />
+        <center></p>
+<div style="height:150px; background-color: #000000; width: 75%; text-align:center;">
+        <object data="data:application/x-silverlight-2," type="application/x-silverlight-2" width="100" height="100" style="margin:25px;"><param name="source" value="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/SilverlightApplication1.xap" /><param name="onError" value="onSilverlightError" /><param name="background" value="white" /><param name="minRuntimeVersion" value="3.0.40624.0" /><param name="autoUpgrade" value="true" /><a href="http://go.microsoft.com/fwlink/?LinkID=149156&amp;v=3.0.40624.0" style="text-decoration:none"><br />
+ 			  <img src="http://go.microsoft.com/fwlink/?LinkId=108181" alt="Get Microsoft Silverlight" style="border-style:none" /><br />
+		  </a></object><br />
+<iframe id="_sl_historyFrame" style="visibility:hidden;height:0px;width:0px;border:0px"></iframe></div>
+<p>        </center></p>
+<h3>Getting Started</h3>
+<p>Start up a new Silverlight application project as usual. If you want to reuse the spinner you may want to make a Silverlight control library project, but for now it&#8217;s easier to make a standard application.
+		</p>
+<h3>The Basic Layout</h3>
+<p>The spinner control starts out just like any other control. We have a layout root control, a grid. In the layout root we add a ViewBox. The view box handles dynamic scaling so that we don&#8217;t have to worry about rendering the spinner at different sizes. The view box only accepts one child though, so we need another grid inside of it. Since the ViewBox can scale to any size, we need to set a fixed size for the grid so that we can work with it. I went with 128&#215;128, you can use any size you like, the larger, the more accurate things will be.
+		</p>
+<h3>The Background</h3>
+<p>In side the grid we&#8217;re going to have a whole lot of rectangles. Starting off with the background, set the background rectangle to fill horizontally and vertically, then set the x and y corner radius to 64. This will cause the rectangle to appear like a circle. Next set the margins to 2 pixels. This will ensure that the background doesn&#8217;t stick out from behind the mask we will make later.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner1.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner1.PNG" border=0 /></a></center>
+		</p>
+<h3>The Windows</h3>
+<p>Next up are the windows. Start off with a top-left justified rectangle. We want it&#8217;s width to be a bit less than a third the width of the control, 45px out of 128px in this case. And we want it to be about three times as long as it is thick, which puts its height at 14px. Again we want it to be rounded, so set the x and y corner radius to 7px. Set the left margin to 3px and the top margin to 57px (128/2 &#8211; 14/2), putting it just inside of the background. Make a copy of this rectangle and switch it to right justified and change the right margin to 3px.<br />
+		Copy and paste twice more, but this time switch the width and the height and horizontal and vertical offsets, this should create the vertical windows.<br />
+		Copy all four of these rectangles and paste them below the others. Select the 4 new rectangles and from the Transforms panel use the Rotate transform to turn them all 45 degrees. You&#8217;ll need to adjust the margins a bit on each one to get them to line up correctly.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner2.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner2.PNG" border=0 /></a></center>
+		</p>
+<p>** Low Tech Tip: Hold a piece of paper up to the screen and mark on it the gap between the outer edge of the circle and the outer edge of one of the Windows that is positioned where you want it. Use that measurement to ensure that all of the other controls are positioned correctly. It may be a low tech solution, but it&#8217;s easier than trying to zoom in and count pixels.</p>
+<h3>The Mask pt1</h3>
+<p>Once we have the windows in place, we need the mask layer. Just like the background, we want a rectangle that fills the control and looks like a circle. The only difference is that we have a margin of 0 on this rectangle.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner3.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner3.PNG" border=0 /></a></center>
+		</p>
+<p>** Special thanks to Adam for introducing me to the combine functionality!</p>
+<h3>The Mask pt2</h3>
+<p>Select all of the window rectangles, right click and select &#8220;Combine&#8221; and &#8220;Unite&#8221;. This will turn all of those separate rectangles into a single path.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner5.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner5.PNG" border=0 /></a></center>
+		</p>
+<h3>The Mask pt3</h3>
+<p>Next, ensure that the Mask rectangle is lower in the list (higher in z-order) than the new path. Select both the mask rectangle and the new path, right click and select &#8220;Combine&#8221; and &#8220;Subtract&#8221;. This will merge the two into a single path, but it will cut the old path out of the rectangle.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner6.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner6.PNG" border=0 /></a></center>
+		</p>
+<h3>Voilà!</h3>
+<p>At this point, you should see something like this. Where the Window rectangles use to be there should now be holes through the mask, and you should be able to see the background.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner7.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner7.PNG" border=0 /></a></center>
+		</p>
+<h3>Bright Side of the Glass</h3>
+<p>Next, we&#8217;re going to need a bunch more rectangles. 16 all together, but start with 2. What we&#8217;re going to do is create a quick and dirty beveled glass effect. The first rectangle we will give a light gray stroke and a radial gradient. The gradient you&#8217;ll want to toy around with, the goal is to get translucent white along the left and top edges that fades into full opacity. Use the Gradient Tool to manipulate how the gradient is applied.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner8.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner8.PNG" border=0 /></a></center>
+		</p>
+<h3>Dark Side of the Glass</h3>
+<p>On the second rectangle we don&#8217;t need the stroke, but just like the first rectangle we&#8217;re adding to the beveled glass effect. This time with a translucent black radial gradient set to the right and bottom.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner9.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner9.PNG" border=0 /></a></center>
+		</p>
+<h3>Making Quick Work of it pt1</h3>
+<p>Manually recreating each of these is going to be a bit of a pain, so to speed things up we can take a short cut. The first 4 are pretty easy, copy &amp; past the two new rectangles and change the justification/margins/height/width appropriately. The next four are a bit more intense. Copy and paste the two original rectangles. Select them both and in the Transform pane switch to the Center Point tab. Set the X value to 1.35 and the Y value to 0.5.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner10.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner10.PNG" border=0 /></a></center>
+		</p>
+<h3>Making Quick Work of it pt2</h3>
+<p>Once you&#8217;ve changed the center point, switch to the Rotate tab and rotate the control 45 degrees. They should line up, almost perfectly, with the mask window. You may have to increase the length and width of these rectangles by 1 pixel and tweak the margins, but once you touch up the first one, the rest are pretty easy.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner11.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner11.PNG" border=0 /></a></center>
+		</p>
+<h3>More Gradients!</h3>
+<p>And on to the spinner graphic! We need another rectangle, identical to the background rectangle (2px margin). This one we&#8217;re going to fill with a radial gradient. The one below is not the same one from the working demo. In most cases you&#8217;ll want a strong leading edge with a gradual fade behind it, but this is an easy part to play with. Use the gradient tool and the Brushes pane to make an interesting pattern.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner12.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner12.PNG" border=0 /></a></center>
+		</p>
+<h3>Looking Good!</h3>
+<p>If you turn on the mask and glass layers, you should see something like this:<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner13.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner13.PNG" border=0 /></a></center>
+		</p>
+<h3>Let&#8217;s Get Moving</h3>
+<p>Next, we want to animate the spinner. Click the &#8220;+&#8221;, or the down arrow and select New, above the control tree to create a new story board.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner14.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner14.PNG" border=0 /></a></center>
+		</p>
+<h3>Name it</h3>
+<p>Name the storyboard so that we can access it from code.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner15.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner15.PNG" border=0 /></a></center>
+		</p>
+<h3>Setting Up the Animation</h3>
+<p>Use the &#8220;Record Keyframe&#8221; button to set a starting position at the 0 second mark on the Spinner rectangle line.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner16.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner16.PNG" border=0 /></a></center>
+		</p>
+<h3>Spin Me Round</h3>
+<p>Drag the yellow bar out to 1 second, then on the Rotate tab of the Transform Pane, set the angle to 360. You should now be able to hit the play button on the animation control to see your spinner spin<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner17.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner17.PNG" border=0 /></a></center>
+		</p>
+<h3>And Around, And Around, And Around&#8230;</h3>
+<p>Before we get into the code, we need to change the looping behavior of the spin animation. Select the animation by clicking on it above the control tree. In the top right corner you should see the &#8220;Common Properties&#8221; pane. Set the RepeatBehavior to &#8220;Forever&#8221;.<br />
+		<center><a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/Spinner18.PNG"><img src="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/thSpinner18.PNG" border=0 /></a></center>
+		</p>
+<h3>On To the Code</h3>
+<p>
+		The code for the spinner is really simple:</p>
+<pre>			Public Sub New()
+				' Required to initialize variables
+				InitializeComponent()
+				StopSpinner
+			End Sub
+
+			public sub StartSpinner
+				me.recSpinner.Visibility=Windows.Visibility.Visible
+				me.Spin.begin
+			end sub
+
+			public sub StopSpinner
+				me.recSpinner.Visibility=Windows.Visibility.Collapsed
+				me.Spin.Stop
+			end sub
+		</pre>
+</p>
+<h3>And So On</h3>
+<p>By calling StopSpinner in the constructor, we can be sure that when the control becomes visible it will be displaying the background, not a stationary spinner. And the Start and Stop methods will handle switching to the appropriate rectangle for us. If you plan on reusing this control, it is also a great idea to expose the brushes for your Background, Spinner, and Mask. This allows future users to change your controls colors to match their applications.
+		</p>
+<h3>Download</h3>
+<p>You can grab the VS2008 project and code from <a href="http://ringdev.com.web10.reliabledomainspace.com/SpinnerTutorial/SilverlightApplication1.zip">here</a></p>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/silverlight-spinner/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Silverlight Partial Classing a Webservice Reference</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/silverlight-partial-classing-a-webservic/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/silverlight-partial-classing-a-webservic/#comments</comments>
+		<pubDate>Thu, 10 Dec 2009 13:39:11 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[silverlight partial class webservice]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/12/silverlight-partial-classing-a-webservic/</guid>
+		<description><![CDATA[Hey Folks, Just ran into this minor quirk today, figured I&#8217;d share the solution. I have a Webservice that returns an array of a class defined on the server. On the client side, I wanted to extend that class to link it to some GUI elements. Enter the partial class. If you haven&#8217;t played with [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Hey Folks,</p>
+<p style="text-indent: 30pt;">Just ran into this minor quirk today, figured I&#8217;d share the solution. I have a Webservice that returns an array of a class defined on the server. On the client side, I wanted to extend that class to link it to some GUI elements. Enter the partial class. If you haven&#8217;t played with Partial Classes before, I&#8217;d recommend checking them out. It allows you to build additional functionality into any class. Not by inheriting from a base, but actually extending that class without creating a new one. Anyways, I wound up with the following:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Namespace</span> srAlerts
+&nbsp; &nbsp; <span class="kw1">Partial</span> <span class="kw1">Public</span> <span class="kw1">Class</span> Alert
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Private</span> _CommentDisplay <span class="kw1">As</span> CommentIndicator
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">&lt;</span>System<span class="sy0">.</span><span class="me1">Xml</span><span class="sy0">.</span><span class="me1">Serialization</span><span class="sy0">.</span><span class="me1">XmlIgnore</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">&gt;</span> _
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Property</span> CommentDisplay<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">As</span> CommentIndicator
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> _CommentDisplay
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Get</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Set</span><span class="br0">&#40;</span><span class="kw1">ByVal</span> value <span class="kw1">As</span> CommentIndicator<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _CommentDisplay <span class="sy0">=</span> value
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Set</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Property</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Class</span>
+<span class="kw1">End</span> <span class="kw1">Namespace</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Namespace srAlerts
+    Partial Public Class Alert
+
+        Private _CommentDisplay As CommentIndicator
+        &lt;System.Xml.Serialization.XmlIgnore()&gt; _
+        Public Property CommentDisplay() As CommentIndicator
+            Get
+                Return _CommentDisplay
+            End Get
+            Set(ByVal value As CommentIndicator)
+                _CommentDisplay = value
+            End Set
+        End Property
+
+    End Class
+End Namespace</pre></div></div>
+
+<p style="text-indent: 30pt;">srAlerts is the namespace of my web service. Alert is the name of the class defined in my web service. CommentIndicatory is the GUI control that I was linking to.</p>
+<p style="text-indent: 30pt;">The critical part though, is the attribute. Without the System.Xml.Serialization.XmlIgnore attribute, you&#8217;ll get an exception on the constructor of the web service Reference.vb file:</p>
+<p>Exception has been thrown by the target of an invocation.<br />
+-There was an error reflecting type &#8216;Alerts.srAlerts.BaseResponse&#8217;.<br />
+&#8211;There was an error reflecting type &#8216;Alerts.srAlerts.GetAlertDataResponse&#8217;.<br />
+&#8212;There was an error reflecting property &#8216;Alerts&#8217;.<br />
+&#8212;-There was an error reflecting type &#8216;Alerts.srAlerts.Alert&#8217;.<br />
+&#8212;&#8211;There was an error reflecting property &#8216;CommentDisplay&#8217;.</p>
+<p style="text-indent: 30pt;">It would appear that the web service system in Silverlight attempts to serialize all members of the class, even those that are defined client side in a partial class, and it gets a little confused. Using the XMLIgnore attribute forces the serializer to skip this property and allows us to use the partial class on the client side as we expected.</p>
+<p style="text-indent: 30pt;">On a side note, there is also a WCF attribute: System.Runtime.Serialization.IgnoreDataMember which will NOT work for web service references.</p>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/silverlight-partial-classing-a-webservic/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Communicating with KBay, Design Pattern for Web Services</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/comms-for-kbay/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/comms-for-kbay/#respond</comments>
+		<pubDate>Mon, 07 Dec 2009 19:06:46 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/12/comms-for-kbay/</guid>
+		<description><![CDATA[Hey everyone, Sorry this post has been so delayed. I was wiped out last week and a half with a nasty cold that I am still recovering from. I missed my entire Thanksgiving break, curled up under blankets and coughing my lungs up. Anyway, I&#8217;m finally back on my feet, albeit completely buried under catch [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Hey everyone, </p>
+<p style="text-indent: 30pt;">Sorry this post has been so delayed. I was wiped out last week  and a half with a nasty cold that I am still recovering from. I missed my entire Thanksgiving break, curled up under blankets and coughing my lungs up. Anyway, I&#8217;m finally back on my feet, albeit completely buried under catch up work and a new project. But as promised, nuts and bolts from KBay!</p>
+<h3>The Power of Communication</h3>
+<p style="text-indent: 30pt;">One the best parts of KBay is, IMO, the communication design. Every web method in the service takes a single object parameter and returns a single parameter. These two objects are always called the Request and the Response. </p>
+<p style="text-indent: 30pt;">Some of the awesomeness behind this pattern includes:<br />
+1) Client side, you can hang on to a request and populated it as needed. No more piles of variables to pass in, just set up the single request object, it&#8217;s all nice and self contained.<br />
+2) Super easy logging/debugging. At any point in time we can serialize the request/response objects to see what&#8217;s in them. Even using a tool like Fiddler you can see a nicely formatted data layout of your parameters.<br />
+3) Server side additions will not break functionality. So long as the server side checks the value it wants to use before using it, the client side will continue to function. This was great for us as we had 2+ developers on the project the whole time. If Adam was adding more parameters and functionality server side, I could continue hitting the dev server with out having to rebind or implement any changes.</p>
+<h3>The Simplest Web Methods Ever</h3>
+<p style="text-indent: 30pt;">First off, the actual code behind on the web services:</p>
+<pre>    &lt;WebMethod(Description:="Returns a set of data required at application startup.")&gt; _
+    Public Function GetInit(ByVal Request As GetInitRequest) As GetInitResponse
+        Return Request.FillRequest()
+    End Function
+
+    &lt;WebMethod(Description:="Returns a list of Alert Data based on the filter criteria set in the request.")&gt; _
+    Public Function GetAlertData(ByVal Request As GetAlertDataRequest) As GetAlertDataResponse
+        Return Request.FillRequest()
+    End Function</pre>
+<p style="text-indent: 30pt;">This code is actually for a different project, but it&#8217;s what I had handy. All of the functions follow the same pattern as the ones you can see here. They take a custom Request object and return a custom Response object (both named after the method). Inside the method, they call the Request.FillRequest method.</p>
+<h3>Where&#8217;s the beef?</h3>
+<p style="text-indent: 30pt;">So let&#8217;s keep digging. Here is the GetInit.vb file that contains the functionality for the GetInit method:</p>
+<pre>Namespace Implementation
+    &lt;ServiceManager.AutoCreateSessionId()&gt; _
+    Public Class GetInitRequest
+        Inherits ServiceManager.BaseRequest(Of GetInitRequest, GetInitResponse)
+
+        Public Overrides Function innerFillRequest() As GetInitResponse
+            Dim output As New GetInitResponse
+
+            Dim env = Utility.GetEnvironement("Alerts|Development")
+            Dim Statuses As String = Utility.GetEnvironmentSetting("Alerts|Development", "StartupMessage").ToString
+            If Statuses &lt;&gt; String.Empty Then
+                output.Statuses.AddRange(Statuses.Split(","c))
+            End If
+
+            Return output
+        End Function
+
+
+        Protected Overrides Function GetLoggingReplacement(ByVal XMLElement As System.Xml.Linq.XElement) As String
+            Return Nothing
+        End Function
+    End Class
+
+
+
+    Public Class GetInitResponse
+        Inherits ServiceManager.BaseResponse
+
+        Private _Statuses As New List(Of String)
+        Public Property Statuses() As List(Of String)
+            Get
+                Return _Statuses
+            End Get
+            Set(ByVal value As List(Of String))
+                _Statuses = value
+            End Set
+        End Property
+    End Class
+
+End Namespace</pre>
+<p style="text-indent: 30pt;">A couple of things to notice here. First, there are two classes in this file, both the request and the response. This is just for organizational purposes. You&#8217;ll also want to note the &#8220;servicemanager.AutoCreateSessionId()&#8221; attribute on the Request class. We&#8217;ll use this again later.</p>
+<p style="text-indent: 30pt;">One of the cool things about this system is that it uses generics to move data UP the hierarchy chain. In this case, you can see that we are inheriting from BaseRequest, which allows us to specify the types of the generic.</p>
+<p style="text-indent: 30pt;">The &#8220;innerFillRequest&#8221; method is where the actual functionality of this web method takes place. In the case of GetInit, it grabs a string from the Environment Provider, splits it, and adds it to a member on the Response object.</p>
+<p style="text-indent: 30pt;">Below that is the GetInitResponse class, which in this case is pretty simple and just contains a property that exposes a list of strings. The same property that is populated in the Request object&#8217;s innerFillRequest method.</p>
+<h3>Strange Child, Who is your Parent?</h3>
+<p style="text-indent: 30pt;">While these derived classes show us what the method does, it doesn&#8217;t show us how they are called. The web methods called Request.FillRequest, not InnerFillRequest. So lets look at the class that the request inherits from, BaseRequest:</p>
+<pre>Namespace ServiceManager
+    Public MustInherit Class BaseRequest(Of Req As {New, iRequest}, Res As {New, BaseResponse})
+        Implements iRequest
+
+        Private mRequestToken As String
+        Public Property RequestToken() As String Implements iRequest.RequestToken
+            Get
+                Return mRequestToken
+            End Get
+            Set(ByVal value As String)
+                mRequestToken = value
+            End Set
+        End Property
+        Private mSessionId As Long
+        Public Property SessionId() As Long Implements iRequest.SessionId
+            Get
+                Return mSessionId
+            End Get
+            Set(ByVal value As Long)
+                mSessionId = value
+            End Set
+        End Property
+
+
+        ''' &lt;summary&gt;
+        ''' This procedure forms a response object and deals with any errors that take place while
+        ''' that response is being created.
+        ''' &lt;/summary&gt;
+        ''' &lt;typeparam name="Req"&gt;&lt;/typeparam&gt;
+        ''' &lt;typeparam name="Res"&gt;&lt;/typeparam&gt;
+        ''' &lt;param name="Request"&gt;&lt;/param&gt;
+        ''' &lt;param name="RunAction"&gt;&lt;/param&gt;
+        ''' &lt;returns&gt;&lt;/returns&gt;
+        ''' &lt;remarks&gt;&lt;/remarks&gt;
+        Public Function FillRequest() As Res
+            '// create a place holder for the output response object
+            Dim Output As Res = Nothing
+            '// note the time we started this service call.
+            Dim sw As New Stopwatch : sw.Start()
+
+            Try
+                '// if this request type implements the AutoCreateSessionIdAttribute AND the user has
+                '// not given a session ID then create a session ID.
+                Dim Atts = Me.GetType.GetCustomAttributes(GetType(AutoCreateSessionIdAttribute), True)
+                If Atts IsNot Nothing AndAlso Atts.Count &gt; 0 Then
+                    If Me.SessionId &lt;= 0 Then
+                        Me.SessionId = Utility.LogApplicationStartup()
+                    End If
+                End If
+
+                '// if at this point there is no session ID, throw an exception
+                If Me.SessionId &lt;= 0 Then
+                    Throw New ApplicationException("Invalid session ID given. Ensure you pass the session ID to every service call.")
+                End If
+
+                '// set a GUID token for this request
+                If String.IsNullOrEmpty(Me.RequestToken) Then
+                    Me.RequestToken = System.Guid.NewGuid.ToString
+                End If
+
+
+                '// log the request XML
+                Utility.WriteLogEntry(Me.SessionId, KerryAuditLoggingServices.LogTypes.Verbose, CreateXML(Me))
+
+                '// actually run the request and build a response object.
+                Output = innerFillRequest()
+
+                '// note the session ID back to the response object
+                Output.SessionId = Me.SessionId
+                '// note the request token
+                Output.RequestToken = Me.RequestToken
+
+
+                '// log the response object about to be sent back.
+                Utility.WriteLogEntry(Output.SessionId, KerryAuditLoggingServices.LogTypes.Verbose, CreateXML(Output))
+            Catch ex As Exception
+                '// create a new empty response object to hold the error that was thrown
+                Output = New Res()
+                Output.Error = ex.ToString
+
+                '// note the session ID if the request isnot empty (the caller may have passed a sessionId in)
+                If Me IsNot Nothing Then
+                    Output.SessionId = Me.SessionId
+                    Output.RequestToken = Me.RequestToken
+                End If
+
+                '// log the error
+                Utility.WriteLogEntry(Me.SessionId, KerryAuditLoggingServices.LogTypes.HandledException, CreateXML(Output))
+            Finally
+                If Output IsNot Nothing Then
+                    '// note the amount of time it took to complete this request.
+                    Output.CompletedInSeconds = sw.Elapsed.TotalSeconds
+                End If
+            End Try
+
+            Return Output
+        End Function
+        Public MustOverride Function innerFillRequest() As Res
+
+
+        ''' &lt;summary&gt;
+        ''' This procedure will take the given object and create an XML string representing the
+        ''' public properties of the given object.
+        ''' &lt;/summary&gt;
+        ''' &lt;param name="Obj"&gt;&lt;/param&gt;
+        ''' &lt;returns&gt;&lt;/returns&gt;
+        ''' &lt;remarks&gt;&lt;/remarks&gt;
+        Private Function CreateXML(ByVal Obj As Object) As String
+            Dim XML As String
+
+
+            Dim xmlSer = New System.Xml.Serialization.XmlSerializer(Obj.GetType)
+            Using ms As New System.IO.MemoryStream(1000)
+                xmlSer.Serialize(ms, Obj)
+                ms.Seek(0, IO.SeekOrigin.Begin)
+                Dim reader As New System.IO.StreamReader(ms)
+                XML = reader.ReadToEnd
+            End Using
+
+            Dim XMLElements = XElement.Parse(XML)
+            ReplaceInvalidTags(XMLElements)
+
+
+            Return XMLElements.ToString
+        End Function
+
+        ''' &lt;summary&gt;
+        ''' This procedure should be modified to remove any tags you do not want to send to the log. 
+        ''' Tags that hold byte arrays are good candidates for removal.
+        ''' &lt;/summary&gt;
+        ''' &lt;param name="Source"&gt;&lt;/param&gt;
+        ''' &lt;remarks&gt;&lt;/remarks&gt;
+        Private Sub ReplaceInvalidTags(ByVal Source As XElement)
+            Dim Nodes = (From e In Source.Elements Select e).ToArray
+            For Each n In Nodes
+                Dim LoggingReplacement As String = GetLoggingReplacement(n)
+                If String.IsNullOrEmpty(LoggingReplacement) Then
+                    ReplaceInvalidTags(n)
+                Else
+                    n.Value = LoggingReplacement
+                End If
+            Next
+        End Sub
+
+        Protected Overridable Function GetLoggingReplacement(ByVal XMLElement As XElement) As String
+            If XMLElement.Name.ToString = "SFDCSessionId" Then
+                Return "[SFDC Session ID Hidden]"
+            Else
+                Return String.Empty
+            End If
+        End Function
+    End Class
+End Namespace</pre>
+<p style="text-indent: 30pt;">The BaseRequest class is abstract, it must be inherited. But even cooler, it is a generic class. We can define it&#8217;s type dynamically. It implements iRequest, which just guarantees it some basic members:</p>
+<pre>Namespace ServiceManager
+    Public Interface iRequest
+        Property SessionId() As Long
+        Property RequestToken() As String
+    End Interface
+End Namespace</pre>
+<p style="text-indent: 30pt;">The &#8220;FillRequest&#8221; method is the conductor of this train. This is the method that the web services are actually calling. Right off the bat, if starts up a stop watch, so we can get performance indicators off of every web service call. </p>
+<p style="text-indent: 30pt;">If you remember back to that GetInitRequest class, we set the AutoCreateSessionIDAttribute. And this is where it gets used. If that attribute is set, then we know that this is an acceptable application start method. So we Log the application start up, which returns the Session ID. The Session ID, from this point on, should always be passed back and forth between the client and server, so that all interactions with this user for this execution of the application are under one ID. If for any reason, this Session ID is not set, we kill the process with an exception. This prevents applications from jumping into web service calls with out following the appropriate chain of processes.</p>
+<p style="text-indent: 30pt;">The RequestToken is a feature used for logging. It allows us to tie multiple log entries (say like a request, some server side process logs, and the response) into a single log entity. This is really only of use when viewing the log, so you can collapse multiple log entries into a single interaction.</p>
+<p style="text-indent: 30pt;">The &#8220;GetLoggingReplacement&#8221; is a block we use to replace chunks of text we don&#8217;t want to log. For instance, if the request contains large binary blocks (like uploading files) or sensitive information, we can set up string manipulations here to remove those items from the serialized request before it gets logged. This sub is usually overridden by the derived classes to add more method specific replacements.</p>
+<h3>Until Next Time</h3>
+<p style="text-indent: 30pt;">The projects continue to pile up. Everyone is trying to wrap stuff up before the holidays and new year, so I&#8217;ve got a lot on my plate. As I get more time, I&#8217;ll try to put up more on some of the other technical tricks we used inside of Silverlight. But this communication system, in conjunction with our Logging system, Unit tests, and having 2 developers on each project has dramatically helped us cut down on development time, reduce released bugs, and improved user acceptance of the applications.</p>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/comms-for-kbay/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>An ode to Log, I love thee so</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/an-ode-to-log-i-love-thee-so/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/an-ode-to-log-i-love-thee-so/#comments</comments>
+		<pubDate>Fri, 20 Nov 2009 14:33:50 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[silverlight logging webservices architexture]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/11/an-ode-to-log-i-love-thee-so/</guid>
+		<description><![CDATA[Hey Everyone, Rick here again. I really want to get to the nuts and bolts of KBay, but first, we have to get into some of the tools our shop has in place. We leverage these tools to improve almost all aspects of our development life cycle. Two of the biggest tools we refer to [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Hey Everyone,</p>
+<p style="text-indent: 30pt;">Rick here again. I really want to get to the nuts and bolts of KBay, but first, we have to get into some of the tools our shop has in place. We leverage these tools to improve almost all aspects of our development life cycle. Two of the biggest tools we refer to as Environment Provider and Application Logging.</p>
+<h3>The Environment Provider</h3>
+<p style="text-indent: 30pt;">The Environment Provider does exactly what its title suggests: It provides an environment, or more specifically, all of the meta-data an application needs to exist in a specific configuration. Connection strings, end points, application configurations, etc. There is one single database that holds all of this data. This data is identified by a &#8220;context&#8221;. For example, the KBay webservices can exist on a local developer&#8217;s PC, a Development Server, a Staging Server, and a Production Server. Each of these locations can connect to either the Development or Production database. So a combination of the location of the application and the desired data environment gives us a context for which a set of environment parameters to use. In the case of KBay, the structure is pretty simple. We have some other apps, international apps with multiple data sources, well, they get a bit crazy, but we have an app just for managing all these settings:</p>
+<h3>The EP Tree</h3>
+<p><img src="http://ringdev.com/images/EnvironmentProvider.JPG" alt="Environment Provider Tree" title="Environment Provider Tree" style="margin-left:50px;" /></p>
+<p style="text-indent: 30pt;">It started off as a proof of concept for organizing Environment Provider data when someone mentioned a &#8220;Tree&#8221; controller and someone (probably Adam!) put it to a Silverlight challenge. Different types of parameters (leaves) are color coded, and if connection strings are detected that point to databases other than their context (branches) would imply, they turn red. And yes, the sun and sky are also animated. Although it started off as a joke, we actually found some bad configurations with the color-coded leaves. </p>
+<h3>Accessing the Meta-Data</h3>
+<p style="text-indent: 30pt;">All of this data gets exposed through a web interface. A web service that takes a context, User Name, and other external parameters returns the appropriate environment data. So all of our applications go to 1 central point for configuration data. </p>
+<h3>It&#8217;s Better Than Great, It&#8217;s Log!</h3>
+<p style="text-indent: 30pt;">The other biggie is the Logging System. The Logging System is pretty straightforward. There is a table that stores application information, one that stores user information (tied in to Active Directory), one that stores Session information (User X started System Y at this date on this machine with this Environment Provider Context), and one table that stores log entries for the sessions. </p>
+<h3>By Your Powers Combined</h3>
+<p style="text-indent: 30pt;">We store the Environment Provider Context on each session. This is actually a function of the Environment Provider. When an application calls the EP web service, in addition to all of the environment data, it also gets a SessionID. The call into the Environment Provider calls the logging service which creates the log session, populates the appropriate data and logs an application start event. This allows us to quickly identify log entries not just to an application, but to a specific user, on a specific server, with a specific data connection, etc&#8230; </p>
+<h3>Getting at More Data</h3>
+<p style="text-indent: 30pt;">All of this log data is exposed through a really quick and dirty Silverlight app that provides us with some standard search functionality:</p>
+<p><img src="http://ringdev.com/images/LogViewer.JPG" alt="Log Viewer" title="Log Viewer" style="margin-left:50px;" /></p>
+<h3>Great Business Value (aka: How to convince your boss it&#8217;s worth doing)</h3>
+<p style="text-indent: 30pt;">Being able to quickly and easily pull up log entries has proven absolutely essential for tracking down user issues, communicating error details between developers, and even determining usage and error rates in applications to help with prioritization. For instance, I give you our Application Usage tool:</p>
+<p><img src="http://ringdev.com/images/AppUsage.JPG" alt="Application Usage Sidebar" title="Application Usage Sidebar" style="margin-left:25px;" /><img src="http://ringdev.com/images/AppUsageDetail.JPG" alt="Application Usage Sidebar - Single Application View" title="Application Usage Sidebar - Single Application View" style="margin-left:15px;" /><img src="http://ringdev.com/images/AppUsageDrill.JPG" alt="Application Usage Sidebar - Usage By User" title="Application Usage Sidebar - Usage By User" style="margin-left:15px;" /></p>
+<h3>Rendered Data at Your Finger Tips</h3>
+<p style="text-indent: 30pt;">Application Usage is a tiny Silverlight App that sits on our developers&#8217; Share Point portal. Similar to the lay out here at LessThanDot, we have a right hand column with generalized data displayed. We&#8217;ve found that column to be a great place to add Silverlight apps for interactive reporting. The Application Usage app for instance, and another that tracks Source Control locks, lock durations, and even file names per developer.</p>
+<h3>Where&#8217;s the Code?</h3>
+<p style="text-indent: 30pt;">That&#8217;s about it for this post, tomorrow I hope to get more written about the communication system. And after that, some of the code and XAML that makes this stuff tick!</p>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/an-ode-to-log-i-love-thee-so/feed/</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+		</item>
+		<item>
+		<title>Developing KBay: It&#8217;s All About the Team</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/developing-kbay-what-went-right/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/developing-kbay-what-went-right/#comments</comments>
+		<pubDate>Wed, 18 Nov 2009 13:14:59 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[development]]></category>
+		<category><![CDATA[silverlight]]></category>
+		<category><![CDATA[team]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/11/developing-kbay-what-went-right/</guid>
+		<description><![CDATA[Hello Everyone, Rick here again with another little blurb on my most recent Silverlight project, KBay. Today, I&#8217;d like to write a little bit about what went right. Separation of Power One of the biggest attributes of KBay&#8217;s success, IMO, was the segregation of development. My coworker Adam (Hi Adam!) and I handled the majority [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Hello Everyone,</p>
+<p style="text-indent: 30pt;">Rick here again with another little blurb on my most recent Silverlight project, KBay. Today, I&#8217;d like to write a little bit about what went right.</p>
+<p><img src="http://ringdev.com/code/KBayHome.PNG" alt="KBay Home Page" title="KBay Home Page " style="margin-left:50px;" /></p>
+<h3>Separation of Power</h3>
+<p style="text-indent: 30pt;">One of the biggest attributes of KBay&#8217;s success, IMO, was the segregation of development. My coworker Adam (Hi Adam!) and I handled the majority of the work for this project. The initial goal was to try to involve everyone on the App Dev team, to give them more exposure to Silverlight. But with the tight time-line and other priorities, we couldn&#8217;t keep the whole team on page. So after some initial design meetings and DB layout, it largely fell to Adam and me to get it to work. </p>
+<h3>Balance Your Strengths</h3>
+<p style="text-indent: 30pt;">Adam and I approached the problem from our own strengths. Both of us are more than capable of writing the entire solution, but we both have our strengths and weaknesses. In my case, my experience with Blend and XAML, along with some rudimentary graphics arts knowledge, really allowed me to speed through the front end, while Adam&#8217;s envelope pushing experience with LINQ and Generics allowed him to come up with some really awesome solutions to communication and technical issues.</p>
+<h3>Two Heads are Better Than One</h3>
+<p style="text-indent: 30pt;">This separation really allowed us to greatly improve not just our development speed, but it also worked as a sort of code review, where we were both interacting with each other&#8217;s interfaces. Since we had virtually no requirements for the project, it allowed us to brainstorm freely and to consider many options that neither of us would have thought of on our own. </p>
+<h3>Lather, Rinse, Repeat</h3>
+<p style="text-indent: 30pt;">Both of us were so struck by how excellently this approach worked in our environment, that we have recommended to our management that we reuse it in more projects . And so far, it has continued to work exceptionally well.</p>
+<h3>One of These Things is Not Like the Others</h3>
+<p style="text-indent: 30pt;">Working in Silverlight, unlike any other mainstream MS platform, means that your only option for interacting with the server is via Webservice or WCF calls. Not only are these the only options (aside from some socket options) but they are also entirely Async in their behavior. </p>
+<h3>Limits Are Good?</h3>
+<p style="text-indent: 30pt;">This limitation opens up a number of options and challenges. First, there is a crystal clear separation between the presentation layer and the business/data layer. It allows for developers to be very pure on either side. A web service does nothing for layout and the UI does nothing for data manipulation (save for maybe some caching). </p>
+<h3>Green Light Go! Red Light Stop!</h3>
+<p style="text-indent: 30pt;">Second, the UI developer can track explicitly when any IO begins and ends, and with a bit of wrapping, control the UI accordingly.</p>
+<h3>Unit Testing Made Easy!</h3>
+<p style="text-indent: 30pt;">Third, and probably best of all, since almost all of the functionality is being controlled by web services, it is really easy to isolate functionality for integrated unit testing. This has been a huge boon for us in terms of stability of deployments, even in the dev environment with multiple developers. It takes 20 seconds to run every single method through all of our known use cases, and those unit tests are run before every deployment. These unit tests are a critical to reducing risks for off-schedule deployments.</p>
+<h3>Are Limits Bad?</h3>
+<p style="text-indent: 30pt;">Maybe &#8216;limits&#8217; isn&#8217;t the right word for this. You can still do almost everything you can do through other platforms, you just have to go about it through entirely different means. The limits that exist force developers to go through the new means, using async communication and webservices/WCF instead of continuing to depend on integrated IO and synchronous processing. So while there is a learning curve in changing the way we approach problems in Silverlight, I think that overcoming that curve will enable more developers to think in a parallel style. Removing the interface from the process, and making the processes async forces developers to partake in good development practices. Because every time I see a Windows app go to a white screen because some developer tried running I/O operations on the GUI thread, I cry a little on the inside.</p>
+<h3>I Love Log</h3>
+<p style="text-indent: 30pt;">That&#8217;s it for the more abstract summary of the KBay project. I promise my next segment will deal with more of the technical nuts and bolts of the project. Including the communication layer and my personal favorite, LOGGING!!!</p>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/developing-kbay-what-went-right/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Pushing Silverlight for my Company</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/pushing-silverlight-for-my-company/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/pushing-silverlight-for-my-company/#comments</comments>
+		<pubDate>Mon, 16 Nov 2009 20:09:58 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[silverlight]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/11/pushing-silverlight-for-my-company/</guid>
+		<description><![CDATA[It's me again, Rick the Silverlight nut. I've been buried under a pile of work this last month and haven't had a chance to post much of the fun stuff I've been working on. But I've got a few minutes to write about my last big project. So I give you, the story of KBay]]></description>
+				<content:encoded><![CDATA[<p>Hey everyone,</p>
+<p style="text-indent: 30pt;">It&#8217;s me again, Rick the Silverlight nut. I&#8217;ve been buried under a pile of work this last month and haven&#8217;t had a chance to post much of the fun stuff I&#8217;ve been working on. But I&#8217;ve got a few minutes to write about my last big project. So I give you, the story of KBay:</p>
+<p><img src="http://ringdev.com/code/KBay.PNG" alt="KBay sample screen" title="KBay Sample Screen" style="margin-left:50px;" /></p>
+<h3>The Story So Far&#8230;</h3>
+<p style="text-indent: 30pt;">I work for Kerry Americas, a food product company with a corporate office in Beloit, Wisconsin. Over the last year we have relocated much of our sales, service, R and D, and other folks to a brand new, state of the art office building and production facility. This place rocks. This did however, leave us with a whole lot of cruddy old furniture, that had been well-used in many of our older office spaces. So the building managers, remembering that almost a decade ago the IT shop had given them an EBay-like app used to auction off goods for charity, gave us a call. They wanted us to fire up this archaic app so they could try to move the furniture to employees for charity. My boss, seeing an opportunity for something better, got us 2 weeks to get something running. We could either get the classic site up and running again, or make one from scratch in Silverlight, but it had to be entirely off the books.</p>
+<h3>Racing the Clock&#8230;</h3>
+<p style="text-indent: 30pt;">So we worked our fingers to the bone pulling it off after hours, over lunch, etc, but after 9 days we had a working prototype. On day 10 we demo&#8217;d it to the users and they were ecstatic. We had 3 weeks to the auction and we used some of that time to refine and improve the system (I hope to be posting about our communication frame work shortly!)</p>
+<h3>Going Live&#8230;</h3>
+<p style="text-indent: 30pt;">Last week, Monday morning we went live with over 200 auctions and almost 600 available users. We had a huge load on the server that morning, but everything stayed up and stable. No crashes, no complaints. We had a few minor bugs, and since it was a non-critical app the boss-man gave us the go-ahead to push to production off-schedule.</p>
+<h3>Down to the Wire&#8230;</h3>
+<p style="text-indent: 30pt;">Friday evening was the big test though. All of the auctions ended at the exact same time. The managers were joking that they had never seen the parking lot so full on a Friday night. And the web server was showing some severe strain. With 300+ users sitting on their favored auction&#8217;s page, hitting refresh over and over again, the server was having issues keeping up. But it never crashed, it just got slow to access the site.</p>
+<h3>In the End&#8230;</h3>
+<p style="text-indent: 30pt;">It was a huge success! The company off loaded almost all of the auctions. The employees got some great deals on some impressive furniture. A local charity food bank picked up a few thousand dollars. And we got Silverlight installed on almost every PC in the building AND got some major good-credit with the users. </p>
+<h3>The Post Mortem&#8230;</h3>
+<p style="text-indent: 30pt;">And post-hoc analysis is pointing to an obvious short coming in our interactions. Since we had developed the application so quickly, we had cut some corners. One of those corners was image caching. Each time users were browsing auctions they were downloading every thumbnail, and every time they looked at a single auction, they would download the full sized image. We had mentioned caching briefly during design, but with a 9 day window, we scrapped it and it was forgotten about while we polished. But looking back now, we could have just hosted the images via an ASP.Net page. Not only would that have solved the hosting issue, but it would have also allowed Silverlight to use the built in browser cache for all of the images. A full caching system without writing a single line of code. We&#8217;re kicking ourselves now for not seeing it before, but we&#8217;ll have it in for the next auction!</p>
+<h3>More to Come&#8230;</h3>
+<p style="text-indent: 30pt;">I hope to have time to post some more of what we learned on this project soon, but I&#8217;ve got another hot deadline approaching for a Silverlight application that mocks Share Point inside of Sales Force.</p>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/pushing-silverlight-for-my-company/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>mercurial &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/mercurial/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Automatically Version Control Your Jenkins Configuration</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/automatically-version-control-your-jenkins/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/automatically-version-control-your-jenkins/#comments</comments>
+		<pubDate>Fri, 03 Feb 2012 17:02:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[jenkins]]></category>
+		<category><![CDATA[mercurial]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/02/automatically-version-control-your-jenkins/</guid>
+		<description><![CDATA[As part of the Continuous Delivery project I embarked on late last year, I created 4 separate jobs in Jenkins to serve as steps in my pipeline. Some of these jobs are fairly complex and, while I could probably rebuild them from the information in my blog posts, I thought it would make more sense to make some backups.]]></description>
+				<content:encoded><![CDATA[<p>As part of the <a href="http://wiki.lessthandot.com/index.php/Eli's_Continuous_Delivery_Project" title="See the wiki post on the project">Continuous Delivery project</a> I embarked on late last year, I created 4 separate jobs in Jenkins to serve as steps in my pipeline. Some of these jobs are fairly complex and, while I could probably rebuild them from the information in my blog posts, I thought it would make more sense to make some backups. </p>
+<p>But I hate doing backups.</p>
+<p>And I hate digging through backups to find something.</p>
+<p>What I really needed was a way to automatically push the configuration files into a mercurial repository. This would require no ongoing work from me, &#8216;backups&#8217; that are taken only when there are changes, and very easy browsing of differences between versions or over time. Sold.</p>
+<h2>Mercurial Repository</h2>
+<p>First up is creating the local mercurial repo. I only want it to pick up the configuration files, but these are stored in the same folders that the Jenkins executables and my jobs are stored in. </p>
+<p>In order to only version my configuration files, I&#8217;ll create the repository, tell it to ignore all files in the folder, then explicitly add just the ones I want to track.</p>
+<p>Creating the repository:</p>
+<pre>cd C:Program Files (x86)Jenkins
+hg init
+echo .*&gt;.hgignore</pre>
+<p>With the repository added and the hgignore set, we can now tell it exactly which files to add to the repository:</p>
+<pre>	hg add .hgignore
+	hg add config.xml
+	hg add jobs/*/config.xml
+	hg commit -m "Initial Commit of Configuration Files"</pre>
+<p>And then the last step is to create a remote repository, add the credentials to mercurial, and do our first push. </p>
+<p>In my case I created a new BitBucket repository and then cheated by opening the repository in TortoiseHg WorkBench to save the remote address and my credentials as &#8220;default&#8221;.</p>
+<p>With the remote repository setup, now I can do the first push:</p>
+<pre>	hg push default</pre>
+<p>And my configurations are safely whisked away to the cloud.</p>
+<h2>Automagicalize It</h2>
+<p>One of the advantages I sold myself on was the hands off nature of the final solution. In order to achieve that I need to setup something to perform nightly commits and pushes for me. With Jenkins right here, I might as well use it to drive it&#8217;s own backups.</p>
+<p>First up, I&#8217;ll create a new job named &#8220;Backup Configurations&#8221;.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/JenkinsBackups/1.png" title="General Job Settings" /><br />
+	General Job Settings
+</div>
+<p>I want this to run every night, so I&#8217;ll setup a trigger to run at 1:30 every night by specifying &#8220;Build Periodically&#8221; with a setting of &#8220;30 1 * * *&#8221;.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/JenkinsBackups/2.png" title="Build Trigger Settings" /><br />
+	Build Trigger Settings
+</div>
+<p>And then the last step is to add an &#8220;Execute Windows Batch Command&#8221; step to my job that executes a similar commit and push to the ones above. Because I am in a subfolder of the repository, I don&#8217;t have to add in any path commands or other trickery.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/JenkinsBackups/3.png" title="Build Step" /><br />
+	Build Step
+</div>
+<p>Save the job and kick it off once to verify it does indeed work (after making a minor change to a config file, of course) and I can see I have a working, automated backup.</p>
+<p>As a last step I went back and added the backup jobs config.xml file to the repository, so now it not only backs up my other configurations but also itself.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/automatically-version-control-your-jenkins/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+	</channel>
+</rss>

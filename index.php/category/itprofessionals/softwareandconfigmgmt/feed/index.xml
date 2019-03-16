@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Software and Configuration Management &#8211; LessthanDot</title>
+	<atom:link href="/index.php/category/itprofessionals/softwareandconfigmgmt/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Multiple NuGet Methods for VS2017 + MSBuild 15 in TeamCity</title>
+		<link>/index.php/itprofessionals/softwareandconfigmgmt/multiple-nuget-methods-for-vs2017-msbuild-15-in-teamcity/</link>
+		<comments>/index.php/itprofessionals/softwareandconfigmgmt/multiple-nuget-methods-for-vs2017-msbuild-15-in-teamcity/#respond</comments>
+		<pubDate>Wed, 19 Jul 2017 18:06:25 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Software and Configuration Management]]></category>
+		<category><![CDATA[nuget]]></category>
+		<category><![CDATA[teamcity]]></category>
+		<category><![CDATA[Visual Studio 2017]]></category>
+
+		<guid isPermaLink="false">/?p=8697</guid>
+		<description><![CDATA[ASP.Net Projects and NuGet have been a moving target the last couple years. I have an ASP.Net Core project (.Net Framework) with several class libraries and had to work through a number of problems to get NuGet Restore working on a TeamCity CI server. Hopefully this will help someone else along the way. It turns [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>ASP.Net Projects and NuGet have been a moving target the last couple years. I have an ASP.Net Core project (.Net Framework) with several class libraries and had to work through a number of problems to get NuGet Restore working on a TeamCity CI server. Hopefully this will help someone else along the way. </p>
+<p>It turns out I have 3 situations:</p>
+<ul>
+<li>ASP.Net Core uses the new <a href="http://blog.nuget.org/20170316/NuGet-now-fully-integrated-into-MSBuild.html">PackageReference</a> for packages instead of packages.json</li>
+<li>Other C# Projects still use the packages.json method for packages</li>
+<li>Solution packages (great for tooling) are (still) not supported after VS 2013 (<a href="https://github.com/NuGet/Home/issues/522">NuGet #522</a>)</li>
+</ul>
+<p>(the last couple years also saw the ill-fated project.json, which isn&#8217;t represented here and may or may not be covered by one of these methods)</p>
+<p>The software versions I am working with are:</p>
+<ul>
+<li>TeamCity 2017.1</li>
+<li>NuGet 4.1.0</li>
+<li>Visual Studio 2017 Community</li>
+<li>MS Build Tools 2017 (MSBuild 15)</li>
+</ul>
+<p>I&#8217;ve outlined the issues I ran into and the individual Build Steps I used to workaround them.</p>
+<h2>Some of the issues</h2>
+<p><b>Issue #1: Restoring packages.json + PackageReference</b></p>
+<p>NuGet Restore is built into MSBuild 15 (<code>msbuild /t:restore</code>) to support the new PackageReference case. Supposedly NuGet.exe 4+ supports this out of the box, but I was unable to make this work (<a href="https://docs.microsoft.com/en-us/nuget/consume-packages/package-restore">NuGet Package Restore</a>):</p>
+<blockquote><p>
+<code>msbuild /t:restore</code> 	Nuget 4.x+ and MSBuild 15.1+ with package references in project files only. nuget restore and dotnet restore both use this command for applicable projects. See NuGet pack and restore as MSBuild targets- restore target.
+</p></blockquote>
+<p>It is possible to <a href="http://blog.nuget.org/20170316/NuGet-now-fully-integrated-into-MSBuild.html#what-about-other-project-types-that-are-not-net-core">use PackageReference with other project types</a>, but you have to know to turn this on from the beginning. There is no migration option to change tracks with later. </p>
+<p><b>Issue #2: MSBuild install location has moved</b><br />
+MSBuild installs to a new folder with 2017 (<code>C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\MSBuild</code>), which means for a while my NuGet Restore commands were defaulting to MSBuild 14. The <code>-MsBuildPath</code> parameter let&#8217;s you provide a path to a specific install, so we can at MSBuild 15 via it&#8217;s new path. </p>
+<p><b>Issue #3: Regular Package.json files plus Solution Package.son File</b></p>
+<p>When we run it against a <code>*.sln</code> file, NuGet.exe will find and run against each project&#8217;s <code>package.json</code> file. Alternatively, you can also point NuGet.exe directly at a package.json file to install that specific file, which is a workaround for the no longer support solution packages. There is not an option (that I could find) to combine these into a single call.</p>
+<p><b>Issue #4: TeamCity only supports NuGet Restore of *.sln files</b></p>
+<p>TeamCity restricts the built-in NuGet Restore command to only run against files that end in &#8220;.sln&#8221;. A separate flaw in this restriction was <a href="https://blog.jetbrains.com/teamcity/2013/08/nuget-package-restore-with-teamcity/#comment-177428">pointed out to JetBrains in 2015</a>, but has not been fixed as of TeamCity 2017.1.</p>
+<p>This restriction prevents me from doing a clean NuGet Restore of my solution-level packages.json from issue #3.</p>
+<h2>The Fixes</h2>
+<p>I ended up using 3 Build Steps to do NuGet restores in TeamCity for this one ASP.Net Core deployment.</p>
+<p><div id="attachment_8699" style="width: 882px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/TeamCityNuGetRestorePost.png" alt="TeamCity NuGet Restore Steps" width="872" height="239" class="size-full wp-image-8699" srcset="/wp-content/uploads/2017/07/TeamCityNuGetRestorePost.png 872w, /wp-content/uploads/2017/07/TeamCityNuGetRestorePost-300x82.png 300w, /wp-content/uploads/2017/07/TeamCityNuGetRestorePost-768x210.png 768w" sizes="(max-width: 872px) 100vw, 872px" /><p class="wp-caption-text">TeamCity NuGet Restore Steps</p></div><br />
+<b>1. Restore from package.json files</b></p>
+<p>I used the built-in Nuget Installer with the Restore option and the name of my solution file. I added an extra command line parameter to point it at MSBuild 15:<br />
+<code>-MsBuildPath "C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\MSBuild\15.0\Bin"</code>.</p>
+<p><b>2. Restore from PackageReferences</b></p>
+<p>For PackageReference, I used the MSBuild task in TeamCity with my Solution file as the Build file path and a target of &#8220;Restore&#8221; (same as running <code>msbuild /t:Restore</code>).</p>
+<p><b>3. Restore Solution-level packages</b></p>
+<p>A solution-level packages file is useful for solution-level build and deploy tools that aren&#8217;t needed locally. Because TeamCity has an artifical constraint on only accepting *.sln files, I solved this with a <code>Command Line</code> runner type with the following script:</p>
+<p><code>%teamcity.tool.NuGet.CommandLine.DEFAULT%\\tools\\nuget.exe restore Deployment/packages.config -PackagesDirectory packages</code></p>
+<p>Deployment/packages.config is my solution-level packages file. The TeamCity variable resolves to the path of my default NuGet installation, which is 4.1.0 in this case.</p>
+<h2>Final Words</h2>
+<p>This experience was roughly 3-5 times longer than I expected, given the number of ASP.Net deployments, TeamCity setups, and so on I&#8217;ve done over the years. The playing field feels littered with half-baked solutions that not only break backwards compatibility, but break compatibility across projects in the same solution using vanilla Visual Studio project templates. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/softwareandconfigmgmt/multiple-nuget-methods-for-vs2017-msbuild-15-in-teamcity/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Backup to the cloud by using duplicati</title>
+		<link>/index.php/itprofessionals/softwareandconfigmgmt/backup-to-the-cloud-by/</link>
+		<comments>/index.php/itprofessionals/softwareandconfigmgmt/backup-to-the-cloud-by/#respond</comments>
+		<pubDate>Thu, 24 May 2012 23:53:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Book Review]]></category>
+		<category><![CDATA[Software and Configuration Management]]></category>
+		<category><![CDATA[amazon]]></category>
+		<category><![CDATA[backup]]></category>
+		<category><![CDATA[cloud]]></category>
+		<category><![CDATA[open source]]></category>
+		<category><![CDATA[restore]]></category>
+		<category><![CDATA[skydrive]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/05/backup-to-the-cloud-by/</guid>
+		<description><![CDATA[I decided to give Duplicati a try to backup some of my stuff to the cloud. Duplicati is free/libre/open-source software (FLOSS). Duplicati works with Amazon S3, Windows Live SkyDrive, Google Drive (Google Docs), Rackspace Cloud Files or WebDAV, SSH, FTP&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I decided to give <a href="http://www.duplicati.com/">Duplicati</a> a try to backup some of my stuff to the cloud. Duplicati is free/libre/open-source software (FLOSS). Duplicati works with Amazon S3, Windows Live SkyDrive, Google Drive (Google Docs), Rackspace Cloud Files or WebDAV, SSH, FTP. </p>
+<p>Duplicati uses Pre-Internet Encryption, you know that nobody can decrypt your files. When working with the cloud you have to be in TNO (Trust No One) mode. You never know what malicious person could be on the other side. Duplicati has built-in AES-256 encryption and backups can be signed using GNU Privacy Guard</p>
+<p>Duplicati is available for the following platforms</p>
+<p>Duplicati 1.3.2 for Windows &#8211; (32bit, msi)<br />
+Duplicati 1.3.2 for Windows &#8211; (64bit, msi)<br />
+Duplicati 1.3.2 for Mac OS X &#8211; (dmg)<br />
+Duplicati 1.3.2 for Debian, Ubuntu, LinuxMint &#8211; (deb)<br />
+Duplicati 1.3.2 for Fedora, RedHat, OpenSuSE &#8211; (rpm)<br />
+Duplicati 1.3.2 &#8211; (Binaries, zip)<br />
+Duplicati 1.3.2 &#8211; (Linux binary, tgz)</p>
+<p>Let&#8217;s take a look at how easy it is to use. After you install Duplicati, run it. When you run it the first time a wizard will pop up. Pick select a new backup</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati01.PNG?mtime=1337909180"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati01.PNG?mtime=1337909180" width="506" height="379" /></a></div>
+<p>A bunch of typical folders that hold your pictures, music, documents etc are shown by default. I decided to create a new folder and dump some pics in that folder</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati02.PNG?mtime=1337909180"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati02.PNG?mtime=1337909180" width="501" height="372" /></a></div>
+<p>Next you give a password for your backups</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati03.PNG?mtime=1337909181"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati03.PNG?mtime=1337909181" width="506" height="370" /></a></div>
+<p>Then you pick where you want to back this up to</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati04.PNG?mtime=1337909182"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati04.PNG?mtime=1337909182" width="511" height="340" /></a></div>
+<p>I picked SkyDrive</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati05.PNG?mtime=1337909183"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati05.PNG?mtime=1337909183" width="506" height="372" /></a></div>
+<p>On the advanced page, you can add custom filters, set up the frequency and add limits</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati06.PNG?mtime=1337909235"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati06.PNG?mtime=1337909235" width="510" height="376" /></a></div>
+<p>On the next page you can now fill the details in for the stuff you picked in the previous page</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati07.PNG?mtime=1337909236"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati07.PNG?mtime=1337909236" width="505" height="377" /></a></div>
+<p>Backup is running&#8230;.and it is done</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati08.PNG?mtime=1337909236"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati08.PNG?mtime=1337909236" width="472" height="412" /></a></div>
+<p>I checked that there was something in the SkyDrive folder</p>
+<p>Next I wiped out the folder on my PC and decided to do a restore. I ran the app, clicked on the wizard and picked the restore option</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati09.PNG?mtime=1337909237"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati09.PNG?mtime=1337909237" width="505" height="376" /></a></div>
+<p>I picked restore from an existing backup</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati10.PNG?mtime=1337909238"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati10.PNG?mtime=1337909238" width="504" height="376" /></a></div>
+<p>I picked the backup I wanted to restore</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati11.PNG?mtime=1337909271"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati11.PNG?mtime=1337909271" width="505" height="378" /></a></div>
+<p>It is downloading the backup</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati12.PNG?mtime=1337909271"><img alt="" src="/wp-content/uploads/blogs/ITProfessionals/Duplicati/Duplicati12.PNG?mtime=1337909271" width="507" height="377" /></a></div>
+<p>I checked the folder and all the pictures that I wiped out were restored</p>
+<p>It is pretty easy to use, I will test this out over the coming weeks to get more familiar with this product</p>
+<p>Duplicati is an open source project, licensed under LGPL, the source can be downloaded here http://code.google.com/p/duplicati/source/checkout</p>
+<p>Try it out and let me know what you think, the main product page is here: http://www.duplicati.com/</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/softwareandconfigmgmt/backup-to-the-cloud-by/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Desktop Computing is Dead</title>
+		<link>/index.php/itprofessionals/itservicemanagement/desktop-computing-is-dead/</link>
+		<comments>/index.php/itprofessionals/itservicemanagement/desktop-computing-is-dead/#comments</comments>
+		<pubDate>Mon, 08 Aug 2011 18:01:00 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[IT Processes]]></category>
+		<category><![CDATA[IT Service Management]]></category>
+		<category><![CDATA[Project Management]]></category>
+		<category><![CDATA[Software and Configuration Management]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/08/desktop-computing-is-dead/</guid>
+		<description><![CDATA[As I was cleaning this past weekend, I did inventory of hardware that was floating about the house and it turns out that I have four laptops and one desktop.  The desktop that I still have is one that I built around four years ago.  It is up in the gues&#8230;]]></description>
+				<content:encoded><![CDATA[<div class="image_block"><a href="/media/blogs/All/lanbag.png?mtime=1312833595"><img src="/wp-content/uploads/blogs/All/lanbag.png?mtime=1312833595" alt="" width="211" height="239" align="left" /></a></div>
+<p class="MsoNormal"><span lang="EN"><span style="color: #000000;">As I was cleaning this past weekend, I did inventory of hardware that was floating about the house and it turns out that I have four laptops and one desktop.  The desktop that I still have is one that I built around four years ago.  It is up in the guest room primarily used by my two sons for school and games.  This started me thinking about where we are today with computing, and desktop computing specifically.  Five or so years ago, a laptop was far under powered in all areas of resources to handle running the number of instances of SQL Server and or Virtual Machines that come with the typical SQL Server Professionals daily routine of learning and testing.  You could go out and spend $4000 to get a laptop that was 5 inches thick and would burn the hair off your legs, but we’re being realistic for the normal geek here.  Today, we have it a bit different.  At a reasonable price of $1000, you can go out and purchase a solid laptop with enough disk, CPU power and memory to successfully install, configure and run SQL Server Developer.  Add a few hundred to that and you are running SSD drives for your data and log files and you are screaming fast in a lot of areas of SQL Server loaded on a laptop. </span></span></p>
+<p class="MsoNormal"><span lang="EN"><span style="color: #000000;">Not only can you run this successfully but you can run it and properly gauge a performance baseline by creating a simple formula from the laptop executions and port them to server hardware. Now, that in no way is a replacement of a well formed landscape consisting of a Development, Test, User Acceptance Testing and Production transport system.  Really, about the only problem you have to worry about are burns from the laptop if you actually leave it on your lap. </span></span></p>
+<p class="MsoNormal"><span lang="EN"><span style="color: #000000;">So why buy a desktop? </span></span></p>
+<p class="MsoNormal"><span lang="EN"><span style="color: #000000;">I hear the arguments coming in…I can pack a desktop full of more memory, disk and dual physical processors and…</span></span></p>
+<p class="MsoNormal"><span lang="EN"><span style="color: #000000;">OK.  You can do that and I’ve built such desktops.  But, do you need it?  Nope.  I’m walking proof of that.  I run seven SQL Server instances from a laptop and VMWare Workstation running a few more virtual machines.  This is all for writing, testing, learning and presenting.  This is being all done without much, if any, problems in the overall speed of my laptop.  The laptop is a more expensive one.  I think around $1700.  But it is still less than the cost of building that desktop mentioned earlier. </span></span></p>
+<p class="MsoNormal"><span lang="EN"><span style="color: #000000;">There it is: Desktop Computing is dead!</span></span></p>
+<p class="MsoNormal"><span lang="EN"><span style="color: #000000;">Desktop Computing is so dead that most people I know that really need to beat on SQL Server or other server related software, run servers at home for it.  Yes, servers can really be cost effective and in a lot of cases, you can pick a decent Gen 2 or 3 servers up for the same price, again, as the monster desktop you would have to build.</span></span></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/itservicemanagement/desktop-computing-is-dead/feed/</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+		</item>
+		<item>
+		<title>Working with vendor-provided databases</title>
+		<link>/index.php/itprofessionals/ethicsit/play-nice-with-vendors/</link>
+		<comments>/index.php/itprofessionals/ethicsit/play-nice-with-vendors/#comments</comments>
+		<pubDate>Mon, 29 Mar 2010 10:20:02 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Ethics and IT]]></category>
+		<category><![CDATA[IT Service Management]]></category>
+		<category><![CDATA[Project Management]]></category>
+		<category><![CDATA[Software and Configuration Management]]></category>
+		<category><![CDATA[community]]></category>
+		<category><![CDATA[help]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[third party databases]]></category>
+		<category><![CDATA[vendor]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/03/play-nice-with-vendors/</guid>
+		<description><![CDATA[Don’t be afraid to call your vendor and begin to create a professional relationship with them.  Always work together to build on the systems that are working hard to keep both companies alive.]]></description>
+				<content:encoded><![CDATA[<h2>Will you be my friend?</h2>
+<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/ITProfessionals/friends.gif" alt="" title="" width="134" height="149" align="left" /></div>
+<p>When it comes to database performance issues, finding the cause and the resolution is usually half the battle, if not most of it. But when the database involved is vendor-provided, getting the resolution implemented can actually be another (long) story. Not only does the vendor have to be involved, they also have to somewhat agree to the resolution and participate actively in implementing it. This is the reason it is so important to build a good relationship with your vendor—and to do so <strong><i>before</i></strong> it’s actually needed.</p>
+<p></p>
+<h2>Make a professional relationship</h2>
+<p>
+How do you do this? The answer to the question is simple and can be done with a few emails or calls over time. This relationship should start as early as the review process before choosing to purchase the software for you business requirements.  Interact with the vendors in the demo process to build respect between each other.  Even when problems are not present, it can be an asset to keep in touch with key individuals that are handling or working directly on the database structure.  You will be able to react more quickly and successfully to performance issues in vendor-provided databases if you already have a good, working relationship with the vendor.  This doesn’t necessarily mean calling them up daily and talking to them about your NCAA picks (in fact that may not be a good idea at all).  You want to build a technical relationship on a professional level but at the same time build trust and respect for each other. Portray your abilities, concerns, thoughts and understanding of the database the vendor has taken great time in creating.   </p>
+<p><div class="image_block"><img src="/wp-content/uploads/blogs/ITProfessionals/fishmarket.gif" alt="" title="" width="600" height="450" /></div>
+<p>Think of it as a fish market shopping experience. If you have a good rapport with the fish vendor, you will most likely get the big tuna behind the counter and not the Chinese carp that they are trying to pawn off as a walleye displayed on the shelf. </p>
+<h2>Don’t break the relationship</h2>
+<p>
+When the problem does occur, don’t’ be rude. Don’t flame their design. You don’t want to be sent back to the first-level support process. Once you’ve broken the relationship, rebuilding can be in some cases, impossible.<br />
+<br />
+Here’s a good example. A few weeks ago, a database behind a warehouse management system started to show progressive performance problems. After some troubleshooting, we discovered that forwarded records on HEAP tables were the root cause of the performance problems.<br />
+<br />
+<blockquote>Finding forwarded records can be done with the following query written by Jonathan Kehayias (<a href="http://sqlblog.com/blogs/jonathan_kehayias/">blog</a> | <a href="http://twitter.com/sqlsarg">Twitter</a>)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> 
+&nbsp; &nbsp; <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>ps.<span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="kw1">AS</span> TableName,
+&nbsp; &nbsp; i.<span class="me1">name</span> <span class="kw1">AS</span> IndexName,
+&nbsp; &nbsp; ps.<span class="me1">index_type_desc</span>,
+&nbsp; &nbsp; ps.<span class="me1">page_count</span>,
+&nbsp; &nbsp; ps.<span class="me1">avg_fragmentation_in_percent</span>,
+&nbsp; &nbsp; ps.<span class="me1">forwarded_record_count</span>
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span>, <span class="st0">'DETAILED'</span><span class="br0">&#41;</span> <span class="kw1">AS</span> ps
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span> sys.<span class="me1">indexes</span> <span class="kw1">AS</span> i 
+&nbsp; &nbsp; <span class="kw1">ON</span> ps.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> i.<span class="kw2">OBJECT_ID</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> ps.<span class="me1">index_id</span> <span class="sy0">=</span> i.<span class="me1">index_id</span>
+<span class="kw1">WHERE</span> ps.<span class="me1">forwarded_record_count</span> <span class="sy0">&gt;</span> <span class="nu0">0</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT 
+    OBJECT_NAME(ps.OBJECT_ID) AS TableName,
+    i.name AS IndexName,
+    ps.index_type_desc,
+    ps.page_count,
+    ps.avg_fragmentation_in_percent,
+    ps.forwarded_record_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL, NULL, 'DETAILED') AS ps
+INNER JOIN sys.indexes AS i 
+    ON ps.OBJECT_ID = i.OBJECT_ID 
+        AND ps.index_id = i.index_id
+WHERE ps.forwarded_record_count &gt; 0</pre></div></div>
+
+</blockquote>
+<p>To learn more about forwarded records and HEAP issues, check Sankar Reddy’s (<a href="http://sankarreddy.com/">blog</a> | <a href="http://twitter.com/SankarReddy13">Twitter</a>) blog, &#8220;<a href="http://sankarreddy.com/2010/03/how-can-i-tell-if-a-sql-server-system-is-affected-by-forwarded-records/">How can I tell if a SQL Server system is affected by Forwarded records?&#8221;</a> and also a very good <a href="http://social.msdn.microsoft.com/Forums/en/sqldatabaseengine/thread/972f68d2-bbc2-4f89-8757-fe1bc7295a3a">reply</a> from Jonathan Kehayias (<a href="http://sqlblog.com/blogs/jonathan_kehayias/">blog</a> | <a href="http://twitter.com/sqlsarg">Twitter</a>) in the msdn forums <a href="http://social.msdn.microsoft.com/Forums/en/sqldatabaseengine/thread/972f68d2-bbc2-4f89-8757-fe1bc7295a3a">here</a>.<br />
+Once the problem was identified as forwarded records on a HEAP table, it was found that the table had a unique non-clustered index.  This left the opportunity to resolve the forwarded records issue by converting the unique non-clustered index into a clustered index and would resolve the problems.<br />
+<br />
+Even knowing the problem and solution to this problem was quickly identified, the database is still a vendor database so altering the structure surly void all support agreements. However, given the rapport with the vendor that was already established, a well composed email explaining the problem in great detail was all that was needed.<br />
+<br />
+The email (has been altered to keep to a NDA):</p>
+<blockquote><p><i>Good morning everyone,</p>
+<p>I have identified a forwarded records issue with the {name removed} database that is causing some performance problems.  I’ve narrowed the problem to two HEAP tables listed below<br />
+Table1<br />
+Table2<br />
+Both tables do not have a clustered index but have unique non-clustered indexes. Is there specific reason behind the unique non-clustered index over a clustered? I was thinking it may benefit the performance to replace the non-clustered index with a clustered index. This will remove the HEAP and then possibly fix the performance bottleneck of the forwarded records?</p>
+<p>The forwarded records count is very high on both tables so I would like to see if the index change can be performed without affecting the structure and functionality of the entire process these tables support. Please let me know your thoughts.  If you want to jump on a conference call and or WebEx to go over this in detail, I’d more than happy to. Our sessions always turn out with great results and look forward to them.</p>
+<p>Sincerely,<br />
+The DBA<br />
+</i></p></blockquote>
+<p>
+The reply from the vendor was good. The relationship that was already created made this major alteration to the tables quick and painless. The vendor immediately discussed the situation with the database architects in their team and came to the conclusion the change was a sound and stable improvement. The change was also added to updates that would be going out so the database changes would be reflected to all of the customers. Because a good relationship already existed between us, the major alteration to the tables was quick and painless. </p>
+<p>Without the effort put forth to create the good relationship with the vendor, this task could have been a long and drawn out process. Worse, the performance problem could have remained on the database and any workaround fix (from us) would have been at best, temporary. </p>
+<h2>What&#8217;s next?</h2>
+<p>Call your vendor and begin to create a professional relationship with them. Introduce yourself. Send them an email.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/ethicsit/play-nice-with-vendors/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>If you are suffering from Cisco VPN on 64 bit Windows then use the Shrew Soft VPN client</title>
+		<link>/index.php/itprofessionals/softwareandconfigmgmt/if-you-are-suffering-from-cisco-vpn-on-6/</link>
+		<comments>/index.php/itprofessionals/softwareandconfigmgmt/if-you-are-suffering-from-cisco-vpn-on-6/#comments</comments>
+		<pubDate>Thu, 11 Feb 2010 00:09:50 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Software and Configuration Management]]></category>
+		<category><![CDATA[64 bit]]></category>
+		<category><![CDATA[software]]></category>
+		<category><![CDATA[tools]]></category>
+		<category><![CDATA[vpn]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/02/if-you-are-suffering-from-cisco-vpn-on-6/</guid>
+		<description><![CDATA[By now you probably have heard or seen the complains that there is no viable 64 bit VPN client that will work with a Cisco VPN. I myself either used a Virtual Machine (Virtual Box) or I have a dual boot system where I boot into the Fisher Price looking OS to VPN into work. [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>By now you probably have heard or seen the complains that there is no viable 64 bit VPN client that will work with a Cisco VPN. I myself either used a Virtual Machine (Virtual Box) or I have a dual boot system where I boot into the Fisher Price looking OS to VPN into work.</p>
+<p>Yesterday my suffering ended. I downloaded the Shrew Soft VPN Client For Windows and it has been working great. It will even import Cisco pcf files so that you don&#8217;t need to configure the VPN client if you already have the Cisco pcf files.</p>
+<p>Download the Shrew Soft VPN client here: http://www.shrew.net/download/vpn<br />
+After it is installed start it up, click on <em>file</em> and then <em>import</em>. You should be presented with a dialog like the one in the screenshot below. Change the dropdown to Cisco PCF file and navigate to the location where your files are. Repeat the process for each PCF file you have.</p>
+<div><img src="/wp-content/uploads/blogs/ITProfessionals//Import.png" alt="" title="" width="630" height="434" /></div>
+<p>After you have imported everything you need, click on one of the connections with a blue padlock icon and after that click on connect</p>
+<div><img src="/wp-content/uploads/blogs/ITProfessionals//connect.png" alt="" title="" width="415" height="320" /></div>
+<div>
+<p>Fill in you username and password, click connect and you should see the following screen</p>
+<p><img src="/wp-content/uploads/blogs/ITProfessionals//Connected.png" alt="" title="" width="307" height="308" /></div>
+<p>If everything is successful you should see something like the following in the  text area above the credentials</p>
+<p><em>config loaded for site &#8216;connectDC.pcf&#8217;<br />
+configuring client settings&#8230;<br />
+attached to key daemon &#8230;<br />
+peer configured<br />
+iskamp proposal configured<br />
+esp proposal configured<br />
+client configured<br />
+local id configured<br />
+pre-shared key configured<br />
+bringing up tunnel &#8230;<br />
+network device configured<br />
+tunnel enabled</em></p>
+<p>If something is wrong you will see a message indicating a status in the same text area.</p>
+<p>Documentation is also available here: http://www.shrew.net/static/help-2.1.x/vpnhelp.htm</p>
+<p>The  Shrew Soft VPN client is free but if it solves a problem for you consider donating something.</p>
+<p>That is it for this post, hopefully I will save a person or two from this 64 bit VPN hell.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/softwareandconfigmgmt/if-you-are-suffering-from-cisco-vpn-on-6/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>Windows 7 Launch In New York City</title>
+		<link>/index.php/itprofessionals/ethicsit/windows-7-launch-in-new-york-city/</link>
+		<comments>/index.php/itprofessionals/ethicsit/windows-7-launch-in-new-york-city/#comments</comments>
+		<pubDate>Fri, 23 Oct 2009 01:21:08 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Ethics and IT]]></category>
+		<category><![CDATA[IT Service Management]]></category>
+		<category><![CDATA[Running My Own IT Business]]></category>
+		<category><![CDATA[Software and Configuration Management]]></category>
+		<category><![CDATA[windows 7]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/10/windows-7-launch-in-new-york-city/</guid>
+		<description><![CDATA[This post is not a review, you can find detailed reviews all over the internet, this is just about the Windows 7 launch in New York City which I attended today. If you click on the pictures you can get larger sizes. I am running Windows 7 on all my home machines since it became [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><a href="http://www.flickr.com/photos/denisgobo/4036474540/" title="Win 7 Logo by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2699/4036474540_2094c780f9_m.jpg" width="180" height="240" alt="Win 7 Logo" /></a><br />
+This post is not a review, you can find detailed reviews all over the internet, this is just about the Windows 7 launch in New York City which I attended today. If you click on the pictures you can get larger sizes.</p>
+<p>I am running Windows 7 on all my home machines since it became available from MSDN in August. I think that this is the best operating system that Microsoft created yet, you can tell that 8 million people have beta tested this puppy. When I upgraded my old <a href="http://www.flickr.com/photos/denisgobo/3090565420/">IBM T43 laptop</a> to Windows 7 I noticed immediately that it was faster than XP and also used less RAM, on my new desktop Windows 7 uses 600 MB less RAM (I have 6 Gigs) than Vista. My favorite new features in Windows 7 are Jump lists and Aero peek, I think people will really appreciate jump lists. </p>
+<p><a href="http://www.flickr.com/photos/denisgobo/4036464788/" title="Monitors by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2795/4036464788_3db9bcea03.jpg" width="500" height="375" alt="Monitors" /></a></p>
+<p>The launch even was held in Soho in a loft which was probably used as an art gallery at other times. It was interesting that this event was only for press, partners and invited guests&#8230;..this time there would be no..developers&#8230; developers&#8230; developers coming out of Steve Ballmer&#8217;s mouth <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p>Remember Kylie from that <a href="http://www.youtube.com/watch?v=ssOq02DTTMU">&#8216;cute&#8217; windows 7 commercial</a>? She was there, she introduced Steve Ballmer and he gave her a pink laptop&#8230;.very cute<br />
+<a href="http://www.flickr.com/photos/denisgobo/4036467632/" title="Ballmer Gives Laptop by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2540/4036467632_1fd5fa76c4_m.jpg" width="240" height="180" alt="Ballmer Gives Laptop" /></a></p>
+<p>Ballmer explained some of the things that happened during the creation of Windows 7.<br />
+<a href="http://www.flickr.com/photos/denisgobo/4035720493/" title="Ballmer by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2747/4035720493_9c96b970a6_m.jpg" width="240" height="180" alt="Ballmer" /></a> &nbsp;<a href="http://www.flickr.com/photos/denisgobo/4036472382/" title="Ballmer Presentation by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2460/4036472382_b78faa8f75_m.jpg" width="240" height="180" alt="Ballmer Presentation" /></a> </p>
+<p>After Ballmer was done with his presentation 7 cool things that Windows 7 can do was presented. The thing that impressed me the most is when they had video, tv and pictures on 8 different monitors from a single DELL XPS machine&#8230;.that was pretty cool. Netflix on a touchscreen looked pretty nice&#8230;.also shown was a kindle app for Windows 7.</p>
+<p>After all this they opened a partition where all the partners had their hardware setup. Some of these devices you can see in the pictures below<br />
+<a href="http://www.flickr.com/photos/denisgobo/4035729307/" title="Hardware by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2543/4035729307_02c3575b70.jpg" width="500" height="375" alt="Hardware" /></a><br />
+<br />
+<a href="http://www.flickr.com/photos/denisgobo/4035730917/" title="Ballmer Inspecting by Denis Gobo, on Flickr"><img src="http://farm4.static.flickr.com/3510/4035730917_119c175cd6.jpg" width="466" height="500" alt="Ballmer Inspecting" /></a></p>
+<p>The 3D Batman game was cool looking&#8230;initially I thought that the screen was fuzzy but then I noticed that I needed to wear the special glasses on the table; after I put the glasses on the game looked really crisp and had that 3D look and feel.<br />
+<a href="http://www.flickr.com/photos/denisgobo/4036486848/" title="Batman 3D by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2498/4036486848_66225f72df.jpg" width="500" height="375" alt="Batman 3D" /></a></p>
+<p>I spotted this Canon 7D with a 14mm 1.4 USM lens and played a little bit with it, interesting camera.<br />
+<a href="http://www.flickr.com/photos/denisgobo/4035735169/" title="Canon EOS D7 by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2702/4035735169_eefd708450.jpg" width="500" height="466" alt="Canon EOS D7" /></a></p>
+<p>This Alienware laptop was pretty nice,keys lit up, quad core but nobody would give me a price for it:-(<br />
+<a href="http://www.flickr.com/photos/denisgobo/4035737381/" title="Alienware by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2783/4035737381_1191d9197a.jpg" width="500" height="375" alt="Alienware" /></a></p>
+<p>There were 3 bars, one of them had a bunch of coffee machines and the other 2 had Champagne and Sodas<br />
+<a href="http://www.flickr.com/photos/denisgobo/4035712229/" title="Bar by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2576/4035712229_3b1c29def8_m.jpg" width="240" height="180" alt="Bar" /></a></p>
+<p>Maybe you know that twitter did a deal with Bing where Bing would get access to twitter&#8217;s firehouse so that it could do real time search, the pic below shows a real time search for Windows 7 which is refereshed every time someone tweets about Windows 7<br />
+<a href="http://www.flickr.com/photos/denisgobo/4035739081/" title="Twitter Bing Live Update by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2502/4035739081_dc847c530d.jpg" width="449" height="500" alt="Twitter Bing Live Update" /></a></p>
+<p>At the end you got a bag, inside was a puzzle, a poster, a book, a t-shirt, playing cards and Windows 7 Ultimate Signature Edition<br />
+<a href="http://www.flickr.com/photos/denisgobo/4036491118/" title="Win 7 Signature Edition by Denis Gobo, on Flickr"><img src="http://farm3.static.flickr.com/2651/4036491118_a1089b2475.jpg" width="500" height="375" alt="Win 7 Signature Edition" /></a></p>
+<p>Now Microsoft has to wait and see how well Windows 7 will do, most if not all reviews have been positive so it should be a sure thing.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/ethicsit/windows-7-launch-in-new-york-city/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Bazaar Version Control System &#8211; better than Subversion ?</title>
+		<link>/index.php/itprofessionals/softwareandconfigmgmt/bazaar-version-control-system-better-tha/</link>
+		<comments>/index.php/itprofessionals/softwareandconfigmgmt/bazaar-version-control-system-better-tha/#comments</comments>
+		<pubDate>Mon, 23 Jun 2008 08:41:25 +0000</pubDate>
+		<dc:creator><![CDATA[damber]]></dc:creator>
+				<category><![CDATA[Software and Configuration Management]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/06/bazaar-version-control-system-better-tha/</guid>
+		<description><![CDATA[Version Control? A Version Control System (VCS) is an essential tool for a development team (or even individual developer) to manage their code. The more it can allow multiple developers to work together easily on the same code and manage the various states of that code, the better. One of the most popular Version Control [&#8230;]]]></description>
+				<content:encoded><![CDATA[<h2>Version Control?</h2>
+<p>
+A Version Control System (VCS) is an essential tool for a development team (or even individual developer) to manage their code.  The more it can allow multiple developers to work together easily on the same code and manage the various states of that code, the better.
+</p>
+<p>One of the most popular Version Control systems in the past was CVS, however in recent times this has been superseded by Subversion (SVN), which is a highly popular VCS that is well supported by a variety of client tools and is often embedded within software configuration management applications to manage file versioning (e.g. <a href="http://trac.edgewall.org/">trac</a>, <a href="http://www.collab.net/">collabNet</a>, etc)</p>
+<p>
+What is sometimes an issue with SVN is the ability to do local commits for each developer before a full commit to the main branch, making the main branch often unreliable and full of partially complete work, or local developers with limited versioning control etc.
+</p>
+<h2>Bazaar</h2>
+<p>
+One VCS tool that tackles this problem is <a href="http://bazaar-vcs.org/">Bazaar</a>, which offers no less than <a href="http://bazaar-vcs.org/Workflows">7 different Version Control workflows</a> depending on your particular scenario.
+</p>
+<p>
+Bazaar is developed and used by <a href="http://canonical.com/">Canonical </a>(the Ubuntu people), and has recently <a href="http://www.theregister.co.uk/2008/06/19/mysql_dumps_bitkeeper/">claimed Sun&#8217;s MySQL as a new user</a>.  Bazaar is one of many VCS tools, but it&#8217;s flexibility in workflow patterns is certainly something that makes it an interesting tool to consider.
+</p>
+<h2>Further Info</h2>
+<ul>
+<li><a href="http://en.wikipedia.org/wiki/Revision_control">General Information on Revision Control</a></li>
+<li><a href="http://en.wikipedia.org/wiki/Comparison_of_revision_control_software">Comparison of Revision Control Systems</a></li>
+<li><a href="http://bazaar-vcs.org/Documentation">Bazaar Documentation</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/softwareandconfigmgmt/bazaar-version-control-system-better-tha/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

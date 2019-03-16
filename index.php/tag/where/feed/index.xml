@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>where &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/where/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>WHERE not to use FUNCTIONS</title>
+		<link>/index.php/datamgmt/dbprogramming/where-not-to-use-functions/</link>
+		<comments>/index.php/datamgmt/dbprogramming/where-not-to-use-functions/#respond</comments>
+		<pubDate>Thu, 24 Jan 2013 12:02:00 +0000</pubDate>
+		<dc:creator><![CDATA[Axel Achten (axel8s)]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[function]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[tsql]]></category>
+		<category><![CDATA[where]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/where-not-to-use-functions/</guid>
+		<description><![CDATA[Functions can be very powerful, but used in the wrong place in a query they can show some unexpected behavior.
+In this post I will be using the AdventureWorks2008R2 database and I will query the Sales.SalesOrderHeader to get all the 2006 OrderDates. A&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Functions can be very powerful, but used in the wrong place in a query they can show some unexpected behavior.<br />
+In this post I will be using the AdventureWorks2008R2 database and I will query the Sales.SalesOrderHeader to get all the 2006 OrderDates. A query that doesn’t make much sense but will return some interesting results.<br />
+Take the following query:</p>
+<pre>USE AdventureWorks2008R2;
+GO
+
+SELECT OrderDate FROM Sales.SalesOrderHeader
+WHERE OrderDate BETWEEN '20060101' AND '20061231';
+GO</pre>
+<p>If we take a look at the execution plan:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction1.png?mtime=1359036029"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction1.png?mtime=1359036029" width="767" height="153" /></a></div>
+<p>We see that there is a complete scan of the Clustered Index which makes sense since there is no index on the OrderDate column.<br />
+As the Missing Index Hint suggests, create an index on the OrderDate column:</p>
+<pre>CREATE INDEX IX_SalesOrderHeader_OrderDate
+	ON Sales.SalesOrderHeader(OrderDate);
+GO</pre>
+<p>Executing our first query again in another form:</p>
+<pre>SELECT OrderDate FROM Sales.SalesOrderHeader
+WHERE OrderDate &gt;= '20060101' AND OrderDate &lt;='20061231';
+GO</pre>
+<p>Results in the following Execution Plan:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction2.png?mtime=1359036029"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction2.png?mtime=1359036029" width="771" height="143" /></a></div>
+<p>You see that the query is internally translated to <code class="codespan">SELECT [OrderDate] FROM [Sales].[SalesOrderHeader] WHERE [OrderDate]&lt;=@1 AND [OrderDate]&lt;=@2&gt;</code> just like the first query using the BETWEEN keyword. The big change is in the execution plan. Since we created an index on the OrderDate column, SQL Server is now using an Index Seek on our index to fetch the results.</p>
+<p>Since we are looking for all the dates in 2006, you might want to consider using the YEAR function. The YEAR function returns only the YEAR part of a date(time) value:</p>
+<pre>SELECT YEAR('20060127 02:15:59')</pre>
+<p>Results in </p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction3.png?mtime=1359036029"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction3.png?mtime=1359036029" width="159" height="66" /></a></div>
+<p>So the following query should make sense and is more readable then the former 2:</p>
+<pre>SELECT OrderDate FROM Sales.SalesOrderHeader
+WHERE YEAR(OrderDate) = 2006;
+GO</pre>
+<p>And looking at the result set it makes sense:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction4.png?mtime=1359036029"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction4.png?mtime=1359036029" width="980" height="300" /></a></div>
+<p>But when we look at the execution plan:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction5.png?mtime=1359036029"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/WhereFunction5.png?mtime=1359036029" width="622" height="149" /></a></div>
+<p>We see that our index isn’t seeked anymore but gets a complete scan. So instead of searching in some 4K rows, SQL Server is scanning more than 30K of rows. This is because SQL Server is applying the function to all of the rows in our Sales.SalesOrderHeader table before it’s compared to our desired value.</p>
+<p><b>Conclusion</b><br />
+Be careful when using functions in the WHERE clause of a query. It’s possible that the function will be applied to all the rows before the filter is applied. Resulting in scans, non used indexes, more I/O, memory consumption and a poor performing query.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/where-not-to-use-functions/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
+		<link rel="shortcut icon" href="http://lessthandot.com/favicon.ico" type="image/vnd.microsoft.icon" />
+	<title>Less Than Dot - Blog -   Columnstore Index Basics</title>
+	<meta prefix="og: http://ogp.me/ns#" property="og:title" content="Less Than Dot - Blog -   Columnstore Index Basics" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:url" content="/index.php/datamgmt/dbadmin/columnstore-index-basics/" />
+		<meta prefix="og: http://ogp.me/ns#" property="og:image" content="http://lessthandot.com/images/logo_prod.png" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:site_name" content="LessThanDot" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:description" content="Columnstore Indexes are among one of the most talked about additions in SQL Server 2012.  These indexes, used properly, can have an extremely high level of impact to performance and lowering overall IO and execution time of querying data that returns a&hellip;" />
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0" href="/index.php/feed/" />
+	<link rel="alternate" type="application/atom+xml" title="Atom" href="/index.php/feed/atom/" />
+
+	<!-- this page is the canonical URL -->	
+	<link rel="stylesheet" href="/wp-content/themes/lessthandot2009/style.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsite.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsiteprint.css" media="print" type="text/css" />
+
+	<link rel='dns-prefetch' href='//ajax.googleapis.com' />
+<link rel='dns-prefetch' href='//s.w.org' />
+<link rel="alternate" type="application/rss+xml" title="LessthanDot &raquo; Columnstore Index Basics Comments Feed" href="/index.php/datamgmt/dbadmin/columnstore-index-basics/feed/" />
+		<script type="text/javascript">
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/svg\/","svgExt":".svg","source":{"concatemoji":"\/wp-includes\/js\/wp-emoji-release.min.js?ver=4.6.1"}};
+			!function(a,b,c){function d(a){var c,d,e,f,g,h=b.createElement("canvas"),i=h.getContext&&h.getContext("2d"),j=String.fromCharCode;if(!i||!i.fillText)return!1;switch(i.textBaseline="top",i.font="600 32px Arial",a){case"flag":return i.fillText(j(55356,56806,55356,56826),0,0),!(h.toDataURL().length<3e3)&&(i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,65039,8205,55356,57096),0,0),c=h.toDataURL(),i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,55356,57096),0,0),d=h.toDataURL(),c!==d);case"diversity":return i.fillText(j(55356,57221),0,0),e=i.getImageData(16,16,1,1).data,f=e[0]+","+e[1]+","+e[2]+","+e[3],i.fillText(j(55356,57221,55356,57343),0,0),e=i.getImageData(16,16,1,1).data,g=e[0]+","+e[1]+","+e[2]+","+e[3],f!==g;case"simple":return i.fillText(j(55357,56835),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode8":return i.fillText(j(55356,57135),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode9":return i.fillText(j(55358,56631),0,0),0!==i.getImageData(16,16,1,1).data[0]}return!1}function e(a){var c=b.createElement("script");c.src=a,c.type="text/javascript",b.getElementsByTagName("head")[0].appendChild(c)}var f,g,h,i;for(i=Array("simple","flag","unicode8","diversity","unicode9"),c.supports={everything:!0,everythingExceptFlag:!0},h=0;h<i.length;h++)c.supports[i[h]]=d(i[h]),c.supports.everything=c.supports.everything&&c.supports[i[h]],"flag"!==i[h]&&(c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&c.supports[i[h]]);c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&!c.supports.flag,c.DOMReady=!1,c.readyCallback=function(){c.DOMReady=!0},c.supports.everything||(g=function(){c.readyCallback()},b.addEventListener?(b.addEventListener("DOMContentLoaded",g,!1),a.addEventListener("load",g,!1)):(a.attachEvent("onload",g),b.attachEvent("onreadystatechange",function(){"complete"===b.readyState&&c.readyCallback()})),f=c.source||{},f.concatemoji?e(f.concatemoji):f.wpemoji&&f.twemoji&&(e(f.twemoji),e(f.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+<link rel='stylesheet' id='bwp-syntax-css'  href='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/css/bwp-syntax-global.css?ver=4.6.1' type='text/css' media='all' />
+<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js?ver=1.12.4'></script>
+<script type='text/javascript' src='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/js/bwp-syntax.js?ver=4.6.1'></script>
+<link rel='https://api.w.org/' href='/wp-json/' />
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="/wp-includes/wlwmanifest.xml" /> 
+<link rel='prev' title='Will I See You At SQL Saturday #118 Wisconsin?' href='/index.php/itprofessionals/professionaldevelopment/will-i-see-you-at/' />
+<link rel='next' title='Would you be interested in an information section for SQLCop?' href='/index.php/datamgmt/datadesign/would-you-be-interested-in/' />
+<meta name="generator" content="WordPress 4.6.1" />
+<link rel="canonical" href="/index.php/datamgmt/dbadmin/columnstore-index-basics/" />
+<link rel='shortlink' href='/?p=1590' />
+<link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdbadmin%2Fcolumnstore-index-basics%2F" />
+<link rel="alternate" type="text/xml+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdbadmin%2Fcolumnstore-index-basics%2F&#038;format=xml" />
+<style type='text/css'>.rp4wp-related-posts ul{width:100%;padding:0;margin:0;float:left;}
+.rp4wp-related-posts ul>li{list-style:none;padding:0;margin:0;padding-bottom:20px;clear:both;}
+.rp4wp-related-posts ul>li>p{margin:0;padding:0;}
+.rp4wp-related-post-image{width:35%;padding-right:25px;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;float:left;}</style>
+	<script src="http://lessthandot.com/includes/allsite.js" type="text/javascript" ></script>
+</head>
+<body>
+<div id="contain"><div id="subcontain"><div id="ttl"><div id="hdr"><div id="snav"><a href="http://lessthandot.com/login.php?backtrack=/index.php/datamgmt/dbadmin/columnstore-index-basics/?">Member Login</a>
+</div><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="logoc"><img src="http://lessthandot.com/images/logo_prod.png" alt="LessThanDot Site Logo" border="0" /></a><h1>LessThanDot</h1><div class="pgsttl">A decade of helpful technical content</div></div><div id="nav">
+<ul>
+<li><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="h" ><span>Launchpad</span></a></li>
+<li class="cur"><a href="/" title="LessThanDot Blogs" id="b" ><span>Blogs</span></a></li>
+<li><a href="http://forum.lessthandot.com/" title="LessThanDot Community Forums" id="f" ><span>Forum</span></a></li>
+<li><a href="http://wiki.lessthandot.com/" title="LessThanDot Wiki Articles" id="w" ><span>Wiki</span></a></li>
+<li><a href="http://sqlcop.lessthandot.com/" title="LessThanDot SQLCop" id="a" ><span>SQLCop</span></a></li>
+<li><a href="http://lessthandot.com/account.php" title="Your Account Settings" id="r"  class="l_ie"><span>My Account</span></a></li></ul></div>
+</div><div id="content">
+<div id="fac"><div id="fa">
+		<p>Less Than Dot is a community of passionate IT professionals and enthusiasts dedicated to sharing technical knowledge, experience, and assistance. Inside you will find reference materials, interesting technical discussions, and expert tips and commentary.</p></div></div><div class="content-sidebar">
+	<div id="social" class="sdsec">
+		<h2>LTD Social Sitings</h2>
+		<div>
+		<a id="social_twitter" href="http://twitter.com/LessThanDot/" title="Follow us on Twitter" ><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Lessthandot twitter"/></a> 
+		<a href="http://www.linkedin.com/groups?home=&amp;gid=113440" title="Join us on LinkedIn" ><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="Lessthandot Linkedin" /></a> 
+		<a href="http://www.facebook.com/group.php?gid=19330511063" title="Join us on Facebook" ><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Lessthandot facebook"/></a> 
+		<a href="http://lessthandot.com/rss.php" title="LessThanDot News Feed" ><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="Lessthandot rss"/></a> 
+		</div>
+		<p><em>Note: Watch for social icons on posts by your favorite authors to follow their postings on these and other social sites.</em></p>
+	</div><div class="content-sidebar-section">
+<h2>Tag cloud</h2>
+	<p class="tag-cloud">
+		<a href='/index.php/tag/net/' class='tag-link-245 tag-link-position-1' title='21 topics' style='font-size: 8.9565217391304pt;'>.net</a> <a href='/index.php/tag/asp-net/' class='tag-link-168 tag-link-position-2' title='21 topics' style='font-size: 8.9565217391304pt;'>asp.net</a> <a href='/index.php/tag/azure-2/' class='tag-link-321 tag-link-position-3' title='29 topics' style='font-size: 10.173913043478pt;'>azure</a> <a href='/index.php/tag/book/' class='tag-link-130 tag-link-position-4' title='26 topics' style='font-size: 9.7391304347826pt;'>book</a> <a href='/index.php/tag/business-intelligence-2/' class='tag-link-256 tag-link-position-5' title='30 topics' style='font-size: 10.260869565217pt;'>business intelligence</a> <a href='/index.php/tag/c/' class='tag-link-138 tag-link-position-6' title='40 topics' style='font-size: 11.304347826087pt;'>c#</a> <a href='/index.php/tag/database/' class='tag-link-134 tag-link-position-7' title='31 topics' style='font-size: 10.434782608696pt;'>database</a> <a href='/index.php/tag/excel/' class='tag-link-155 tag-link-position-8' title='16 topics' style='font-size: 8pt;'>excel</a> <a href='/index.php/tag/gotcha/' class='tag-link-240 tag-link-position-9' title='19 topics' style='font-size: 8.6086956521739pt;'>gotcha</a> <a href='/index.php/tag/how-to/' class='tag-link-272 tag-link-position-10' title='44 topics' style='font-size: 11.652173913043pt;'>how to</a> <a href='/index.php/tag/mongodb/' class='tag-link-765 tag-link-position-11' title='17 topics' style='font-size: 8.2608695652174pt;'>mongodb</a> <a href='/index.php/tag/nosql/' class='tag-link-775 tag-link-position-12' title='18 topics' style='font-size: 8.4347826086957pt;'>nosql</a> <a href='/index.php/tag/performance/' class='tag-link-179 tag-link-position-13' title='26 topics' style='font-size: 9.7391304347826pt;'>performance</a> <a href='/index.php/tag/security-2/' class='tag-link-398 tag-link-position-14' title='25 topics' style='font-size: 9.5652173913043pt;'>security</a> <a href='/index.php/tag/sql/' class='tag-link-132 tag-link-position-15' title='42 topics' style='font-size: 11.478260869565pt;'>sql</a> <a href='/index.php/tag/sql-advent-2012/' class='tag-link-1416 tag-link-position-16' title='18 topics' style='font-size: 8.4347826086957pt;'>sql advent 2012</a> <a href='/index.php/tag/sql-friday/' class='tag-link-377 tag-link-position-17' title='18 topics' style='font-size: 8.4347826086957pt;'>sql friday</a> <a href='/index.php/tag/sql-server/' class='tag-link-154 tag-link-position-18' title='145 topics' style='font-size: 16.086956521739pt;'>sql server</a> <a href='/index.php/tag/sql-server-2000/' class='tag-link-366 tag-link-position-19' title='45 topics' style='font-size: 11.739130434783pt;'>sql server 2000</a> <a href='/index.php/tag/sql-server-2005/' class='tag-link-327 tag-link-position-20' title='118 topics' style='font-size: 15.391304347826pt;'>sql server 2005</a> <a href='/index.php/tag/sql-server-2008/' class='tag-link-152 tag-link-position-21' title='237 topics' style='font-size: 18pt;'>sql server 2008</a> <a href='/index.php/tag/sql-server-2008-r2/' class='tag-link-548 tag-link-position-22' title='38 topics' style='font-size: 11.130434782609pt;'>sql server 2008 r2</a> <a href='/index.php/tag/sql-server-2012/' class='tag-link-1161 tag-link-position-23' title='76 topics' style='font-size: 13.739130434783pt;'>sql server 2012</a> <a href='/index.php/tag/ssis-2/' class='tag-link-501 tag-link-position-24' title='52 topics' style='font-size: 12.260869565217pt;'>ssis</a> <a href='/index.php/tag/ssms/' class='tag-link-640 tag-link-position-25' title='18 topics' style='font-size: 8.4347826086957pt;'>ssms</a> <a href='/index.php/tag/ssrs-2/' class='tag-link-557 tag-link-position-26' title='27 topics' style='font-size: 9.9130434782609pt;'>ssrs</a> <a href='/index.php/tag/syndicated/' class='tag-link-1407 tag-link-position-27' title='67 topics' style='font-size: 13.217391304348pt;'>syndicated</a> <a href='/index.php/tag/t-sql/' class='tag-link-185 tag-link-position-28' title='26 topics' style='font-size: 9.7391304347826pt;'>t-sql</a> <a href='/index.php/tag/tip/' class='tag-link-194 tag-link-position-29' title='46 topics' style='font-size: 11.826086956522pt;'>tip</a> <a href='/index.php/tag/unit-testing/' class='tag-link-162 tag-link-position-30' title='17 topics' style='font-size: 8.2608695652174pt;'>unit testing</a>	</p>
+</div>		<div class="content-sidebar-section">
+		<h2>Authors</h2>
+			<ul class="author-list dimmed">
+				<li><a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis">SQLDenis</a> <a href="/index.php/author/SQLDenis/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (597)</li><li><a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)">Ted Krueger (onpnt)</a> <a href="/index.php/author/onpnt/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (355)</li><li><a href="/index.php/author/grrlgeek/" title="Posts by Jes Borland">Jes Borland</a> <a href="/index.php/author/grrlgeek/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (202)</li><li><a href="/index.php/author/tarwn/" title="Posts by Eli Weinstock-Herman (tarwn)">Eli Weinstock-Herman (tarwn)</a> <a href="/index.php/author/tarwn/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (190)</li><li><a href="/index.php/author/koenverbeeck/" title="Posts by Koen Verbeeck">Koen Verbeeck</a> <a href="/index.php/author/koenverbeeck/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (100)</li><li><a href="/index.php/author/alexcuse/" title="Posts by Alex Ullrich">Alex Ullrich</a> <a href="/index.php/author/alexcuse/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (55)</li><li><a href="/index.php/author/gmmastros/" title="Posts by George Mastros (gmmastros)">George Mastros (gmmastros)</a> <a href="/index.php/author/gmmastros/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (45)</li><li><a href="/index.php/author/axel8s/" title="Posts by Axel Achten (axel8s)">Axel Achten (axel8s)</a> <a href="/index.php/author/axel8s/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (28)</li><li><a href="/index.php/author/naomi/" title="Posts by Naomi Nosonovsky">Naomi Nosonovsky</a> <a href="/index.php/author/naomi/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (27)</li><li><a href="/index.php/author/thirster42/" title="Posts by David Forck (thirster42)">David Forck (thirster42)</a> <a href="/index.php/author/thirster42/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (24)</li><li><a href="/index.php/author/chopstik/" title="Posts by chopstik">chopstik</a> <a href="/index.php/author/chopstik/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (20)</li><li><a href="/index.php/author/kconan/" title="Posts by Kevin Conan">Kevin Conan</a> <a href="/index.php/author/kconan/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (18)</li><li><a href="/index.php/author/robearl/" title="Posts by Rob Earl">Rob Earl</a> <a href="/index.php/author/robearl/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (14)</li><li><a href="/index.php/author/thatrickguy/" title="Posts by ThatRickGuy">ThatRickGuy</a> <a href="/index.php/author/thatrickguy/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (12)</li><li><a href="/index.php/author/sqlarcher/" title="Posts by SQLArcher">SQLArcher</a> <a href="/index.php/author/sqlarcher/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (11)</li>                <li><a href="http://lessthandot.com/Stats/BlogAuthors.php">More...</a></li>
+			</ul>
+		</div>
+				<div class="content-sidebar-section">
+		<h2>Categories</h2>
+			<ul class="categories-list">
+					<li class="cat-item cat-item-10"><a href="/index.php/category/all/" >All Blogs</a>
+</li>
+	<li class="cat-item cat-item-5"><a href="/index.php/category/architect/" >Architecture, Design and Strategy</a>
+</li>
+	<li class="cat-item cat-item-1759"><a href="/index.php/category/artificial-intelligence/" >Artificial Intelligence</a>
+</li>
+	<li class="cat-item cat-item-6"><a href="/index.php/category/datamgmt/" >Data Management</a>
+</li>
+	<li class="cat-item cat-item-7"><a href="/index.php/category/desktopdev/" >Desktop Developer</a>
+</li>
+	<li class="cat-item cat-item-8"><a href="/index.php/category/enterprisedev/" >Enterprise Developer</a>
+</li>
+	<li class="cat-item cat-item-11"><a href="/index.php/category/itprofessionals/" >IT Professionals</a>
+</li>
+	<li class="cat-item cat-item-12"><a href="/index.php/category/itstudents/" >IT Students and Researchers</a>
+</li>
+	<li class="cat-item cat-item-1743"><a href="/index.php/category/management/" >Management</a>
+</li>
+	<li class="cat-item cat-item-9"><a href="/index.php/category/sysadmins/" >System Admins</a>
+</li>
+	<li class="cat-item cat-item-1"><a href="/index.php/category/uncategorized/" >Uncategorized</a>
+</li>
+	<li class="cat-item cat-item-4"><a href="/index.php/category/webdev/" >Web Developer</a>
+</li>
+			</ul>
+		</div>
+		</div><div class="content-main">
+				<div class="post-navigation">
+				<div class="post-navigation-forward"><a href="/index.php/datamgmt/datadesign/would-you-be-interested-in/" rel="next">Would you be interested in an information section for SQLCop?</a> &raquo; </div>
+				<div class="post-navigation-back">&laquo; <a href="/index.php/itprofessionals/professionaldevelopment/will-i-see-you-at/" rel="prev">Will I See You At SQL Saturday #118 Wisconsin?</a></div>
+			</div>
+			<div class="post-area instapaper_body">
+				<div class="post-title-line">
+										<h1 class="instapaper_ignore"><a href="/index.php/datamgmt/dbadmin/columnstore-index-basics/" class="post-title">Columnstore Index Basics</a></h1>
+					<div class="post-byline">by <a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)" rel="author">Ted Krueger (onpnt)</a> on April 9, 2012 in category <a href="/index.php/category/datamgmt/dbadmin/" rel="category tag">Database Administration</a> <a href="/index.php/category/datamgmt/dbprogramming/mssqlserver/" rel="category tag">Microsoft SQL Server</a>. Article views: 15,760 </div>
+				</div>
+				<div class="post-tagline"><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/dbadmin/columnstore-index-basics/&text=RT @LessThanDot Blog - Columnstore Index Basics by @onpnt" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/dbadmin/columnstore-index-basics/&title=Columnstore Index Basics&source=/index.php/datamgmt/dbadmin/columnstore-index-basics/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/dbadmin/columnstore-index-basics/&title=Columnstore Index Basics" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/dbadmin/columnstore-index-basics/&quote=Columnstore Index Basics" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/dbadmin/columnstore-index-basics/&title=Columnstore Index Basics" class="instapaper_button">Instapaper</a></div>
+
+				<div class="post-content"><p><a href="http://msdn.microsoft.com/en-us/library/gg492088.aspx">Columnstore Indexes</a> are among one of the most talked about additions in SQL Server 2012.  These indexes, used properly, can have an extremely high level of impact to performance and lowering overall IO and execution time of querying data that returns a high volume result set.   The only thing columnstore indexes have in common with clustered and nonclustered indexes is the use of the term “<em>index</em>” in the name.  This article will try to give you a look into columnstore indexing from a perspective of a DBA or Developer that is familiar with traditional indexing to tune execution plan.</p>
+<p><strong>Storage Visualization</strong></p>
+<p>Clustered and Nonclustered indexes are stored based on rows on a page or RowStore.  Columnstore indexes store data a bit differently.  As the name insinuates, data is stored by each column or ColumnStore.  This can be visualized in its simplest form below</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-123.png?mtime=1333986143"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-123.png?mtime=1333986143" width="320" height="229" /></a></div>
+</p>
+<p>Reading data from this storage model is extremely fast comparable to row based models.  However, that level of performance revolves around a mostly read environment like a data warehouse.  Storage itself is enhanced by additional capabilities the columnstore index model has with compression of data. With warehouse situations and fact tables, data is commonly <em>not</em> unique and this also adds an extremely enhanced ability for compression.</p>
+<p>Why is all of this important when it comes to performance?  Well, Columnstore index technology is built on xVelocity in-memory analytics services, once known as Vertipaq.  <a href="http://www.sqlbi.com/articles/optimizing-high-cardinality-columns-in-vertipaq/">Vertipaq</a> is what made <a href="http://msdn.microsoft.com/en-us/library/ee210644.aspx">PowerPivot</a> have the ability to throw out millions of rows of data in seconds to users.  xVelocity is an internal engine of its own, most commonly known in the SQL Server Analysis Services and the PowerPivot for Excel worlds, but extended to refer to columnstore index usage in SQL Server 2012.  The capabilities that we, as SQL Server enthusiasts, have proved that lightning fast data retrieval can be slated as one of the largest advancements we’ve seen in data retrieval speed in past years.</p>
+<p>Everything so far the columnstore index has to offer has referred to OLAP systems or data warehousing.  Although OLAP will see the most value in columnstore indexing, OLTP systems can retain value in this indexing.  With a highly transactional database, work tables or tables that have data that rapidly changes by increasing, removals and updating, will not be a candidate for a columnstore index.  However, most, if not all, OLTP databases implement some internal historical table structure as a means of internal archiving, with methods to limit the number of rows in the highly transactional work tables.  The historic tables may still show promise in utilizing columnstore indexing.  There are some limitations that need to be considered when going this direction with OLTP though.  The primary limitation: a table with a columnstore index cannot have data changed unless the columnstore index is disabled or partitioning method is implemented.  Later, we will show a method to work around that.</p>
+<p>A few other limitations in this release of the columnstore index are data type limitations.  Binary, varbinary, ntext, text, image, varchar(max), nvarchar(max), uniqueidentifier, timestamp or rowversion, sql_variant, decimal, datetimeoffset, CLR types and XML, cannot be used.  This restriction isn’t a new restriction in indexing.  Indexing these types of data types even in clustered and nonclustered indexing has its downfalls.</p>
+<p>Before moving into showing how to work with a columnstore index, creating columnstore indexes on a table should typically contain all the columns in the table that meet the requirements of a columnstore index.  This can be hard to get a handle on when it comes to traditional and OLTP based DBAs.  Creating an index that contains all the columns in a table has not been the most optimal strategy in the past.  Columnstore indexing is a different type of index and based on an entirely different internal engine, xVelocity, so in terms of the columnstore index, it is best to include all the columns.   The concept of this index in bed with xVelocity also prevents the traditional index maintenance and review processes you may be used to from being performed on it.  In almost every scenario while working on a SQL Server 2005 or higher instance, a DBA would turn to dm_db_index_physical_stats and several other DMVs to provide us the ability to make proactive maintenance and reviews of index objects.  Columnstore indexes have a different path and at this point, not much metadata is revealed but again, the same maintenance methods don’t apply either.  For a great in-depth look at the metadata and even more demonstrations of digging into the columnstore index, read Joe Sack’s blog, “<a href="http://www.sqlskills.com/blogs/joe/post/Exploring-Columnstore-Index-Metadata-Segment-Distribution-and-Elimination-Behaviors.aspx">Exploring Columnstore Index Metadata, Segment Distribution and Elimination Behaviors</a>”.</p>
+<p>To show how a columnstore index can improve overall performance for querying a table in a data warehouse, download the AdventureWorksDW2012 data file and attach it to a SQL Server 2012 instance.  The AdventureWorksDW2012 data file can be found on <a href="http://msftdbprodsamples.codeplex.com/releases/view/55330">this download page</a>.</p>
+<p>When attaching the data file, ensure the log file that is generated automatically in the attach database wizard, is removed.</p>
+<p>The demonstrations will work off the table, FactInternetSales and two columns, TotalProductCost and SalesAmount.</p>
+<p>Run the following query before adding any indexes other than what was in place in the database when attached.</p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> <span class="kw1">STATISTICS</span> IO <span class="kw1">ON</span>
+<span class="kw1">SELECT</span> TotalProductCost, SalesAmount <span class="kw1">FROM</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>FactInternetSales<span class="br0">&#93;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET STATISTICS IO ON
+SELECT TotalProductCost, SalesAmount FROM [dbo].[FactInternetSales]</pre></div></div>
+
+</p>
+<p> </p>
+<p>Review the execution plan and the IO statistics generated from the query.</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-124.png?mtime=1333986143"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-124.png?mtime=1333986143" width="574" height="118" /></a></div>
+</p>
+<p><em>(60398 row(s) affected)</em></p>
+<p><em>Table &#8216;FactInternetSales&#8217;. Scan count 1, logical reads 2062, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.</em></p>
+<p> </p>
+<p>The IO that was generated from the query is extensive on logical reads.  This in most situations will cause the query to not only run slower, but also cause IO and CPU resources to be used less efficiently.</p>
+<p> </p>
+<p>After reviewing this query plan, in most cases a nonclustered index would be used to decrease the overall IO that is required by the query.  For example, execute the create index below.</p>
+<p> </p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> IDX_PRODCOST_SALESAMT <span class="kw1">ON</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>FactInternetSales<span class="br0">&#93;</span> <span class="br0">&#40;</span>TotalProductCost,SalesAmount<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX IDX_PRODCOST_SALESAMT ON [dbo].[FactInternetSales] (TotalProductCost,SalesAmount)</pre></div></div>
+
+</p>
+<p> </p>
+<p>Then, execute the query to retrieve TotalProductCost and SalesAmount again and review the new execution plan and IO that was generated.</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-125.png?mtime=1333986143"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-125.png?mtime=1333986143" width="566" height="125" /></a></div>
+</p>
+<p><em>(60398 row(s) affected)</em></p>
+<p><em>Table &#8216;FactInternetSales&#8217;. Scan count 1, logical reads 311, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.</em></p>
+<p> </p>
+<p>The execution plan shows the new nonclustered index being utilized and the IO also shows a significant decrease in logical reads.  This is a major improvement over the original execution plan and index use of the clustered index.  A columnstore index can improve this even more.</p>
+<p> </p>
+<p>Prepare the table for a columnstore index by dropping the nonclustered index created earlier.</p>
+<p> </p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">INDEX</span> <span class="br0">&#91;</span>FactInternetSales<span class="br0">&#93;</span>.<span class="me1">IDX_PRODCOST_SALESAMT</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP INDEX [FactInternetSales].IDX_PRODCOST_SALESAMT</pre></div></div>
+
+</p>
+<p> </p>
+<p>The create columnstore index statement is similar to creating a clustered or nonclustered index.  All columnstore indexes are created as nonclustered indexes and use the keyword, COLUMNSTORE in the statement.</p>
+<p> </p>
+<p>Create a columnstore index on the FactInternetSales table by using the statement below.</p>
+<p> </p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> COLUMNST<span class="sy0">OR</span>E <span class="kw1">INDEX</span> IDX_COLST<span class="sy0">OR</span>E_PRODCOST_SALESAMT <span class="kw1">ON</span> <span class="br0">&#91;</span>FactInternetSales<span class="br0">&#93;</span> <span class="br0">&#40;</span>TotalProductCost,SalesAmount<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED COLUMNSTORE INDEX IDX_COLSTORE_PRODCOST_SALESAMT ON [FactInternetSales] (TotalProductCost,SalesAmount)</pre></div></div>
+
+</p>
+<p> </p>
+<p>After the columnstore index is created, execute the same query used earlier and review the new execution plan generated.</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-126.png?mtime=1333986143"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-126.png?mtime=1333986143" width="570" height="131" /></a></div>
+</p>
+<p>The columnstore index is now used.  Review the IO statistics.</p>
+<p> </p>
+<p><em>(60398 row(s) affected)</em></p>
+<p><em>Table &#8216;FactInternetSales&#8217;. Scan count 1, logical reads 21, physical reads 2, read-ahead reads 4, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.</em></p>
+<p> </p>
+<p>The logical reads have been lowered from 2062 to 21 with this new execution plan and use of the columnstore index.  This has shown an even larger positive impact to the performance of this query by implementing a columnstore index.</p>
+<p> </p>
+<p>The overall time of execution in milliseconds can be seen with each index being used below.  Overall, the columnstore index has proven to be more efficient for this type of query and with data that is designated for reading only requirements.</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-127.png?mtime=1333986143"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-127.png?mtime=1333986143" width="485" height="295" /></a></div>
+</p>
+<p> </p>
+<p><strong>Updating Tables with Columnstore Indexes on them</strong></p>
+<p>There is one aspect to using a columnstore index that can be undesirable.  A table that has a columnstore index on it cannot have any data altered in it.  This includes UPDATE, INSERT or DELETE.</p>
+<p>Partitioning and either disabling or removing the columnstore index can be performed to work around this.  Disabling a columnstore index can be a quick way when quick fixes are needed.  When disabling an index, the only way to enable the index again for the optimizer to consider it in an execution plan, is to rebuild it.  Rebuild operations on an index of substantial size can take some time and cause some delays in normal data retrieval while the rebuild is executing.    On smaller to mid-size tables, it is a good method to look into.</p>
+<p>For example, a situation may arise after a data warehouse processing task that has caused some calculations to be incorrect.   Often, in situations where a calculation is incorrect and the correct value has been found, an update is the quickest method to resolving the incorrect data so the business can continue to use the data effectively.  With a columnstore index on the table, the update cannot be performed until the index is disabled.  In the following demonstration, all the SalesAmount data with a SalesTerritoryKey of 6 requires an increase of 23%.  Leave the columnstore index on the table and execute the update statement below.</p>
+<p> </p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>FactInternetSales<span class="br0">&#93;</span>
+<span class="kw1">SET</span> SalesAmount <span class="sy0">=</span> SalesAmount <span class="sy0">*</span> .23
+<span class="kw1">WHERE</span> SalesTerritoryKey <span class="sy0">=</span> <span class="nu0">6</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE [dbo].[FactInternetSales]
+SET SalesAmount = SalesAmount * .23
+WHERE SalesTerritoryKey = 6</pre></div></div>
+
+</p>
+<p> </p>
+<p>The following error will be generated from the update and no data will be changed.</p>
+<p><span class="MT_red">Msg 35330, Level 15, State 1, Line 1<br />
+UPDATE statement failed because data cannot be updated in a table with a columnstore index. Consider disabling the columnstore index before issuing the UPDATE statement, then rebuilding the columnstore index after UPDATE is complete</span>.</p>
+<p> </p>
+<p>To achieve the update statement, use the ALTER INDEX statement to disable the index.</p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> IDX_COLST<span class="sy0">OR</span>E_PRODCOST_SALESAMT <span class="kw1">ON</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>FactInternetSales<span class="br0">&#93;</span> DISABLE</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX IDX_COLSTORE_PRODCOST_SALESAMT ON [dbo].[FactInternetSales] DISABLE</pre></div></div>
+
+</p>
+<p> </p>
+<p>Execute the update statement again and the update will succeed in updating the data for SalesTerritoryKey 6.</p>
+<p> </p>
+<p>In order to get the columnstore index enabled and available for the optimizer to utilize, the index needs to be rebuilt by using the ALTER INDEX command again with the REBUILD option this time.</p>
+<p> </p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> IDX_COLST<span class="sy0">OR</span>E_PRODCOST_SALESAMT <span class="kw1">ON</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>FactInternetSales<span class="br0">&#93;</span> REBUILD</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX IDX_COLSTORE_PRODCOST_SALESAMT ON [dbo].[FactInternetSales] REBUILD</pre></div></div>
+
+</p>
+<p> </p>
+<p> </p>
+<p> </p>
+<p><strong>Batch vs. Row Execution</strong></p>
+<p><strong> </strong></p>
+<p>With OLTP based systems, parallelism can be a handicap.  I want to emphasis the word, “can” in that statement.  It is commonly thought that if you see parallelism in your execution plan, you should work to remove it.  Before we talk about this on an OLAP based system, which should never be a written rule.  Each case of parallelism should be tested for overall performance.  Parallelism can be a good thing and improve some queries.  There is a good reason it is generated in some execution plans and that reason is, overall better performance.  With OLTP, it needs to be considered as something that you need to verify it should not be removed by testing the execution plan generated for optimal performance.</p>
+<p> </p>
+<p>With OLAP, parallelism is a friend.  Typically, in an OLAP based system, you are generating an extremely large result from queries being run on SQL Server. These types of queries can be enhanced a great deal by parallelism in the execution plans.  Essentially, batch processing at a CPU level occurs.  The term batch in this case means, slicing a total amount of work into multiple amounts of work that still equal the total amount of work.  This set of smaller amounts of work are then set to a processing resource and then run in parallel.  When considering working with a large amount work to retrieve data, you can start to see the impact can be significant on helping the overall task complete faster.</p>
+<p> </p>
+<p>The columnstore usage can benefit from parallelism the same way a simple select with other indexes can when retrieving a large amount of data.  Recall that this entire scenario works from an OLAP based system.  This typically means working with extremely large tables.  However, in some situations, tables may not be as large and the optimizer will decide parallelism is not the best method in an execution plan over a simple execution plan that can truly only needs the utilization of one processing resource.  In the AdventureWorksDW2012 database, the tables will most likely all generate execution plans that will not use parallelism due to the size of the tables.  To fully show the differences in a columnstore index being used with both row execution mode and batch execution mode, a second table can be created and loaded with duplicate data.</p>
+<p> </p>
+<p>Use the same FactInternetSales table that was used earlier.  The SELECT INTO statement and GO n can be used to accomplish this quickly.</p>
+<p> </p>
+<p>
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">INTO</span> <span class="br0">&#91;</span>FactInternetSales_VLT<span class="br0">&#93;</span> <span class="kw1">FROM</span> <span class="br0">&#91;</span>FactInternetSales<span class="br0">&#93;</span>
+GO
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> <span class="br0">&#91;</span>FactInternetSales_VLT<span class="br0">&#93;</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> <span class="br0">&#91;</span>FactInternetSales_VLT<span class="br0">&#93;</span>
+GO <span class="nu0">10</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * INTO [FactInternetSales_VLT] FROM [FactInternetSales]
+GO
+INSERT INTO [FactInternetSales_VLT]
+SELECT * FROM [FactInternetSales_VLT]
+GO 10</pre></div></div>
+
+</p>
+<p> </p>
+<p>The GO <em>n </em>will execute the statement in a loop with a subscript value based on the number specified after the GO.  If you ran GO 4 on a table that had 60398 rows, like the FactInternetSales table, you would essentially be calculating ((((60398 * 2) * 2) * 2) * 2).</p>
+<p> </p>
+<p>For each step, the table would multiply itself by 2.</p>
+<p> </p>
+<p>60398 * 2 = 120796</p>
+<p>120796 * 2 = 241592</p>
+<p>241592 * 2 = 483184</p>
+<p>483184 * 2 = 966368</p>
+<p>… And so on</p>
+<p>To show a more substantial amount of work in the execution plan with parallelism, the following query can be used.</p>
+<p> </p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> SalesTerritoryKey, <span class="kw2">SUM</span><span class="br0">&#40;</span>TotalProductCost<span class="br0">&#41;</span>, <span class="kw2">SUM</span><span class="br0">&#40;</span>SalesAmount<span class="br0">&#41;</span> <span class="kw1">FROM</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>FactInternetSales_VLT<span class="br0">&#93;</span> &nbsp;
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> SalesTerritoryKey
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> SalesTerritoryKey</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT SalesTerritoryKey, SUM(TotalProductCost), SUM(SalesAmount) FROM [dbo].[FactInternetSales_VLT]  
+GROUP BY SalesTerritoryKey
+ORDER BY SalesTerritoryKey</pre></div></div>
+
+</p>
+<p> </p>
+<p>This query generates the execution plan shown below</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-128.png?mtime=1333986143"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-128.png?mtime=1333986143" width="624" height="86" /></a></div>
+</p>
+<p> </p>
+<p>The statistics IO that was generated from this query</p>
+</p>
+<p><em>Table &#8216;Worktable&#8217;. Scan count 0, logical reads 0, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.</em></p>
+<p><em>Table &#8216;FactInternetSales_VLT&#8217;. Scan count 5, logical reads 131348, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.</em></p>
+<p> </p>
+<p>The execution plan and the results are of course not optimal.  The Table Scan operation in almost all instances will cause an extreme decrease in performance.  As with our previous demonstration showing both a nonclustered index and a columnstore index, a nonclustered index on SalesTerritoryKey, TotalProductCost and SalesAmount would help this plan by implementing an Index Scan over the Table Scan.  However, a columnstore index would benefit this plan even more as long as an execution mode of batch was utilized.</p>
+<p> </p>
+<p>Create a columnstore index that contains all three columns used in the query.</p>
+<p> </p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> COLUMNST<span class="sy0">OR</span>E <span class="kw1">INDEX</span> IDX_COLST<span class="sy0">OR</span>E_PRODCOST_SALESAMT <span class="kw1">ON</span> <span class="br0">&#91;</span>FactInternetSales_VLT<span class="br0">&#93;</span> <span class="br0">&#40;</span>SalesTerritoryKey,TotalProductCost,SalesAmount<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED COLUMNSTORE INDEX IDX_COLSTORE_PRODCOST_SALESAMT ON [FactInternetSales_VLT] (SalesTerritoryKey,TotalProductCost,SalesAmount)</pre></div></div>
+
+</p>
+<p> </p>
+<p>Execute the same query again and review the execution plan that was generated and statistics IO.</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-129.png?mtime=1333986143"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-129.png?mtime=1333986143" width="624" height="76" /></a></div>
+</p>
+<p> </p>
+<p><em>Table &#8216;FactInternetSales_VLT&#8217;. Scan count 4, logical reads 116, physical reads 10, read-ahead reads 33, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.</em></p>
+<p><em>Table &#8216;Worktable&#8217;. Scan count 0, logical reads 0, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.</em></p>
+<p> </p>
+<p>These results are much more favorable due two primary aspects of the execution plan and the actual scan on the columnstore index.  With the execution plan still showing, hover over the Columnstore Index Scan operation to show the properties.</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-130.png?mtime=1333986144"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-130.png?mtime=1333986144" width="489" height="465" /></a></div>
+</p>
+<p> </p>
+<p>Note the execution mode shown as Batch.  This is only accomplished due to the use of parallelism in the execution plan.</p>
+<p> </p>
+<p>To run this same query using a row execution mode, use the MAXDOP query hint to force only the number of processors the plan will use to 1.</p>
+<p> </p>
+<p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> SalesTerritoryKey, <span class="kw2">SUM</span><span class="br0">&#40;</span>TotalProductCost<span class="br0">&#41;</span>, <span class="kw2">SUM</span><span class="br0">&#40;</span>SalesAmount<span class="br0">&#41;</span> <span class="kw1">FROM</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>FactInternetSales_VLT<span class="br0">&#93;</span> &nbsp;
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> SalesTerritoryKey
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> SalesTerritoryKey
+<span class="kw1">OPTION</span> <span class="br0">&#40;</span>MAXDOP <span class="nu0">1</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT SalesTerritoryKey, SUM(TotalProductCost), SUM(SalesAmount) FROM [dbo].[FactInternetSales_VLT]  
+GROUP BY SalesTerritoryKey
+ORDER BY SalesTerritoryKey
+OPTION (MAXDOP 1)</pre></div></div>
+
+</p>
+<p> </p>
+<p> </p>
+<p>The execution plan generated will appear identical to the previous execution plan.  However, the time to generate the plan may have been observed as slightly longer.  This was due to the execution mode being row in this plan.  Hover the mouse over the Columnstore Index Scan and check the execution mode again.</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-131.png?mtime=1333986144"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-131.png?mtime=1333986144" width="461" height="430" /></a></div>
+</p>
+<p> </p>
+<p>The overall execution time between the execution mode of row and batch is significant as well.  In these two tests, the actually overall time spent executing the query was 1738ms for a row execution mode and 45ms for a batch execution mode.</p>
+<p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/-132.png?mtime=1333986144"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/-132.png?mtime=1333986144" width="486" height="293" /></a></div>
+</p>
+<p> </p>
+<p> </p>
+<p><strong>Summary</strong></p>
+<p>Indexing is one of the most powerful means to enhancing the performance of retrieving data in SQL Server. At the same time, misuse of indexing can also negatively affect performance. Each type of index and definition of an index should be reviewed and considered carefully in regards to the effect it will have on storage, and as it relates to other indexes that may exist already. Columnstore indexes, as we’ve discussed, are different from the other indexing strategies SQL Server has traditionally had available. It may appear from this and other reviews of the columnstore index that every table or database would benefit from using them, but each should be considered carefully on how they will impact the databases.</p>
+<p>This review has shown the extremely high value in columnstore indexing. Although this method of indexing and technology has a place in OLAP based databases, the value can extend into OLTP based databases where there is the ability to meet the restrictions they bring.</p>
+<div class='rp4wp-related-posts'>
+<h3>Related Posts</h3>
+<ul>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/datadesign/columnstore-index-limitations-in-sql/'>ColumnStore Index limitations in SQL Server Denali CTP3</a><p>If you have been working with Sybase IQ then you might be familiar with what&hellip;</p></div>
+</li>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/dbadmin/columnstore-index-index-statistics/'>Columnstore Index – Index Statistics</a><p>Compression and Segments Columnstore indexes are efficient due to a few primary characteristics they rely&hellip;</p></div>
+</li>
+</ul>
+</div>
+</div>
+				<div class="post-author">
+					<div class="userInfo"><h2>About the Author</h2>Ted Krueger is a SQL Server MVP and Author that has been working in development and database administration and the owner of a successful consulting business, DataMetrics Consulting.  Specialties range from High Availability and Disaster / Recovery setup and testing methods down to custom assembly development for SQL Server Reporting Services.  Ted blogs and is also one of the founders of LessThanDot.com technology community.  Some of the articles focused on are Backup / Recovery, Security, SSIS and working on SQL Server and using all of the SQL Server features available to create stable and scalable database services.  <br style="clear: left" /><div class="bioSoc"><span class="bioSocTitle">Social Sitings</span><a href="http://twitter.com/onpnt" title="onpnt at Twitter" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Twitter" /></a><a href="http://www.facebook.com/profile.php?id=https://www.facebook.com/onpntfirearms" title="onpnt at Facebook" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Facebook" /></a><a href="http://www.linkedin.com/pub/ted-krueger/2/183/b66" title="onpnt at LinkedIn" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="LinkedIn" /></a><a href="http://www.datametricsconsulting.com/" title="onpnt at HomePage" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_homepage.png" alt="HomePage" /></a><a href="/index.php/author/onpnt/feed/" title="Blog RSS feed for onpnt" class="bioSocLink"><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="LTD RSS Feed" /></a></div></div>				</div>
+				<div class="post-foot instapaper_ignore">
+					<div class="post-tagline">
+						<div class="post-foot-views"><label>Article views:</label> 15,760 </div>
+						<div class="post-foot-more-posts">
+                            <a href="/index.php/author/onpnt/">Read More Posts by Ted Krueger (onpnt)</a>
+						</div>
+					</div>
+					<div>
+						 
+					</div>
+					<div class="post-tagline" style="height: auto">
+						<span class="social-button-label">Share:</span><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/dbadmin/columnstore-index-basics/&text=RT @LessThanDot Blog - Columnstore Index Basics by @onpnt" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/dbadmin/columnstore-index-basics/&title=Columnstore Index Basics&source=/index.php/datamgmt/dbadmin/columnstore-index-basics/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/dbadmin/columnstore-index-basics/&title=Columnstore Index Basics" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/dbadmin/columnstore-index-basics/&quote=Columnstore Index Basics" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/dbadmin/columnstore-index-basics/&title=Columnstore Index Basics" class="instapaper_button">Instapaper</a>					</div>			
+				</div>
+				<div class="comments-area instapaper_ignore">
+	<h4 class="comments-title">
+		7 Comments	</h4>
+			<ol class="comments-list">
+					<li class="comment byuser comment-author-SQLDenis even thread-even depth-1" id="comment-5237">
+				<div id="div-comment-5237" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">SQLDenis</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbadmin/columnstore-index-basics/#comment-5237">
+			April 9, 2012 at 10:43 am</a>		</div>
+
+		<p>One of my biggest tables where I would love to use a column store index use a decimal data type with a precision greater than 18 (it is 20). A decimal data type with precision greater than 18 digits is not supported currently</p>
+<p>Here is a list of all the data types that cannot be included in a columnstore index:</p>
+<p>binary and varbinary</p>
+<p>ntext , text, and image</p>
+<p>varchar(max) and nvarchar(max)</p>
+<p>uniqueidentifier</p>
+<p>rowversion (and timestamp)</p>
+<p>sql_variant</p>
+<p>decimal (and numeric) with precision greater than 18 digits</p>
+<p>datetimeoffset with scale greater than 2</p>
+<p>CLR types (hierarchyid and spatial types)</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbadmin/columnstore-index-basics/?replytocom=5237#respond' onclick='return addComment.moveForm( "div-comment-5237", "5237", "respond", "1590" )' aria-label='Reply to SQLDenis'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-onpnt bypostauthor odd alt thread-odd thread-alt depth-1" id="comment-5238">
+				<div id="div-comment-5238" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Ted Krueger (onpnt)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbadmin/columnstore-index-basics/#comment-5238">
+			April 9, 2012 at 10:49 am</a>		</div>
+
+		<p>Hopefully the future will see some of the restrictions ironed out and functional on other types 🙂</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbadmin/columnstore-index-basics/?replytocom=5238#respond' onclick='return addComment.moveForm( "div-comment-5238", "5238", "respond", "1590" )' aria-label='Reply to Ted Krueger (onpnt)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-5239">
+				<div id="div-comment-5239" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9a05ed28e1d33e4849a5342a942a2074?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9a05ed28e1d33e4849a5342a942a2074?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Chris Adkin</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbadmin/columnstore-index-basics/#comment-5239">
+			April 12, 2012 at 6:49 am</a>		</div>
+
+		<p>Nice article, presumably a full scan of the table is performed when creating a column store index ?</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbadmin/columnstore-index-basics/?replytocom=5239#respond' onclick='return addComment.moveForm( "div-comment-5239", "5239", "respond", "1590" )' aria-label='Reply to Chris Adkin'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-5240">
+				<div id="div-comment-5240" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://2.gravatar.com/avatar/5d3406d066a397bd167b703a20fec440?s=64&#038;d=mm&#038;r=g' srcset='http://2.gravatar.com/avatar/5d3406d066a397bd167b703a20fec440?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn"><a href='http://www.nyc-software.com/' rel='external nofollow' class='url'>Dacid</a></cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbadmin/columnstore-index-basics/#comment-5240">
+			April 15, 2012 at 11:29 pm</a>		</div>
+
+		<p>Great Article this finally makes sense to me.  I have to say tho, I&#8217;m a little disappointed with the scope of practical application given the hype that&#8217;s been drummed up over this feature in 2012.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbadmin/columnstore-index-basics/?replytocom=5240#respond' onclick='return addComment.moveForm( "div-comment-5240", "5240", "respond", "1590" )' aria-label='Reply to Dacid'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-onpnt bypostauthor even thread-even depth-1" id="comment-5241">
+				<div id="div-comment-5241" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Ted Krueger (onpnt)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbadmin/columnstore-index-basics/#comment-5241">
+			April 16, 2012 at 9:18 am</a>		</div>
+
+		<p>Chris &#8211; the build process would require that as building most indexing.  There is also some added pressure on the compression at the build point. Good things to take into account on implementation. <br />
+Thank you for the compliments David.  Although it seems limiting or lacking some large scope in this and the second article, it was strictly due to resources lacking of a large DW to work on.  There will be a 3rd posting however incorporating a DW that will show the value.</p>
+<p>Meher Malakapalli &#8211; @MeherSQL had a very good question regarding some IO stats listed in this article also.  If you notice in the section after creating the CSI, there are a few physical reads and read-ahead reads.  This is due to clearing the data cache on testing to ensure I retained the results through.  read-ahead reads are not bad and actually good in this case while they pull the pages into cache for the query and later use.  This is also a good topic and method to test the true performance of your queries by clearing the cache and working at goals of a initial execution.</p>
+<p>To test this you can run a checkpoint and dropcleanbuffers (in your DEV environment, please)</p>
+<p>The query below, if run after you&#8217;ve already cached the pages would show a clean IO on the first execution<br />
+(60398 row(s) affected)<br />
+Table &#8216;FactInternetSales&#8217;. Scan count 1, logical reads 18, physical reads 0, read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.</p>
+<p>
+SET STATISTICS IO ON<br />
+SELECT TotalProductCost, SalesAmount FROM [dbo].[FactInternetSales]<br />
+&#8211;break review results<br />
+CHECKPOINT; <br />
+GO <br />
+DBCC DROPCLEANBUFFERS; <br />
+GO<br />
+SELECT TotalProductCost, SalesAmount FROM [dbo].[FactInternetSales]</p>
+<p>The second would show the results that are also shown in the article<br />
+(60398 row(s) affected)<br />
+Table &#8216;FactInternetSales&#8217;. Scan count 1, logical reads 20, physical reads 3, read-ahead reads 4, lob logical reads 0, lob physical reads 0, lob read-ahead reads 0.</p>
+<p>Thanks to Meher for pointing this out so I could clarify.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbadmin/columnstore-index-basics/?replytocom=5241#respond' onclick='return addComment.moveForm( "div-comment-5241", "5241", "respond", "1590" )' aria-label='Reply to Ted Krueger (onpnt)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-5242">
+				<div id="div-comment-5242" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://2.gravatar.com/avatar/8f2451ec4e21142d76ca086f817bc44d?s=64&#038;d=mm&#038;r=g' srcset='http://2.gravatar.com/avatar/8f2451ec4e21142d76ca086f817bc44d?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Frank Hell</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbadmin/columnstore-index-basics/#comment-5242">
+			April 17, 2012 at 7:52 am</a>		</div>
+
+		<p>&#8220;&#8230; overall time spent executing the query was 1738ms for a batch execution mode and 45ms for a row execution mode&#8221; is misleading:</p>
+<p>45ms: batch<br />
+1738: row</p>
+<p>please consider to fix this!<br />
+thx</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbadmin/columnstore-index-basics/?replytocom=5242#respond' onclick='return addComment.moveForm( "div-comment-5242", "5242", "respond", "1590" )' aria-label='Reply to Frank Hell'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-onpnt bypostauthor even thread-even depth-1" id="comment-5243">
+				<div id="div-comment-5243" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9666550a97e912e0dff5023dddb78e64?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Ted Krueger (onpnt)</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbadmin/columnstore-index-basics/#comment-5243">
+			April 17, 2012 at 7:56 am</a>		</div>
+
+		<p>Ha! Thanks, Frank. Fixed.  Remind me to have a talk with my editor 😉 In this case, all of them lol</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbadmin/columnstore-index-basics/?replytocom=5243#respond' onclick='return addComment.moveForm( "div-comment-5243", "5243", "respond", "1590" )' aria-label='Reply to Ted Krueger (onpnt)'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		</ol>
+						<div id="respond" class="comment-respond">
+			<h3 id="reply-title" class="comment-reply-title">Leave a Reply <small><a rel="nofollow" id="cancel-comment-reply-link" href="/index.php/datamgmt/dbadmin/columnstore-index-basics/#respond" style="display:none;">Cancel reply</a></small></h3>				<form action="/wp-comments-post.php" method="post" id="commentform" class="comment-form">
+					<p class="comment-notes"><span id="email-notes">Your email address will not be published.</span> Required fields are marked <span class="required">*</span></p><p class="comment-form-comment"><label for="comment">Comment</label> <textarea id="comment" name="comment" cols="45" rows="8" maxlength="65525" aria-required="true" required="required"></textarea></p><p class="comment-form-author"><label for="author">Name <span class="required">*</span></label> <input id="author" name="author" type="text" value="" size="30" maxlength="245" aria-required='true' required='required' /></p>
+<p class="comment-form-email"><label for="email">Email <span class="required">*</span></label> <input id="email" name="email" type="text" value="" size="30" maxlength="100" aria-describedby="email-notes" aria-required='true' required='required' /></p>
+<p class="comment-form-url"><label for="url">Website</label> <input id="url" name="url" type="text" value="" size="30" maxlength="200" /></p>
+<p class="form-submit"><input name="submit" type="submit" id="submit" class="submit" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='1590' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='0' />
+</p><input type="hidden" id="killer_value" name="killer_value" value="8d3bba7425e7c98c50f52ca1b52d3735"/><noscript>Sorry, but you are required to use a javascript enabled brower to comment here.</noscript>				</form>
+					</div><!-- #respond -->
+		</div>			</div>
+				<br style="clear: both;" />
+</div>
+		</div>
+		<div id="page-footer">
+			<div id="botnav"><a href="http://lessthandot.com/" title="LessThanDot Launchpad">Launchpad</a> | <a href="http://lessthandot.com/account.php" title="Your Account Settings">My Account</a> | <a href="http://lessthandot.com/statistics.php" title="Statistics">Statistics</a> | <a href="http://lessthandot.com/donate.php" title="Donate">Donate</a> | <a href="http://lessthandot.com/contactus.php" title="Contact Us">Contact Us</a> | <a href="http://lessthandot.com/aboutus.php" title="About the LessThanDot Team">&copy;2008 - 2019 LessThanDot, LLC</a></div>
+
+		<script type='text/javascript'>
+		var _gaq = _gaq || [];
+		_gaq.push(['_setAccount', 'UA-4471405-1']);
+		_gaq.push(['_trackPageview']);
+		_gaq.push(['_setCustomVar', 1, 'Environment', 'lessthandot.com', 3]);
+
+		(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		})();
+	  </script>			<div class="validator"><a href="http://validator.w3.org/check?uri=referer">Valid XHTML</a> | <a href="http://jigsaw.w3.org/css-validator/check/referer" title="Validate the CSS for this page at the W3C website">Valid CSS</a> | 2018-11-11 15:52</div>
+		</div>
+	</div>
+</div>
+<!-- <script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script> -->
+<script type='text/javascript' src='/wp-includes/js/wp-embed.min.js?ver=4.6.1'></script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var spam_destroyer = {"key":"159ff9dcc225580310c2de238cdd1f1a","lifetime":"3600","limit":"1552765748"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='/wp-content/plugins/spam-destroyer/kill.js?ver=1.2'></script>
+</body>
+</html>

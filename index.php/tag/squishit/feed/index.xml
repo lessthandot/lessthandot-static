@@ -1,0 +1,1768 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>squishit &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/squishit/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SquishIt and Nancy &#8211; Part Deux</title>
+		<link>/index.php/webdev/serverprogramming/squishit-and-nancy-part-deux/</link>
+		<comments>/index.php/webdev/serverprogramming/squishit-and-nancy-part-deux/#comments</comments>
+		<pubDate>Fri, 21 Feb 2014 02:53:31 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[nancy]]></category>
+		<category><![CDATA[squishit]]></category>
+
+		<guid isPermaLink="false">/?p=2430</guid>
+		<description><![CDATA[About a year ago, I wrote about getting SquishIt up and running with the (awesome) Nancy Web Framework.  You can read all about that here.  Since then, things have changed a bit, as they are wont to do.  I had mostly been ignoring this project, until an issue came up on the SquishIt mailing list [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>About a year ago, I wrote about getting SquishIt up and running with the (awesome) <a href="http://nancyfx.org/">Nancy Web Framework</a>.  You can read all about that <a href="/index.php/webdev/serverprogramming/aspnet/squishit-and-nancy/">here</a>.  Since then, things have changed a bit, as they are wont to do.  I had mostly been ignoring this project, until an issue came up on the SquishIt mailing list that forced me to fire it up again.  The biggest change I found is that Nancy no longer depends on System.Web.  This really messed up the file path resolution in SquishIt, and forced us to introduce a new extensibility point for path translation.  Frankly, this probably should have been done a long time ago, but at least it is getting done now.</p>
+<p>It was a pretty simple change but I&#8217;ll go over it here.  First we needed to introduce a new interface, IPathTranslator.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">Framework</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">interface</span> IPathTranslator
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> ResolveAppRelativePathToFileSystem<span class="br0">&#40;</span><span class="kw4">string</span> file<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> ResolveFileSystemPathToAppRelative<span class="br0">&#40;</span><span class="kw4">string</span> file<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace SquishIt.Framework
+{
+    public interface IPathTranslator
+    {
+        string ResolveAppRelativePathToFileSystem(string file);
+        string ResolveFileSystemPathToAppRelative(string file);
+    }
+}</pre></div></div>
+
+<p>This takes the place of the old &#8220;FileSystem&#8221; static class, that probably only a few people are aware of.  The implementation isn&#8217;t that important, but it takes some information from HttpRuntime / HttpContext and uses that to convert between file locations on disk and app-relative web paths.  </p>
+<p>Because newer versions of Nancy don&#8217;t reference System.Web, we had to find another way to do this.  It seems like the best way to get it done is using Nancy&#8217;s IRootPathProvider.  The following looks like a reasonable approximation of what was being done with HttpContext / HttpRuntime &#8211; I have not tested it with CSS path rewriting or any of the trickier stuff that SquishIt does, but I think it will work.  If not I&#8217;m sure someone will let me know.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Nancy</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">SquishIt.Framework</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">NancySample</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> NancyPathTranslator <span class="sy0">:</span> IPathTranslator
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">private</span> <span class="kw1">readonly</span> IRootPathProvider _rootPathProvider<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> NancyPathTranslator<span class="br0">&#40;</span>IRootPathProvider rootPathProvider<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _rootPathProvider <span class="sy0">=</span> rootPathProvider<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">string</span> ResolveAppRelativePathToFileSystem<span class="br0">&#40;</span><span class="kw4">string</span> file<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Remove query string</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span>file<span class="sy0">.</span><span class="me1">IndexOf</span><span class="br0">&#40;</span><span class="st0">'?'</span><span class="br0">&#41;</span> <span class="sy0">!=</span> <span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; file <span class="sy0">=</span> file<span class="sy0">.</span><span class="me1">Substring</span><span class="br0">&#40;</span><span class="nu0">0</span>, file<span class="sy0">.</span><span class="me1">IndexOf</span><span class="br0">&#40;</span><span class="st0">'?'</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> _rootPathProvider<span class="sy0">.</span><span class="me1">GetRootPath</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">&quot;/&quot;</span> <span class="sy0">+</span> file<span class="sy0">.</span><span class="me1">TrimStart</span><span class="br0">&#40;</span><span class="st0">'~'</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">TrimStart</span><span class="br0">&#40;</span><span class="st0">'/'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">string</span> ResolveFileSystemPathToAppRelative<span class="br0">&#40;</span><span class="kw4">string</span> file<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> root <span class="sy0">=</span> <span class="kw3">new</span> Uri<span class="br0">&#40;</span>_rootPathProvider<span class="sy0">.</span><span class="me1">GetRootPath</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> root<span class="sy0">.</span><span class="me1">MakeRelativeUri</span><span class="br0">&#40;</span><span class="kw3">new</span> Uri<span class="br0">&#40;</span>file, UriKind<span class="sy0">.</span><span class="me1">RelativeOrAbsolute</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System;
+using Nancy;
+using SquishIt.Framework;
+
+namespace SquishIt.NancySample
+{
+    public class NancyPathTranslator : IPathTranslator
+    {
+        private readonly IRootPathProvider _rootPathProvider;
+
+        public NancyPathTranslator(IRootPathProvider rootPathProvider)
+        {
+            _rootPathProvider = rootPathProvider;
+        }
+
+        public string ResolveAppRelativePathToFileSystem(string file)
+        {
+            // Remove query string
+            if(file.IndexOf('?') != -1)
+            {
+                file = file.Substring(0, file.IndexOf('?'));
+            }
+
+            return _rootPathProvider.GetRootPath() + "/" + file.TrimStart('~').TrimStart('/');
+        }
+
+        public string ResolveFileSystemPathToAppRelative(string file)
+        {
+            var root = new Uri(_rootPathProvider.GetRootPath());
+            return root.MakeRelativeUri(new Uri(file, UriKind.RelativeOrAbsolute)).ToString();
+        }
+    }
+}</pre></div></div>
+
+<p>Pretty simple.  We basically had to replace the Server.MapPath / HttpRuntime.AppDomainAppPath type stuff we were using with IRootPathProvider.GetRootPath().  It may very well end up being more complicated than this &#8211; but whats important is it is now in the user&#8217;s control.  In addition to allowing users of newer versions of Nancy to use SquishIt, this will also let users with environmental issues that our code does not account for work around our bad code without needing to dig too deeply into SquishIt&#8217;s internals.</p>
+<p>Once this is coded, we just have to configure SquishIt to use it.  This can be done in a nancy bootstrapper like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">ConfigureDefaults</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UsePathTranslator</span><span class="br0">&#40;</span><span class="kw3">new</span> NancyPathTranslator<span class="br0">&#40;</span><span class="kw3">new</span> AspNetRootSourceProvider<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.ConfigureDefaults()
+    .UsePathTranslator(new NancyPathTranslator(new AspNetRootSourceProvider()));</pre></div></div>
+
+<p>Once this is done, we can run the project successfully again, and go back to not worrying about this until another Nancy user points out the next problem.  For a closer look, the sample project is available at <a href="https://github.com/AlexCuse/SquishIt.NancySample">github</a>.  Big thanks to SquishIt/Nancy user Mike Ward for pointing out on the mailing list that things weren&#8217;t working anymore.  It would be impossible to stay on top of this kind of stuff without the help of people like him.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/squishit-and-nancy-part-deux/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Using IIS Rewrite Rules With SquishIt Cache Invalidation</title>
+		<link>/index.php/webdev/serverprogramming/using-iis-rewrite-rules-to-improve/</link>
+		<comments>/index.php/webdev/serverprogramming/using-iis-rewrite-rules-to-improve/#respond</comments>
+		<pubDate>Sat, 03 Aug 2013 13:32:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[squishit]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/08/using-iis-rewrite-rules-to-improve/</guid>
+		<description><![CDATA[In version 0.9.2 and earlier, SquishIt had two options for handling browser cache invalidation.  The default behavior was to append the hash to the query string, and the other was to include the hash in the combined filename.  While both got the job don&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In version 0.9.2 and earlier, SquishIt had two options for handling browser cache invalidation.  The default behavior was to append the hash to the query string, and the other was to include the hash in the combined filename.  While both got the job done, they both came with advantages and disadvantages.  This post will attempt to cover those while also introducing a third option that is available starting in version 0.9.3.</p>
+<h3>Querystring Invalidation</h3>
+<p>SquishIt&#8217;s default versioning behavior is to append the versioning hash to the URL of a combined file as a query string parameter.  So a bundle set up like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/jquery_1.7.2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/minifyjs_test.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">ForceRelease</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">Render</span><span class="br0">&#40;</span><span class="st0">&quot;/output/minifyjs_test_output.js&quot;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.JavaScript()
+   .Add("/assets/js/jquery_1.7.2.js")
+   .Add("/assets/js/minifyjs_test.js")
+   .ForceRelease()
+   .Render("/output/minifyjs_test_output.js")</pre></div></div>
+
+<p>Would render a script tag like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;/output/minifyjs_test_output.js?{hashKeyName}={invalidationHash}&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;script type="text/javascript" src="/output/minifyjs_test_output.js?{hashKeyName}={invalidationHash}"&gt;&lt;/script&gt;</pre></div></div>
+
+<p>The main disadvantage of this is that it doesn&#8217;t work with all caching proxies, though it seems to be pretty consistently supported in modern browsers.  The advantage is that it only requires one set of combined files to be stored on the server.  This is usually the best choice for files served locally because it doesn&#8217;t require any cleanup of old files on the server.</p>
+<h3>Filename Invalidation</h3>
+<p>When using this strategy, hashes are written directly into the filename.  So a bundle set up like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/jquery_1.7.2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/minifyjs_test.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">ForceRelease</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">Render</span><span class="br0">&#40;</span><span class="st0">&quot;/output/minifyjs_test_output#.js&quot;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.JavaScript()
+   .Add("/assets/js/jquery_1.7.2.js")
+   .Add("/assets/js/minifyjs_test.js")
+   .ForceRelease()
+   .Render("/output/minifyjs_test_output#.js")</pre></div></div>
+
+<p>Would render a script tag like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;/output/minifyjs_test_output{invalidationHash}.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;script type="text/javascript" src="/output/minifyjs_test_output{invalidationHash}.js"&gt;&lt;/script&gt;</pre></div></div>
+
+<p>The main disadvantage of this strategy is that it tends to accumulate files over time. Because the hash is generated off of the combined file&#8217;s contents, every time a bundled script file or stylesheet changes, a new combined file is created. It eventually becomes necessary to clean this stuff up (The easiest way is to delete all files and reset the app pool, otherwise its usually safe to delete all but the most recent version for each combined file). The main advantage is that it is supported by all caching proxies &#8211; this consistent behavior makes it a good choice for CDN environments where you typically need to manage multiple versions of files anyway.</p>
+<h3>Folder Invalidation</h3>
+<p>This new strategy is similar to the filename invalidation strategy when it comes to output file naming, but behaves more like querystring invalidation in terms of disk footprint.  It is used similarly to the hash in filename option, in that you simply put a hash symbol in the path where you want the content&#8217;s hash to show up.  Unlike the hash in filename method, it requires you to use it explicitly because we need to be able to figure out the right folder to write files to.  So a bundle set up like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/jquery_1.7.2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/minifyjs_test.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">WithCacheInvalidationStrategy</span><span class="br0">&#40;</span><span class="kw3">new</span> HashAsVirtualDirectoryCacheInvalidationStrategy<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">ForceRelease</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">Render</span><span class="br0">&#40;</span><span class="st0">&quot;/output/#/minifyjs_test_output.js&quot;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.JavaScript()
+   .Add("/assets/js/jquery_1.7.2.js")
+   .Add("/assets/js/minifyjs_test.js")
+   .WithCacheInvalidationStrategy(new HashAsVirtualDirectoryCacheInvalidationStrategy())
+   .ForceRelease()
+   .Render("/output/#/minifyjs_test_output.js")</pre></div></div>
+
+<p>Would render a script tag like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;/output/{invalidationHash}/minifyjs_test_output.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;script type="text/javascript" src="/output/{invalidationHash}/minifyjs_test_output.js"&gt;&lt;/script&gt;</pre></div></div>
+
+<p>From looking at these URLs it is clear that caching agents will handle this the same way they handled the URLs built with the filename invalidation strategy.  But the strategy actually scrubs the hash from the disk location for the bundle, meaning that only one file is generated.  We can then set up a rewrite rule to scrub the hash out of the URL for incoming requests like so.</p>
+<p>So for IIS we could do something like this in our web.config:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="sc3"><span class="re1">&lt;system.webServer<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- snip --&gt;</span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;rewrite<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;rules<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;rule</span> <span class="re0">name</span>=<span class="st0">&quot;squishit&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;match</span> <span class="re0">url</span>=<span class="st0">&quot;([S]+)(/r-[w]+/)([S]+)&quot;</span> &nbsp;<span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;action</span> <span class="re0">type</span>=<span class="st0">&quot;Rewrite&quot;</span> <span class="re0">url</span>=<span class="st0">&quot;{R:1}/{R:3}&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/rule<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/rules<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/rewrite<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/system.webServer<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  &lt;system.webServer&gt;
+    &lt;!-- snip --&gt;
+    &lt;rewrite&gt;
+      &lt;rules&gt;
+        &lt;rule name="squishit"&gt;
+          &lt;match url="([S]+)(/r-[w]+/)([S]+)"  /&gt;
+          &lt;action type="Rewrite" url="{R:1}/{R:3}" /&gt;
+        &lt;/rule&gt;
+      &lt;/rules&gt;
+    &lt;/rewrite&gt;
+  &lt;/system.webServer&gt;</pre></div></div>
+
+<p>To configure these options globally we can add the following in Application_Start:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">ConfigureDefaults</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">UseCacheInvalidationStrategy</span><span class="br0">&#40;</span><span class="kw3">new</span> HashAsVirtualDirectoryCacheInvalidationStrategy<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.ConfigureDefaults().UseCacheInvalidationStrategy(new HashAsVirtualDirectoryCacheInvalidationStrategy()); </pre></div></div>
+
+<p>This will result in the supplied strategy being used for all bundles <strong>unless</strong> you override on a bundle using the method shown above.</p>
+<p>The end result combines the advantages of querystring invalidation and filename invalidation for what should be a minimal performance hit.  Hopefully this comes in handy in the future.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/using-iis-rewrite-rules-to-improve/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SquishIt and Nancy</title>
+		<link>/index.php/webdev/serverprogramming/aspnet/squishit-and-nancy/</link>
+		<comments>/index.php/webdev/serverprogramming/aspnet/squishit-and-nancy/#comments</comments>
+		<pubDate>Fri, 11 Jan 2013 13:11:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[nancy]]></category>
+		<category><![CDATA[squishit]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/squishit-and-nancy/</guid>
+		<description><![CDATA[Everybody's favorite LTD blogger / Belgian tweeter Chris asked me last week how he could get SquishIt working with the Nancy web framework.  I had to admit, I had no idea.  But couldn't imagine it would be that much more difficult than making it work wi&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Everybody&#8217;s favorite <a href="/index.php/All/?disp=authdir&amp;author=7">LTD blogger</a> / <a href="http://twitter.com/chrissie1">Belgian tweeter</a> Chris asked me last week how he could get SquishIt working with the <a href="http://nancyfx.org/">Nancy web framework</a>. I had to admit, I had no idea. But couldn&#8217;t imagine it would be that much more difficult than making it work with ASP.net MVC. So I decided to look into it. It turned out to be pretty much the same, with one extra step. I started out by installing the packages I needed from NuGet to an empty asp.net application:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1">&gt; install-package SquishIt
+&gt; install-package Nancy
+&gt; install-package Nancy.Hosting.AspNet
+&gt; install-package Nancy.Viewengines.Razor</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&gt; install-package SquishIt
+&gt; install-package Nancy
+&gt; install-package Nancy.Hosting.AspNet
+&gt; install-package Nancy.Viewengines.Razor</pre></div></div>
+
+<p>Once installed, there is a little bit of setup work we need to do.</p>
+<h3>Configuring Nancy&#8217;s View Engine</h3>
+<p>This was infinitely more complex than using a referenced library in a razor view with MVC. Translation: this was as simple as adding a &#8220;razor&#8221; section to the web.config:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="sc3"><span class="re1">&lt;configSections<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;section</span> <span class="re0">name</span>=<span class="st0">&quot;razor&quot;</span> <span class="re0">type</span>=<span class="st0">&quot;Nancy.ViewEngines.Razor.RazorConfigurationSection, Nancy.ViewEngines.Razor&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/configSections<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;razor</span> <span class="re0">disableAutoIncludeModelNamespace</span>=<span class="st0">&quot;false&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;assemblies<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">assembly</span>=<span class="st0">&quot;System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">assembly</span>=<span class="st0">&quot;SquishIt.Framework&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/assemblies<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;namespaces<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">namespace</span>=<span class="st0">&quot;SquishIt.Framework&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/namespaces<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/razor<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  &lt;configSections&gt;
+    &lt;section name="razor" type="Nancy.ViewEngines.Razor.RazorConfigurationSection, Nancy.ViewEngines.Razor" /&gt;
+  &lt;/configSections&gt;
+  &lt;razor disableAutoIncludeModelNamespace="false"&gt;
+    &lt;assemblies&gt;
+      &lt;add assembly="System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" /&gt;
+      &lt;add assembly="SquishIt.Framework" /&gt;
+    &lt;/assemblies&gt;
+    &lt;namespaces&gt;
+      &lt;add namespace="SquishIt.Framework" /&gt;
+    &lt;/namespaces&gt;
+  &lt;/razor&gt;</pre></div></div>
+
+<p>Its worth noting that when I added SquishIt.Framework to the namespaces section it <strong>worked</strong>, but didn&#8217;t help with intellisense. So I ended up adding the @using directives in my views anyway. So if you want intellisense, don&#8217;t bother with the namespaces if redundancy bothers you.</p>
+<h3>Static Bundles</h3>
+<p>The typical SquishIt use involves writing a new css or javascript file to the server&#8217;s file system. At least I think it does &#8211; this is certainly what I would consider typical. So I looked at that first. First thing I needed to do was figure out how to get Nancy to render a view for me. It wasn&#8217;t terribly difficult, just had to set up a module with the routes involved:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">Nancy</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">NancySample</span><span class="sy0">.</span><span class="me1">Modules</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> HomeModule <span class="sy0">:</span> NancyModule
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> HomeModule<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> View<span class="br0">&#91;</span><span class="st0">&quot;Hello.cshtml&quot;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using Nancy;
+
+namespace SquishIt.NancySample.Modules
+{
+    public class HomeModule : NancyModule
+    {
+        public HomeModule()
+        {
+            Get["/"] = parameters =&gt; View["Hello.cshtml"];
+        }
+    }
+}</pre></div></div>
+
+<p>By convention, Nancy locates the view in Views/Home. I assume it would look in Views/Shared next, but didn&#8217;t bother to confirm. So I added couple javascript files in Content/js, and then added a view with a bundle:</p>
+<pre>@using SquishIt.Framework
+&lt;!DOCTYPE html&gt;
+
+&lt;html lang="en"&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8" /&gt;
+        &lt;title&gt;Hello World Page&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Hello World Page&lt;/h1&gt;
+        &lt;p&gt;Hello World!&lt;/p&gt;
+        &lt;p&gt;This page will include a javascript bundle that is rendered to the file system and served as a static asset.&lt;/p&gt;
+        @Html.Raw(Bundle.JavaScript()
+            .Add("~/Content/js/js1.js")
+            .Add("~/Content/js/js2.js")
+            .Render("~/Content/combined/bundle.js"))
+    &lt;/body&gt;
+&lt;/html&gt;</pre>
+<p>As long as I disabled debugging, a single tag was rendered into my page for bundle.js. That was easy.</p>
+<h3>Cached Bundles</h3>
+<p>SquishIt also has the ability to render bundles to an internal cache instead of the file system. This is useful for shared hosting environments. You can read the initial documentation <a href="https://github.com/jetheredge/SquishIt/wiki/Using-SquishIt-programmatically-without-the-file-system">here</a>. Getting this to work with Nancy was not really that different &#8211; we just needed to create a module to handle serving the assets:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System.IO</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Text</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Nancy</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">SquishIt.Framework</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">NancySample</span><span class="sy0">.</span><span class="me1">Modules</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> AssetsModule <span class="sy0">:</span> NancyModule
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> AssetsModule<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">:</span> <span class="kw1">base</span><span class="br0">&#40;</span><span class="st0">&quot;/assets&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/js/{name}&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> CreateResponse<span class="br0">&#40;</span>Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">RenderCached</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw4">string</span><span class="br0">&#41;</span>parameters<span class="sy0">.</span><span class="me1">name</span><span class="br0">&#41;</span>, Configuration<span class="sy0">.</span><span class="me1">Instance</span><span class="sy0">.</span><span class="me1">JavascriptMimeType</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/css/{name}&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> CreateResponse<span class="br0">&#40;</span>Bundle<span class="sy0">.</span><span class="me1">Css</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">RenderCached</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw4">string</span><span class="br0">&#41;</span>parameters<span class="sy0">.</span><span class="me1">name</span><span class="br0">&#41;</span>, Configuration<span class="sy0">.</span><span class="me1">Instance</span><span class="sy0">.</span><span class="me1">CssMimeType</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; Response CreateResponse<span class="br0">&#40;</span><span class="kw4">string</span> content, <span class="kw4">string</span> contentType<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> Response
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">FromStream</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">=&gt;</span> <span class="kw3">new</span> MemoryStream<span class="br0">&#40;</span>Encoding<span class="sy0">.</span><span class="me1">UTF8</span><span class="sy0">.</span><span class="me1">GetBytes</span><span class="br0">&#40;</span>content<span class="br0">&#41;</span><span class="br0">&#41;</span>, contentType<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithHeader</span><span class="br0">&#40;</span><span class="st0">&quot;Cache-Control&quot;</span>, <span class="st0">&quot;max-age=45&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System.IO;
+using System.Text;
+using Nancy;
+using SquishIt.Framework;
+
+namespace SquishIt.NancySample.Modules
+{
+    public class AssetsModule : NancyModule
+    {
+        public AssetsModule()
+            : base("/assets")
+        {
+            Get["/js/{name}"] = parameters =&gt; CreateResponse(Bundle.JavaScript().RenderCached((string)parameters.name), Configuration.Instance.JavascriptMimeType);
+            Get["/css/{name}"] = parameters =&gt; CreateResponse(Bundle.Css().RenderCached((string)parameters.name), Configuration.Instance.CssMimeType);
+        }
+
+        Response CreateResponse(string content, string contentType)
+        {
+            return Response
+                .FromStream(() =&gt; new MemoryStream(Encoding.UTF8.GetBytes(content)), contentType)
+                .WithHeader("Cache-Control", "max-age=45");
+        }
+    }
+}</pre></div></div>
+
+<p>This module renders a cached bundle by name using SquishIt&#8217;s globally configured MIME types to render the content. It also sets a cache-control header on the response, just because I wanted to see how to set headers with Nancy.</p>
+<p>We then need to add a Global.asax and build a bundle:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">protected</span> <span class="kw4">void</span> Application_Start<span class="br0">&#40;</span><span class="kw4">object</span> sender, EventArgs e<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;~/Content/js/js1.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;~/Content/js/js2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">AsCached</span><span class="br0">&#40;</span><span class="st0">&quot;hello&quot;</span>, <span class="st0">&quot;~/assets/js/hello&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">protected void Application_Start(object sender, EventArgs e)
+{
+    Bundle.JavaScript()
+        .Add("~/Content/js/js1.js")
+        .Add("~/Content/js/js2.js")
+        .AsCached("hello", "~/assets/js/hello");
+}</pre></div></div>
+
+<p>The second parameter here is called filePath, but actually represents the path to the assets controller, including the &#8220;name&#8221; parameter. This is what gets used in the src attribute of the rendered tag.</p>
+<p>Finally we can add a view. Note that the cached bundle is rendered by name into the page:</p>
+<pre>@using SquishIt.Framework
+&lt;!DOCTYPE html&gt;
+
+&lt;html lang="en"&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8" /&gt;
+        &lt;title&gt;Hello World Page&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Hello World Page&lt;/h1&gt;
+        &lt;p&gt;Hello World!&lt;/p&gt;
+        &lt;p&gt;This page will include a javascript bundle that is rendered into memory in Global.asax and served through the Assets Module&lt;/p&gt;
+        @Html.Raw(Bundle.JavaScript()
+            .RenderCachedAssetTag("hello"))
+    &lt;/body&gt;
+&lt;/html&gt;</pre>
+<p>and change our HomeModule to serve the route:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">Nancy</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">NancySample</span><span class="sy0">.</span><span class="me1">Modules</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> HomeModule <span class="sy0">:</span> NancyModule
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> HomeModule<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> View<span class="br0">&#91;</span><span class="st0">&quot;Hello.cshtml&quot;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/cached&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> View<span class="br0">&#91;</span><span class="st0">&quot;HelloCached.cshtml&quot;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using Nancy;
+
+namespace SquishIt.NancySample.Modules
+{
+    public class HomeModule : NancyModule
+    {
+        public HomeModule()
+        {
+            Get["/"] = parameters =&gt; View["Hello.cshtml"];
+            Get["/cached"] = parameters =&gt; View["HelloCached.cshtml"];
+        }
+    }
+}</pre></div></div>
+
+<p>Piece of cake.</p>
+<h3>Conclusion</h3>
+<p>This was my first exposure to Nancy, and I came away pretty impressed. Its no-nonsense approach reminds me of other projects I&#8217;ve messed around with in the past like <a href="http://manosdemono.org/">manos</a> and <a href="http://servicestack.net/">ServiceStack</a>. I hope to get a chance to play around with it at least a little bit more.</p>
+<p>I&#8217;ll think about putting together a package to help with integration (similar to <a href="http://nuget.org/packages/SquishIt.Mvc/">SquishIt.Mvc</a> but its so easy to get going that I&#8217;m not sure its needed (that package is only a controller and a few extension methods that return MvcHtmlStrings instead of strings). I guess I will have to see if there is any demand, or if there are any issues preventing Nancy from being used in shared hosting environments to see if it&#8217;d be worth it.</p>
+<p>The sample project can be downloaded in its&#8217; entirety at <a href="https://github.com/AlexCuse/SquishIt.NancySample/tree/blog-20130111">github</a>.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/aspnet/squishit-and-nancy/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Preprocessor Extensibility in SquishIt 0.9</title>
+		<link>/index.php/webdev/serverprogramming/preprocessor-extensibility-in-squishit-0-9/</link>
+		<comments>/index.php/webdev/serverprogramming/preprocessor-extensibility-in-squishit-0-9/#respond</comments>
+		<pubDate>Fri, 05 Oct 2012 12:38:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[squishit]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/10/preprocessor-extensibility-in-squishit-0-9/</guid>
+		<description><![CDATA[For the past couple years, .net developers have been embracing various content preprocessors as they become more accessible.  For the same couple of years, we've been trying to keep up.  The dotLess port of the popular .less CSS extension has been getti&#8230;]]></description>
+				<content:encoded><![CDATA[<p>For the past couple years, .net developers have been embracing various content preprocessors as they become more accessible.  For the same couple of years, we&#8217;ve been trying to keep up.  The <a href="http://www.dotlesscss.org/">dotLess</a> port of the popular .less CSS extension has been getting better by leaps and bounds. It has become almost trivial to embed a javascript compiler in .net these days (thanks to projects like <a href="http://jurassic.codeplex.com/">Jurassic</a>), enabling us to support things like coffeescript.  So we&#8217;re doing the obvious thing &#8211; stripping preprocessor support from our core library.</p>
+<p>There are some good reasons for this.  Why force people to download things like Jurassic or dotLess if they don&#8217;t have the need?  The flipside of this is that we&#8217;d been deliberately avoiding adding support for SASS/SCSS because of concerns about linking to IronRuby &#8211; these concerns largely disappear when preprocessing becomes an opt-in behavior.  Some of these libraries don&#8217;t even work on Mono (I think .less might be the only one that works currently) so I feel extra bitter downloading code that won&#8217;t run on my platform of choice.  Finally, the growth in adoption has been so fast that frankly, we&#8217;re unable to keep up.</p>
+<p>So let&#8217;s take a look at some of the original code (well not original as some of our refactorings did find their way to the 0.8.x branch).</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">internal</span> <span class="kw1">override</span> <span class="kw4">string</span> PreprocessForDebugging<span class="br0">&#40;</span><span class="kw4">string</span> filename<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span>filename<span class="sy0">.</span><span class="me1">ToLower</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">EndsWith</span><span class="br0">&#40;</span><span class="st0">&quot;.coffee&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> js <span class="sy0">=</span> ProcessCoffee<span class="br0">&#40;</span>filename<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; filename <span class="sy0">+=</span> debugExtension<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">using</span><span class="br0">&#40;</span><span class="kw1">var</span> fileWriter <span class="sy0">=</span> fileWriterFactory<span class="sy0">.</span><span class="me1">GetFileWriter</span><span class="br0">&#40;</span>filename<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; fileWriter<span class="sy0">.</span><span class="me1">Write</span><span class="br0">&#40;</span>js<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> filename<span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">internal override string PreprocessForDebugging(string filename)
+{
+    if(filename.ToLower().EndsWith(".coffee"))
+    {
+        string js = ProcessCoffee(filename);
+        filename += debugExtension;
+        using(var fileWriter = fileWriterFactory.GetFileWriter(filename))
+        {
+            fileWriter.Write(js);
+        }
+    }
+    return filename;
+}</pre></div></div>
+
+<p>As you can see, the trigger for preprocessing is the extension.  This is the desired behavior, but the way it was coded left it very brittle and made adding new preprocessors unwieldy.  So we set out to find a way to break this code out of the core library.  </p>
+<p>The approach that we used was plugin based &#8211; we defined an interface and exposed a mechanism to register implementations of this interface with the core library.  Our original interface actually checked a file name to see if it needed preprocessing, so you could define any logic you wanted to determine whether to preprocess &#8211; we ended up eschewing this to go back to the extension-based decisions, for reasons that will be discussed later.  The interface looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">interface</span> IPreprocessor
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw4">bool</span> ValidFor<span class="br0">&#40;</span><span class="kw4">string</span> extension<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; IProcessResult Process<span class="br0">&#40;</span><span class="kw4">string</span> filePath, <span class="kw4">string</span> content<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw4">string</span><span class="br0">&#91;</span><span class="br0">&#93;</span> Extensions <span class="br0">&#123;</span> <span class="kw1">get</span><span class="sy0">;</span> <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public interface IPreprocessor
+{
+    bool ValidFor(string extension);
+    IProcessResult Process(string filePath, string content);
+    string[] Extensions { get; }
+}</pre></div></div>
+
+<p>The &#8220;ValidFor&#8221; method does exactly what it says &#8211; check if the preprocessor should be used with the supplied extension.  &#8220;Process&#8221; is where the actual preprocessing happens.  The array of extensions is exposed publicly to be used in registering the preprocessor &#8211; this is because each type of content bundle has a list of allowed extensions that is used to filter what gets included when we add a directory full of files.  Finally, the ProcessResult type includes a string representing preprocessed content and a list of any dependent files that were changed.  This last part was added by <a href="http://twitter.com/SimonPStevens">Simon Stevens</a> to enable <a href="https://github.com/jetheredge/SquishIt/pull/211">inclusion of .less imports as dependent files</a>.</p>
+<p>Preprocessors can be registered two ways &#8211; both statically and with a particular bundle instance.  For the instance level configuration there is a method in the bundle&#8217;s fluent API called &#8220;WithPreprocessor&#8221; that allows inclusion of a preprocessor with that bundle instance.  Globally, we used the static &#8220;Bundle&#8221; class to allow preprocessor registration &#8211; methods exist there for registering script, style, and global preprocessors.  If preprocessors of the same type are registered both statically and with a bundle instance, the instance-level preprocessor will be used.</p>
+<p>Now, back to why we decided to make preprocessor selection based on extension rather than the complete file name.  To understand, I guess all you have to do is read about the <a href="http://guides.rubyonrails.org/asset_pipeline.html">Asset Pipeline</a> in Ruby on Rails, but I will attempt to summarize here.  The beautiful thing about the pipeline approach is the ability to chain preprocessing steps.  This allows you to use ERB&#8217;s helper methods in your file <strong>prior to</strong> other preprocessing.  For example, if you wanted to use ERB helpers in a coffeescript file you can name your file file.js.coffee.erb &#8211; when an asset has the .coffee and .erb extensions, both preprocessors will be applied.  The order they are applied is driven by the reverse order of extensions, so *.coffee.erb would be preprocessed first by ERB and then by the coffeescript compiler.  Our goal was to emulate this behavior in SquishIt, and without matching preprocessors to extensions rather than filenames we wouldn&#8217;t have been able to.</p>
+<p>Enabling this behavior is mostly a matter of finding preprocessors correctly.  We find them like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">protected</span> IPreprocessor<span class="br0">&#91;</span><span class="br0">&#93;</span> FindPreprocessors<span class="br0">&#40;</span><span class="kw4">string</span> file<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> file<span class="sy0">.</span><span class="me1">Split</span><span class="br0">&#40;</span><span class="st0">'.'</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">Skip</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">Reverse</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Select</span><span class="br0">&#40;</span>FindPreprocessor<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>p <span class="sy0">=&gt;</span> p <span class="sy0">!=</span> <span class="kw1">null</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">ToArray</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">protected IPreprocessor[] FindPreprocessors(string file)
+{
+    return file.Split('.')
+        .Skip(1)
+        .Reverse()
+        .Select(FindPreprocessor)
+        .Where(p =&gt; p != null)
+        .ToArray();
+}</pre></div></div>
+
+<p>It&#8217;s important to note here that &#8220;FindPreprocessor&#8221; uses the firstpreprocessor it finds for a given extension &#8211; so we need to take care if implementing preprocessors for common file extensions like &#8220;.js&#8221;.  We can then use the preprocessors in the default order to process our content:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">protected</span> <span class="kw4">string</span> PreprocessFile<span class="br0">&#40;</span><span class="kw4">string</span> file, IPreprocessor<span class="br0">&#91;</span><span class="br0">&#93;</span> preprocessors<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> directoryWrapper<span class="sy0">.</span><span class="me1">ExecuteInDirectory</span><span class="br0">&#40;</span>Path<span class="sy0">.</span><span class="me1">GetDirectoryName</span><span class="br0">&#40;</span>file<span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">=&gt;</span> PreprocessContent<span class="br0">&#40;</span>file, preprocessors, ReadFile<span class="br0">&#40;</span>file<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">protected</span> <span class="kw4">string</span> PreprocessContent<span class="br0">&#40;</span><span class="kw4">string</span> file, IPreprocessor<span class="br0">&#91;</span><span class="br0">&#93;</span> preprocessors, <span class="kw4">string</span> content<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> preprocessors<span class="sy0">.</span><span class="me1">NullSafeAny</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">?</span> preprocessors<span class="sy0">.</span><span class="me1">Aggregate</span><span class="br0">&#40;</span>content, <span class="br0">&#40;</span>cntnt, pp<span class="br0">&#41;</span> <span class="sy0">=&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> result <span class="sy0">=</span> pp<span class="sy0">.</span><span class="me1">Process</span><span class="br0">&#40;</span>file, cntnt<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; bundleState<span class="sy0">.</span><span class="me1">DependentFiles</span><span class="sy0">.</span><span class="me1">AddRange</span><span class="br0">&#40;</span>result<span class="sy0">.</span><span class="me1">Dependencies</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> result<span class="sy0">.</span><span class="me1">Result</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">:</span> content<span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">protected string PreprocessFile(string file, IPreprocessor[] preprocessors)
+{
+    return directoryWrapper.ExecuteInDirectory(Path.GetDirectoryName(file),
+        () =&gt; PreprocessContent(file, preprocessors, ReadFile(file)));
+}
+
+protected string PreprocessContent(string file, IPreprocessor[] preprocessors, string content)
+{
+    return preprocessors.NullSafeAny()
+               ? preprocessors.Aggregate(content, (cntnt, pp) =&gt;
+                                                      {
+                                                          var result = pp.Process(file, cntnt);
+                                                          bundleState.DependentFiles.AddRange(result.Dependencies);
+                                                          return result.Result;
+                                                      })
+               : content;
+}</pre></div></div>
+
+<p>Despite the fact that we have totally broken everything users have come to depend on, we really do want to make the transition easier for people who were using .less or coffeescript with SquishIt.  This is where the tremendous <a href="http://nuget.org/packages/WebActivator">WebActivator</a> library comes in.  By including this library in our project, it allows us to define bits of code to run when the application starts up, like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>assembly<span class="sy0">:</span> WebActivator<span class="sy0">.</span><span class="me1">PreApplicationStartMethod</span><span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>$rootnamespace$<span class="sy0">.</span><span class="me1">App_Start</span><span class="sy0">.</span><span class="me1">SquishItHogan</span><span class="br0">&#41;</span>, <span class="st0">&quot;Start&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp;
+<span class="kw1">namespace</span> $rootnamespace$<span class="sy0">.</span><span class="me1">App_Start</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">using</span> <span class="co3">SquishIt.Framework</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">using</span> <span class="co3">SquishIt.Hogan</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> SquishItHogan
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">void</span> Start<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Bundle<span class="sy0">.</span><span class="me1">RegisterScriptPreprocessor</span><span class="br0">&#40;</span><span class="kw3">new</span> HoganPreprocessor<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[assembly: WebActivator.PreApplicationStartMethod(typeof($rootnamespace$.App_Start.SquishItHogan), "Start")]
+
+namespace $rootnamespace$.App_Start
+{
+    using SquishIt.Framework;
+    using SquishIt.Hogan;
+
+    public class SquishItHogan
+    {
+        public static void Start()
+        {
+            Bundle.RegisterScriptPreprocessor(new HoganPreprocessor());
+        }
+    }
+}</pre></div></div>
+
+<p>Thanks to this snippet, you don&#8217;t actually need to do anything to hook up global preprocessing &#8211; just reference the dll containing your preprocessor and WebActivator.  This example is from the Hogan preprocessor, submitted by <a href="https://twitter.com/jincod">Abdrashitov Vadim</a>.  This pull request made me smile more than any I&#8217;ve seen in recent memory &#8211; a big part of the reason we moved to this model was to make it easier for people to define their own preprocessors and share them with the community.  To have one submitted by a user before we even had a production-ready release was just so cool.</p>
+<p>I think this covers most of the changes, at least at a cursory level.  I hope to find the time to put together a bit of proper documentation in the next few months, but hopefully this will help in the meantime.  I&#8217;d like to extend a huge thanks to everyone who reported bugs in our pre-release versions, and to <a href="https://twitter.com/rlsdumont">Rodrigo Dumont</a> who provided the spark to get started on this stuff late last year.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/preprocessor-extensibility-in-squishit-0-9/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SquishIt Integration with Amazon S3 / Cloudfront</title>
+		<link>/index.php/webdev/serverprogramming/making-squishit-work-with-amazon/</link>
+		<comments>/index.php/webdev/serverprogramming/making-squishit-work-with-amazon/#comments</comments>
+		<pubDate>Tue, 12 Jun 2012 11:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[squishit]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/06/making-squishit-work-with-amazon/</guid>
+		<description><![CDATA[For the unfortunate souls not in the know (or is it the fortunate souls using one of the myriad alternatives?), SquishIt is a library used to optimize content delivery at runtime in ASP.net applications.  It combines and minifies javascript files, and a&#8230;]]></description>
+				<content:encoded><![CDATA[<p>For the unfortunate souls not in the know (or is it the fortunate souls using one of the myriad alternatives?), <a href="https://github.com/jetheredge/SquishIt">SquishIt</a> is a library used to optimize content delivery at runtime in ASP.net applications.  It combines and minifies javascript files, and also does a bit of preprocessing for things like <a href="http://lesscss.org/">LESS</a> and <a href="http://coffeescript.org/">CoffeeScript</a>.  I&#8217;ve been working with Justin Etheredge (<a href="http://www.codethinked.com/">blog</a>|<a href="https://twitter.com/#!/justinetheredge">twitter</a>) on this for a while, first on patches for various bugs I encountered trying to use SquishIt on linux, but more recently my focus has been on improving extensibility.  One of the areas that I really felt the library could benefit from increased extensibility is the area of CDN support.  I&#8217;ve been doing a lot of work with Amazon CloudFront lately, and decided it would be cool to see how cleanly I could get SquishIt to work with the service.</p>
+<h3>SquishIt CDN Support in Previous Versions</h3>
+<p>I suppose it makes sense to start with what we already had in place.  CDN support in SquishIt has been slowly progressing, largely thanks to community contributions.  As of version 0.8.6 we did have support for injecting a base URL into asset paths, but this required you to know the generated file name in advance and upload it to your CDN through other means.  While this worked, and could be easily automated in your build process, it wasn&#8217;t exactly convenient.  The pull requests we&#8217;ve gotten have done a fairly good job showing us what the community wants in terms of CDN support, so it feels like it is time to start trying to treat it as a first class citizen.    The first thing I would like is a way to render the combined file directly to my CDN if it doesn&#8217;t already exist, and maybe a way to force overwriting the file if need be.</p>
+<h3>Adding Support for Custom Renderers</h3>
+<p>For a while now, SquishIt has had an IRenderer interface.  It has been there, but it has only been used internally to support rendering to the file system or to an in-memory cache.  To get started, we needed to expose this interface publicly so that other assemblies could provide implementations.  Once exposed, we need to enable consumers to supply their custom renderers to the SquishIt core somehow.</p>
+<p>SquishIt uses a fluent configuration syntax for setting up individual bundles, and that seemed as good a place to start as any.  Typical usage looks something like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithAttribute</span><span class="br0">&#40;</span><span class="st0">&quot;attrName&quot;</span>, <span class="st0">&quot;attrValue&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;file1.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/otherscripts/file2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">Render</span><span class="br0">&#40;</span><span class="st0">&quot;combinedOutput.js&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.JavaScript()
+    .WithAttribute("attrName", "attrValue")
+    .Add("file1.js")
+    .Add("/otherscripts/file2.js")
+    .Render("combinedOutput.js");</pre></div></div>
+
+<p>So the first thing that came to mind was to add something like a &#8220;WithFileRenderer&#8221; method.  This would give us a way to inject a renderer into a bundle and have it used to render the combined files.  However, we probably don&#8217;t want to render to the CDN while debugging, so &#8220;WithReleaseFileRenderer&#8221; might be more appropriate.   Setting up the method went something like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">IRenderer releaseFileRenderer<span class="sy0">;</span>
+&nbsp;
+<span class="kw1">public</span> T WithReleaseFileRenderer<span class="br0">&#40;</span>IRenderer renderer<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">releaseFileRenderer</span> <span class="sy0">=</span> renderer<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> <span class="br0">&#40;</span>T<span class="br0">&#41;</span><span class="kw1">this</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">IRenderer releaseFileRenderer;
+
+public T WithReleaseFileRenderer(IRenderer renderer)
+{
+    this.releaseFileRenderer = renderer;
+    return (T)this;
+}</pre></div></div>
+
+<p>We also want a way to configure this globally, to do that we needed to add a bit to our configuration class.  This was basically the same thing:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">IRenderer _defaultReleaseRenderer<span class="sy0">;</span>
+<span class="kw1">public</span> Configuration UseReleaseRenderer<span class="br0">&#40;</span>IRenderer releaseRenderer<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; _defaultReleaseRenderer <span class="sy0">=</span> releaseRenderer<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> <span class="kw1">this</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">IRenderer _defaultReleaseRenderer;
+public Configuration UseReleaseRenderer(IRenderer releaseRenderer)
+{
+    _defaultReleaseRenderer = releaseRenderer;
+    return this;
+}</pre></div></div>
+
+<p>Finally, we need to change the way the file renderer is obtained when we go to render the combined assets.  Previously we were instantiating a new FileRenderer or CacheRenderer depending on circumstance, and passing that renderer into the main rendering method.  This won&#8217;t cut it anymore, as our needs have gotten significantly more complex.  The constraints we have to deal with are as follows:</p>
+<ul>
+<li>When debugging we should use a normal file renderer</li>
+<li>We should favor a renderer configured at the instance level over one configured statically</li>
+<li>If no instance or static renderer is configured we should use the old default behavior</li>
+</ul>
+<p>So the constructor calls for a new FileRenderer are replaced with calls to this method:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">protected</span> IRenderer GetFileRenderer<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> debugStatusReader<span class="sy0">.</span><span class="me1">IsDebuggingEnabled</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">?</span> <span class="kw3">new</span> FileRenderer<span class="br0">&#40;</span>fileWriterFactory<span class="br0">&#41;</span> <span class="sy0">:</span>
+&nbsp; &nbsp; &nbsp; &nbsp; bundleState<span class="sy0">.</span><span class="me1">ReleaseFileRenderer</span> <span class="sy0">??</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Configuration<span class="sy0">.</span><span class="me1">Instance</span><span class="sy0">.</span><span class="me1">DefaultReleaseRenderer</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">??</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">new</span> FileRenderer<span class="br0">&#40;</span>fileWriterFactory<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">protected IRenderer GetFileRenderer()
+{
+    return debugStatusReader.IsDebuggingEnabled() ? new FileRenderer(fileWriterFactory) :
+        bundleState.ReleaseFileRenderer ??
+        Configuration.Instance.DefaultReleaseRenderer() ??
+        new FileRenderer(fileWriterFactory);
+}</pre></div></div>
+
+<p>This is basically all we needed to do to enable us to plug in a custom renderer to use in release mode.  Now we can look at how we can make the CDN integration happen.</p>
+<h3>Building the S3 Keys</h3>
+<p>The only really tricky thing about building the renderer is that it takes a string representing the disk location to render to.  Changing what the renderer takes as a parameter would involve a more significant change to the core behavior than I&#8217;m comfortable making right now, so the first thing we need is a way to turn these disk locations into keys that S3 can use.  The key we create needs to match the relative path to that of the locally-rendered asset so that injecting the base url will yield the absolute path that we need.</p>
+<p>None of this is terribly difficult &#8211; the main edge cases we need to cover are</p>
+<ul>
+<li>Root appearing twice in the file path (because of Windows&#8217; drive lettering this is mostly an issue running on unix-based systems)</li>
+<li>Virtual directories</li>
+</ul>
+<p>To meet these requirements the two pieces of information that we need inside the key builder are the physical application path and virtual directory.  Here are some tests:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> ReturnToRelative<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> root <span class="sy0">=</span> <span class="st_h">@&quot;C:fakedir&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> file <span class="sy0">=</span> <span class="st_h">@&quot;anotherfile.js&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> expected <span class="sy0">=</span> <span class="st_h">@&quot;another/file.js&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> builder <span class="sy0">=</span> <span class="kw3">new</span> KeyBuilder<span class="br0">&#40;</span>root, <span class="st0">&quot;&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreEqual</span><span class="br0">&#40;</span>expected, builder<span class="sy0">.</span><span class="me1">GetKeyFor</span><span class="br0">&#40;</span>root <span class="sy0">+</span> file<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> ReturnToRelative_Injects_Virtual_Directory<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> root <span class="sy0">=</span> <span class="st_h">@&quot;C:fakedir&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> file <span class="sy0">=</span> <span class="st_h">@&quot;anotherfile.js&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> vdir <span class="sy0">=</span> <span class="st0">&quot;/this&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> expected <span class="sy0">=</span> <span class="st_h">@&quot;this/another/file.js&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> builder <span class="sy0">=</span> <span class="kw3">new</span> KeyBuilder<span class="br0">&#40;</span>root, vdir<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreEqual</span><span class="br0">&#40;</span>expected, builder<span class="sy0">.</span><span class="me1">GetKeyFor</span><span class="br0">&#40;</span>root <span class="sy0">+</span> file<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> ReturnToRelative_Only_Replaces_First_Occurrence_Of_Root<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> root <span class="sy0">=</span> <span class="st_h">@&quot;test/&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> file <span class="sy0">=</span> <span class="st_h">@&quot;another/andthen/test/again.js&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> expected <span class="sy0">=</span> <span class="st_h">@&quot;another/andthen/test/again.js&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> builder <span class="sy0">=</span> <span class="kw3">new</span> KeyBuilder<span class="br0">&#40;</span>root, <span class="st0">&quot;&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreEqual</span><span class="br0">&#40;</span>expected, builder<span class="sy0">.</span><span class="me1">GetKeyFor</span><span class="br0">&#40;</span>root <span class="sy0">+</span> file<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void ReturnToRelative()
+{
+    var root = @"C:fakedir";
+    var file = @"anotherfile.js";
+    var expected = @"another/file.js";
+
+    var builder = new KeyBuilder(root, "");
+    Assert.AreEqual(expected, builder.GetKeyFor(root + file));
+}
+
+[Test]
+public void ReturnToRelative_Injects_Virtual_Directory()
+{
+    var root = @"C:fakedir";
+    var file = @"anotherfile.js";
+    var vdir = "/this";
+    var expected = @"this/another/file.js";
+
+    var builder = new KeyBuilder(root, vdir);
+    Assert.AreEqual(expected, builder.GetKeyFor(root + file));
+}
+
+[Test]
+public void ReturnToRelative_Only_Replaces_First_Occurrence_Of_Root()
+{
+    var root = @"test/";
+    var file = @"another/andthen/test/again.js";
+    var expected = @"another/andthen/test/again.js";
+
+    var builder = new KeyBuilder(root, "");
+    Assert.AreEqual(expected, builder.GetKeyFor(root + file));
+}</pre></div></div>
+
+<p>And the implementation for the KeyBuilder:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">internal</span> <span class="kw4">class</span> KeyBuilder <span class="sy0">:</span> IKeyBuilder
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">readonly</span> <span class="kw4">string</span> physicalApplicationPath<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">readonly</span> <span class="kw4">string</span> virtualDirectory<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> KeyBuilder<span class="br0">&#40;</span><span class="kw4">string</span> physicalApplicationPath, <span class="kw4">string</span> virtualDirectory<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">physicalApplicationPath</span> <span class="sy0">=</span> physicalApplicationPath<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">virtualDirectory</span> <span class="sy0">=</span> virtualDirectory<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">string</span> GetKeyFor<span class="br0">&#40;</span><span class="kw4">string</span> path<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> RelativeFromAbsolutePath<span class="br0">&#40;</span>path<span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">TrimStart</span><span class="br0">&#40;</span><span class="st0">'/'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw4">string</span> RelativeFromAbsolutePath<span class="br0">&#40;</span><span class="kw4">string</span> path<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; path <span class="sy0">=</span> path<span class="sy0">.</span><span class="me1">StartsWith</span><span class="br0">&#40;</span>physicalApplicationPath<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">?</span> path<span class="sy0">.</span><span class="me1">Substring</span><span class="br0">&#40;</span>physicalApplicationPath<span class="sy0">.</span><span class="me1">Length</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">:</span> path<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> virtualDirectory <span class="sy0">+</span> <span class="st0">&quot;/&quot;</span> <span class="sy0">+</span> path<span class="sy0">.</span><span class="me1">Replace</span><span class="br0">&#40;</span><span class="st_h">@&quot;&quot;</span>, <span class="st0">&quot;/&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">TrimStart</span><span class="br0">&#40;</span><span class="st0">'/'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">internal class KeyBuilder : IKeyBuilder
+{
+    readonly string physicalApplicationPath;
+    readonly string virtualDirectory;
+
+    public KeyBuilder(string physicalApplicationPath, string virtualDirectory)
+    {
+        this.physicalApplicationPath = physicalApplicationPath;
+        this.virtualDirectory = virtualDirectory;
+    }
+
+    public string GetKeyFor(string path)
+    {
+        return RelativeFromAbsolutePath(path).TrimStart('/');
+    }
+
+    string RelativeFromAbsolutePath(string path)
+    {
+        path = path.StartsWith(physicalApplicationPath)
+                        ? path.Substring(physicalApplicationPath.Length)
+                        : path;
+
+        return virtualDirectory + "/" + path.Replace(@"", "/").TrimStart('/');
+    }
+}</pre></div></div>
+
+<p>Now that we have a means to build keys we can look at implementing the S3 Renderer.</p>
+<h3>S3 Renderer Implementation</h3>
+<p>The interface for renderers is very simple.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">interface</span> IRenderer
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw4">void</span> Render<span class="br0">&#40;</span><span class="kw4">string</span> content, <span class="kw4">string</span> outputPath<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public interface IRenderer
+{
+    void Render(string content, string outputPath);
+}</pre></div></div>
+
+<p>The only things we&#8217;ll need to implement this method are an initialized S3 client, a bucket and the key builder we implemented in the last section.  By default, we won&#8217;t want to upload our content if it already exists on the CDN, so we will need to check for existence before uploading the content.  This can be done by querying for object metadata using the desired key &#8211; if the file doesn&#8217;t exist we will get a &#8220;not found&#8221; status on the exception thrown by the s3 client.  So the most important test will look like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> Render_Uploads_If_File_Doesnt_Exist<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> s3client <span class="sy0">=</span> <span class="kw3">new</span> Mock<span class="sy0">&lt;</span>AmazonS3<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> keyBuilder <span class="sy0">=</span> <span class="kw3">new</span> Mock<span class="sy0">&lt;</span>IKeyBuilder<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> key <span class="sy0">=</span> <span class="st0">&quot;key&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> bucket <span class="sy0">=</span> <span class="st0">&quot;bucket&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> path <span class="sy0">=</span> <span class="st0">&quot;path&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> content <span class="sy0">=</span> <span class="st0">&quot;content&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; keyBuilder<span class="sy0">.</span><span class="me1">Setup</span><span class="br0">&#40;</span>kb <span class="sy0">=&gt;</span> kb<span class="sy0">.</span><span class="me1">GetKeyFor</span><span class="br0">&#40;</span>path<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Returns</span><span class="br0">&#40;</span>key<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; s3client<span class="sy0">.</span><span class="me1">Setup</span><span class="br0">&#40;</span>c <span class="sy0">=&gt;</span> c<span class="sy0">.</span><span class="me1">GetObjectMetadata</span><span class="br0">&#40;</span>It<span class="sy0">.</span><span class="kw3">Is</span><span class="sy0">&lt;</span>GetObjectMetadataRequest<span class="sy0">&gt;</span><span class="br0">&#40;</span>gomr <span class="sy0">=&gt;</span> gomr<span class="sy0">.</span><span class="me1">BucketName</span> <span class="sy0">==</span> bucket <span class="sy0">&amp;&amp;</span> gomr<span class="sy0">.</span><span class="me1">Key</span> <span class="sy0">==</span> key<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="me1">Throws</span><span class="br0">&#40;</span><span class="kw3">new</span> AmazonS3Exception<span class="br0">&#40;</span><span class="st0">&quot;&quot;</span>, HttpStatusCode<span class="sy0">.</span><span class="me1">NotFound</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">using</span><span class="br0">&#40;</span><span class="kw1">var</span> renderer <span class="sy0">=</span> S3Renderer<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span>s3client<span class="sy0">.</span><span class="kw4">Object</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithBucketName</span><span class="br0">&#40;</span>bucket<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithKeyBuilder</span><span class="br0">&#40;</span>keyBuilder<span class="sy0">.</span><span class="kw4">Object</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; renderer<span class="sy0">.</span><span class="me1">Render</span><span class="br0">&#40;</span>content, path<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; s3client<span class="sy0">.</span><span class="me1">Verify</span><span class="br0">&#40;</span>c <span class="sy0">=&gt;</span> c<span class="sy0">.</span><span class="me1">PutObject</span><span class="br0">&#40;</span>It<span class="sy0">.</span><span class="kw3">Is</span><span class="sy0">&lt;</span>PutObjectRequest<span class="sy0">&gt;</span><span class="br0">&#40;</span>por <span class="sy0">=&gt;</span> por<span class="sy0">.</span><span class="me1">Key</span> <span class="sy0">==</span> key <span class="sy0">&amp;&amp;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; por<span class="sy0">.</span><span class="me1">BucketName</span> <span class="sy0">==</span> bucket <span class="sy0">&amp;&amp;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; por<span class="sy0">.</span><span class="me1">ContentBody</span> <span class="sy0">==</span> content <span class="sy0">&amp;&amp;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; por<span class="sy0">.</span><span class="me1">CannedACL</span> <span class="sy0">==</span> S3CannedACL<span class="sy0">.</span><span class="me1">NoACL</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void Render_Uploads_If_File_Doesnt_Exist()
+{
+    var s3client = new Mock&lt;AmazonS3&gt;();
+    var keyBuilder = new Mock&lt;IKeyBuilder&gt;();
+
+    var key = "key";
+    var bucket = "bucket";
+    var path = "path";
+    var content = "content";
+
+    keyBuilder.Setup(kb =&gt; kb.GetKeyFor(path)).Returns(key);
+
+    s3client.Setup(c =&gt; c.GetObjectMetadata(It.Is&lt;GetObjectMetadataRequest&gt;(gomr =&gt; gomr.BucketName == bucket &amp;&amp; gomr.Key == key))).
+        Throws(new AmazonS3Exception("", HttpStatusCode.NotFound));
+
+    using(var renderer = S3Renderer.Create(s3client.Object)
+                            .WithBucketName(bucket)
+                            .WithKeyBuilder(keyBuilder.Object))
+    {
+        renderer.Render(content, path);
+    }
+
+    s3client.Verify(c =&gt; c.PutObject(It.Is&lt;PutObjectRequest&gt;(por =&gt; por.Key == key &amp;&amp;
+                                                                        por.BucketName == bucket &amp;&amp;
+                                                                        por.ContentBody == content &amp;&amp;
+                                                                        por.CannedACL == S3CannedACL.NoACL)));
+}</pre></div></div>
+
+<p>Note that it is checking the PutObjectRequest to ensure that the ACL used is &#8220;NoACL&#8221;.  This is probably not an optimal default (most people will want the &#8220;PublicRead&#8221; ACL I imagine) but I decided to err on the side of caution and force people to opt-in to making their content publicly visible.  The implementation for the render method looks something like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">void</span> Render<span class="br0">&#40;</span><span class="kw4">string</span> content, <span class="kw4">string</span> outputPath<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span><span class="kw4">string</span><span class="sy0">.</span><span class="me1">IsNullOrEmpty</span><span class="br0">&#40;</span>outputPath<span class="br0">&#41;</span> <span class="sy0">||</span> <span class="kw4">string</span><span class="sy0">.</span><span class="me1">IsNullOrEmpty</span><span class="br0">&#40;</span>content<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">throw</span> <span class="kw3">new</span> InvalidOperationException<span class="br0">&#40;</span><span class="st0">&quot;Can't render to S3 with missing key/content.&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> key <span class="sy0">=</span> keyBuilder<span class="sy0">.</span><span class="me1">GetKeyFor</span><span class="br0">&#40;</span>outputPath<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span><span class="sy0">!</span>FileExists<span class="br0">&#40;</span>key<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; UploadContent<span class="br0">&#40;</span>key, content<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw4">void</span> UploadContent<span class="br0">&#40;</span><span class="kw4">string</span> key, <span class="kw4">string</span> content<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> request <span class="sy0">=</span> <span class="kw3">new</span> PutObjectRequest<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithBucketName</span><span class="br0">&#40;</span>bucket<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithKey</span><span class="br0">&#40;</span>key<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithCannedACL</span><span class="br0">&#40;</span>cannedACL<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithContentBody</span><span class="br0">&#40;</span>content<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; s3client<span class="sy0">.</span><span class="me1">PutObject</span><span class="br0">&#40;</span>request<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw4">bool</span> FileExists<span class="br0">&#40;</span><span class="kw4">string</span> key<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> request <span class="sy0">=</span> <span class="kw3">new</span> GetObjectMetadataRequest<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithBucketName</span><span class="br0">&#40;</span>bucket<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithKey</span><span class="br0">&#40;</span>key<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> response <span class="sy0">=</span> s3client<span class="sy0">.</span><span class="me1">GetObjectMetadata</span><span class="br0">&#40;</span>request<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="kw1">true</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">catch</span><span class="br0">&#40;</span>AmazonS3Exception ex<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span>ex<span class="sy0">.</span><span class="me1">StatusCode</span> <span class="sy0">==</span> HttpStatusCode<span class="sy0">.</span><span class="me1">NotFound</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="kw1">false</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">throw</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public void Render(string content, string outputPath)
+{
+    if(string.IsNullOrEmpty(outputPath) || string.IsNullOrEmpty(content)) throw new InvalidOperationException("Can't render to S3 with missing key/content.");
+
+    var key = keyBuilder.GetKeyFor(outputPath);
+    if(!FileExists(key))
+    {
+        UploadContent(key, content);
+    }
+}
+
+void UploadContent(string key, string content)
+{
+    var request = new PutObjectRequest()
+        .WithBucketName(bucket)
+        .WithKey(key)
+        .WithCannedACL(cannedACL)
+        .WithContentBody(content);
+
+    s3client.PutObject(request);
+}
+
+bool FileExists(string key)
+{
+    try
+    {
+        var request = new GetObjectMetadataRequest()
+            .WithBucketName(bucket)
+            .WithKey(key);
+
+        var response = s3client.GetObjectMetadata(request);
+
+        return true;
+    }
+    catch(AmazonS3Exception ex)
+    {
+        if(ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+        throw;
+    }
+}</pre></div></div>
+
+<p>It has gotten slightly more complex since then (I&#8217;ve added configurable headers and an option for forcing overwrite of the existing file) but the core logic remains the same.  It&#8217;s a fairly naive implementation but my experience with the Amazon services has been good enough so far that I haven&#8217;t encountered a lot of the exceptions that I hope to add handling for in the future.</p>
+<h3>Adding Invalidation</h3>
+<p>At this point we should be able to render our content directly to S3, but this doesn&#8217;t get us all the way to where we need to be.  While hosting static content in S3 offers some advantages over hosting it locally and it <strong>can</strong> work as a CDN, using CloudFront to deliver your S3 content makes more sense if you really want to minimize latency.  To make this work we&#8217;ll just need to add an invaliator to the mix.  A test for the core usage looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> Invalidate<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> cloudfrontClient <span class="sy0">=</span> <span class="kw3">new</span> Mock<span class="sy0">&lt;</span>AmazonCloudFront<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> distributionId <span class="sy0">=</span> Guid<span class="sy0">.</span><span class="me1">NewGuid</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> bucket <span class="sy0">=</span> Guid<span class="sy0">.</span><span class="me1">NewGuid</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> distribution <span class="sy0">=</span> bucket <span class="sy0">+</span> <span class="st0">&quot;.s3.amazonaws.com&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> key <span class="sy0">=</span> Guid<span class="sy0">.</span><span class="me1">NewGuid</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> listDistributionsResponse <span class="sy0">=</span> <span class="kw3">new</span> ListDistributionsResponse<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; listDistributionsResponse<span class="sy0">.</span><span class="me1">Distribution</span><span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="kw3">new</span> CloudFrontDistribution
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Id <span class="sy0">=</span> distributionId,
+&nbsp; &nbsp; &nbsp; &nbsp; DistributionConfig <span class="sy0">=</span> <span class="kw3">new</span> CloudFrontDistributionConfig
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; S3Origin <span class="sy0">=</span> <span class="kw3">new</span> S3Origin<span class="br0">&#40;</span>distribution, <span class="kw1">null</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; cloudfrontClient<span class="sy0">.</span><span class="me1">Setup</span><span class="br0">&#40;</span>cfc <span class="sy0">=&gt;</span> cfc<span class="sy0">.</span><span class="me1">ListDistributions</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">Returns</span><span class="br0">&#40;</span>listDistributionsResponse<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> invalidator <span class="sy0">=</span> <span class="kw3">new</span> CloudFrontInvalidator<span class="br0">&#40;</span>cloudfrontClient<span class="sy0">.</span><span class="kw4">Object</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; invalidator<span class="sy0">.</span><span class="me1">InvalidateObject</span><span class="br0">&#40;</span>bucket, key<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; cloudfrontClient<span class="sy0">.</span><span class="me1">Verify</span><span class="br0">&#40;</span>cfc <span class="sy0">=&gt;</span> cfc<span class="sy0">.</span><span class="me1">PostInvalidation</span><span class="br0">&#40;</span>It<span class="sy0">.</span><span class="kw3">Is</span><span class="sy0">&lt;</span>PostInvalidationRequest<span class="sy0">&gt;</span><span class="br0">&#40;</span>pir <span class="sy0">=&gt;</span> pir<span class="sy0">.</span><span class="me1">DistributionId</span> <span class="sy0">==</span> distributionId
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">&amp;&amp;</span> pir<span class="sy0">.</span><span class="me1">InvalidationBatch</span><span class="sy0">.</span><span class="me1">Paths</span><span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">==</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">&amp;&amp;</span> pir<span class="sy0">.</span><span class="me1">InvalidationBatch</span><span class="sy0">.</span><span class="me1">Paths</span><span class="sy0">.</span><span class="me1">First</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">==</span> key<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void Invalidate()
+{
+    var cloudfrontClient = new Mock&lt;AmazonCloudFront&gt;();
+
+    var distributionId = Guid.NewGuid().ToString();
+    var bucket = Guid.NewGuid().ToString();
+    var distribution = bucket + ".s3.amazonaws.com";
+    var key = Guid.NewGuid().ToString();
+
+    var listDistributionsResponse = new ListDistributionsResponse();
+    listDistributionsResponse.Distribution.Add(new CloudFrontDistribution
+    {
+        Id = distributionId,
+        DistributionConfig = new CloudFrontDistributionConfig
+        {
+            S3Origin = new S3Origin(distribution, null)
+        }
+    });
+
+    cloudfrontClient.Setup(cfc =&gt; cfc.ListDistributions())
+        .Returns(listDistributionsResponse);
+
+    var invalidator = new CloudFrontInvalidator(cloudfrontClient.Object);
+    invalidator.InvalidateObject(bucket, key);
+
+    cloudfrontClient.Verify(cfc =&gt; cfc.PostInvalidation(It.Is&lt;PostInvalidationRequest&gt;(pir =&gt; pir.DistributionId == distributionId
+        &amp;&amp; pir.InvalidationBatch.Paths.Count == 1
+        &amp;&amp; pir.InvalidationBatch.Paths.First() == key)));
+}</pre></div></div>
+
+<p>The implementation is pretty straightforward, and will look very familiar to anyone who read my post regarding <a href="/index.php/WebDev/ServerProgramming/copying-buckets-with-the-amazon-s3-api">copying buckets with the S3 API</a>.  There are only two changes, first that we only need to invalidate one object at a time, and second that we only want to query for the list of CloudFront distributions once.  Code for the CloudFront invalidator looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+</pre></td><td class="de1"><pre class="de1"><span class="kw4">class</span> CloudFrontInvalidator <span class="sy0">:</span> IDisposable, IInvalidator
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">const</span> <span class="kw4">string</span> amazonBucketUriSuffix <span class="sy0">=</span> <span class="st0">&quot;.s3.amazonaws.com&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">const</span> <span class="kw4">string</span> dateFormatWithMilliseconds <span class="sy0">=</span> <span class="st0">&quot;yyyy-MM-dd hh:mm:ss.ff&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">readonly</span> AmazonCloudFront cloudFrontClient<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> CloudFrontInvalidator<span class="br0">&#40;</span>AmazonCloudFront cloudFrontClient<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span><span class="sy0">.</span><span class="me1">cloudFrontClient</span> <span class="sy0">=</span> cloudFrontClient<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> InvalidateObject<span class="br0">&#40;</span><span class="kw4">string</span> bucket, <span class="kw4">string</span> key<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> distId <span class="sy0">=</span> GetDistributionIdFor<span class="br0">&#40;</span>bucket<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span><span class="sy0">!</span><span class="kw4">string</span><span class="sy0">.</span><span class="me1">IsNullOrWhiteSpace</span><span class="br0">&#40;</span>distId<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> invalidationRequest <span class="sy0">=</span> <span class="kw3">new</span> PostInvalidationRequest<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithDistribtionId</span><span class="br0">&#40;</span>distId<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithInvalidationBatch</span><span class="br0">&#40;</span><span class="kw3">new</span> InvalidationBatch<span class="br0">&#40;</span>DateTime<span class="sy0">.</span><span class="me1">Now</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span>dateFormatWithMilliseconds<span class="br0">&#41;</span>, <span class="kw3">new</span> List<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span> <span class="br0">&#123;</span> key <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; cloudFrontClient<span class="sy0">.</span><span class="me1">PostInvalidation</span><span class="br0">&#40;</span>invalidationRequest<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; Dictionary<span class="sy0">&lt;</span><span class="kw4">string</span>, <span class="kw4">string</span><span class="sy0">&gt;</span> distributionNameAndIds<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw4">string</span> GetDistributionIdFor<span class="br0">&#40;</span><span class="kw4">string</span> bucketName<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; distributionNameAndIds <span class="sy0">=</span> distributionNameAndIds <span class="sy0">??</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; cloudFrontClient<span class="sy0">.</span><span class="me1">ListDistributions</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">Distribution</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">ToDictionary</span><span class="br0">&#40;</span>cfd <span class="sy0">=&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; cfd<span class="sy0">.</span><span class="me1">DistributionConfig</span><span class="sy0">.</span><span class="me1">S3Origin</span><span class="sy0">.</span><span class="me1">DNSName</span><span class="sy0">.</span><span class="me1">Replace</span><span class="br0">&#40;</span>amazonBucketUriSuffix, <span class="st0">&quot;&quot;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; cfd <span class="sy0">=&gt;</span> cfd<span class="sy0">.</span><span class="me1">Id</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> id <span class="sy0">=</span> <span class="kw1">null</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; distributionNameAndIds<span class="sy0">.</span><span class="me1">TryGetValue</span><span class="br0">&#40;</span>bucketName, <span class="kw1">out</span> id<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> id<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Dispose<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; cloudFrontClient<span class="sy0">.</span><span class="me1">Dispose</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">class CloudFrontInvalidator : IDisposable, IInvalidator
+{
+    const string amazonBucketUriSuffix = ".s3.amazonaws.com";
+    const string dateFormatWithMilliseconds = "yyyy-MM-dd hh:mm:ss.ff";
+    readonly AmazonCloudFront cloudFrontClient;
+
+    public CloudFrontInvalidator(AmazonCloudFront cloudFrontClient)
+    {
+        this.cloudFrontClient = cloudFrontClient;
+    }
+
+    public void InvalidateObject(string bucket, string key)
+    {
+        var distId = GetDistributionIdFor(bucket);
+        if(!string.IsNullOrWhiteSpace(distId))
+        {
+            var invalidationRequest = new PostInvalidationRequest()
+                .WithDistribtionId(distId)
+                .WithInvalidationBatch(new InvalidationBatch(DateTime.Now.ToString(dateFormatWithMilliseconds), new List&lt;string&gt; { key }));
+
+            cloudFrontClient.PostInvalidation(invalidationRequest);
+        }
+    }
+
+    Dictionary&lt;string, string&gt; distributionNameAndIds;
+
+    string GetDistributionIdFor(string bucketName)
+    {
+        distributionNameAndIds = distributionNameAndIds ??
+            cloudFrontClient.ListDistributions()
+            .Distribution
+            .ToDictionary(cfd =&gt;
+                cfd.DistributionConfig.S3Origin.DNSName.Replace(amazonBucketUriSuffix, ""),
+                cfd =&gt; cfd.Id);
+
+        string id = null;
+        distributionNameAndIds.TryGetValue(bucketName, out id);
+        return id;
+    }
+
+    public void Dispose()
+    {
+        cloudFrontClient.Dispose();
+    }
+}</pre></div></div>
+
+<p>As an interesting aside, while I was working on this Amazon released <a href="http://aws.amazon.com/releasenotes/7875688065681094">support for querystring invalidation/versioning</a>, which is SquishIt&#8217;s default behavior.  I had planned to add a release note telling people that they would need to use squishit&#8217;s &#8220;hash in filename&#8221; option, but it seems like now there won&#8217;t be any need <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<h3>Neat, But How Do I Use This?</h3>
+<p>It&#8217;s nice that this all works on paper (and in unit tests) but how do we actually tie everything together?  One of the key design decisions was that the renderer is instantiated with pre-initialized CloudFront and S3 clients.  This way users aren&#8217;t locked into a certain method of getting credentials or anything like that.  To use the custom renderer for only a particular bundle usage would be something like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> s3client <span class="sy0">=</span> <span class="kw3">new</span> AmazonS3Client<span class="br0">&#40;</span><span class="st0">&quot;accessKey&quot;</span>, <span class="st0">&quot;secretKey&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">var</span> renderer <span class="sy0">=</span> S3Renderer<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span>s3client<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithBucketName</span><span class="br0">&#40;</span><span class="st0">&quot;bucket&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithDefaultKeyBuilder</span><span class="br0">&#40;</span>HttpContext<span class="sy0">.</span><span class="me1">Current</span><span class="sy0">.</span><span class="me1">Request</span><span class="sy0">.</span><span class="me1">PhysicalApplicationPath</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; HttpContext<span class="sy0">.</span><span class="me1">Current</span><span class="sy0">.</span><span class="me1">Request</span><span class="sy0">.</span><span class="me1">ApplicationPath</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithCannedAcl</span><span class="br0">&#40;</span>S3CannedACL<span class="sy0">.</span><span class="me1">PublicRead</span><span class="br0">&#41;</span> <span class="kw1">as</span> IRenderer<span class="sy0">;</span>
+&nbsp;
+Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithReleaseFileRenderer</span><span class="br0">&#40;</span>renderer<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithOutputBaseHref</span><span class="br0">&#40;</span><span class="st0">&quot;http://s3.amazonaws.com/bucket&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;file1.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;file2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">Render</span><span class="br0">&#40;</span><span class="st0">&quot;combined.js&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var s3client = new AmazonS3Client("accessKey", "secretKey");
+var renderer = S3Renderer.Create(s3client)
+    .WithBucketName("bucket")
+    .WithDefaultKeyBuilder(HttpContext.Current.Request.PhysicalApplicationPath,
+                                    HttpContext.Current.Request.ApplicationPath)
+    .WithCannedAcl(S3CannedACL.PublicRead) as IRenderer;
+
+Bundle.JavaScript()
+    .WithReleaseFileRenderer(renderer)
+    .WithOutputBaseHref("http://s3.amazonaws.com/bucket")
+    .Add("file1.js")
+    .Add("file2.js")
+    .Render("combined.js");</pre></div></div>
+
+<p>This is nice, but I think the global configuration is probably what people will be using more often.  As is common in ASP.net apps a lot of the setup magic for this happens in the app initialization.  So you&#8217;d add something like this to your Application_Start method (in Global.asax.cs):</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> s3client <span class="sy0">=</span> <span class="kw3">new</span> AmazonS3Client<span class="br0">&#40;</span><span class="st0">&quot;accessKey&quot;</span>, <span class="st0">&quot;secretKey&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">var</span> renderer <span class="sy0">=</span> S3Renderer<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span>s3client<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithBucketName</span><span class="br0">&#40;</span><span class="st0">&quot;bucket&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithDefaultKeyBuilder</span><span class="br0">&#40;</span>HttpContext<span class="sy0">.</span><span class="me1">Current</span><span class="sy0">.</span><span class="me1">Request</span><span class="sy0">.</span><span class="me1">PhysicalApplicationPath</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; HttpContext<span class="sy0">.</span><span class="me1">Current</span><span class="sy0">.</span><span class="me1">Request</span><span class="sy0">.</span><span class="me1">ApplicationPath</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithCannedAcl</span><span class="br0">&#40;</span>S3CannedACL<span class="sy0">.</span><span class="me1">PublicRead</span><span class="br0">&#41;</span> <span class="kw1">as</span> IRenderer<span class="sy0">;</span>
+&nbsp;
+Bundle<span class="sy0">.</span><span class="me1">ConfigureDefaults</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UseReleaseRenderer</span><span class="br0">&#40;</span>renderer<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UseDefaultOutputBaseHref</span><span class="br0">&#40;</span><span class="st0">&quot;http://s3.amazonaws.com/bucket&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var s3client = new AmazonS3Client("accessKey", "secretKey");
+var renderer = S3Renderer.Create(s3client)
+    .WithBucketName("bucket")
+    .WithDefaultKeyBuilder(HttpContext.Current.Request.PhysicalApplicationPath,
+                                    HttpContext.Current.Request.ApplicationPath)
+    .WithCannedAcl(S3CannedACL.PublicRead) as IRenderer;
+
+Bundle.ConfigureDefaults()
+    .UseReleaseRenderer(renderer)
+    .UseDefaultOutputBaseHref("http://s3.amazonaws.com/bucket");</pre></div></div>
+
+<p>I tried to make this something that could be run via WebActivator, but had trouble finding a method to use that would have access to the HttpContext (needed to resolve application path and virtual directory) so for now it needs to be set up manually.  This may be for the best though, as it doesn&#8217;t force any particular convention for access key / secret key retrieval.  It doesn&#8217;t <strong>feel</strong> like a ton of setup code to me, hopefully others will agree.</p>
+<h3>What&#8217;s Next</h3>
+<p>Now that SquishIt 0.8.7 has been released I can finally start planning to make this available <a href="http://nuget.org/packages/SquishIt.S3">on NuGet</a> as a standard package (currently in beta until I get a little more testing).  It can be installed like any other, but will require updating SquishIt if you&#8217;re using a pre-0.8.7 version.  If you need to report any issues encountered while using the library, or feel like contributing some code, please do so <a href="https://github.com/AlexCuse/SquishIt.S3">on github</a>.  Oh, and if you just want to kick the tires on SquishIt without all this other nonsense, or try making it work with another CDN you can find the core library <a href="http://nuget.org/packages/SquishIt">on NuGet</a> as well.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/making-squishit-work-with-amazon/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+	</channel>
+</rss>

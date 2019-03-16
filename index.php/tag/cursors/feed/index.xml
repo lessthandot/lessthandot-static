@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>cursors &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/cursors/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2012 Day 11: Cursors and loops</title>
+		<link>/index.php/datamgmt/dbprogramming/cursors-and-loops/</link>
+		<comments>/index.php/datamgmt/dbprogramming/cursors-and-loops/#comments</comments>
+		<pubDate>Tue, 11 Dec 2012 13:01:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[cursors]]></category>
+		<category><![CDATA[loops]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/cursors-and-loops/</guid>
+		<description><![CDATA[This is day eleven of the SQL Advent 2012 series of blog posts. Today we are going to look at cursors and loops.
+
+
+Loops in triggers
+Loops in stored procedures
+Loops for maintenance purposes
+
+
+  
+That is all for day eleven of the SQL Advent 201&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This is day eleven of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at cursors and loops.</p>
+<h2>Why do we hate those poor cursors?</h2>
+<p>Let&#8217;s first see why people tend to use cursors. Let&#8217;s say you come from a procedural language and this is the first time you are using SQL. In the procedural language you know how to traverse a list, you of course will look for something that is similar in SQL&#8230;&#8230;..bingo!!! you found it&#8230;the almighty cursor&#8230;.the crusher of allmost all SQL Server performance. You start using it, your code works, you are happy, life is good. Now a team member tells you that the cursor is evil and should never ever be used. You are confused, if a cursor is never to be used then why is it part of the language? Well you might say the same for the goto statement, this exists in SQL however Edsger Dijkstra&#8217;s letter <em>Go To Statement Considered Harmful</em> was published in the March 1968 Communications of the ACM.</p>
+<p>The reason that cursors are evil is that they tend to be slower than a set based solution. Cursors are not needed for 99% of the cases. SQL is a set based language, it works best with sets of data not row by row processing, when you do something set based it will generally perform hundreds of times faster than using a cursor.</p>
+<p>Take a look at this code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">FUNCTION</span> dbo.<span class="me1">cursorEnroll</span> <span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">RETURNS</span> <span class="kw1">INT</span> <span class="kw1">AS</span>
+&nbsp; &nbsp; <span class="kw1">BEGIN</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">DECLARE</span> @studentsEnrolled <span class="kw1">INT</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">SET</span> @studentsEnrolled <span class="sy0">=</span> <span class="nu0">0</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">DECLARE</span> myCursor <span class="kw1">CURSOR</span> <span class="kw1">FOR</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">SELECT</span> enrollementID
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> courseEnrollment
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">OPEN</span> myCursor;
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FETCH</span> <span class="kw1">NEXT</span> <span class="kw1">FROM</span> myCursor <span class="kw1">INTO</span> @studentsEnrolled
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHILE</span> <span class="kw2">@@FETCH_STATUS</span> <span class="sy0">=</span> <span class="nu0">0</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">BEGIN</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">SET</span> @studentsEnrolled <span class="sy0">=</span> @studentsEnrolled<span class="sy0">+</span><span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FETCH</span> <span class="kw1">NEXT</span> <span class="kw1">FROM</span> myCursor <span class="kw1">INTO</span> @studentsEnrolled
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">END</span>;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">CLOSE</span> myCursor
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">RETURN</span> @studentsEnrolled
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">END</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE FUNCTION dbo.cursorEnroll ()
+    RETURNS INT AS
+    BEGIN
+        DECLARE @studentsEnrolled INT
+        SET @studentsEnrolled = 0
+        DECLARE myCursor CURSOR FOR
+            SELECT enrollementID
+                FROM courseEnrollment
+        OPEN myCursor;
+ 
+        FETCH NEXT FROM myCursor INTO @studentsEnrolled
+ 
+        WHILE @@FETCH_STATUS = 0
+            BEGIN
+                SET @studentsEnrolled = @studentsEnrolled+1
+                    FETCH NEXT FROM myCursor INTO @studentsEnrolled
+            END;
+        CLOSE myCursor
+        RETURN @studentsEnrolled
+ 
+    END;</pre></div></div>
+
+<p>That whole flawed cursor logic can be replaced with one line of T-SQL</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> @studentsEnrolled <span class="sy0">=</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> courseEnrollment</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT @studentsEnrolled = COUNT(*) FROM courseEnrollment</pre></div></div>
+
+<p>Which one do you think will perform faster?</p>
+<h2>What is more evil than a cursor?</h2>
+<p>If cursors are evil, then what is more evil than a cursor? Nested cursors of course, especially three nested cursors. Here is an example of some horrible code where a cursor is not needed</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">PROCEDURE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>sp_SomeMadeUpName<span class="br0">&#93;</span>
+<span class="kw1">AS</span>
+&nbsp;
+<span class="kw1">DECLARE</span> @SomeDate <span class="kw1">DATETIME</span>
+&nbsp;
+<span class="kw1">SET</span> @SomeDate <span class="sy0">=</span> &nbsp;<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span>,<span class="kw2">getDate</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="nu0">112</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">EXEC</span> sp_createSomeLinkedServer @SomeDate,@SomeDate,<span class="nu0">12</span>
+&nbsp;
+<span class="kw1">DECLARE</span> @<span class="kw1">sql</span> <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="nu0">2000</span><span class="br0">&#41;</span>, @SomeID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">DECLARE</span> SomeCursor <span class="kw1">CURSOR</span> 
+<span class="kw1">FOR</span>
+<span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span> SomeID
+<span class="kw1">FROM</span> SomeTable
+<span class="kw1">WHERE</span> <span class="kw2">getDate</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">BETWEEN</span> SomeStart and SomeEnd
+&nbsp;
+&nbsp;
+<span class="kw1">OPEN</span> SomeCursor
+&nbsp;
+<span class="kw1">FETCH</span> <span class="kw1">NEXT</span> <span class="kw1">FROM</span> SomeCursor <span class="kw1">INTO</span> @SomeID
+&nbsp;
+<span class="kw1">WHILE</span> <span class="kw2">@@FETCH_STATUS</span> <span class="sy0">=</span> <span class="nu0">0</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">BEGIN</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">PRINT</span> @SomeID
+&nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> <span class="st0">''</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'DECLARE @Date DATETIME, @Value FLOAT'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'DECLARE curData CURSOR FOR'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'SELECT * '</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'FROM OPENQUERY(LinkedServerName,'</span><span class="st0">'SELECT Date,'</span> <span class="sy0">+</span> <span class="kw2">RTRIM</span><span class="br0">&#40;</span>@SomeID<span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">' FROM SomeTable'</span><span class="st0">')'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'OPEN curData'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'FETCH NEXT FROM curData INTO @Date,@Value'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'WHILE @@FETCH_STATUS = 0'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'BEGIN'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'INSERT INTO SomeTAble'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'VALUES('</span><span class="st0">''</span> <span class="sy0">+</span> @SomeID <span class="sy0">+</span> <span class="st0">''</span><span class="st0">',@Date,@Value)'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'FETCH NEXT FROM curData INTO @Date,@Value'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'END'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'CLOSE curData'</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SET</span> @<span class="kw1">sql</span> <span class="sy0">=</span> @<span class="kw1">sql</span> <span class="sy0">+</span> N<span class="st0">'DEALLOCATE curData'</span> 
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">PRINT</span> @<span class="kw1">sql</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">EXEC</span> <span class="kw3">sp_ExecuteSQL</span> @<span class="kw1">sql</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">FETCH</span> <span class="kw1">NEXT</span> <span class="kw1">FROM</span> SomeCursor <span class="kw1">INTO</span> @SomeID
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">END</span>
+&nbsp;
+<span class="kw1">CLOSE</span> SomeCursor
+<span class="kw1">DEALLOCATE</span> SomeCursor</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PROCEDURE [dbo].[sp_SomeMadeUpName]
+AS
+
+DECLARE @SomeDate DATETIME
+
+SET @SomeDate =  CONVERT(CHAR(10),getDate(),112)
+
+EXEC sp_createSomeLinkedServer @SomeDate,@SomeDate,12
+
+DECLARE @sql NVARCHAR(2000), @SomeID VARCHAR(20)
+
+
+
+DECLARE SomeCursor CURSOR 
+FOR
+SELECT DISTINCT SomeID
+FROM SomeTable
+WHERE getDate() BETWEEN SomeStart and SomeEnd
+
+
+OPEN SomeCursor
+
+FETCH NEXT FROM SomeCursor INTO @SomeID
+
+WHILE @@FETCH_STATUS = 0
+
+	BEGIN
+	
+	PRINT @SomeID
+	
+	SET @sql = ''
+	SET @sql = @sql + N'DECLARE @Date DATETIME, @Value FLOAT' + char(13) + char(13)
+	SET @sql = @sql + N'DECLARE curData CURSOR FOR' + char(13)
+	SET @sql = @sql + N'SELECT * ' + char(13)
+	SET @sql = @sql + N'FROM OPENQUERY(LinkedServerName,''SELECT Date,' + RTRIM(@SomeID) + ' FROM SomeTable'')' + char(13) + char(13)
+	SET @sql = @sql + N'OPEN curData' + char(13) + char(13)
+	SET @sql = @sql + N'FETCH NEXT FROM curData INTO @Date,@Value' + char(13)
+	SET @sql = @sql + N'WHILE @@FETCH_STATUS = 0' + char(13)
+	SET @sql = @sql + N'BEGIN' + char(13)
+	SET @sql = @sql + N'INSERT INTO SomeTAble' + char(13)
+	SET @sql = @sql + N'VALUES(''' + @SomeID + ''',@Date,@Value)' + char(13)
+	SET @sql = @sql + N'FETCH NEXT FROM curData INTO @Date,@Value' + char(13)
+	SET @sql = @sql + N'END' + char(13)
+	SET @sql = @sql + N'CLOSE curData' + char(13) + char(13)
+	SET @sql = @sql + N'DEALLOCATE curData'	
+
+	PRINT @sql + char(13) + char(13)
+
+	EXEC sp_ExecuteSQL @sql
+
+	FETCH NEXT FROM SomeCursor INTO @SomeID
+
+	END
+
+CLOSE SomeCursor
+DEALLOCATE SomeCursor</pre></div></div>
+
+<p>Why the need of looping over the list od IDs? Join with the linked server and do all this in 3 lines of code</p>
+<h2>Replacing one evil with another</h2>
+<p>If you are using while loops instead of cursors then you really have not replaced the cursor at all, you are still not doing a set based operation, everything is still going row by row. Aaron Bertrand has a good post here, no need for me to repeat the same <a href="http://sqlblog.com/blogs/aaron_bertrand/archive/2012/01/26/the-fallacy-that-a-while-loop-isn-t-a-cursor.aspx">Bad Habits to Kick : Thinking a WHILE loop isn&#8217;t a CURSOR</a></p>
+<h2>Loops in triggers</h2>
+<p>Usually you will find a loop in a trigger that will call some sort of stored procedures that needs to perform some kind of task for each row affected by the trigger. In the <a href="/index.php/DataMgmt/DBProgramming/triggers-what-to-do-what">Triggers, what to do, what not to do</a> post I already explained how to handle this scenario</p>
+<h2>Loops in stored procedures</h2>
+<p>Here is where you will find the biggest offenders. All you have to do to find the procs with cursors is run the following piece of code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> sys.<span class="me1">procedures</span> 
+<span class="kw1">WHERE</span> OBJECT_DEF<span class="sy0">IN</span>ITION<span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="br0">&#41;</span><span class="sy0">LIKE</span> <span class="st0">'%DECLARE%%cursor%'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM sys.procedures 
+WHERE OBJECT_DEFINITION((object_id) )LIKE '%DECLARE%%cursor%'</pre></div></div>
+
+<p>For while loops, just change the &#8216;%DECLARE%%cursor%&#8217; part to &#8216;%while%&#8217;</p>
+<p>Look at those procs and investigate if you can rewrite them using a SET based operation instead</p>
+<h2>Loops for maintenance purposes</h2>
+<p>One of the few times I will use cursors or while loops is if I need to get information about tables or databases where I have to get information from a stored procedure.</p>
+<p>Here is an example</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #tempSpSpaceUsed <span class="br0">&#40;</span>TableName <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Rows</span> <span class="kw1">INT</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Reserved <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Data</span> <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; IndexSize <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Unused <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+<span class="kw1">SELECT</span> name, ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> id
+<span class="kw1">INTO</span> #temp
+<span class="kw1">FROM</span> sys.<span class="me1">tables</span> 
+&nbsp;
+<span class="kw1">DECLARE</span> @TableName <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">300</span><span class="br0">&#41;</span>
+<span class="kw1">DECLARE</span> @loopid <span class="kw1">INT</span> <span class="sy0">=</span> <span class="nu0">1</span>, @maxID <span class="kw1">int</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="kw2">MAX</span><span class="br0">&#40;</span>id<span class="br0">&#41;</span> <span class="kw1">FROM</span> #temp<span class="br0">&#41;</span>
+<span class="kw1">WHILE</span> @loopid <span class="sy0">&lt;=</span> @maxID
+<span class="kw1">BEGIN</span>
+&nbsp;
+<span class="kw1">SELECT</span> @TableName <span class="sy0">=</span> name <span class="kw1">FROM</span> #temp <span class="kw1">WHERE</span> id <span class="sy0">=</span> @loopid
+<span class="kw1">INSERT</span> #tempSpSpaceUsed
+&nbsp; &nbsp; <span class="kw1">EXEC</span><span class="br0">&#40;</span><span class="st0">'EXEC sp_spaceused '</span><span class="st0">''</span> <span class="sy0">+</span> @TableName <span class="sy0">+</span> <span class="st0">''</span><span class="st0">''</span><span class="br0">&#41;</span>
+<span class="kw1">SET</span> @loopid <span class="sy0">+=</span><span class="nu0">1</span>
+<span class="kw1">END</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #tempSpSpaceUsed</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #tempSpSpaceUsed (TableName VARCHAR(100),
+								Rows INT,
+								Reserved VARCHAR(100),
+								Data VARCHAR(100),
+								IndexSize VARCHAR(100),
+								Unused VARCHAR(100))
+								
+								
+SELECT name, ROW_NUMBER() OVER(ORDER BY name) AS id
+INTO #temp
+FROM sys.tables 
+
+DECLARE @TableName VARCHAR(300)
+DECLARE @loopid INT = 1, @maxID int = (SELECT MAX(id) FROM #temp)
+WHILE @loopid &lt;= @maxID
+BEGIN
+
+SELECT @TableName = name FROM #temp WHERE id = @loopid
+INSERT #tempSpSpaceUsed
+	EXEC('EXEC sp_spaceused ''' + @TableName + '''')
+SET @loopid +=1
+END
+
+SELECT * FROM #tempSpSpaceUsed</pre></div></div>
+
+<p>Of course this can be simplified as well, you can just run this instead of the while loop and run the output</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span> <span class="st0">'INSERT #tempSpSPaceUsed</span>
+<span class="st0">EXEC sp_spaceused '</span><span class="st0">''</span> <span class="sy0">+</span> <span class="br0">&#91;</span>name<span class="br0">&#93;</span> <span class="sy0">+</span> <span class="st0">''</span><span class="st0">''</span>
+<span class="kw1">FROM</span> sys.<span class="me1">tables</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT DISTINCT 'INSERT #tempSpSPaceUsed
+EXEC sp_spaceused ''' + [name] + ''''
+FROM sys.tables</pre></div></div>
+
+<p>
+<h2>Are cursors always evil?</h2>
+<p>No, cursors have their purpose, see the section above. Also take a look at Adam Machanic&#8217;s post <a href="http://sqlblog.com/blogs/adam_machanic/archive/2006/07/12/running-sums-redux.aspx">Running sums, redux</a> where you can actually see that a cursor is faster if you are doing a running count</p>
+<p>
+<h2>How to change from cursors to a set based operation</h2>
+<p>Take a look at our wiki, there is an article named <a href="http://wiki.lessthandot.com/index.php/Cursors_and_How_to_Avoid_Them">Cursors and How to Avoid Them</a><br />
+It has the following sections<br />
+1 Row by row processing, the impact on performance<br />
+2 Typical Uses of a Cursor and Set-Based Replacements for Them<br />
+2.1 To perform an insert using the values clause<br />
+2.2 Using joins in updates, and deletes<br />
+2.3 The need to process in different tables depending on a value in the table<br />
+2.4 Using case for special treatment based on a the data in a field<br />
+2.5 The need to do either an update or an insert depending on whether the record exists in the table</p>
+<p>Finally if you need more cursor goodness, take a look at these three posts which are also mentioned in the wiki article</p>
+<p><a href="http://bradsruminations.blogspot.com/2010/05/truth-about-cursors-part-1.html">The Truth About Cursors: Part I</a><br />
+<a href="http://bradsruminations.blogspot.com/2010/05/truth-about-cursors-part-2.html">The Truth About Cursors: Part II</a><br />
+<a href="http://bradsruminations.blogspot.com/2010/05/truth-about-cursors-part-3.html">The Truth About Cursors: Part III</a></p>
+<p>That is all for day eleven of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/cursors-and-loops/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

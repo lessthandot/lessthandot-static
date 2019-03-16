@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>import image &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/import-image/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Using SSIS to import a directory of images</title>
+		<link>/index.php/datamgmt/dbprogramming/ssis-import-images-table/</link>
+		<comments>/index.php/datamgmt/dbprogramming/ssis-import-images-table/#comments</comments>
+		<pubDate>Wed, 24 Nov 2010 18:02:45 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[import image]]></category>
+		<category><![CDATA[rapid development]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/11/ssis-import-images-table/</guid>
+		<description><![CDATA[SQL Server provides database professionals with several paths in order to import and export data in and out of many data sources and file services.  One main task, the Foreach Loop Container, allows for processing large (or small) groups of files with one contained and manageable process.  Tasks that once were difficult and required larger scale development efforts have now moved into the realm of the rapid development methodology.  Rapid Development is defined as requiring a much lower amount of resources in order to push a process into a production environment.  Resources can contain any one of the main components in developing strategies such as management, developers, infrastructure changes and so on.  The resources take time in planning stages, developing stages and testing stages.  Accomplishing this methodology is done by placing each of these on top of each other in a sense.  Planning is done alongside developing and testing.]]></description>
+				<content:encoded><![CDATA[<p>SQL Server provides database professionals with several paths in order to import and export data in and out of many data sources and file services.  One main task, the Foreach Loop Container, allows for processing large (or small) groups of files with one contained and manageable process.  Tasks that once were difficult and required larger scale development efforts have now moved into the realm of the rapid development methodology.  Rapid Development is defined as requiring a much lower amount of resources in order to push a process into a production environment.  Resources can contain any one of the main components in developing strategies such as management, developers, infrastructure changes and so on.  The resources take time in planning stages, developing stages and testing stages.  Accomplishing this methodology is done by placing each of these on top of each other in a sense.  Planning is done alongside developing and testing. </p>
+<p>SSIS promotes this in a way just by the imagery that the designer, BIDS (Business Intelligence Studio), uses while you develop packages.  From most SSIS packages, you can compile a flow chart in great detail.  Jumping ahead on the topic and task at hand; take the example below of the finished package for importing a directory of images into a table in a SQL Server database.</p>
+<p><div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_01.gif" alt="" title="" width="328" height="311" /></div>
+<p>With the steps shown we can write a flowchart as shown below</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_02.gif" alt="" title="" width="394" height="371" /></div>
+</p>
+<p>The process in both representations is readable in the same manner.  Process starts, then checks and if required, creates an archive directory and then processes the images internally in a subprocess (container).  This added benefit of the way BIDS and the visual aspects of the development studio helps promote rapid development and quick documentation.  All of this means lower to mid-level complex processing initiatives can be developed faster.</p>
+<p>Remember, with any process, the complexity and depth of the requirements are considered if the longer planning process can be performed while developing them.  Planning out a process before hand when a certain point is passed, should be performed.  Combining the planning, development and testing at one time can cause the initiative to be longer if misused.</p>
+<p>Back to the process at hand&#8230;</p>
+<p>The outlined flow and package above has the goal of iterating through a folder and inserting the images found in it into a SQL Server database.  Some of the dynamic needs in this are:</p>
+<ol>
+<li>Passing the type of images to insert</li>
+<li>Passing the directory to look in</li>
+<li>All connections to SQL Server</li>
+</ol>
+<p>For error handling, each insert will be allowed to error only those insert statement.  This means the package should not exit with an error state simply because one image failed to insert.  Event handlers can be used to accomplish this.<br />
+The following statements will create the supporting database and tables.  Setting up the main table to insert into and the primary error handling table initially will help speed the process of developing our package up.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>IMAGES<span class="br0">&#93;</span> <span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'IMAGES'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:Program FilesMicrosoft SQL ServerMSSQL10_50.XPS2008R2MSSQLDATAIMAGES.mdf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 14336KB , MAXSIZE <span class="sy0">=</span> UNLIMITED, FILEGROWTH <span class="sy0">=</span> 1024KB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'IMAGES_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:Program FilesMicrosoft SQL ServerMSSQL10_50.XPS2008R2MSSQLDATAIMAGES_log.ldf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 1792KB , MAXSIZE <span class="sy0">=</span> 2048GB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">10</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> WebImages 
+<span class="br0">&#40;</span> 
+&nbsp; &nbsp; ImageName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span> not <span class="sy0">NULL</span> <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span>, 
+&nbsp; &nbsp; ImageSource <span class="kw1">varbinary</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span> not null 
+<span class="br0">&#41;</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> WebImageImportErrorLog
+<span class="br0">&#40;</span> 
+&nbsp; &nbsp; ImageName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; ErrorDesc <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">2000</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; PackageID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; ExeDateTime <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; UserExeName <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>
+<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE [IMAGES] ON  PRIMARY 
+( NAME = N'IMAGES', FILENAME = N'C:Program FilesMicrosoft SQL ServerMSSQL10_50.XPS2008R2MSSQLDATAIMAGES.mdf' , SIZE = 14336KB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024KB )
+ LOG ON 
+( NAME = N'IMAGES_log', FILENAME = N'C:Program FilesMicrosoft SQL ServerMSSQL10_50.XPS2008R2MSSQLDATAIMAGES_log.ldf' , SIZE = 1792KB , MAXSIZE = 2048GB , FILEGROWTH = 10%)
+GO
+CREATE TABLE WebImages 
+( 
+    ImageName varchar(50) not NULL PRIMARY KEY, 
+    ImageSource varbinary(max) not null 
+)
+CREATE TABLE WebImageImportErrorLog
+( 
+    ImageName varchar(50),
+    ErrorDesc VARCHAR(2000),
+    PackageID VARCHAR(255),
+    ExeDateTime VARCHAR(50),
+    UserExeName VARCHAR(255)
+)</pre></div></div>
+
+<p>To insert an image into the table WebImages, use OPENROWSET with SINGLE_BLOB.  This method is shown as</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> WebImages <span class="br0">&#40;</span>ImageName, ImageSource<span class="br0">&#41;</span> 
+<span class="kw1">SELECT</span> 
+&nbsp; &nbsp; <span class="st0">'C:UsersonpntDocumentsImages 001.jpg'</span> ImageName
+&nbsp; &nbsp; ,BulkColumn
+<span class="kw1">FROM</span> 
+<span class="kw1">OPENROWSET</span> <span class="br0">&#40;</span><span class="kw1">BULK</span> <span class="st0">'C:UsersonpntDocumentsImages 001.jpg'</span>, S<span class="sy0">IN</span>GLE_BLOB<span class="br0">&#41;</span> <span class="kw1">AS</span> Images </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO WebImages (ImageName, ImageSource) 
+SELECT 
+	'C:UsersonpntDocumentsImages 001.jpg' ImageName
+	,BulkColumn
+FROM 
+OPENROWSET (BULK 'C:UsersonpntDocumentsImages 001.jpg', SINGLE_BLOB) AS Images </pre></div></div>
+
+<p>Notice that we set the ImageName to a primary key.  This is due to the table following the same constraints as directory services.  No file may exist in the same location with the same name.  We propagate this concept to the table.</p>
+<p><strong>Create the package &#8211; Preparation</strong></p>
+<p>Variables are a key to making this process reusable and portable.  For this example, four variables will be utilized.</p>
+<ul>
+<li>SqlInsertCmd: Used to build the INSERT statement based on the image currently being processed</li>
+<li>ArchiveDirectory: Mentioned earlier to create the archive folder once images are processed</li>
+<li>ImageFileFocus: The place holder of the image being processed<br />
+SourceDirectory: Directory to work on that is holding the images</li>
+</ul>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_03.gif" alt="" title="" width="331" height="151" /></div>
+<p>Data types for these variables are all strings.  The scope will primarily be set to the package level with a few set to the container level.<br />
+Create the variables as shown above after moving the following into the control flow window.</p>
+<p>File System Task, Foreach Loop Container with an Execute SQL Task and File System<br />
+Task within the container</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_04.gif" alt="" title="" width="148" height="211" /></div>
+<p><strong>Archive Task</strong></p>
+<p>The first task that needs to be accomplished is the archive directory.  In order to prevent unwanted errors to be logged be reprocessing images on each execution of the package, we want to move the images to a folder that is designated as processed already.  This can be accomplished with a File System Task and the create directory operation.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_05.gif" alt="" title="" width="442" height="170" /></div>
+<p>Set the UseDirectoryIfExists to True so if the directory exists already, we do not unintentionally remove or overwrite the directory.  This may cause unwanted loss of images that exist in the directory. The Archive directory for this example is set in the directory that is being processed so using the source directory while adding the “Archive” additional path is sufficient.  This is done in the ArchiveDirectory variable as an expression</p>
+<p>@[User::SourceDirectory] + &#8220;\Archive&#8221;</p>
+<p><strong>The container</strong></p>
+<p>The Foreach Loop Container is truly the core processing mechanism in this package.  With the Foreach Loop Container, iterating all files in a specified directory is made simple in a sense.  It is simple due to the limited requirement of properties to get the container looping through the files.</p>
+<p>The key properties that are required to set the container are directory (Folder), file extensions, resulting return of string that will be the file currently focused on and a variable mapping.  The variable mapping is used to set a variable to the file that is currently being processed by the container so it can be passed to other tasks within the container.</p>
+<p>To set the properties for the container to process the directory from the variable SourceDirectory, use expressions.  This will set the property at runtime.  This allows us to quickly change where the processing will occur if the folder is changing often, the moved or the package is going to be used for other tasks.  Set the expression by going to the Collection window in the Foreach Loop Editor, click the ellipse to open the Property Expression Editor and select Directory for Property and set the Expression to the variable, @[User::SourceDirectory]. (shown below)</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_06.gif" alt="" title="" width="482" height="169" /></div>
+<p>Use a hardcoded folder value for the setup and enter in “.jpg” (or the image types you want to import) in the Files text box.</p>
+<p><strong>Execute SQL Task – INSERT</strong></p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_07.gif" alt="" title="" width="628" height="272" /></div>
+<p><strong>Error Handling</strong></p>
+<p>Event Handlers are used to catch any issues that may arise when inserting the image into SQL Server.  The most common error that will come up with the process is a primary key violation.  This is due to the primary key being the file name (or image) in the table WebImages.  In the case an image was placed in the folder again or the archive process failed, there is a chance for the image to be inserted again.  This is not ideal in this processing and would be set as a secondary processing design to update the table.  That design would be set with either child package or a variable setting to validate the tasks to begin processing in the package itself.  (for a later discussion)<br />
+To setup the event handler:<br />
+While the Execute SQL Task is highlighted, click the Event Handlers tab.  Click the link to create the OnError event handler for the SQL task.  Bring an Execute SQL Task over into the window.</p>
+<p>The connection for the task will be to the IMAGES database created earlier, and an  insert into the error table also created earlier.  The system level information and image file name will be inserted into the error table so they can be analyzed later.  To insert the system variables, use the insert statement shown below</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> WebImageImportErrorLog 
+<span class="br0">&#40;</span><span class="br0">&#91;</span>ImageName<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ErrorDesc<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>PackageID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ExeDateTime<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>UserExeName<span class="br0">&#93;</span><span class="br0">&#41;</span>
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span>?,?,?,?,?<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO WebImageImportErrorLog 
+([ImageName]
+      ,[ErrorDesc]
+      ,[PackageID]
+      ,[ExeDateTime]
+      ,[UserExeName])
+VALUES (?,?,?,?,?)</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_08.gif" alt="" title="" width="628" height="363" /></div>
+</p>
+<p>Set ByPassPrepare to True so the statement is not parsed.<br />
+Move to the to the Parameter Mapping section.  Each ? will map based on the ordinal positions mapped.  This is set by the Parameter Name as shown below. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_09.gif" alt="" title="" width="628" height="137" /></div>
+</p>
+<p>The last property to set is a system variable in order to manage the errors when they occur.  </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_10.gif" alt="" title="" width="628" height="117" /></div>
+<p>Set the Propagate system variable to False so the errors do not flow back up to the container and stop the processing of the next image.</p>
+<p><strong>Archive the processed image</strong></p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_11.gif" alt="" title="" width="628" height="261" /></div>
+<p>The File System Task to perform the archive task will utilize the Move file type.  Using the ImageFileFocus variable for the source, the last setting required is the archive directory path.  The file name is not required on the move.<br />
+Set the DelayValidation to true or the variable setting will cause it to error given it is empty until the package is executed.</p>
+<p><strong>Processing</strong></p>
+<p>Putting this all together we arrive at the package outlined in the beginning of this discussion.  Executing this package initially and then a second time will show the normal process of inserting all images into the WebImages table along with the error handling and logging put in place.</p>
+<p>Execute the package initially</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_12.gif" alt="" title="" width="104" height="146" /></div>
+</p>
+<p>Once complete, validate the WebImages table by selecting the contents </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_13.gif" alt="" title="" width="516" height="137" /></div>
+</p>
+<p>To test the event handler error logging, move the images back into the root directory from the archive directory and execute the package a second time.  While processing, the Execute SQL Task will start to throw errors based on the primary key violation.  This can be seen by selecting from the WebImageErrorLog table</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_14.gif" alt="" title="" width="628" height="140" /></div>
+<p><strong>Closing</strong></p>
+<p>SSIS and the Foreach Loop Container allow for quick setup and processing of entire directory contents.   Within the container, the use of T-SQL, Data Flow Tasks and other processing can be used to fully validate, transform and import data while iterating through those files.  This promotes rapid development methods and allows for shorter and less costly initiatives to transport from development to testing and into production.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/ssis-import-images-table/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+	</channel>
+</rss>

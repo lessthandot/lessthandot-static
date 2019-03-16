@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>bi &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/bi/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Formatting Durations in SSAS: Caveat</title>
+		<link>/index.php/webdev/business-intelligence/formatting-durations-in-ssas-caveat/</link>
+		<comments>/index.php/webdev/business-intelligence/formatting-durations-in-ssas-caveat/#respond</comments>
+		<pubDate>Mon, 22 Dec 2014 12:49:40 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[SSAS]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[mdx]]></category>
+		<category><![CDATA[ssas]]></category>
+		<category><![CDATA[syndicated]]></category>
+
+		<guid isPermaLink="false">/?p=3125</guid>
+		<description><![CDATA[I recently published an article on MSSQLTips.com titled Format Durations in SQL Server Analysis Services. For those who haven’t read it I’ll summarize it quickly: it explains how to create an MDX formula that formats durations into an [hh]:mm:ss format, where [hh] can go over 24 hours. For more detailed information, please check out the [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify">I recently published an article on <a href="http://www.mssqltips.com/">MSSQLTips.com</a> titled <a href="http://www.mssqltips.com/sqlservertip/3374/format-durations-in-sql-server-analysis-services/">Format Durations in SQL Server Analysis Services</a>. For those who haven’t read it I’ll summarize it quickly: it explains how to create an MDX formula that formats durations into an <em>[hh]:mm:ss</em> format, where [hh] can go over 24 hours. For more detailed information, please check out the article itself.</p>
+<p style="text-align: justify">An example:</p>
+<p><a href="/wp-content/uploads/2014/12/FormattedDurations.jpg"><img class="alignnone wp-image-3127 size-medium" src="/wp-content/uploads/2014/12/FormattedDurations-300x88.jpg" alt="FormattedDurations" width="300" height="88" srcset="/wp-content/uploads/2014/12/FormattedDurations-300x88.jpg 300w, /wp-content/uploads/2014/12/FormattedDurations.jpg 392w" sizes="(max-width: 300px) 100vw, 300px" /></a></p>
+<p style="text-align: justify">However, I recently found out at a project that the formula doesn’t really deal well with <em>null</em> values. For instance, when I browse the sample data I get the following result:</p>
+<p><a href="/wp-content/uploads/2014/12/NullProblem.jpg"><img class="alignnone wp-image-3129 size-full" src="/wp-content/uploads/2014/12/NullProblem.jpg" alt="NullProblem" width="700" height="484" srcset="/wp-content/uploads/2014/12/NullProblem.jpg 700w, /wp-content/uploads/2014/12/NullProblem-300x207.jpg 300w" sizes="(max-width: 700px) 100vw, 700px" /></a></p>
+<p style="text-align: justify">The returned data set contains (null) values for the <a href="http://msdn.microsoft.com/en-us/library/ms170707.aspx"><em>Unknown</em> member</a>, although empty cells should not be included. If I browse the same set with the unformatted measure, the empty cells are not returned so it the issue is caused with the formatting formula.</p>
+<p><a href="/wp-content/uploads/2014/12/Unformatted.jpg"><img class="alignnone size-medium wp-image-3130" src="/wp-content/uploads/2014/12/Unformatted-264x300.jpg" alt="Unformatted" width="264" height="300" srcset="/wp-content/uploads/2014/12/Unformatted-264x300.jpg 264w, /wp-content/uploads/2014/12/Unformatted.jpg 343w" sizes="(max-width: 264px) 100vw, 264px" /></a></p>
+<p style="text-align: justify">My educated guess is that SSAS doesn’t know upfront if the result of the formula will be <em>null</em> or not, so it calculated the measure anyway and displays everything on the grid. The solution is to add an extra check for <em>null</em> values into the formula.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1">CREATE MEMBER CURRENTCUBE<span class="sy0">.</span><span class="br0">&#91;</span>Measures<span class="br0">&#93;</span><span class="sy0">.</span><span class="br0">&#91;</span>DurationFormatted<span class="br0">&#93;</span>
+&nbsp;<span class="kw1">AS</span> &nbsp; <span class="kw7">Iif</span><span class="br0">&#40;</span><span class="kw7">IsEmpty</span><span class="br0">&#40;</span><span class="br0">&#91;</span>Measures<span class="br0">&#93;</span><span class="sy0">.</span><span class="br0">&#91;</span>Duration<span class="br0">&#93;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,null
+&nbsp; &nbsp; &nbsp; &nbsp; , &nbsp; <span class="kw4">Cstr</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw7">Int</span><span class="br0">&#40;</span><span class="br0">&#91;</span>Measures<span class="br0">&#93;</span><span class="sy0">.</span><span class="br0">&#91;</span>Duration<span class="br0">&#93;</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">24</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">+</span> &nbsp; <span class="kw4">CInt</span><span class="br0">&#40;</span><span class="kw7">FORMAT</span><span class="br0">&#40;</span><span class="kw4">CDate</span><span class="br0">&#40;</span><span class="br0">&#91;</span>Measures<span class="br0">&#93;</span><span class="sy0">.</span><span class="br0">&#91;</span>Duration<span class="br0">&#93;</span><span class="br0">&#41;</span>, <span class="st0">&quot;HH&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">+</span> &nbsp; <span class="kw7">FORMAT</span><span class="br0">&#40;</span><span class="kw4">CDate</span><span class="br0">&#40;</span><span class="br0">&#91;</span>Measures<span class="br0">&#93;</span><span class="sy0">.</span><span class="br0">&#91;</span>Duration<span class="br0">&#93;</span><span class="br0">&#41;</span>, <span class="st0">&quot;:mm:ss&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#41;</span>
+,VISIBLE <span class="sy0">=</span> <span class="nu0">1</span>
+,ASSOCIATED_MEASURE_GROUP <span class="sy0">=</span> <span class="co1">'Customer Service';</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE MEMBER CURRENTCUBE.[Measures].[DurationFormatted]
+ AS   Iif(IsEmpty([Measures].[Duration])
+        ,null
+        ,   Cstr((Int([Measures].[Duration]) * 24)
+        +   CInt(FORMAT(CDate([Measures].[Duration]), "HH")) )
+        +   FORMAT(CDate([Measures].[Duration]), ":mm:ss")
+        )
+,VISIBLE = 1
+,ASSOCIATED_MEASURE_GROUP = 'Customer Service';</pre></div></div>
+
+<p style="text-align: justify">When browsing the cube now, the Unknown member is now ignored due to the explicit check for <em>null</em> values.</p>
+<p><a href="/wp-content/uploads/2014/12/IssueFixed.jpg"><img class="alignnone size-medium wp-image-3128" src="/wp-content/uploads/2014/12/IssueFixed-300x296.jpg" alt="IssueFixed" width="300" height="296" srcset="/wp-content/uploads/2014/12/IssueFixed-300x296.jpg 300w, /wp-content/uploads/2014/12/IssueFixed.jpg 396w" sizes="(max-width: 300px) 100vw, 300px" /></a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/business-intelligence/formatting-durations-in-ssas-caveat/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>PASS BI VC: How to (not) torment your fellow SSIS developer?</title>
+		<link>/index.php/datamgmt/ssis/pass-bi-vc-how-to-not-torment-your-fellow-ssis-developer/</link>
+		<comments>/index.php/datamgmt/ssis/pass-bi-vc-how-to-not-torment-your-fellow-ssis-developer/#comments</comments>
+		<pubDate>Wed, 12 Nov 2014 11:52:09 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[SSIS]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[pass]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[ssis]]></category>
+		<category><![CDATA[syndicated]]></category>
+		<category><![CDATA[webinar]]></category>
+
+		<guid isPermaLink="false">/?p=3058</guid>
+		<description><![CDATA[On November 17th 2PM CET I will redo my SQL Server Days presentation How to (not) torment your fellow SSIS developer? for the PASS BI virtual chapter. This is great news for the people who couldn&#8217;t attend my session at the SQL Server Days and who still want to see it (I hope those people [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify">On November 17th 2PM CET I will redo my SQL Server Days presentation <a href="/index.php/uncategorized/speaking-at-sql-server-days-2014/">How to (not) torment your fellow SSIS developer?</a> for the <a href="http://bi.sqlpass.org/">PASS BI virtual chapter</a>. This is great news for the people who couldn&#8217;t attend my session at the SQL Server Days and who still want to see it (I hope those people actually exist).</p>
+<p style="text-align: justify">What is even better is that the PASS BI virtual chapter afterwards always uploads the webinars to Youtube, so there won&#8217;t be any excuse for not watching my session <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /><br />
+Check out other amazing BI sessions from the SQL community on<a href="https://www.youtube.com/user/passbivc"> their Youtube channel</a>!</p>
+<p style="text-align: justify">You can register for the webinar <a href="https://attendee.gotowebinar.com/register/8118983337165731074">here</a>.</p>
+<p><a href="https://www.youtube.com/user/passbivc"><img class="alignnone wp-image-3059 size-medium" src="/wp-content/uploads/2014/11/passbivc-300x150.jpg" alt="passbivc" width="300" height="150" srcset="/wp-content/uploads/2014/11/passbivc-300x150.jpg 300w, /wp-content/uploads/2014/11/passbivc.jpg 400w" sizes="(max-width: 300px) 100vw, 300px" /></a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/ssis/pass-bi-vc-how-to-not-torment-your-fellow-ssis-developer/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #59: My Hero</title>
+		<link>/index.php/uncategorized/t-sql-tuesday-59-my-hero/</link>
+		<comments>/index.php/uncategorized/t-sql-tuesday-59-my-hero/#comments</comments>
+		<pubDate>Tue, 14 Oct 2014 06:56:19 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sqlfamily]]></category>
+		<category><![CDATA[syndicated]]></category>
+		<category><![CDATA[tsql2sday]]></category>
+
+		<guid isPermaLink="false">/?p=3021</guid>
+		<description><![CDATA[This month’s T-SQL Tuesday is hosted by Tracy McKibben (blog &#124; twitter) and is all about heroes (not the TV show). Ada Lovelace has been an inspiration to many. In keeping with my blog theme, let’s call her a hero. We all have our heroes, those people who we admire, who inspire us, who we [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>This month’s <a href="http://realsqlguy.com/invite-for-tsql2sday-59-my-hero/">T-SQL Tuesday</a> is hosted by Tracy McKibben (<a href="http://realsqlguy.com/">blog</a> | <a href="https://twitter.com/RealSQLGuy">twitter</a>) and is all about heroes (not the TV show).</p>
+<p><a href="http://realsqlguy.com/invite-for-tsql2sday-59-my-hero/"><img class="alignnone size-full wp-image-2241" src="/wp-content/uploads/2014/01/TSQL2sday.png" alt="TSQL2sday" width="133" height="134" /></a></p>
+<blockquote><p><em>Ada Lovelace has been an inspiration to many. In keeping with my blog theme, let’s call her a hero. We all have our heroes, those people who we admire, who inspire us, who we strive to be like. Who is your hero?</em></p>
+<p><em>Your assignment is to acknowledge, in writing, your hero (or heroes). You don’t have to mention them by name if you’re not comfortable doing so, but you do have to tell us how you met them, how they have inspired you, and what qualities or traits of theirs you have striven to adopt.</em></p></blockquote>
+<p>I was thinking for the past week about my heroes and I decided to give you a shortlist of SQL Server people who had some influence on me during my BI career.</p>
+<ul>
+<li>Jamie Thomson (<a href="http://sqlblog.com/blogs/jamie_thomson/">blog</a> | <a href="https://twitter.com/jamiet">twitter</a>) aka SSISJunkie. When I started out with BI and mainly SSIS, his blog taught me a lot about SSIS. I still use his naming conventions every day in my SSIS packages.</li>
+<li>Chris Webb (<a href="http://cwebbbi.wordpress.com/">blog</a> | <a href="https://twitter.com/Technitrain">twitter</a>). He was the first “international” speaker I saw live on a SQL Server conference. He lives and breathes SSAS and his little pinky toe knows more about MDX than I ever will (that isn’t hard to accomplish though <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></li>
+<li>Steve Jones (<a href="http://voiceofthedba.com/">blog</a> | <a href="https://twitter.com/way0utwest">twitter</a>), Grant Fritchey (<a href="http://www.scarydba.com/">blog</a> | <a href="https://twitter.com/GFritchey">twitter</a>), Gail Shaw (<a href="http://sqlinthewild.co.za/">blog</a> | <a href="https://twitter.com/SQLintheWild">twitter</a>) and Jeff Moden + other regulars at the <a href="http://www.sqlservercentral.com/">SQLServerCentral</a> forums. Their knowledge and untiring effort on the forums still amazes me day after day. Special thanks to Jeff, Jedi of set-based thinking and master of the tally table, for teaching me through his articles how to make my queries a thousand times faster.</li>
+<li>Rafal Luckawiecki (<a href="https://projectbotticelli.com/">blog</a> | <a href="https://twitter.com/rafaldotnet">twitter</a>) and Buck Woody (<a href="http://buckwoody.com/">blog</a> | <a href="https://twitter.com/buckwoody">twitter</a>) because they are such amazing speakers. Their level of expertise in bringing a message across to an audience is what I strive to have someday. If you are on event and one of them are speaking, try the catch a session, you won’t regret it.</li>
+<li>Brent Ozar (<a href="http://www.brentozar.com/">blog</a> | <a href="https://twitter.com/BrentO">twitter</a>) and Thomas LaRock (<a href="http://thomaslarock.com/">blog</a> | <a href="https://twitter.com/SQLRockstar">twitter</a>). Both have – in my opinion – awesome blogs. Not only by content, but also by having very strong online branding. If I ever started my own blog site, I would try to take it to their level. Brent is also a great speaker. I watched some of his sessions – despite the DBA content – to learn more about speaking. And Thomas because, well … bacon of course.</li>
+<li>All the other people of the #sqlfamily for making this community so great. You know who you are <img src="https://s.w.org/images/core/emoji/2/72x72/1f609.png" alt="😉" class="wp-smiley" style="height: 1em; max-height: 1em;" /></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/t-sql-tuesday-59-my-hero/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>SQL Server Days 2014 &#8211; Slide deck</title>
+		<link>/index.php/datamgmt/ssis/sql-server-days-2014-slide-deck/</link>
+		<comments>/index.php/datamgmt/ssis/sql-server-days-2014-slide-deck/#comments</comments>
+		<pubDate>Mon, 06 Oct 2014 07:45:53 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[SSIS]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[integration services]]></category>
+		<category><![CDATA[slides]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sql server days]]></category>
+		<category><![CDATA[ssis]]></category>
+
+		<guid isPermaLink="false">/?p=3004</guid>
+		<description><![CDATA[SQL Server Days 2014 is over, but it has been one great event. A very big thanks to the organizers! My session went pretty well, somewhere around 60 attendees I would guess and they didn&#8217;t seem too bored. I saw some other great sessions as well, such as Buck Woody (twitter) on Big Data (and [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>SQL Server Days 2014 is over, but it has been one great event. A very big thanks to the organizers! My session went pretty well, somewhere around 60 attendees I would guess and they didn&#8217;t seem too bored. I saw some other great sessions as well, such as Buck Woody (<a href="https://twitter.com/buckwoody">twitter</a>) on Big Data (and a fantastic keynote) and a demo session on Azure ML. I also attended Grants (<a href="https://twitter.com/GFritchey">twitter </a>| <a href="http://www.scarydba.com/">blog</a>) precon on execution plans and I definitely learned a lot.</p>
+<p>It was great to meet up with the #sqlfamily and I can&#8217;t wait for next years edition.</p>
+<p>I have uploaded my slides to <a href="http://www.slideshare.net/KoenVerbeeck/sql-server-days-2014-how-to-not-torment-your">Slideshare</a>, in case you&#8217;re interested.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/ssis/sql-server-days-2014-slide-deck/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Overview of Published Articles – 2014Q2</title>
+		<link>/index.php/webdev/business-intelligence/overview-of-published-articles-2014q2/</link>
+		<comments>/index.php/webdev/business-intelligence/overview-of-published-articles-2014q2/#respond</comments>
+		<pubDate>Wed, 09 Jul 2014 13:35:48 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[articles]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sqlfamily]]></category>
+
+		<guid isPermaLink="false">/?p=2822</guid>
+		<description><![CDATA[Here is an overview of the articles I published in the second quarter of 2014. Intense School MCSE Prep: The Integration Services Package and Project Deployment Models—Part 1 MCSE Prep: The Integration Services Package and Project Deployment Models—Part 2 MCSE Prep (SQL) – Using Parameters in Reporting Services Reports (Part 1) MSSQLTips Improve SSIS data [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Here is an overview of the articles I published in the second quarter of 2014.</p>
+<p><strong>Intense School</strong></p>
+<ul>
+<li><a href="http://resources.intenseschool.com/mcse-prep-the-integration-services-package-and-project-deployment-models-part-1/">MCSE Prep: The Integration Services Package and Project Deployment Models—Part 1</a></li>
+<li><a href="http://resources.intenseschool.com/mcse-prep-the-integration-services-package-and-project-deployment-models-part-2/">MCSE Prep: The Integration Services Package and Project Deployment Models—Part 2</a></li>
+<li><a href="http://resources.intenseschool.com/mcse-prep-using-parameters-in-reporting-services-reports-part-1/">MCSE Prep (SQL) – Using Parameters in Reporting Services Reports (Part 1)</a></li>
+</ul>
+<p><strong>MSSQLTips</strong></p>
+<ul>
+<li><a href="http://www.mssqltips.com/sqlservertip/3217/improve-ssis-data-flow-buffer-performance/">Improve SSIS data flow buffer performance</a></li>
+<li><a href="http://www.mssqltips.com/sqlservertip/3220/using-the-new-odata-source-in-sql-server-integration-services/">Using the New OData Source in SQL Server Integration Services</a></li>
+<li><a href="http://www.mssqltips.com/sqlservertip/3242/semiblocking-transformations-in-sql-server-integration-services-ssis/">Semi-blocking Transformations in SQL Server Integration Services SSIS</a></li>
+<li><a href="http://www.mssqltips.com/sqlservertip/3254/sorting-a-dimension-attribute-by-another-dimension-attribute-in-sql-server-analysis-services/">Sorting a dimension attribute by another dimension attribute in SQL Server Analysis Services</a></li>
+</ul>
+<p>Related posts:</p>
+<p><a href="/index.php/itprofessionals/professionaldevelopment/overview-of-published-articles-2014q1/">Overview of Published Articles – 2014Q1</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/business-intelligence/overview-of-published-articles-2014q2/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Speaking at ITPROceed</title>
+		<link>/index.php/uncategorized/speaking-at-itproceed/</link>
+		<comments>/index.php/uncategorized/speaking-at-itproceed/#respond</comments>
+		<pubDate>Wed, 14 May 2014 11:14:27 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[data visualization]]></category>
+		<category><![CDATA[itproceed]]></category>
+		<category><![CDATA[reporting services]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[ssrs]]></category>
+
+		<guid isPermaLink="false">/?p=2611</guid>
+		<description><![CDATA[I&#8217;m delighted to announce I will be giving a session at ITPROceed, a new event in Belgium for the IT Professional. From their website: ITPROceed is a joint effort between the ITProfessional User Groups with the strong support of Microsoft to bring you the best on the Cloud OS, System Center, SQL, Office 365, Windows [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;m delighted to announce I will be giving a session at <a href="http://www.itproceed.be/">ITPROceed</a>, a new event in Belgium for the IT Professional. From their website:</p>
+<blockquote><p>ITPROceed is a joint effort between the ITProfessional User Groups with the strong support of Microsoft to bring you the best on the Cloud OS, System Center, SQL, Office 365, Windows 8, Unified Communications, Lync, Azure and SharePoint.</p></blockquote>
+<p>My session is titled <em>Get More Out Of Your Data Visualizations</em>. The abstract is short and simple:</p>
+<p><em>With data you can tell important and compelling stories, if done right. In this session, we will review a few guidelines on how to create communicative visualizations and how this can be implemented in Excel and Reporting Services.<br />
+Because SSRS is often underestimated, we&#8217;ll finish off with some eye-catchers.</em></p>
+<p>There are other excellent sessions about SQL Server and Business Intelligence, so make sure to check out the <a href="http://www.itproceed.be/agenda">agenda</a>!<br />
+Tickets are almost sold out, so you better hurry!</p>
+<p><a href="http://www.itproceed.be/"><img class="alignnone size-full wp-image-2612" alt="itproceed_003" src="/wp-content/uploads/2014/05/itproceed_003.png" width="340" height="62" srcset="/wp-content/uploads/2014/05/itproceed_003.png 340w, /wp-content/uploads/2014/05/itproceed_003-300x54.png 300w" sizes="(max-width: 340px) 100vw, 340px" /></a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/speaking-at-itproceed/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Modify a Power View Data Source</title>
+		<link>/index.php/webdev/business-intelligence/modify-power-view-data-source/</link>
+		<comments>/index.php/webdev/business-intelligence/modify-power-view-data-source/#comments</comments>
+		<pubDate>Wed, 08 May 2013 08:11:00 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[credentials]]></category>
+		<category><![CDATA[data source]]></category>
+		<category><![CDATA[power view]]></category>
+		<category><![CDATA[sharepoint 2013]]></category>
+		<category><![CDATA[syndicated]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/05/modify-power-view-data-source/</guid>
+		<description><![CDATA[This blog posts explains how you can modify the data source of a Power View report published on SharePoint.]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify;">I’m currently setting up a demo environment using SQL Server 2012 and SharePoint 2013 (more on that in later blog posts). This gives me the chance to play around with Power View for SharePoint and I absolutely love it. I ran into an issue however because the Windows Authentication wasn’t working properly. When I view a Power View report I get the following error:</p>
+<p style="text-align: justify;"><em>An error occurred while loading the model for the item or data source &#8216;EntityDataSource&#8217;. Verify that the connection information is correct and that you have permissions to access the data source.</em></p>
+<p><a href="/media/users/koenverbeeck/PowerViewDataSource/errorbis.png?mtime=1367999572"><img src="/wp-content/uploads/users/koenverbeeck/PowerViewDataSource/errorbis.png?mtime=1367999572" alt="" width="802" height="361" /></a></p>
+<p><span style="text-align: justify;">Not exactly what you want to encounter when giving a sales demo. So I had two options: either deal with Windows Token Claims / Kerberos or set up an unattended account to run the report. Since I’d rather jab myself in the eye with a rusty nail then dealing with Kerberos, I chose the last option. Setting up an unattended account is my preferred method for authentication, as it gives the least amount of troubles. I do it for Reporting Services reports and PowerPivot workbooks, so I’d also like to do it for Power View as well.</span></p>
+<p style="text-align: justify;">So how do you modify a Power View data source? Luckily it’s pretty straight forward if you know where to look. Go to the library where your Power View report is stored.</p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/PowerViewDataSource/library_01.png?mtime=1367999585"><img src="/wp-content/uploads/users/koenverbeeck/PowerViewDataSource/library_01.png?mtime=1367999585" alt="" width="608" height="375" /></a></p>
+<p><span style="text-align: justify;">In the Library ribbon, set the Current View to </span><em>All Documents.</em><span style="text-align: justify;"> Click on the down arrow of the report you wish to edit and select </span><em>Manage Data Sources</em><span style="text-align: justify;">.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/PowerViewDataSource/library_02.png?mtime=1367999606"><img src="/wp-content/uploads/users/koenverbeeck/PowerViewDataSource/library_02.png?mtime=1367999606" alt="" width="567" height="306" /></a></p>
+<p><span style="text-align: justify;">Click on </span><strong>EntityDataSource</strong><span style="text-align: justify;">.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/PowerViewDataSource/library_03.png?mtime=1367999616"><img src="/wp-content/uploads/users/koenverbeeck/PowerViewDataSource/library_03.png?mtime=1367999616" alt="" width="470" height="141" /></a></p>
+<p><span style="text-align: justify;">Here we can finally modify the data source. You can choose a shared data source, modify the connection string (a PowerPivot workbook in my case) and set the credentials, which we are interested in. Fill in a user name and password under </span><em>Stored Credentials</em><span style="text-align: justify;"> to specify an unattended execution account. Don’t forget to check the </span><em>Use as Windows credentials</em><span style="text-align: justify;"> checkbox.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/PowerViewDataSource/library_04.png?mtime=1368000128"><img src="/wp-content/uploads/users/koenverbeeck/PowerViewDataSource/library_04.png?mtime=1368000128" alt="" width="616" height="548" /></a></p>
+<p><span style="text-align: justify;">Note: my demo environment has only one user: the Administrator. This is OK because it is – in fact – a demo environment. Please do not specify administrator credentials in a production environment (especially if you pay attention to the nice red warning on top). Use a dedicated domain account.</span></p>
+<p style="text-align: justify;">Click OK and go back to your SharePoint page. The report now renders successfully! It is as easy as that.</p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/PowerViewDataSource/library_05.png?mtime=1368000136"><img src="/wp-content/uploads/users/koenverbeeck/PowerViewDataSource/library_05.png?mtime=1368000136" alt="" width="715" height="471" /></a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/business-intelligence/modify-power-view-data-source/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>SQL Server 2012 Business Intelligence Whitepaper and Data Tools released</title>
+		<link>/index.php/webdev/business-intelligence/sql-server-2012-business-intelligence/</link>
+		<comments>/index.php/webdev/business-intelligence/sql-server-2012-business-intelligence/#respond</comments>
+		<pubDate>Sat, 09 Mar 2013 08:49:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssas]]></category>
+		<category><![CDATA[ssis]]></category>
+		<category><![CDATA[ssrs]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/sql-server-2012-business-intelligence/</guid>
+		<description><![CDATA[If you are into Business Intelligence, you are in luck, this week Microsoft has released a SQL Server 2012 Business Intelligence whitepaper as well as SQL Server Data Tools – Business Intelligence for Visual Studio 2012 (SSDT BI) templates.
+
+The white&#8230;]]></description>
+				<content:encoded><![CDATA[<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/SQLServer2012BusinessIntelligence.png?mtime=1362825412"><img alt="SQL Server 2012 Business Intelligence" title="SQL Server 2012 Business Intelligence" src="/wp-content/uploads/blogs/DataMgmt/Denis/SQLServer2012BusinessIntelligence.png?mtime=1362825412" width="587" height="179" /></a></div>
+<p>If you are into Business Intelligence, you are in luck, this week Microsoft has released a SQL Server 2012 Business Intelligence whitepaper as well as SQL Server Data Tools – Business Intelligence for Visual Studio 2012 (SSDT BI) templates.</p>
+<p>The whitepaper is 41 pages and covers Microsoft BI Authentication and Identity Delegation . Here are the contents of the whitepaper</p>
+<p>Contents<br />
+Introduction<br />
+<strong>Personal BI Scenarios in Excel</strong><br />
+Client/Server Connections to Import Data<br />
+Data Sources and their Authentication Methods<br />
+<strong>Team BI Scenarios in SharePoint	</strong><br />
+Multi-Tier Application Architecture<br />
+Classic-Mode versus Claims-Mode Authentication<br />
+Identity Delegation within a SharePoint Farm<br />
+Client Authentication Issues<br />
+Workbooks as a Data Source<br />
+PowerPivot Gallery<br />
+Anonymous Users<br />
+Mitigating Client Authentication Issues<br />
+Backend Authentication Issues<br />
+Accessing Relational Configuration, Content, and Service Application Databases<br />
+Authentication against External Data Sources<br />
+Kerberos Constrained Delegation and Alternatives<br />
+Accessing Analysis Services in SharePoint Mode<br />
+<strong>Corporate BI Data Access Scenarios</strong><br />
+Authentication Flows in Native-Mode Reporting Services<br />
+Windows User Authentication<br />
+Custom User Authentication<br />
+Custom Data Source Authentication<br />
+Authentication Flows in Analysis Services<br />
+Multidimensional and Tabular Data Access<br />
+ROLAP and DirectQuery Mode<br />
+Client Authentication over HTTP<br />
+Custom Analysis Services Authentication over HTTP<br />
+<strong>Federated BI Scenarios</strong><br />
+Multi-Forest Active Directory Environments<br />
+Extranet Environments<br />
+Cloud Environments<br />
+Conclusion	</p>
+<p>Download the <a href="http://download.microsoft.com/download/D/2/0/D20E1C5F-72EA-4505-9F26-FEF9550EFD44/MSFTBIAuthOverview.docx">Microsoft BI Authentication and Identity Delegation Word document</a>.</p>
+<h2>SSDT BI</h2>
+<p>SQL Server Data Tools – Business Intelligence for Visual Studio 2012 (SSDT BI) templates has been released this week as well. With SSDT BI for Visual Studio 2012 you can develop and deploy SQL Server Business intelligence projects. Projects created in Visual Studio 2010 can be opened in Visual Studio 2012 and the other way around without upgrading or downgrading. You can read more about this and see some screenshots here: http://blogs.msdn.com/b/sqlrsteamblog/archive/2013/03/06/sql-server-data-tools-business-intelligence-for-visual-studio-2012-released-online.aspx</p>
+<p>You can download it here:<a href="http://www.microsoft.com/en-us/download/details.aspx?id=36843"> Microsoft SQL Server Data Tools &#8211; Business Intelligence for Visual Studio 2012</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/business-intelligence/sql-server-2012-business-intelligence/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Learn About SQL Server 2008 R2 Project Gemini And Project Madison By Watching These Videos</title>
+		<link>/index.php/datamgmt/datadesign/learn-about-sql-server-2008-r2-project-g/</link>
+		<comments>/index.php/datamgmt/datadesign/learn-about-sql-server-2008-r2-project-g/#respond</comments>
+		<pubDate>Tue, 01 Sep 2009 22:53:06 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[data warehouse]]></category>
+		<category><![CDATA[excel]]></category>
+		<category><![CDATA[gemini]]></category>
+		<category><![CDATA[madison]]></category>
+		<category><![CDATA[olap]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[ssas]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/09/learn-about-sql-server-2008-r2-project-g/</guid>
+		<description><![CDATA[Channel 9 has two videos up about Project Gemini And Project Madison. These two videos will give you a good overview what Gemini and Madison are all about. Both videos are available in a variety of formats Introduction to SQL Server Project Madison The SQL Server team is working on a new project code-named “Madison”. [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Channel 9 has two videos up about Project Gemini And Project Madison. These two videos will give you a good overview what Gemini and Madison are all about. Both videos are available in a variety of formats</p>
+<p><strong>Introduction to SQL Server Project Madison</strong></p>
+<blockquote><p>The SQL Server team is working on a new project code-named “Madison”. &#8220;Madison&#8221; is a highly scalable data warehouse appliance that delivers performance at low cost through massively parallel processing (MPP). How does it work? What&#8217;s the story? Well, &#8220;Madison&#8221; Product Unit Manager Christian Kleinerman sure knows the answers and he provides an introduction to this new SQL data warehousing technology</p></blockquote>
+<p>The Madison video is 27 minutes and 48 seconds and you can watch/download it here: http://channel9.msdn.com/posts/Charles/Christian-Kleinerman-Introduction-to-SQL-Server-Project-Madison/</p>
+<p><strong>Inside Project Gemini</strong></p>
+<blockquote><p>Office Marketing says: &#8220;Need to make timely business decisions without having to use complicated and sluggish analytical applications? Love to use Excel? Project Gemini is an Excel 2010 add-in that allows you to create powerful analyses by quickly manipulating millions of rows of data into a single Excel workbook and utilize Microsoft Office 2010 to share and collaborate on your insights with your team.&#8221;</p>
+<p>Donald Farmer and Julie Strauss are Program Managers behind this new technology &#8220;Gemini&#8221;. What is &#8220;Gemini&#8221;? How does it work? Why? What&#8217;s it all really mean, anyway? </p>
+<p>Tune in. Very interesting technology here. For all you spreadsheet jockeys out there, this should prove extraordinarliy useful to you when you need to crunch and analyze lots of data effeciently. Wow. 1,000,000 rows in Excel without causing a hang. Nice work, &#8220;Gemini&#8221; team!</p></blockquote>
+<p>The Gemini video is 29 minutes and 17 seconds and you can watch/download it here: http://channel9.msdn.com/posts/Charles/Donald-Farmer-and-Julie-Strauss-Inside-Project-Gemini/</p>
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/learn-about-sql-server-2008-r2-project-g/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>PerformancePoint Server To Become PerformancePoint Services In SharePoint Server</title>
+		<link>/index.php/datamgmt/datadesign/performancepoint-server-to-become-perfor/</link>
+		<comments>/index.php/datamgmt/datadesign/performancepoint-server-to-become-perfor/#respond</comments>
+		<pubDate>Fri, 23 Jan 2009 15:23:07 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[excel]]></category>
+		<category><![CDATA[moss]]></category>
+		<category><![CDATA[performancepoint server]]></category>
+		<category><![CDATA[sharepoint server]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/01/performancepoint-server-to-become-perfor/</guid>
+		<description><![CDATA[PerformancePoint Server To Become PerformancePoint Services In SharePoint Server Microsoft is consolidating the scorecard, dashboard, and analytical capabilities from PerformancePoint Server into SharePoint Server as PerformancePoint Services, making these capabilities available to millions of SharePoint users around the world. See the announcement here: http://blogs.msdn.com/bi/archive/2009/01/23/microsoft-bi-strategy-update.aspx You can also watch a video of the announcement here: http://www.microsoft.com/winme/0901/35195/Guy_Weismantel_BI_Announcement_MBR.asx]]></description>
+				<content:encoded><![CDATA[<p>PerformancePoint Server To Become PerformancePoint Services In SharePoint Server </p>
+<p>Microsoft is consolidating the scorecard, dashboard, and analytical capabilities from PerformancePoint Server into SharePoint Server as PerformancePoint Services, making these capabilities available to millions of SharePoint users around the world. </p>
+<p>See the announcement here: http://blogs.msdn.com/bi/archive/2009/01/23/microsoft-bi-strategy-update.aspx</p>
+<p>You can also watch a video of the announcement here: http://www.microsoft.com/winme/0901/35195/Guy_Weismantel_BI_Announcement_MBR.asx</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/performancepoint-server-to-become-perfor/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+<enclosure url="http://www.microsoft.com/winme/0901/35195/Guy_Weismantel_BI_Announcement_MBR.asx" length="137" type="video/x-ms-asf" />
+		</item>
+	</channel>
+</rss>

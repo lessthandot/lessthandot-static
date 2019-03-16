@@ -1,0 +1,948 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>asp.net core &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/asp-net-core/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Custom Authentication in ASP.Net Core 1 (without Identity)</title>
+		<link>/index.php/webdev/serverprogramming/aspnet/custom-authentication-in-asp-net-core-without-identity/</link>
+		<comments>/index.php/webdev/serverprogramming/aspnet/custom-authentication-in-asp-net-core-without-identity/#comments</comments>
+		<pubDate>Fri, 08 Sep 2017 11:59:48 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[asp.net core]]></category>
+		<category><![CDATA[authentication]]></category>
+		<category><![CDATA[bcrypt]]></category>
+
+		<guid isPermaLink="false">/?p=8790</guid>
+		<description><![CDATA[Performing Authentication and Authorization has changed from ASP.Net to ASP.Net Core. Rather than relying on attributes, ASP.Net Core uses middleware similar to NancyFX and Rails. This is a short, step-by-step approach to implementing custom Authentication in ASP.Net Core without the overhead (and assumptions) of the new Identity model. The goal is to support basic necessities [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Performing Authentication and Authorization has changed from ASP.Net to ASP.Net Core. Rather than relying on attributes, ASP.Net Core uses middleware similar to NancyFX and Rails. This is a short, step-by-step approach to implementing custom Authentication in ASP.Net Core without the overhead (and assumptions) of the new Identity model. </p>
+<p>The goal is to support basic necessities like a Login page with cookie-based authentication tickets that properly require HTTPS in production, but gracefully fail back to HTTP in local development.</p>
+<h2>Cookie Middleware</h2>
+<p>ASP.Net Core has Cookie Middleware we can use out of the box: <a href="https://docs.microsoft.com/en-us/aspnet/core/security/authentication/cookie" title="Using Cookie Authentication without ASP.NET Core Identity">Using Cookie Authentication without ASP.NET Core Identity</a></p>
+<div style="border: 1px solid #EEBBBB; border-left: 16px solid #EEBBBB; padding: 1em">
+<div style="color: #883333; font-weight: bold">
+Warning: This only applies for ASP.Net Core 1.0, not 2.0.
+</div>
+<p>ASP.Net Core 2.0 has pivoted authentication in a different direction, ASP.Net Core 2 Custom Authentication is covered in a <a href="/index.php/webdev/serverprogramming/aspnet/custom-authentication-in-asp-net-core-2-w-cosmos-db/">newer post</a>.
+</div>
+<p>This middleware provides support for a number of things we want: directing unauthenticated users to a LoginPath, redirecting access denied requests, authentication tickets with sliding expirations and encryption, and hooks to tie into the process for additional custom logic.</p>
+<p>Add the Cookie Authentication middleware in the Startup.Configure method:</p>
+<p><b>APIProject/Startup.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+</pre></td><td class="de1"><pre class="de1">&nbsp;<span class="kw1">public</span> <span class="kw4">void</span> Configure<span class="br0">&#40;</span>IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// ... other setup ...</span>
+&nbsp;
+&nbsp; &nbsp; app<span class="sy0">.</span><span class="me1">UseCookieAuthentication</span><span class="br0">&#40;</span><span class="kw3">new</span> CookieAuthenticationOptions<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// A string to identify the authentication scheme we used, useful for filtering in Authorize attributes</span>
+&nbsp; &nbsp; &nbsp; &nbsp; AuthenticationScheme <span class="sy0">=</span> <span class="st0">&quot;NAME_OF_YOUR_COOKIE_SCHEME&quot;</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Location to send people too to log in</span>
+&nbsp; &nbsp; &nbsp; &nbsp; LoginPath <span class="sy0">=</span> <span class="kw3">new</span> PathString<span class="br0">&#40;</span><span class="st0">&quot;/Account/Login&quot;</span><span class="br0">&#41;</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Location to send people who fail to authenticate when required</span>
+&nbsp; &nbsp; &nbsp; &nbsp; AccessDeniedPath <span class="sy0">=</span> <span class="kw3">new</span> PathString<span class="br0">&#40;</span><span class="st0">&quot;/Account/Forbidden&quot;</span><span class="br0">&#41;</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Automatically check authentication on every call?</span>
+&nbsp; &nbsp; &nbsp; &nbsp; AutomaticAuthenticate <span class="sy0">=</span> <span class="kw1">true</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Challenge every request (enforce requirement to have this auth scheme if it got this far)</span>
+&nbsp; &nbsp; &nbsp; &nbsp; AutomaticChallenge <span class="sy0">=</span> <span class="kw1">true</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Expiration of the authentication ticket </span>
+&nbsp; &nbsp; &nbsp; &nbsp; ExpireTimeSpan <span class="sy0">=</span> TimeSpan<span class="sy0">.</span><span class="me1">FromMinutes</span><span class="br0">&#40;</span><span class="nu0">30</span><span class="br0">&#41;</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Update the timeout each time a new request comes in</span>
+&nbsp; &nbsp; &nbsp; &nbsp; SlidingExpiration <span class="sy0">=</span> <span class="kw1">true</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; Events <span class="sy0">=</span> <span class="kw3">new</span> CookieAuthenticationEvents<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Overwrite the attempt to redirect API calls to login page w/ 401 response instead</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; OnRedirectToLogin <span class="sy0">=</span> <span class="br0">&#40;</span>ctx<span class="br0">&#41;</span> <span class="sy0">=&gt;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// return true 401 to API calls, continue redirect to login for interactive</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>ctx<span class="sy0">.</span><span class="me1">Request</span><span class="sy0">.</span><span class="me1">Path</span><span class="sy0">.</span><span class="me1">StartsWithSegments</span><span class="br0">&#40;</span><span class="st0">&quot;/api&quot;</span><span class="br0">&#41;</span> <span class="sy0">&amp;&amp;</span> ctx<span class="sy0">.</span><span class="me1">Response</span><span class="sy0">.</span><span class="me1">StatusCode</span> <span class="sy0">==</span> <span class="nu0">200</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ctx<span class="sy0">.</span><span class="me1">Response</span><span class="sy0">.</span><span class="me1">StatusCode</span> <span class="sy0">=</span> <span class="nu0">401</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> Task<span class="sy0">.</span><span class="me1">FromResult</span><span class="sy0">&lt;</span><span class="kw4">object</span><span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="kw1">null</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ctx<span class="sy0">.</span><span class="me1">Response</span><span class="sy0">.</span><span class="me1">Redirect</span><span class="br0">&#40;</span>ctx<span class="sy0">.</span><span class="me1">RedirectUri</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> Task<span class="sy0">.</span><span class="me1">FromResult</span><span class="sy0">&lt;</span><span class="kw4">object</span><span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="kw1">null</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// ... other setup ...</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"> public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
+{
+	// ... other setup ...
+
+	app.UseCookieAuthentication(new CookieAuthenticationOptions() {
+
+		// A string to identify the authentication scheme we used, useful for filtering in Authorize attributes
+		AuthenticationScheme = "NAME_OF_YOUR_COOKIE_SCHEME",
+
+		// Location to send people too to log in
+		LoginPath = new PathString("/Account/Login"),
+
+		// Location to send people who fail to authenticate when required
+		AccessDeniedPath = new PathString("/Account/Forbidden"),
+
+		// Automatically check authentication on every call?
+		AutomaticAuthenticate = true,
+
+		// Challenge every request (enforce requirement to have this auth scheme if it got this far)
+		AutomaticChallenge = true,
+
+		// Expiration of the authentication ticket 
+		ExpireTimeSpan = TimeSpan.FromMinutes(30),
+
+		// Update the timeout each time a new request comes in
+		SlidingExpiration = true,
+
+		Events = new CookieAuthenticationEvents() {
+
+			// Overwrite the attempt to redirect API calls to login page w/ 401 response instead
+			OnRedirectToLogin = (ctx) =&gt; {
+				// return true 401 to API calls, continue redirect to login for interactive
+				if (ctx.Request.Path.StartsWithSegments("/api") &amp;&amp; ctx.Response.StatusCode == 200)
+				{
+					ctx.Response.StatusCode = 401;
+					return Task.FromResult&lt;object&gt;(null);
+				}
+
+				ctx.Response.Redirect(ctx.RedirectUri);
+				return Task.FromResult&lt;object&gt;(null);
+			},
+
+		}
+	});
+
+	// ... other setup ...
+}</pre></div></div>
+
+<p><i>Note the OnRedirectToLogin logic, this causes the middleware to return basic 401 HTTP errors for calls through the &#8220;/api&#8221; path instead of redirects to the login page</i></p>
+<h2>Account Controller</h2>
+<p>To support the endpoints above, and some others that may be useful, we need a simple Account controller:</p>
+<p><b>APIProject/Controllers/InteractiveAccountController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>ApiExceptionFilter<span class="br0">&#93;</span>
+<span class="br0">&#91;</span>Route<span class="br0">&#40;</span><span class="st0">&quot;Account&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">class</span> InteractiveAccountController <span class="sy0">:</span> Controller
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>HttpGet<span class="br0">&#40;</span><span class="st0">&quot;Unauthorized&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> async Task<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span> GetUnauthorizedAsync<span class="br0">&#40;</span><span class="kw4">string</span> returnUrl<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;You really should login first.&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>HttpGet<span class="br0">&#40;</span><span class="st0">&quot;Forbidden&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">string</span> GetForbidden<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;Forbidden&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>HttpGet<span class="br0">&#40;</span><span class="st0">&quot;TimedOut&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">string</span> GetTimedOut<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;TimedOut&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>HttpGet<span class="br0">&#40;</span><span class="st0">&quot;Login&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> async Task<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span> GetLogin<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> principal <span class="sy0">=</span> <span class="kw3">new</span> ClaimsPrincipal<span class="br0">&#40;</span><span class="kw3">new</span> StandardUser<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; await HttpContext<span class="sy0">.</span><span class="me1">Authentication</span><span class="sy0">.</span><span class="me1">SignInAsync</span><span class="br0">&#40;</span><span class="st0">&quot;NAME_OF_YOUR_COOKIE_SCHEME&quot;</span>, principal<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;Success!&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>HttpGet<span class="br0">&#40;</span><span class="st0">&quot;Logout&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> async Task<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span> GetLogout<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; await HttpContext<span class="sy0">.</span><span class="me1">Authentication</span><span class="sy0">.</span><span class="me1">SignOutAsync</span><span class="br0">&#40;</span><span class="st0">&quot;NAME_OF_YOUR_COOKIE_SCHEME&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// TODO replace with redirect to login once it exists</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;Goodbye!&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[ApiExceptionFilter]
+[Route("Account")]
+public class InteractiveAccountController : Controller
+{
+	[HttpGet("Unauthorized")]
+	public async Task&lt;string&gt; GetUnauthorizedAsync(string returnUrl)
+	{
+		return "You really should login first.";
+	}
+
+	[HttpGet("Forbidden")]
+	public string GetForbidden()
+	{
+		return "Forbidden";
+	}
+
+	[HttpGet("TimedOut")]
+	public string GetTimedOut()
+	{
+		return "TimedOut";
+	}
+
+	[HttpGet("Login")]
+	public async Task&lt;string&gt; GetLogin()
+	{
+		var principal = new ClaimsPrincipal(new StandardUser());
+		await HttpContext.Authentication.SignInAsync("NAME_OF_YOUR_COOKIE_SCHEME", principal);
+		return "Success!";
+	}
+
+	[HttpGet("Logout")]
+	public async Task&lt;string&gt; GetLogout()
+	{
+		await HttpContext.Authentication.SignOutAsync("NAME_OF_YOUR_COOKIE_SCHEME");
+		// TODO replace with redirect to login once it exists
+		return "Goodbye!";
+	}
+}</pre></div></div>
+
+<h2>Authorize</h2>
+<p>Once we have an authenticated user, we can add the standard <code>[Authorize]</code> attribute on any controllers or methods to ensure access will require authentication (or challenge if it&#8217;s not present). If we had multiple methods of authentication (interactive user, some API access, etc), we could further restrict these actions to just the cookie-based authenticated requests by specifying that authentication scheme in the attribute:<br />
+<code>[Authorize(ActiveAuthenticationSchemes = "NAME_OF_YOUR_COOKIE_SCHEME")]</code></p>
+<p>An easy way to verify things are in working order is to decorate another Controller/Action with Authorize and attempt to visit it. We should get redirected to <code>Unauthorized</code> on the Account controller above. If we visit <code>Login</code> first, then visit our sample Action we should be allowed in. Visit <code>Logout</code> and then our sample Action, we&#8217;re back at Unauthorized.</p>
+<h2>Ensure Endpoints have Authorization</h2>
+<p>Now that we have the middleware in place, the Account pages, and a sample page, we should add some protection to make sure we don&#8217;t leave any pages exposed accidentally. This step is optional, but it&#8217;s something I prefer to do for every application I work on. </p>
+<p>Using the sample code from <a href="/index.php/webdev/asp-net-ensure-your-actions-arent-missing-authorization-with-unit-tests/">a prior ASP.Net post</a>, we can write a quick unit test that will inspect all Actions and require them to either have explicit [Authorize] or [AllowAnonymous] attributes. This will protect us from accidentally pushing an unprotected endpoint.</p>
+<p>Unfortunately, APIExplorer in ASP.Net Core is even less documented so we have to rely on Reflection instead:</p>
+<p><b>APIProject.Tests/SecurityTests.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="br0">&#91;</span>TestFixture<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> SecurityTests
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Func<span class="sy0">&lt;</span><span class="kw4">object</span>, <span class="kw4">bool</span><span class="sy0">&gt;</span> IsMVCAttributeAuth <span class="sy0">=</span> <span class="br0">&#40;</span>o<span class="br0">&#41;</span> <span class="sy0">=&gt;</span> <span class="br0">&#40;</span>o <span class="kw3">is</span> AuthorizeAttribute <span class="sy0">||</span> o <span class="kw3">is</span> AllowAnonymousAttribute<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> AllMvcActionsHaveExplicitAuthorizationDefined_UsingStandardReflection<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> actionsMissingAuth <span class="sy0">=</span> <span class="kw3">new</span> List<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// 1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> controllers <span class="sy0">=</span> Assembly<span class="sy0">.</span><span class="me1">GetAssembly</span><span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>InteractiveAccountController<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">GetLoadableTypes</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>t <span class="sy0">=&gt;</span> <span class="kw3">typeof</span><span class="br0">&#40;</span>Controller<span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">IsAssignableFrom</span><span class="br0">&#40;</span>t<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> controller <span class="kw1">in</span> controllers<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// 2</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// if the controller has it, all it's actions are covered also</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>controller<span class="sy0">.</span><span class="me1">GetCustomAttributes</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span>a <span class="sy0">=&gt;</span> IsMVCAttributeAuth<span class="br0">&#40;</span>a<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">continue</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> actions <span class="sy0">=</span> controller<span class="sy0">.</span><span class="me1">GetMethods</span><span class="br0">&#40;</span>BindingFlags<span class="sy0">.</span><span class="me1">Instance</span> <span class="sy0">|</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; BindingFlags<span class="sy0">.</span><span class="me1">DeclaredOnly</span> <span class="sy0">|</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; BindingFlags<span class="sy0">.</span><span class="kw1">Public</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> action <span class="kw1">in</span> actions<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// 3</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// if the action has a defined authorization filter, it's covered</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>action<span class="sy0">.</span><span class="me1">GetCustomAttributes</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span>a <span class="sy0">=&gt;</span> IsMVCAttributeAuth<span class="br0">&#40;</span>a<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">continue</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// no controller or action defined, add it to the list</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; actionsMissingAuth<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0}.{1}&quot;</span>, controller<span class="sy0">.</span><span class="me1">Name</span>, action<span class="sy0">.</span><span class="me1">Name</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// 4</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>actionsMissingAuth<span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">Fail</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0} action(s) do not have explicit authorization: {1}&quot;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; actionsMissingAuth<span class="sy0">.</span><span class="me1">Count</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">String</span><span class="sy0">.</span><span class="kw1">Join</span><span class="br0">&#40;</span><span class="st0">&quot;,&quot;</span>, actionsMissingAuth<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">class</span> AssemblyExtensions
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> IEnumerable<span class="sy0">&lt;</span>Type<span class="sy0">&gt;</span> GetLoadableTypes<span class="br0">&#40;</span><span class="kw1">this</span> Assembly assembly<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> assembly<span class="sy0">.</span><span class="me1">GetTypes</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">catch</span> <span class="br0">&#40;</span>ReflectionTypeLoadException e<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> e<span class="sy0">.</span><span class="me1">Types</span><span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>t <span class="sy0">=&gt;</span> t <span class="sy0">!=</span> <span class="kw1">null</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    [TestFixture]
+    public class SecurityTests
+    {
+        Func&lt;object, bool&gt; IsMVCAttributeAuth = (o) =&gt; (o is AuthorizeAttribute || o is AllowAnonymousAttribute);
+
+        [Test]
+        public void AllMvcActionsHaveExplicitAuthorizationDefined_UsingStandardReflection()
+        {
+            var actionsMissingAuth = new List&lt;string&gt;();
+
+            // 1
+            var controllers = Assembly.GetAssembly(typeof(InteractiveAccountController)).GetLoadableTypes()
+                          .Where(t =&gt; typeof(Controller).IsAssignableFrom(t));
+
+            foreach (var controller in controllers)
+            {
+                // 2
+                // if the controller has it, all it's actions are covered also
+                if (controller.GetCustomAttributes().Any(a =&gt; IsMVCAttributeAuth(a)))
+                    continue;
+
+                var actions = controller.GetMethods(BindingFlags.Instance |
+                                                    BindingFlags.DeclaredOnly |
+                                                    BindingFlags.Public);
+                foreach (var action in actions)
+                {
+                    // 3
+                    // if the action has a defined authorization filter, it's covered
+                    if (action.GetCustomAttributes().Any(a =&gt; IsMVCAttributeAuth(a)))
+                        continue;
+
+                    // no controller or action defined, add it to the list
+                    actionsMissingAuth.Add(String.Format("{0}.{1}", controller.Name, action.Name));
+                }
+            }
+
+            // 4
+            if (actionsMissingAuth.Any())
+            {
+                Assert.Fail(String.Format("{0} action(s) do not have explicit authorization: {1}",
+                              actionsMissingAuth.Count,
+                              String.Join(",", actionsMissingAuth)));
+            }
+        }
+    }
+
+
+    public static class AssemblyExtensions
+    {
+        public static IEnumerable&lt;Type&gt; GetLoadableTypes(this Assembly assembly)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (ReflectionTypeLoadException e)
+            {
+                return e.Types.Where(t =&gt; t != null);
+            }
+        }
+    }</pre></div></div>
+
+<h2>Add Real Login Pages and Logic</h2>
+<p>I&#8217;m not going to push a particular storage solution on you, so I have two interfaces I&#8217;ll be using as stand-ins for all of my &#8220;storage&#8221; needs:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">interface</span> IUserStorage
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Task<span class="sy0">&lt;</span>User<span class="sy0">&gt;</span> GetUserByUsernameAsync<span class="br0">&#40;</span><span class="kw4">string</span> username<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Task<span class="sy0">&lt;</span>User<span class="sy0">&gt;</span> GetUserAsync<span class="br0">&#40;</span>Guid userId<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw4">interface</span> ISessionManager
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Task<span class="sy0">&lt;</span>IPrincipal<span class="sy0">&gt;</span> CreateSessionAsync<span class="br0">&#40;</span>Guid userId<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Task<span class="sy0">&lt;</span><span class="kw4">bool</span><span class="sy0">&gt;</span> IsSessionValidAsync<span class="br0">&#40;</span>IPrincipal principal<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw4">bool</span> IsUserValidForSession<span class="br0">&#40;</span>User user<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public interface IUserStorage
+{
+    Task&lt;User&gt; GetUserByUsernameAsync(string username);
+    Task&lt;User&gt; GetUserAsync(Guid userId);
+}
+
+public interface ISessionManager
+{
+    Task&lt;IPrincipal&gt; CreateSessionAsync(Guid userId);
+    Task&lt;bool&gt; IsSessionValidAsync(IPrincipal principal);
+    bool IsUserValidForSession(User user);
+}</pre></div></div>
+
+<p>I am also using <a href="https://en.wikipedia.org/wiki/Bcrypt">BCrypt</a> for password hashing. BCrypt is a slow hashing function that makes brute force attempts computationally expensive. To verify a hashed BCrypt password, we have to pull it out of our store and ask BCrypt to verify it (instead of some methods that allow you to hash a new value and compare at the storage level).</p>
+<p><b>APIProject/Controllers/InteractiveAccountController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+</pre></td><td class="de1"><pre class="de1"><span class="sy0">...</span>
+&nbsp;
+<span class="br0">&#91;</span>HttpGet<span class="br0">&#40;</span><span class="st0">&quot;Login&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="kw1">public</span> async Task<span class="sy0">&lt;</span>IActionResult<span class="sy0">&gt;</span> GetLoginAsync<span class="br0">&#40;</span><span class="kw4">string</span> returnUrl<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> View<span class="br0">&#40;</span><span class="st0">&quot;Login&quot;</span>, <span class="kw3">new</span> LoginModel<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> ReturnURL <span class="sy0">=</span> returnUrl <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="br0">&#91;</span>HttpPost<span class="br0">&#40;</span><span class="st0">&quot;Login&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="kw1">public</span> async Task<span class="sy0">&lt;</span>IActionResult<span class="sy0">&gt;</span> PostLoginAsync<span class="br0">&#40;</span><span class="kw4">string</span> username, <span class="kw4">string</span> password, <span class="kw4">string</span> returnUrl<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// Did they provide all the details?</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span><span class="kw4">string</span><span class="sy0">.</span><span class="me1">IsNullOrEmpty</span><span class="br0">&#40;</span>username<span class="br0">&#41;</span> <span class="sy0">||</span> <span class="kw4">String</span><span class="sy0">.</span><span class="me1">IsNullOrEmpty</span><span class="br0">&#40;</span>password<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> View<span class="br0">&#40;</span><span class="st0">&quot;Login&quot;</span>, <span class="kw3">new</span> LoginModel<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> ReturnURL <span class="sy0">=</span> returnUrl, UserName <span class="sy0">=</span> username, Error <span class="sy0">=</span> <span class="st0">&quot;Please provide both a username and password.&quot;</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// Load the User and see if BCrypt can verify the entered password matches the stored hash</span>
+&nbsp; &nbsp; <span class="kw1">var</span> secrets <span class="sy0">=</span> await _userStorage<span class="sy0">.</span><span class="me1">GetUserByUsernameAsync</span><span class="br0">&#40;</span>username<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>secrets <span class="sy0">==</span> <span class="kw1">null</span> <span class="sy0">||</span> <span class="sy0">!</span>BCrypt<span class="sy0">.</span><span class="me1">Net</span><span class="sy0">.</span><span class="me1">BCrypt</span><span class="sy0">.</span><span class="me1">Verify</span><span class="br0">&#40;</span>password, secrets<span class="sy0">.</span><span class="me1">PasswordHash</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> View<span class="br0">&#40;</span><span class="st0">&quot;Login&quot;</span>, <span class="kw3">new</span> LoginModel<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> ReturnURL <span class="sy0">=</span> returnUrl, UserName <span class="sy0">=</span> username, Error <span class="sy0">=</span> <span class="st0">&quot;Sorry, could not find a user with that name and password.&quot;</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp;
+&nbsp; &nbsp; <span class="co1">// Verify the user is allowed to start a session (record is enabled, etc)</span>
+&nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span><span class="sy0">!</span>_sessionManager<span class="sy0">.</span><span class="me1">IsUserValidForSession</span><span class="br0">&#40;</span>user<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> View<span class="br0">&#40;</span><span class="st0">&quot;Login&quot;</span>, <span class="kw3">new</span> LoginModel<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> ReturnURL <span class="sy0">=</span> returnUrl, UserName <span class="sy0">=</span> username, Error <span class="sy0">=</span> <span class="st0">&quot;Sorry, your account is currently disabled.&quot;</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// Create a principal for the session/user and put it in the cookie</span>
+&nbsp; &nbsp; <span class="kw1">var</span> principal <span class="sy0">=</span> await _sessionManager<span class="sy0">.</span><span class="me1">CreateSessionAsync</span><span class="br0">&#40;</span>user<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; await HttpContext<span class="sy0">.</span><span class="me1">Authentication</span><span class="sy0">.</span><span class="me1">SignInAsync</span><span class="br0">&#40;</span><span class="st0">&quot;NAME_OF_YOUR_COOKIE_SCHEME&quot;</span>, principal<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// Redirect the user</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">IsNullOrWhiteSpace</span><span class="br0">&#40;</span>returnUrl<span class="br0">&#41;</span> <span class="sy0">||</span> returnUrl<span class="sy0">.</span><span class="me1">ToLower</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">StartsWith</span><span class="br0">&#40;</span><span class="st0">&quot;/account/login&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; returnUrl <span class="sy0">=</span> <span class="st0">&quot;/&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">return</span> Redirect<span class="br0">&#40;</span>returnUrl<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="br0">&#91;</span>HttpGet<span class="br0">&#40;</span><span class="st0">&quot;Logout&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="kw1">public</span> async Task<span class="sy0">&lt;</span>IActionResult<span class="sy0">&gt;</span> GetLogout<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; await HttpContext<span class="sy0">.</span><span class="me1">Authentication</span><span class="sy0">.</span><span class="me1">SignOutAsync</span><span class="br0">&#40;</span><span class="st0">&quot;NAME_OF_YOUR_COOKIE_SCHEME&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> Redirect<span class="br0">&#40;</span><span class="st0">&quot;/account/login&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="sy0">...</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">...
+
+[HttpGet("Login")]
+public async Task&lt;IActionResult&gt; GetLoginAsync(string returnUrl)
+{
+    return View("Login", new LoginModel() { ReturnURL = returnUrl });
+}
+
+[HttpPost("Login")]
+public async Task&lt;IActionResult&gt; PostLoginAsync(string username, string password, string returnUrl)
+{
+    // Did they provide all the details?
+    if (string.IsNullOrEmpty(username) || String.IsNullOrEmpty(password))
+        return View("Login", new LoginModel() { ReturnURL = returnUrl, UserName = username, Error = "Please provide both a username and password." });
+
+    // Load the User and see if BCrypt can verify the entered password matches the stored hash
+    var secrets = await _userStorage.GetUserByUsernameAsync(username);
+    if (secrets == null || !BCrypt.Net.BCrypt.Verify(password, secrets.PasswordHash))
+        return View("Login", new LoginModel() { ReturnURL = returnUrl, UserName = username, Error = "Sorry, could not find a user with that name and password." });
+   
+    // Verify the user is allowed to start a session (record is enabled, etc)
+    if(!_sessionManager.IsUserValidForSession(user))
+        return View("Login", new LoginModel() { ReturnURL = returnUrl, UserName = username, Error = "Sorry, your account is currently disabled." });
+
+    // Create a principal for the session/user and put it in the cookie
+    var principal = await _sessionManager.CreateSessionAsync(user);
+    await HttpContext.Authentication.SignInAsync("NAME_OF_YOUR_COOKIE_SCHEME", principal);
+
+    // Redirect the user
+    if (String.IsNullOrWhiteSpace(returnUrl) || returnUrl.ToLower().StartsWith("/account/login"))
+        returnUrl = "/";
+
+    return Redirect(returnUrl);
+}
+
+[HttpGet("Logout")]
+public async Task&lt;IActionResult&gt; GetLogout()
+{
+    await HttpContext.Authentication.SignOutAsync("NAME_OF_YOUR_COOKIE_SCHEME");
+    return Redirect("/account/login");
+}
+
+...</pre></div></div>
+
+<p>Inside the <code>ISessionManager.CreateSessionAsync</code>, we create a session in storage with an id and then when the Principal is created we add that Id as a claim in the Principal. This is how we&#8217;ll look up the session on later requests to get the user information.</p>
+<p>The Cookie middleware will take care of built-in timeouts, but we also need to add a check in case someone disables the user (or whatever criteria is necessary in your system). Add this to the Startup.cs setup.</p>
+<p><b>APIProject/Startup.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+</pre></td><td class="de1"><pre class="de1">app<span class="sy0">.</span><span class="me1">UseCookieAuthentication</span><span class="br0">&#40;</span><span class="kw3">new</span> CookieAuthenticationOptions<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sy0">...</span>
+&nbsp;
+&nbsp; &nbsp; <span class="me1">Events</span> <span class="sy0">=</span> <span class="kw3">new</span> CookieAuthenticationEvents<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">...</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Use my ISessionManager to ensure session is still valid (user not disabled) or reject the principal if it is no longer valid</span>
+&nbsp; &nbsp; &nbsp; &nbsp; OnValidatePrincipal <span class="sy0">=</span> async <span class="br0">&#40;</span>ctx<span class="br0">&#41;</span> <span class="sy0">=&gt;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> sessionManager <span class="sy0">=</span> ctx<span class="sy0">.</span><span class="me1">HttpContext</span><span class="sy0">.</span><span class="me1">RequestServices</span><span class="sy0">.</span><span class="me1">GetRequiredService</span><span class="sy0">&lt;</span>ISessionManager<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> isSessionValid <span class="sy0">=</span> await sessionManager<span class="sy0">.</span><span class="me1">IsSessionValidAsync</span><span class="br0">&#40;</span>ctx<span class="sy0">.</span><span class="me1">Principal</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span><span class="sy0">!</span>isSessionValid<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ctx<span class="sy0">.</span><span class="me1">RejectPrincipal</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">app.UseCookieAuthentication(new CookieAuthenticationOptions() {
+
+	...
+
+	Events = new CookieAuthenticationEvents() {
+
+		...
+
+		// Use my ISessionManager to ensure session is still valid (user not disabled) or reject the principal if it is no longer valid
+		OnValidatePrincipal = async (ctx) =&gt; {
+			var sessionManager = ctx.HttpContext.RequestServices.GetRequiredService&lt;ISessionManager&gt;();
+			var isSessionValid = await sessionManager.IsSessionValidAsync(ctx.Principal);
+			if (!isSessionValid) {
+				ctx.RejectPrincipal();
+			}
+		}
+	}
+});</pre></div></div>
+
+<p><code>ISessionManager.IsSessionValidAsync</code> can now pull that Id claim we created above, get the associated user, and do any number of additional validations on the session length, user enabled state, and so on.</p>
+<h2>Accessing the User/Session</h2>
+<p>The last step is to the ability to access the User in other controllers. Controllers have a <code>User</code> property that grants access to the ClaimsPrincipal created during login. Assuming we had also stored a property like &#8220;UserId&#8221; in <code>ISessionManager.CreateSessionAsync</code> then we can access it like this:</p>
+<p><b>APIProject/Controllers/AnyOldController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> userIdClaim <span class="sy0">=</span> User<span class="sy0">.</span><span class="me1">FindFirst</span><span class="br0">&#40;</span><span class="st0">&quot;UserId&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">var</span> userId <span class="sy0">=</span> Guid<span class="sy0">.</span><span class="me1">Parse</span><span class="br0">&#40;</span>userIdClaim<span class="sy0">.</span><span class="kw1">Value</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var userIdClaim = User.FindFirst("UserId");
+var userId = Guid.Parse(userIdClaim.Value);</pre></div></div>
+
+<p>The second time I jumped through this particular hoop, I added a method to my SessionManager that accepted a Controller and looked the user up from the database, so I could do this instead:</p>
+<p><b>APIProject/Controllers/AnyOldController.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> user <span class="sy0">=</span> await _sessionManager<span class="sy0">.</span><span class="me1">GetCurrentUserAsync</span><span class="br0">&#40;</span><span class="kw1">this</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var user = await _sessionManager.GetCurrentUserAsync(this);</pre></div></div>
+
+<p>The Session Id mentioned in the prior section is handled the same way.</p>
+<h2>Final Checklist</h2>
+<p>If you&#8217;re using this to follow along and implement, here are the pieces you should have:</p>
+<ul>
+<li>Startup.cs: The CookieMiddleware configured with expiration, automatic challenge, 401 redirects for APIs, and re-validation of the session</li>
+<li>InteractiveAccountController: GET/POST for Login, GET for Logout, pages for Forbidden plus the Views for these pages</li>
+<li>UserStore and SessionManager implementations, with just a few functions needed and ability to extend the ClaimsPrincipal with more fields as you grow</li>
+</ul>
+<p>You can go as light or heavy as you need to with storage, relational or non-relational, as needed. You have BCrypt, one of the small set of recommended options from <a href="https://www.owasp.org/index.php/Password_Storage_Cheat_Sheet">OWASP</a> (or upgrade to <a href="https://www.nuget.org/packages/Liphsoft.Crypto.Argon2">Argon2</a>). You have cookies with encrypted contents (including the expiration date) that automatically default to <code>secure</code> for HTTPS websites.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/aspnet/custom-authentication-in-asp-net-core-without-identity/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>SPA Routing in ASP.Net Core</title>
+		<link>/index.php/webdev/serverprogramming/aspnet/spa-routing-in-asp-net-core/</link>
+		<comments>/index.php/webdev/serverprogramming/aspnet/spa-routing-in-asp-net-core/#respond</comments>
+		<pubDate>Fri, 30 Jun 2017 11:58:40 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[C#]]></category>
+		<category><![CDATA[asp.net core]]></category>
+		<category><![CDATA[spa]]></category>
+
+		<guid isPermaLink="false">/?p=8664</guid>
+		<description><![CDATA[One of the challenges of SPA applications is making sure a bookmark or hard refresh knows how to load just enough of the content from the server before applying the client-side routing logic to that base page. This is not guaranteed to be the only way to do this, just the one that worked for [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>One of the challenges of SPA applications is making sure a bookmark or hard refresh knows how to load just enough of the content from the server before applying the client-side routing logic to that base page.</p>
+<p>This is not guaranteed to be the only way to do this, just the one that worked for me.</p>
+<p><b>Goals:</b><br />
+1. Static files to live in &#8220;Assets&#8221; instead of &#8220;wwwroot&#8221;<br />
+2. Client-side routes like ~/configure/userScenarios to return ~/index.html when the browser loads them<br />
+3. No extra work to remember when I add new configuration pages client-side</p>
+<h2>Program.cs &#8211; Rename WebRoot</h2>
+<p>In my Program.cs file, I renamed wwwroot to Assets:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">void</span> Main<span class="br0">&#40;</span><span class="kw4">string</span><span class="br0">&#91;</span><span class="br0">&#93;</span> args<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> host <span class="sy0">=</span> <span class="kw3">new</span> WebHostBuilder<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UseKestrel</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UseContentRoot</span><span class="br0">&#40;</span>Directory<span class="sy0">.</span><span class="me1">GetCurrentDirectory</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UseWebRoot</span><span class="br0">&#40;</span><span class="st0">&quot;Assets&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UseIISIntegration</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UseStartup</span><span class="sy0">&lt;</span>Startup<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UseApplicationInsights</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">Build</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; host<span class="sy0">.</span><span class="me1">Run</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public static void Main(string[] args)
+{
+    var host = new WebHostBuilder()
+        .UseKestrel()
+        .UseContentRoot(Directory.GetCurrentDirectory())
+        .UseWebRoot("Assets")
+        .UseIISIntegration()
+        .UseStartup&lt;Startup&gt;()
+        .UseApplicationInsights()
+        .Build();
+
+    host.Run();
+}</pre></div></div>
+
+<h2>Startup.cs &#8211; Default Files, Assets, Client Routes</h2>
+<p>Then in my Startup.cs file I added configuration to load &#8220;index.html&#8221; by default, static files in my &#8220;Assets&#8221; folder, and URL rewriting to rewrite client-side route patterns to the base &#8220;index.html&#8221; file:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">void</span> Configure<span class="br0">&#40;</span>IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp;<span class="co1">// ...</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// rewrite client-side routes to return index.html</span>
+&nbsp; &nbsp; <span class="kw1">var</span> options <span class="sy0">=</span> <span class="kw3">new</span> RewriteOptions<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">AddRewrite</span><span class="br0">&#40;</span><span class="st0">&quot;^testRuns.*&quot;</span>, <span class="st0">&quot;index.html&quot;</span>, skipRemainingRules<span class="sy0">:</span> <span class="kw1">true</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">AddRewrite</span><span class="br0">&#40;</span><span class="st0">&quot;^configure/.*&quot;</span>, <span class="st0">&quot;index.html&quot;</span>, skipRemainingRules<span class="sy0">:</span> <span class="kw1">true</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">AddRewrite</span><span class="br0">&#40;</span><span class="st0">&quot;^settings/.*&quot;</span>, <span class="st0">&quot;index.html&quot;</span>, skipRemainingRules<span class="sy0">:</span> <span class="kw1">true</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; app<span class="sy0">.</span><span class="me1">UseRewriter</span><span class="br0">&#40;</span>options<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// index.html is the default if a file isn't asked for</span>
+&nbsp; &nbsp; app<span class="sy0">.</span><span class="me1">UseDefaultFiles</span><span class="br0">&#40;</span><span class="kw3">new</span> DefaultFilesOptions<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; DefaultFileNames <span class="sy0">=</span> <span class="kw3">new</span> List<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="st0">&quot;index.html&quot;</span> <span class="br0">&#125;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; FileProvider <span class="sy0">=</span> <span class="kw3">new</span> PhysicalFileProvider<span class="br0">&#40;</span>Path<span class="sy0">.</span><span class="me1">Combine</span><span class="br0">&#40;</span>Directory<span class="sy0">.</span><span class="me1">GetCurrentDirectory</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="st_h">@&quot;Assets&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; RequestPath <span class="sy0">=</span> <span class="kw3">new</span> PathString<span class="br0">&#40;</span><span class="st0">&quot;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// and all the rest of my static files live in Assets too</span>
+&nbsp; &nbsp; app<span class="sy0">.</span><span class="me1">UseStaticFiles</span><span class="br0">&#40;</span><span class="kw3">new</span> StaticFileOptions<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; FileProvider <span class="sy0">=</span> <span class="kw3">new</span> PhysicalFileProvider<span class="br0">&#40;</span>Path<span class="sy0">.</span><span class="me1">Combine</span><span class="br0">&#40;</span>Directory<span class="sy0">.</span><span class="me1">GetCurrentDirectory</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="st_h">@&quot;Assets&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; RequestPath <span class="sy0">=</span> <span class="kw3">new</span> PathString<span class="br0">&#40;</span><span class="st0">&quot;&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// ...</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
+{
+   // ...
+
+    // rewrite client-side routes to return index.html
+    var options = new RewriteOptions()
+        .AddRewrite("^testRuns.*", "index.html", skipRemainingRules: true)
+        .AddRewrite("^configure/.*", "index.html", skipRemainingRules: true)
+        .AddRewrite("^settings/.*", "index.html", skipRemainingRules: true);
+    app.UseRewriter(options);
+
+    // index.html is the default if a file isn't asked for
+    app.UseDefaultFiles(new DefaultFilesOptions()
+    {
+        DefaultFileNames = new List&lt;string&gt;() { "index.html" },
+        FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), @"Assets")),
+        RequestPath = new PathString("")
+    });
+
+    // and all the rest of my static files live in Assets too
+    app.UseStaticFiles(new StaticFileOptions()
+    {
+        FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), @"Assets")),
+        RequestPath = new PathString("")
+    });
+
+    // ...
+}</pre></div></div>
+
+<p>I needed two Nuget packages:</p>
+<ul>
+<li>Install-Package Microsoft.AspNetCore.Rewrite</li>
+<li>Install-Package Microsoft.AspNetCore.StaticFiles</li>
+</ul>
+<p>And the only ongoing work as I add to my application is when I add a new client-side route pattern for a new set of pages.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/aspnet/spa-routing-in-asp-net-core/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

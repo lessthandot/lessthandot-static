@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>procedure cache &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/procedure-cache/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Why avoiding multiple code blocks in a Stored Procedure</title>
+		<link>/index.php/datamgmt/dbprogramming/why-avoiding-multiple-code-blocks/</link>
+		<comments>/index.php/datamgmt/dbprogramming/why-avoiding-multiple-code-blocks/#respond</comments>
+		<pubDate>Mon, 21 Jan 2013 11:45:00 +0000</pubDate>
+		<dc:creator><![CDATA[Axel Achten (axel8s)]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[case]]></category>
+		<category><![CDATA[if else]]></category>
+		<category><![CDATA[procedure cache]]></category>
+		<category><![CDATA[t-sql]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/why-avoiding-multiple-code-blocks/</guid>
+		<description><![CDATA[It was a little remark from Bob Beauchemin (B&#124;T) during the Belgian SQL Server Days that started me writing this post.
+Showing cached Execution Plans
+In this post I’m going to use information from the following Dynamic Management Views and Functions t&#8230;]]></description>
+				<content:encoded><![CDATA[<p>It was a little remark from Bob Beauchemin (<a href="http://www.sqlskills.com/blogs/bobb">B</a>|<a href="https://twitter.com/bobbeauch">T</a>) during the <a href="http://www.sqlserverdays.be/">Belgian SQL Server Days</a> that started me writing this post.</p>
+<p><b>Showing cached Execution Plans</b><br />
+In this post I’m going to use information from the following Dynamic Management Views and Functions to show some information about the cached Execution Plans of the queries used in this post:</p>
+<ul>
+<li>sys.dm_exec_cached_plans shows types, usage, size… of the Execution Plans;</li>
+<li>sys.dm_exec_sql_text shows the actual code of the query;</li>
+<li>sys.dm_exec_query_plan is used to get the XML Execution Plan itself.</li>
+</ul>
+<p>In fact I use following query to get the results:</p>
+<pre>SELECT cp.objtype, cp.cacheobjtype, cp.usecounts, cp.size_in_bytes, st.[text], qp.query_plan
+	FROM sys.dm_exec_cached_plans cp
+	CROSS APPLY sys.dm_exec_sql_text(cp.plan_handle) st
+	CROSS APPLY sys.dm_exec_query_plan (cp.plan_handle)qp;</pre>
+<p>The result set of this query looks like this:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB1.JPG?mtime=1358775444"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB1.JPG?mtime=1358775444" width="933" height="427" /></a></div>
+<p>The result set can contain thousands of rows, depending on the uptime of the server, the number of queries and their corresponding execution plans, the available buffer memory…</p>
+<p><b>IF using 2 code blocks</b><br />
+So let’s create a simple Stored Procedure that executes against the AdventureWorks2008R2 database:</p>
+<pre>USE AdventureWorks2008R2;
+GO
+
+CREATE PROCEDURE TwoPlans
+	@IfParameter int
+AS
+	SET NOCOUNT ON;
+	IF @IfParameter = 1
+		SELECT a.City, COUNT(bea.AddressID) EmployeeCount
+		FROM Person.BusinessEntityAddress bea 
+			INNER JOIN Person.Address a
+				ON bea.AddressID = a.AddressID
+		GROUP BY a.City
+		ORDER BY a.City
+	ELSE
+		SELECT DATEPART(yyyy,OrderDate) AS N'Year'
+			,SUM(TotalDue) AS N'Total Order Amount'
+		FROM Sales.SalesOrderHeader
+		GROUP BY DATEPART(yyyy,OrderDate)
+		ORDER BY DATEPART(yyyy,OrderDate);
+GO</pre>
+<p>The results of the query aren’t important what is important is to see what happens in the Procedure Cache. To be able to see what’s happening we are going to empty the procedure cache:</p>
+<p><span class="MT_red">WARNING: executing the following code deletes all cached plans from the Procedure Cache. All Execution Plans need to be recompiled. This can result in a slow or unresponsive server.<br />
+DON’T EXECUTE THE FOLLOWING CODE ON A PRODUCTION SERVER!!!<br />
+</span></p>
+<pre>DBCC FREEPROCCACHE;
+GO</pre>
+<p>When you execute our first query again:</p>
+<pre>SELECT cp.objtype, cp.cacheobjtype, cp.usecounts, cp.size_in_bytes, st.[text], qp.query_plan
+	FROM sys.dm_exec_cached_plans cp
+	CROSS APPLY sys.dm_exec_sql_text(cp.plan_handle) st
+	CROSS APPLY sys.dm_exec_query_plan (cp.plan_handle)qp;</pre>
+<p>You can see in the result set that only the Execution Plan from the above query is stored in the Procedure Cache.</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB2.JPG?mtime=1358775444"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB2.JPG?mtime=1358775444" width="871" height="67" /></a></div>
+<p>Now execute the stored procedure:</p>
+<pre>EXEC TwoPlans 1;
+GO</pre>
+<p>Execute the query against the Procedure Cache again:</p>
+<pre>SELECT cp.objtype, cp.cacheobjtype, cp.usecounts, cp.size_in_bytes, st.[text], qp.query_plan
+	FROM sys.dm_exec_cached_plans cp
+	CROSS APPLY sys.dm_exec_sql_text(cp.plan_handle) st
+	CROSS APPLY sys.dm_exec_query_plan (cp.plan_handle)qp;</pre>
+<p>The result set shows us the execution of the above query with a usecount of 2 and the Execution Plan of our Stored Procedure:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB3.JPG?mtime=1358775444"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB3.JPG?mtime=1358775444" width="871" height="85" /></a></div>
+<p>Now click the XML link in the query_plan column. A new tab will open in SSMS showing you the XML Execution Plan:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB4.JPG?mtime=1358775444"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB4.JPG?mtime=1358775444" width="1434" height="865" /></a></div>
+<p>You can now read the XML plan and you will find both the statements in the query plan:</p>
+<pre>ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.1" Build="10.50.2500.0"&gt;
+  &lt;BatchSequence&gt;
+    &lt;Batch&gt;
+      &lt;Statements&gt;
+        &lt;StmtSimple StatementText="CREATE procedure TwoPlans&amp;#xD;&amp;#xA;&amp;#x9;@IfParameter int&amp;#xD;&amp;#xA;as&amp;#xD;&amp;#xA;&amp;#x9;SET NOCOUNT ON;&amp;#xD;&amp;#xA;" StatementId="1" StatementCompId="3" StatementType="SET ON/OFF" /&gt;
+        &lt;StmtCond StatementText="&amp;#x9;If @IfParameter = 1&amp;#xD;&amp;#xA;&amp;#x9;" StatementId="2" StatementCompId="4" StatementType="COND"&gt;
+          &lt;Condition /&gt;
+          &lt;Then&gt;
+            &lt;Statements&gt;
+              &lt;StmtSimple StatementText="&amp;#x9;SELECT a.City, COUNT(bea.AddressID) EmployeeCount&amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;FROM Person.BusinessEntityAddress bea &amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;&amp;#x9;INNER JOIN Person.Address a&amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;&amp;#x9;&amp;#x9;ON bea.AddressID = a.AddressID&amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;GROUP BY a.City&amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;ORDER BY a.City&amp;#xD;&amp;#xA;" StatementId="3" StatementCompId="5" StatementType="SELECT" StatementSubTreeCost="0.604708" StatementEstRows="574.696" StatementOptmLevel="FULL" QueryHash="0x03E92D79FC617C86" QueryPlanHash="0xED13B89036D1A5E6" StatementOptmEarlyAbortReason="GoodEnoughPlanFound"&gt;
+                &lt;StatementSetOptions QUOTED_IDENTIFIER="true" ARITHABORT="true" CONCAT_NULL_YIELDS_NULL="true" ANSI_NULLS="true" ANSI_PADDING="true" ANSI_WARNINGS="true" NUMERIC_ROUNDABORT="false" /&gt;
+                &lt;QueryPlan CachedPlanSize="32" CompileTime="7" CompileCPU="7" CompileMemory="344"&gt;…
+             &lt;/StmtSimple&gt;
+            &lt;/Statements&gt;
+          &lt;/Then&gt;
+          &lt;Else&gt;
+            &lt;Statements&gt;
+              &lt;StmtSimple StatementText="&amp;#x9;Else&amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;SELECT DATEPART(yyyy,OrderDate) AS N'Year'&amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;&amp;#x9;,SUM(TotalDue) AS N'Total Order Amount'&amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;FROM Sales.SalesOrderHeader&amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;GROUP BY DATEPART(yyyy,OrderDate)&amp;#xD;&amp;#xA;&amp;#x9;&amp;#x9;ORDER BY DATEPART(yyyy,OrderDate);&amp;#xD;" StatementId="4" StatementCompId="8" StatementType="SELECT" StatementSubTreeCost="0.780189" StatementEstRows="4" StatementOptmLevel="FULL" QueryHash="0xA73814A2D4649412" QueryPlanHash="0x7A5BDE1102728DAA" StatementOptmEarlyAbortReason="GoodEnoughPlanFound"&gt;…
+            &lt;/Statements&gt;
+          &lt;/Else&gt;
+        &lt;/StmtCond&gt;
+      &lt;/Statements&gt;
+    &lt;/Batch&gt;
+  &lt;/BatchSequence&gt;
+&lt;/ShowPlanXML&gt;</pre>
+<p>An easier trick to see the Graphical Execution Plans is to open <a href="http://www.sqlsentry.com/plan-explorer/sql-server-query-view.asp">SQL Sentry Plan Explorer</a> and copy the XML into the Plan XML tab:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB5.JPG?mtime=1358775444"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB5.JPG?mtime=1358775444" width="652" height="298" /></a></div>
+<p>After doing this SQL Sentry Plan Explorer will give you all the details about the Execution Plan and you’ll see in the Plan Diagram that SQL Server created an Execution Plan for both the queries altough only the first one was used:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB6.JPG?mtime=1358775445"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB6.JPG?mtime=1358775445" width="1347" height="765" /></a></div>
+<p><b>IF calling 2 Stored Procedures</b><br />
+Now let’s create 2 Stored Procedures that each will execute 1 part of the code from the previous query:</p>
+<pre>CREATE PROCEDURE EmpCntCity
+AS
+	SET NOCOUNT ON;
+	SELECT a.City, COUNT(bea.AddressID) EmployeeCount
+	FROM Person.BusinessEntityAddress bea 
+		INNER JOIN Person.Address a
+			ON bea.AddressID = a.AddressID
+	GROUP BY a.City
+	ORDER BY a.City;
+GO
+
+CREATE PROCEDURE OrderAmountYear
+AS
+	SET NOCOUNT ON;
+	SELECT DATEPART(yyyy,OrderDate) AS N'Year'
+		,SUM(TotalDue) AS N'Total Order Amount'
+	FROM Sales.SalesOrderHeader
+	GROUP BY DATEPART(yyyy,OrderDate)
+	ORDER BY DATEPART(yyyy,OrderDate);
+GO</pre>
+<p>Next we create a Stored Procedure that will contain the IF…ELSE logic and based on the input parameter will execute one of the above Stored Procedures:</p>
+<pre>CREATE PROCEDURE TwoProcs
+	@IfParameter int
+AS
+	SET NOCOUNT ON;
+	IF @IfParameter = 1
+		EXEC EmpCntCity
+	ELSE
+		EXEC OrderAmountYear;
+GO</pre>
+<p>Now we can call our Stored Procedure and execute 1 of the Stored Procedures:</p>
+<pre>EXEC TwoProcs 1;
+GO</pre>
+<p>Let’s again query the Procedure Cache:</p>
+<pre>SELECT cp.objtype, cp.cacheobjtype, cp.usecounts, cp.size_in_bytes, st.[text], qp.query_plan
+	FROM sys.dm_exec_cached_plans cp
+	CROSS APPLY sys.dm_exec_sql_text(cp.plan_handle) st
+	CROSS APPLY sys.dm_exec_query_plan (cp.plan_handle)qp;</pre>
+<p>And have a look at the result:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB7.JPG?mtime=1358775445"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/IFCB7.JPG?mtime=1358775445" width="919" height="125" /></a></div>
+<p>Now we see that executing the second Stored Procedure also created 2 Executions Plans: 1 for the Stored Procedure “TwoProcs” and one for the Stored Procedure “EmpCntCity” that was effectively executed. But we see that there was no Execution Plan created for the Stored Procedure “OrderAmountYear”. And this Execution Plan was more complex than the Execution Plan of our “TwoProcs” Stored Procedure. We can also see that the sum of the sizes of the 2 Execution Plans (65536 + 16384 = 81920) is still smaller than the Execution Plan of the “TwoPlans” Stored Procedure (98304).</p>
+<p><b>Conclusion</b><br />
+Avoid Stored Procedures that contain complete code blocks encapsulated in IF&#8230;ELSE or CASE blocks. It will result in SQL Server creating Execution Plans for all possibilities, consuming more Buffer Cache (memory) and in the end slow down the execution of the code.<br />
+As a bonus, troubleshooting the individual Stored Procedures will be much easier and there is a bigger chance that you can reuse the Stored Procedures.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/why-avoiding-multiple-code-blocks/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,1554 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Christiaan Baes (chrissie1) &#8211; LessthanDot</title>
+	<atom:link href="/index.php/author/chrissie1/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Testing your resx files to see if all languages have the same items.</title>
+		<link>/index.php/uncategorized/testing-your-resx-files-to-see-if-all-languages-have-the-same-items/</link>
+		<comments>/index.php/uncategorized/testing-your-resx-files-to-see-if-all-languages-have-the-same-items/#comments</comments>
+		<pubDate>Thu, 07 Sep 2017 12:48:58 +0000</pubDate>
+		<dc:creator><![CDATA[Christiaan Baes (chrissie1)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=8800</guid>
+		<description><![CDATA[It&#8217;s one of those things you need to when writing multilingual applications. Create resource file (resx) for each language you want to support. And then you add an item and forget to add it to one of language files and then, oops empty label. We don&#8217;t want that. And we write tests, so why not [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>It&#8217;s one of those things you need to when writing multilingual applications. Create resource file (resx) for each language you want to support. And then you add an item and forget to add it to one of language files and then, oops empty label. </p>
+<p>We don&#8217;t want that. </p>
+<p>And we write tests, so why not write a test for that. </p>
+<p>And on <a href="https://stackoverflow.com/a/41760659">Stackoverflow</a> the user <a href="https://stackoverflow.com/users/3733965/tiltonjh">TiltonJH</a> was so kind to provide me with the answer. </p>
+<p>I translated it to VB.Net code and changed a small thing (the resourcemanager didn&#8217;t find the resourcesets but the resourcemaager from the type did, so I pass that in. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Imports</span> System<span class="sy0">.</span><span class="me1">Globalization</span>
+<span class="kw1">Imports</span> System<span class="sy0">.</span><span class="me1">Reflection</span>
+<span class="kw1">Imports</span> System<span class="sy0">.</span><span class="me1">Resources</span>
+<span class="kw1">Imports</span> System<span class="sy0">.</span><span class="me1">Text</span>
+<span class="kw1">Imports</span> Nancy<span class="sy0">.</span><span class="me1">Testing</span>
+&nbsp;
+<span class="kw1">Namespace</span> Resources
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Class</span> ResourceTester
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Shared</span> <span class="kw1">Sub</span> TestResxForInconsistencies<span class="br0">&#40;</span>type <span class="kw1">As</span> Type, resourceManager <span class="kw1">As</span> ResourceManager<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> type <span class="kw1">Is</span> <span class="kw1">Nothing</span> <span class="kw1">Then</span> <span class="kw1">Throw</span> <span class="kw1">New</span> ArgumentNullException<span class="br0">&#40;</span>NameOf<span class="br0">&#40;</span>type<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> cultureResourceDictionaries <span class="sy0">=</span> GetResxDictionaries<span class="br0">&#40;</span>type, resourceManager<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> emptyEntries <span class="sy0">=</span> GetEmpty<span class="br0">&#40;</span>cultureResourceDictionaries<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> neutralLanguage <span class="sy0">=</span> ExtractNeutralLanguage<span class="br0">&#40;</span>cultureResourceDictionaries, type<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> missingEntries <span class="sy0">=</span> GetMissing<span class="br0">&#40;</span>cultureResourceDictionaries, neutralLanguage<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> dispensableEntries <span class="sy0">=</span> GetDispensable<span class="br0">&#40;</span>cultureResourceDictionaries, neutralLanguage<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="br0">&#40;</span>emptyEntries<span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">&gt;</span> <span class="nu0">0</span> <span class="kw1">OrElse</span> missingEntries<span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">&gt;</span> <span class="nu0">0</span> <span class="kw1">OrElse</span> dispensableEntries<span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">&gt;</span> <span class="nu0">0</span><span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> message <span class="sy0">=</span> <span class="kw1">New</span> StringBuilder<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendFormat</span><span class="br0">&#40;</span><span class="st0">&quot;Found resx errors in &quot;</span><span class="st0">&quot;{0}&quot;</span><span class="st0">&quot;:&quot;</span>, type<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendLine</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendLine</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Append<span class="br0">&#40;</span>message, emptyEntries, <span class="st0">&quot; Empty Entries &quot;</span>, <span class="st0">&quot;Entries which do not have a value.&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Append<span class="br0">&#40;</span>message, missingEntries, <span class="st0">&quot; Missing Entries &quot;</span>, <span class="st0">&quot;Entries which are specified in the neutral language but are missing in the specified language.&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Append<span class="br0">&#40;</span>message, dispensableEntries, <span class="st0">&quot; Dispensable Entries &quot;</span>, <span class="st0">&quot;Entries which are not specified in the neutral language but are present in the specified language and should be removed.&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Throw</span> <span class="kw1">New</span> Nunit<span class="sy0">.</span><span class="me1">Framework</span><span class="sy0">.</span><span class="me1">AssertionException</span><span class="br0">&#40;</span>message<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Sub</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Private</span> <span class="kw1">Shared</span> <span class="kw1">Sub</span> Append<span class="br0">&#40;</span>message <span class="kw1">As</span> StringBuilder, entries <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#41;</span>, headline <span class="kw1">As</span> <span class="kw2">String</span>, description <span class="kw1">As</span> <span class="kw2">String</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> entries<span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">&gt;</span> <span class="nu0">0</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendLine</span><span class="br0">&#40;</span>headline<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendLine</span><span class="br0">&#40;</span><span class="kw1">New</span> <span class="kw2">String</span><span class="br0">&#40;</span><span class="st0">&quot;=&quot;</span>, headline<span class="sy0">.</span><span class="me1">Length</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;(&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span>description<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendLine</span><span class="br0">&#40;</span><span class="st0">&quot;)&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> pair <span class="kw1">In</span> entries
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> languageName <span class="sy0">=</span> pair<span class="sy0">.</span><span class="me1">Key</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="kw2">String</span><span class="sy0">.</span><span class="me1">IsNullOrEmpty</span><span class="br0">&#40;</span>languageName<span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; languageName <span class="sy0">=</span> <span class="st0">&quot;&lt;neutral language&gt;&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> line <span class="sy0">=</span> <span class="kw2">String</span><span class="sy0">.</span><span class="kw7">Format</span><span class="br0">&#40;</span><span class="st0">&quot; &nbsp;Language: {0} &nbsp;&quot;</span>, languageName<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendLine</span><span class="br0">&#40;</span>line<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendLine</span><span class="br0">&#40;</span><span class="kw1">New</span> <span class="kw2">String</span><span class="br0">&#40;</span><span class="st0">&quot;-&quot;</span>, line<span class="sy0">.</span><span class="me1">Length</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> key <span class="kw1">In</span> pair<span class="sy0">.</span><span class="me1">Value</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">Append</span><span class="br0">&#40;</span><span class="st0">&quot;\t&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendLine</span><span class="br0">&#40;</span>key<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; message<span class="sy0">.</span><span class="me1">AppendLine</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Sub</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Private</span> <span class="kw1">Shared</span> <span class="kw1">Function</span> ExtractNeutralLanguage<span class="br0">&#40;</span>resxs <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span><span class="br0">&#41;</span>, type <span class="kw1">As</span> Type<span class="br0">&#41;</span> <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> neutralLanguage <span class="sy0">=</span> <span class="kw1">New</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="kw1">Not</span> resxs<span class="sy0">.</span><span class="me1">TryGetValue</span><span class="br0">&#40;</span><span class="kw2">String</span><span class="sy0">.</span><span class="me1">Empty</span>, neutralLanguage<span class="br0">&#41;</span> <span class="kw1">Then</span> <span class="kw1">Throw</span> <span class="kw1">New</span> AssertException<span class="br0">&#40;</span><span class="kw2">String</span><span class="sy0">.</span><span class="kw7">Format</span><span class="br0">&#40;</span><span class="st0">&quot;The neutral language is not specified in &quot;</span><span class="st0">&quot;{0}&quot;</span><span class="st0">&quot;.&quot;</span>, type<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; resxs<span class="sy0">.</span><span class="me1">Remove</span><span class="br0">&#40;</span><span class="kw2">String</span><span class="sy0">.</span><span class="me1">Empty</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> neutralLanguage
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Private</span> <span class="kw1">Shared</span> <span class="kw1">Function</span> GetAvailableResxCultureInfos<span class="br0">&#40;</span>assembly <span class="kw1">As</span> Assembly<span class="br0">&#41;</span> <span class="kw1">As</span> CultureInfo<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> assemblyResxCultures <span class="sy0">=</span> <span class="kw1">New</span> HashSet<span class="br0">&#40;</span><span class="kw1">Of</span> CultureInfo<span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; assemblyResxCultures<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>CultureInfo<span class="sy0">.</span><span class="me1">InvariantCulture</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> names <span class="sy0">=</span> assembly<span class="sy0">.</span><span class="me1">GetManifestResourceNames</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> names <span class="kw1">IsNot</span> <span class="kw1">Nothing</span> <span class="kw1">AndAlso</span> names<span class="sy0">.</span><span class="me1">Length</span> <span class="sy0">&gt;</span> <span class="nu0">0</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> allCultures <span class="sy0">=</span> CultureInfo<span class="sy0">.</span><span class="me1">GetCultures</span><span class="br0">&#40;</span>CultureTypes<span class="sy0">.</span><span class="me1">AllCultures</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Const</span> resourcesEnding <span class="kw1">As</span> <span class="kw2">String</span> <span class="sy0">=</span> <span class="st0">&quot;.resources&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> i <span class="sy0">=</span> <span class="nu0">0</span> <span class="kw1">To</span> names<span class="sy0">.</span><span class="me1">Length</span> <span class="sy0">-</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> name <span class="sy0">=</span> names<span class="br0">&#40;</span>i<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="kw2">String</span><span class="sy0">.</span><span class="me1">IsNullOrWhiteSpace</span><span class="br0">&#40;</span>name<span class="br0">&#41;</span> <span class="kw1">OrElse</span> name<span class="sy0">.</span><span class="me1">Length</span> <span class="sy0">&lt;=</span> resourcesEnding<span class="sy0">.</span><span class="me1">Length</span> <span class="kw1">OrElse</span> <span class="kw1">Not</span> name<span class="sy0">.</span><span class="me1">EndsWith</span><span class="br0">&#40;</span>resourcesEnding, StringComparison<span class="sy0">.</span><span class="me1">InvariantCultureIgnoreCase</span><span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Continue</span> <span class="kw1">For</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; name <span class="sy0">=</span> name<span class="sy0">.</span><span class="me1">Remove</span><span class="br0">&#40;</span>name<span class="sy0">.</span><span class="me1">Length</span> <span class="sy0">-</span> resourcesEnding<span class="sy0">.</span><span class="me1">Length</span>, resourcesEnding<span class="sy0">.</span><span class="me1">Length</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="br0">&#40;</span><span class="kw2">String</span><span class="sy0">.</span><span class="me1">IsNullOrWhiteSpace</span><span class="br0">&#40;</span>name<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Continue</span> <span class="kw1">For</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> resourceManager <span class="sy0">=</span> <span class="kw1">New</span> ResourceManager<span class="br0">&#40;</span>name, assembly<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> j <span class="sy0">=</span> <span class="nu0">0</span> <span class="kw1">To</span> allCultures<span class="sy0">.</span><span class="me1">Length</span> <span class="sy0">-</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> culture <span class="sy0">=</span> allCultures<span class="br0">&#40;</span>j<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="br0">&#40;</span>culture<span class="sy0">.</span><span class="me1">Equals</span><span class="br0">&#40;</span>CultureInfo<span class="sy0">.</span><span class="me1">InvariantCulture</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Continue</span> <span class="kw1">For</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Using</span> resourceSet <span class="sy0">=</span> resourceManager<span class="sy0">.</span><span class="me1">GetResourceSet</span><span class="br0">&#40;</span>culture, <span class="kw1">True</span>, <span class="kw1">False</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="br0">&#40;</span>resourceSet <span class="kw1">IsNot</span> <span class="kw1">Nothing</span><span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; assemblyResxCultures<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>culture<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Using</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Catch</span> ex <span class="kw1">As</span> CultureNotFoundException
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> assemblyResxCultures<span class="sy0">.</span><span class="me1">ToArray</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Private</span> <span class="kw1">Shared</span> <span class="kw1">Function</span> GetResxDictionaries<span class="br0">&#40;</span>type <span class="kw1">As</span> Type, resourceManager <span class="kw1">As</span> resourceManager<span class="br0">&#41;</span> <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> availableResxsCultureInfos <span class="sy0">=</span> GetAvailableResxCultureInfos<span class="br0">&#40;</span>type<span class="sy0">.</span><span class="me1">Assembly</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> resxDictionaries <span class="sy0">=</span> <span class="kw1">New</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> i <span class="sy0">=</span> <span class="nu0">0</span> <span class="kw1">To</span> availableResxsCultureInfos<span class="sy0">.</span><span class="me1">Length</span> <span class="sy0">-</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> cultureInfo <span class="sy0">=</span> availableResxsCultureInfos<span class="br0">&#40;</span>i<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> resourceSet <span class="sy0">=</span> resourceManager<span class="sy0">.</span><span class="me1">GetResourceSet</span><span class="br0">&#40;</span>cultureInfo, <span class="kw1">True</span>, <span class="kw1">True</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> resourceSet <span class="kw1">IsNot</span> <span class="kw1">Nothing</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> dict <span class="sy0">=</span> <span class="kw1">New</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> item <span class="kw1">In</span> resourceSet
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> key <span class="sy0">=</span> item<span class="sy0">.</span><span class="me1">Key</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> value <span class="sy0">=</span> item<span class="sy0">.</span><span class="me1">Value</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; dict<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>key, value<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; resxDictionaries<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>cultureInfo<span class="sy0">.</span><span class="me1">Name</span>, dict<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Catch</span> ex <span class="kw1">As</span> Exception
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> resxDictionaries
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Private</span> <span class="kw1">Shared</span> <span class="kw1">Function</span> GetDispensable<span class="br0">&#40;</span>resxDictionaries <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span><span class="br0">&#41;</span>, neutralLanguage <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> dispensable <span class="sy0">=</span> <span class="kw1">New</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> pair <span class="kw1">In</span> resxDictionaries
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> resxs <span class="sy0">=</span> pair<span class="sy0">.</span><span class="me1">Value</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> list <span class="sy0">=</span> <span class="kw1">New</span> List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> key <span class="kw1">In</span> resxs<span class="sy0">.</span><span class="me1">Keys</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="kw1">Not</span> neutralLanguage<span class="sy0">.</span><span class="me1">ContainsKey</span><span class="br0">&#40;</span>key<span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; list<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>key<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="br0">&#40;</span>list<span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">&gt;</span> <span class="nu0">0</span><span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; dispensable<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>pair<span class="sy0">.</span><span class="me1">Key</span>, list<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> dispensable
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Private</span> <span class="kw1">Shared</span> <span class="kw1">Function</span> GetEmpty<span class="br0">&#40;</span>resxDictionaries <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> empty <span class="sy0">=</span> <span class="kw1">New</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> pair <span class="kw1">In</span> resxDictionaries
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> resxs <span class="sy0">=</span> pair<span class="sy0">.</span><span class="me1">Value</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> list <span class="sy0">=</span> <span class="kw1">New</span> List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> entrie <span class="kw1">In</span> resxs
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> entrie<span class="sy0">.</span><span class="me1">Value</span> <span class="kw1">Is</span> <span class="kw1">Nothing</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; list<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>entrie<span class="sy0">.</span><span class="me1">Key</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> stringValue <span class="sy0">=</span> entrie<span class="sy0">.</span><span class="me1">Value</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="br0">&#40;</span><span class="kw2">String</span><span class="sy0">.</span><span class="me1">IsNullOrWhiteSpace</span><span class="br0">&#40;</span>stringValue<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; list<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>entrie<span class="sy0">.</span><span class="me1">Key</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="br0">&#40;</span>list<span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">&gt;</span> <span class="nu0">0</span><span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; empty<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>pair<span class="sy0">.</span><span class="me1">Key</span>, list<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> empty
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Private</span> <span class="kw1">Shared</span> <span class="kw1">Function</span> GetMissing<span class="br0">&#40;</span>resxDictionaries <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span><span class="br0">&#41;</span>, neutralLanguage <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, <span class="kw2">Object</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">As</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> missing <span class="sy0">=</span> <span class="kw1">New</span> Dictionary<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span>, List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> pair <span class="kw1">In</span> resxDictionaries
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> resxs <span class="sy0">=</span> pair<span class="sy0">.</span><span class="me1">Value</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> list <span class="sy0">=</span> <span class="kw1">New</span> List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> key <span class="kw1">In</span> neutralLanguage<span class="sy0">.</span><span class="me1">Keys</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="kw1">Not</span> resxs<span class="sy0">.</span><span class="me1">ContainsKey</span><span class="br0">&#40;</span>key<span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; list<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>key<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> list<span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">&gt;</span> <span class="nu0">0</span> <span class="kw1">Then</span> missing<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span>pair<span class="sy0">.</span><span class="me1">Key</span>, list<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> missing
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Class</span>
+<span class="kw1">End</span> <span class="kw1">Namespace</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Imports System.Globalization
+Imports System.Reflection
+Imports System.Resources
+Imports System.Text
+Imports Nancy.Testing
+
+Namespace Resources
+
+    Public Class ResourceTester
+
+        Public Shared Sub TestResxForInconsistencies(type As Type, resourceManager As ResourceManager)
+            If type Is Nothing Then Throw New ArgumentNullException(NameOf(type))
+            Dim cultureResourceDictionaries = GetResxDictionaries(type, resourceManager)
+            Dim emptyEntries = GetEmpty(cultureResourceDictionaries)
+            Dim neutralLanguage = ExtractNeutralLanguage(cultureResourceDictionaries, type)
+            Dim missingEntries = GetMissing(cultureResourceDictionaries, neutralLanguage)
+            Dim dispensableEntries = GetDispensable(cultureResourceDictionaries, neutralLanguage)
+            If (emptyEntries.Count &gt; 0 OrElse missingEntries.Count &gt; 0 OrElse dispensableEntries.Count &gt; 0) Then
+                Dim message = New StringBuilder()
+                message.AppendFormat("Found resx errors in ""{0}"":", type)
+                message.AppendLine()
+                message.AppendLine()
+                Append(message, emptyEntries, " Empty Entries ", "Entries which do not have a value.")
+                Append(message, missingEntries, " Missing Entries ", "Entries which are specified in the neutral language but are missing in the specified language.")
+                Append(message, dispensableEntries, " Dispensable Entries ", "Entries which are not specified in the neutral language but are present in the specified language and should be removed.")
+                Throw New Nunit.Framework.AssertionException(message.ToString())
+            End If
+        End Sub
+
+        Private Shared Sub Append(message As StringBuilder, entries As Dictionary(Of String, List(Of String)), headline As String, description As String)
+            If entries.Count &gt; 0 Then
+                message.AppendLine(headline)
+                message.AppendLine(New String("=", headline.Length))
+                message.Append("(")
+                message.Append(description)
+                message.AppendLine(")")
+                For Each pair In entries
+                    Dim languageName = pair.Key
+                    If String.IsNullOrEmpty(languageName) Then
+                        languageName = "&lt;neutral language&gt;"
+                    End If
+                    Dim line = String.Format("  Language: {0}  ", languageName)
+                    message.AppendLine(line)
+                    message.AppendLine(New String("-", line.Length))
+                    For Each key In pair.Value
+                        message.Append("\t")
+                        message.AppendLine(key)
+                    Next
+                Next
+                message.AppendLine()
+            End If
+        End Sub
+
+        Private Shared Function ExtractNeutralLanguage(resxs As Dictionary(Of String, Dictionary(Of String, Object)), type As Type) As Dictionary(Of String, Object)
+            Dim neutralLanguage = New Dictionary(Of String, Object)
+            If Not resxs.TryGetValue(String.Empty, neutralLanguage) Then Throw New AssertException(String.Format("The neutral language is not specified in ""{0}"".", type))
+            resxs.Remove(String.Empty)
+            Return neutralLanguage
+        End Function
+
+        Private Shared Function GetAvailableResxCultureInfos(assembly As Assembly) As CultureInfo()
+            Dim assemblyResxCultures = New HashSet(Of CultureInfo)()
+            assemblyResxCultures.Add(CultureInfo.InvariantCulture)
+            Dim names = assembly.GetManifestResourceNames()
+            If names IsNot Nothing AndAlso names.Length &gt; 0 Then
+                Dim allCultures = CultureInfo.GetCultures(CultureTypes.AllCultures)
+                Const resourcesEnding As String = ".resources"
+                For i = 0 To names.Length - 1
+                    Dim name = names(i)
+                    If String.IsNullOrWhiteSpace(name) OrElse name.Length &lt;= resourcesEnding.Length OrElse Not name.EndsWith(resourcesEnding, StringComparison.InvariantCultureIgnoreCase) Then
+                        Continue For
+                    End If
+                    name = name.Remove(name.Length - resourcesEnding.Length, resourcesEnding.Length)
+                    If (String.IsNullOrWhiteSpace(name)) Then
+                        Continue For
+                    End If
+                    Dim resourceManager = New ResourceManager(name, assembly)
+                    For j = 0 To allCultures.Length - 1
+                        Dim culture = allCultures(j)
+                        Try
+                            If (culture.Equals(CultureInfo.InvariantCulture)) Then
+                                Continue For
+                            End If
+                            Using resourceSet = resourceManager.GetResourceSet(culture, True, False)
+                                If (resourceSet IsNot Nothing) Then
+                                    assemblyResxCultures.Add(culture)
+                                End If
+                            End Using
+                        Catch ex As CultureNotFoundException
+
+                        End Try
+                    Next
+                Next
+            End If
+            Return assemblyResxCultures.ToArray()
+        End Function
+
+        Private Shared Function GetResxDictionaries(type As Type, resourceManager As resourceManager) As Dictionary(Of String, Dictionary(Of String, Object))
+            Dim availableResxsCultureInfos = GetAvailableResxCultureInfos(type.Assembly)
+            Dim resxDictionaries = New Dictionary(Of String, Dictionary(Of String, Object))()
+            For i = 0 To availableResxsCultureInfos.Length - 1
+                Dim cultureInfo = availableResxsCultureInfos(i)
+                Try
+                    Dim resourceSet = resourceManager.GetResourceSet(cultureInfo, True, True)
+                    If resourceSet IsNot Nothing Then
+                        Dim dict = New Dictionary(Of String, Object)()
+                        For Each item In resourceSet
+                            Dim key = item.Key.ToString()
+                            Dim value = item.Value
+                            dict.Add(key, value)
+                        Next
+                        resxDictionaries.Add(cultureInfo.Name, dict)
+                    End If
+                Catch ex As Exception
+
+                End Try
+               
+            Next
+            Return resxDictionaries
+        End Function
+
+        Private Shared Function GetDispensable(resxDictionaries As Dictionary(Of String, Dictionary(Of String, Object)), neutralLanguage As Dictionary(Of String, Object)) As Dictionary(Of String, List(Of String))
+            Dim dispensable = New Dictionary(Of String, List(Of String))()
+            For Each pair In resxDictionaries
+                Dim resxs = pair.Value
+                Dim list = New List(Of String)()
+                For Each key In resxs.Keys
+                    If Not neutralLanguage.ContainsKey(key) Then
+                        list.Add(key)
+                    End If
+                Next
+                If (list.Count &gt; 0) Then
+                    dispensable.Add(pair.Key, list)
+                End If
+            Next
+            Return dispensable
+        End Function
+
+        Private Shared Function GetEmpty(resxDictionaries As Dictionary(Of String, Dictionary(Of String, Object))) As Dictionary(Of String, List(Of String))
+            Dim empty = New Dictionary(Of String, List(Of String))()
+            For Each pair In resxDictionaries
+                Dim resxs = pair.Value
+                Dim list = New List(Of String)()
+                For Each entrie In resxs
+                    If entrie.Value Is Nothing Then
+                        list.Add(entrie.Key)
+                    End If
+                    Dim stringValue = entrie.Value
+                    If (String.IsNullOrWhiteSpace(stringValue)) Then
+                        list.Add(entrie.Key)
+                    End If
+                Next
+                If (list.Count &gt; 0) Then
+                    empty.Add(pair.Key, list)
+                End If
+            Next
+            Return empty
+        End Function
+
+        Private Shared Function GetMissing(resxDictionaries As Dictionary(Of String, Dictionary(Of String, Object)), neutralLanguage As Dictionary(Of String, Object)) As Dictionary(Of String, List(Of String))
+            Dim missing = New Dictionary(Of String, List(Of String))()
+            For Each pair In resxDictionaries
+                Dim resxs = pair.Value
+                Dim list = New List(Of String)()
+                For Each key In neutralLanguage.Keys
+                    If Not resxs.ContainsKey(key) Then
+                        list.Add(key)
+                    End If
+                Next
+                If list.Count &gt; 0 Then missing.Add(pair.Key, list)
+            Next
+            Return missing
+        End Function
+
+    End Class
+End Namespace</pre></div></div>
+
+<p>ANd now my test looks like this. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Imports</span> NUnit<span class="sy0">.</span><span class="me1">Framework</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp;
+<span class="kw1">Namespace</span> Resources
+&nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Class</span> TestReportResource
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">&lt;</span>Test<span class="sy0">&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Sub</span> TestResx
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ResourceTester<span class="sy0">.</span><span class="me1">TestResxForInconsistencies</span><span class="br0">&#40;</span><span class="kw1">Gettype</span><span class="br0">&#40;</span>BI<span class="sy0">.</span><span class="me1">My</span><span class="sy0">.</span><span class="me1">Resources</span><span class="sy0">.</span><span class="me1">Report</span><span class="br0">&#41;</span>, BI<span class="sy0">.</span><span class="me1">My</span><span class="sy0">.</span><span class="me1">Resources</span><span class="sy0">.</span><span class="me1">Report</span><span class="sy0">.</span><span class="me1">ResourceManager</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Sub</span>
+&nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Class</span>
+<span class="kw1">End</span> <span class="kw1">NameSpace</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Imports NUnit.Framework                 
+
+Namespace Resources
+    Public Class TestReportResource
+
+        &lt;Test&gt;
+        Public Sub TestResx
+            ResourceTester.TestResxForInconsistencies(Gettype(BI.My.Resources.Report), BI.My.Resources.Report.ResourceManager)
+        End Sub
+        
+    End Class
+End NameSpace</pre></div></div>
+
+<p>And when it failes it looks like this. </p>
+<p><img src="/wp-content/uploads/2017/09/resx.png" alt="resx" width="850" height="400" class="alignnone size-full wp-image-8801" srcset="/wp-content/uploads/2017/09/resx.png 850w, /wp-content/uploads/2017/09/resx-300x141.png 300w, /wp-content/uploads/2017/09/resx-768x361.png 768w" sizes="(max-width: 850px) 100vw, 850px" /></p>
+<p>So there you go, simple. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/testing-your-resx-files-to-see-if-all-languages-have-the-same-items/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Elasticsearch and my setup. Part 1: the why and the how.</title>
+		<link>/index.php/uncategorized/elasticsearch-and-my-setup-part-1-the-why-and-the-how/</link>
+		<comments>/index.php/uncategorized/elasticsearch-and-my-setup-part-1-the-why-and-the-how/#respond</comments>
+		<pubDate>Tue, 20 Jun 2017 17:53:24 +0000</pubDate>
+		<dc:creator><![CDATA[Christiaan Baes (chrissie1)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=8675</guid>
+		<description><![CDATA[Introduction Over the past few years I used elasticsearch, one bit for using as a fulltextsearch engine and one bit as using to store logdata. Somehow I ended up with 2 seperate elasticsearch server, each forming their own cluster. The cluster was in a yellow state most of the time if not red the ther [&#8230;]]]></description>
+				<content:encoded><![CDATA[<h1>Introduction</h1>
+<p>Over the past few years I used elasticsearch, one bit for using as a fulltextsearch engine and one bit as using to store logdata.<br />
+Somehow I ended up with 2 seperate elasticsearch server, each forming their own cluster. The cluster was in a yellow state most of the time if not red the ther time. Mostly caused by unassigned clusters. By default elastic tries to replicate every shard at least once. When you have only one node in your cluster it can&#8217;t get rid of the shard. So you end up with unassigned shards and thus a cluster in a yellow state. Which is annoying to say the least. You want things to be nice and green. So I needed to setup a new cluster and copy some data over from the old clusters. Starting fresh is always a good idea.<br />
+My previous elastic machines were windows machines. But let&#8217;s be honest linux is the way forward here. </p>
+<h1>The stack</h1>
+<p>Of course I want the whole ELK (Elastic, logstash and kibana). So that means setting up 5 servers from scratch.<br />
+What better way to make a machine than to use <a href="https://www.packer.io/">packer</a>? Since you can make VM&#8217;s from the ISO and build from there. </p>
+<p>So I used </p>
+<ul>
+<li>ElasticSearch 5.4.0</li>
+<li>Kibana 5.4.0</li>
+<li>Logstash 5.4.0</li>
+<li>Ubuntu server edition 17.04</li>
+<li>X-pack 5.4.0</li>
+<li>Packer (latest version)</li>
+<li>Virtualbox 5.something</li>
+</ul>
+<p>For ease of use I downloaded the iso file for ubuntu the deb files for Elastic, Kibana and logstash and the zip file ofr X-pack. These files can be found by googling for them. </p>
+<h1>The setup</h1>
+<p>So you create a folder somewhere and then you <a href="https://github.com/chrissie1/packerelastic">git clone</a> the repo. Which should probably be online sometime later tonight.<br />
+The repo does not contain the zip,deb or iso-files. </p>
+<h1>Why?</h1>
+<p>This will create 5 servers for which you will need a lot of memory to run them 3*24GB and 2*8GB that&#8217;s&#8230; a lot of memory. So why do the elasticsearch servers have so much RAM. Becuase that&#8217;s what I found on the internet to be the best. 12GB for elastic and 12GB for the full text index engine. I only have a few million documents a day and have yet to see it use all the memory.<br />
+The disks on the servers are 200GB. And they use 4vCPUs. But since this is a script you can change all this.<br />
+The kibana and logstash server each have their own elastic node that doesn&#8217;t have data or isn&#8217;t a master.<br />
+3 elastic masters is great since this way they work as a RAID5 setup and you can reboot one while the cluster keeps going. </p>
+<p>this does not yet configure the NIC but the ip-adresses should be.</p>
+<ul>
+<li>Elasticsearch01: 192.168.0.10</li>
+<li>Elasticsearch02: 192.168.0.11</li>
+<li>Elasticsearch03: 192.168.0.12</li>
+<li>Kibana01: 192.168.0.13</li>
+<li>Logstash01: 192.168.0.14</li>
+</ul>
+<p>If you want to change the ip-adresses than you also have to change the config files in the config folders.</p>
+<p>In some later blogposts I will go into the config a bit further, and try to explain my deciscions.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/elasticsearch-and-my-setup-part-1-the-why-and-the-how/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Running Nunit tests from your code</title>
+		<link>/index.php/uncategorized/running-nunit-tests-from-your-code/</link>
+		<comments>/index.php/uncategorized/running-nunit-tests-from-your-code/#respond</comments>
+		<pubDate>Wed, 09 Nov 2016 11:21:09 +0000</pubDate>
+		<dc:creator><![CDATA[Christiaan Baes (chrissie1)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4805</guid>
+		<description><![CDATA[How to run tests in your VB.Net script, and if you ask nicely I'm sure this works in C# too. ]]></description>
+				<content:encoded><![CDATA[<p>So I had this script that makes our dev and test environment and blahblah. In other words I needed to verify that what I had was good before starting the process and that checked if everything succeeded as it was supposed to after the script runs. Seems like what I needed were a bunch of tests. First to check no one tampered with the bits I needed to make this work and in the end see if the things I did worked. I repeated myself didn&#8217;t I? Good.</p>
+<p>So first of all I wrote some simple tests and found this piece of code on the <a href="http://stackoverflow.com/questions/2834717/nunit-is-it-possible-to-continue-executing-test-after-assert-fails">StackOverflow site</a> </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Namespace</span> TestFramework
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Class</span> AssertAll
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Shared</span> <span class="kw1">Function</span> Succeed<span class="br0">&#40;</span><span class="kw1">ParamArray</span> assertions <span class="kw1">As</span> Action<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">As</span> <span class="kw2">String</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> errors <span class="sy0">=</span> <span class="kw1">New</span> List<span class="br0">&#40;</span><span class="kw1">Of</span> <span class="kw2">String</span><span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;Running {0} tests.&quot;</span>, assertions<span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> assertion <span class="kw1">In</span> assertions
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; assertion<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Catch</span> ex <span class="kw1">As</span> Exception
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; errors<span class="sy0">.</span><span class="me1">Add</span><span class="br0">&#40;</span><span class="kw2">String</span><span class="sy0">.</span><span class="kw7">Format</span><span class="br0">&#40;</span><span class="st0">&quot;Test {0} failed with message {1}&quot;</span>, assertion<span class="sy0">.</span><span class="me1">Method</span><span class="sy0">.</span><span class="me1">Name</span>, ex<span class="sy0">.</span><span class="me1">Message</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> <span class="br0">&#40;</span>errors<span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;{0} tests failed, {1} tests passed.&quot;</span>, errors<span class="sy0">.</span><span class="me1">Count</span>, assertions<span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">-</span> errors<span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> errorDescription <span class="kw1">In</span> errors
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; LogTo<span class="sy0">.</span><span class="me1">Warn</span><span class="br0">&#40;</span>errorDescription<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Throw</span> <span class="kw1">New</span> Exception<span class="br0">&#40;</span><span class="kw2">String</span><span class="sy0">.</span><span class="kw7">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0} tests failed, {1} tests passed.&quot;</span>, errors<span class="sy0">.</span><span class="me1">Count</span>, assertions<span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">-</span> errors<span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;All {0} tests passed.&quot;</span>, assertions<span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> <span class="kw2">String</span><span class="sy0">.</span><span class="kw7">Format</span><span class="br0">&#40;</span><span class="st0">&quot;All {0} tests passed.&quot;</span>, assertions<span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Class</span>
+<span class="kw1">End</span> <span class="kw1">Namespace</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Namespace TestFramework
+
+    Public Class AssertAll
+
+        Public Shared Function Succeed(ParamArray assertions As Action()) As String
+            Dim errors = New List(Of String)()
+            Console.WriteLine("Running {0} tests.", assertions.Count)
+            For Each assertion In assertions
+                Try
+                    assertion()
+                Catch ex As Exception
+                    errors.Add(String.Format("Test {0} failed with message {1}", assertion.Method.Name, ex.Message))
+                End Try
+            Next
+            If (errors.Any()) Then
+                Console.WriteLine("{0} tests failed, {1} tests passed.", errors.Count, assertions.Count - errors.Count)
+                For Each errorDescription In errors
+                    LogTo.Warn(errorDescription)
+                Next
+                Throw New Exception(String.Format("{0} tests failed, {1} tests passed.", errors.Count, assertions.Count - errors.Count))
+            End If
+            Console.WriteLine("All {0} tests passed.", assertions.Count)
+            Return String.Format("All {0} tests passed.", assertions.Count)
+        End Function
+
+    End Class
+End Namespace</pre></div></div>
+
+<p>This ofcourse wants you to pass it some actions which are our tests.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Public</span> <span class="kw1">Function</span> Execute<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">As</span> <span class="kw2">String</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;Running tests for {0}&quot;</span>, <span class="kw1">Me</span><span class="sy0">.</span><span class="kw1">GetType</span><span class="sy0">.</span><span class="me1">Name</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> methods <span class="sy0">=</span> <span class="kw1">Me</span><span class="sy0">.</span><span class="kw1">GetType</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">GetMethods</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="kw5">Where</span><span class="br0">&#40;</span><span class="kw1">Function</span><span class="br0">&#40;</span>m<span class="br0">&#41;</span> m<span class="sy0">.</span><span class="me1">GetCustomAttributes</span><span class="br0">&#40;</span><span class="kw1">GetType</span><span class="br0">&#40;</span>TestAttribute<span class="br0">&#41;</span>, <span class="kw1">False</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Length</span> <span class="sy0">&gt;</span> <span class="nu0">0</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> tests <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw5">From</span> t <span class="kw1">In</span> methods <span class="kw1">Select</span> <span class="br0">&#91;</span><span class="kw1">Delegate</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="me1">CreateDelegate</span><span class="br0">&#40;</span><span class="kw1">GetType</span><span class="br0">&#40;</span>Action<span class="br0">&#41;</span>, <span class="kw1">Me</span>, t<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Cast</span><span class="br0">&#40;</span><span class="kw1">Of</span> Action<span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToList</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> AssertAll<span class="sy0">.</span><span class="me1">Succeed</span><span class="br0">&#40;</span>tests<span class="sy0">.</span><span class="me1">ToArray</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Public Function Execute() As String
+            Console.WriteLine("Running tests for {0}", Me.GetType.Name)
+            Dim methods = Me.GetType().GetMethods().Where(Function(m) m.GetCustomAttributes(GetType(TestAttribute), False).Length &gt; 0)
+            Dim tests = (From t In methods Select [Delegate].CreateDelegate(GetType(Action), Me, t)).Cast(Of Action)().ToList()
+            Return AssertAll.Succeed(tests.ToArray)
+        End Function</pre></div></div>
+
+<p>Or something like that.<br />
+This was in a baseclass from which testclasses inherit (so you can pass some much needed parameters to them and then you just call execute and BAM! tests run. </p>
+<p>This however only works for &#8220;simple&#8221; tests. As soon as you start to use testcase you are in trouble and a world of much code. Much code means much work and I don&#8217;t like to work. But I don&#8217;t have too. Because I can run the tests another way, with nunit.engine. </p>
+<p>Just nuget the NUnit.Engine package and make sure everyone of those files is in your outputfolder</p>
+<p><a href="/wp-content/uploads/2016/11/nunitengine.png"><img src="/wp-content/uploads/2016/11/nunitengine.png" alt="nunitengine" width="184" height="184" class="alignnone size-full wp-image-4806" /></a></p>
+<p>(I don&#8217;t care how you do this just make it happen, no need to kill kittens for this, but if you must).  </p>
+<p>I guess you don&#8217;t need the config or addins file. </p>
+<p>After that you can run tests with this.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Imports</span> System<span class="sy0">.</span><span class="me1">Reflection</span>
+<span class="kw1">Imports</span> System<span class="sy0">.</span><span class="me1">Xml</span>
+<span class="kw1">Imports</span> NUnit<span class="sy0">.</span><span class="me1">Engine</span>
+&nbsp;
+<span class="kw1">Namespace</span> TestFramework
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Class</span> RunTests
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Shared</span> <span class="kw1">Function</span> Run<span class="br0">&#40;</span><span class="kw1">ByVal</span> category <span class="kw1">As</span> <span class="kw2">String</span><span class="br0">&#41;</span> <span class="kw1">As</span> <span class="kw2">String</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> returnvalue <span class="sy0">=</span> <span class="st0">&quot;&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> path <span class="sy0">=</span> Assembly<span class="sy0">.</span><span class="me1">GetExecutingAssembly</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Location</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> package <span class="sy0">=</span> <span class="kw1">New</span> TestPackage<span class="br0">&#40;</span>path<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; package<span class="sy0">.</span><span class="me1">AddSetting</span><span class="br0">&#40;</span><span class="st0">&quot;WorkDirectory&quot;</span>, Environment<span class="sy0">.</span><span class="me1">CurrentDirectory</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> engine <span class="sy0">=</span> TestEngineActivator<span class="sy0">.</span><span class="me1">CreateInstance</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> filterService <span class="sy0">=</span> engine<span class="sy0">.</span><span class="me1">Services</span><span class="sy0">.</span><span class="me1">GetService</span><span class="br0">&#40;</span><span class="kw1">Of</span> ITestFilterService<span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> builder <span class="sy0">=</span> filterService<span class="sy0">.</span><span class="me1">GetTestFilterBuilder</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; builder<span class="sy0">.</span><span class="me1">SelectWhere</span><span class="br0">&#40;</span><span class="st0">&quot;cat==&quot;</span> <span class="sy0">&amp;</span> category<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> emptyFilter <span class="sy0">=</span> builder<span class="sy0">.</span><span class="me1">GetFilter</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Using</span> runner <span class="sy0">=</span> engine<span class="sy0">.</span><span class="me1">GetRunner</span><span class="br0">&#40;</span>package<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> explore <span class="sy0">=</span> runner<span class="sy0">.</span><span class="me1">CountTestCases</span><span class="br0">&#40;</span>emptyFilter<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;Running {0} tests.&quot;</span>, explore<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Dim</span> result <span class="sy0">=</span> runner<span class="sy0">.</span><span class="me1">Run</span><span class="br0">&#40;</span><span class="kw1">New</span> Listener, emptyFilter<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> result<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;result&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span> <span class="sy0">=</span> <span class="st0">&quot;Passed&quot;</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; returnvalue <span class="sy0">=</span> <span class="kw2">String</span><span class="sy0">.</span><span class="kw7">Format</span><span class="br0">&#40;</span><span class="st0">&quot;All {0} tests passed.&quot;</span>, result<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;total&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;All {0} tests passed.&quot;</span>, result<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;total&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Else</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;Some of the {0} tests failed. Passed: {1} , failed {2}&quot;</span>, result<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;total&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span>, result<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;passed&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span>, result<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;failed&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">For</span> <span class="kw1">Each</span> r <span class="kw1">As</span> XmlNode <span class="kw1">In</span> result<span class="sy0">.</span><span class="me1">SelectNodes</span><span class="br0">&#40;</span><span class="st0">&quot;//test-case[contains(@result, 'Failed')]&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">If</span> r<span class="sy0">.</span><span class="me1">SelectSingleNode</span><span class="br0">&#40;</span><span class="st0">&quot;//failure&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ChildNodes</span><span class="sy0">.</span><span class="me1">Count</span> <span class="sy0">=</span> <span class="nu0">1</span> <span class="kw1">Then</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;Test {0} failed with error {1}.&quot;</span>, r<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;name&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span>, r<span class="sy0">.</span><span class="me1">SelectSingleNode</span><span class="br0">&#40;</span><span class="st0">&quot;//failure&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ChildNodes</span><span class="br0">&#40;</span><span class="nu0">0</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Else</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;Test {0} failed with error {1} with stacktrace {2}.&quot;</span>, r<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;name&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span>, r<span class="sy0">.</span><span class="me1">SelectSingleNode</span><span class="br0">&#40;</span><span class="st0">&quot;//failure&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ChildNodes</span><span class="br0">&#40;</span><span class="nu0">0</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span>, r<span class="sy0">.</span><span class="me1">SelectSingleNode</span><span class="br0">&#40;</span><span class="st0">&quot;//failure&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ChildNodes</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Next</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Throw</span> <span class="kw1">New</span> Exception<span class="br0">&#40;</span><span class="kw2">String</span><span class="sy0">.</span><span class="kw7">Format</span><span class="br0">&#40;</span><span class="st0">&quot;Some of the {0} tests failed. Passed: {1} , failed {2}&quot;</span>, result<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;total&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span>, result<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;passed&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span>, result<span class="sy0">.</span><span class="me1">Attributes</span><span class="sy0">.</span><span class="me1">GetNamedItem</span><span class="br0">&#40;</span><span class="st0">&quot;failed&quot;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">InnerText</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">If</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Using</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> returnvalue
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Class</span>
+&nbsp;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Class</span> Listener
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Implements</span> ITestEventListener
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Sub</span> OnTestEvent<span class="br0">&#40;</span>report <span class="kw1">As</span> <span class="kw2">String</span><span class="br0">&#41;</span> <span class="kw1">Implements</span> ITestEventListener<span class="sy0">.</span><span class="me1">OnTestEvent</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span>report<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Sub</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Class</span>
+&nbsp;
+<span class="kw1">End</span> <span class="kw1">Namespace</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Imports System.Reflection
+Imports System.Xml
+Imports NUnit.Engine
+
+Namespace TestFramework
+
+    Public Class RunTests
+
+        Public Shared Function Run(ByVal category As String) As String
+            Dim returnvalue = ""
+            Dim path = Assembly.GetExecutingAssembly().Location
+            Dim package = New TestPackage(path)
+            package.AddSetting("WorkDirectory", Environment.CurrentDirectory)
+
+            Dim engine = TestEngineActivator.CreateInstance()
+            Dim filterService = engine.Services.GetService(Of ITestFilterService)()
+            Dim builder = filterService.GetTestFilterBuilder()
+            builder.SelectWhere("cat==" &amp; category)
+            Dim emptyFilter = builder.GetFilter
+
+            Using runner = engine.GetRunner(package)
+                Dim explore = runner.CountTestCases(emptyFilter)
+                Console.WriteLine("Running {0} tests.", explore)
+                Dim result = runner.Run(New Listener, emptyFilter)
+                If result.Attributes.GetNamedItem("result").InnerText = "Passed" Then
+                    returnvalue = String.Format("All {0} tests passed.", result.Attributes.GetNamedItem("total").InnerText)
+                    Console.WriteLine("All {0} tests passed.", result.Attributes.GetNamedItem("total").InnerText)
+                Else
+                    Console.WriteLine("Some of the {0} tests failed. Passed: {1} , failed {2}", result.Attributes.GetNamedItem("total").InnerText, result.Attributes.GetNamedItem("passed").InnerText, result.Attributes.GetNamedItem("failed").InnerText)
+                    For Each r As XmlNode In result.SelectNodes("//test-case[contains(@result, 'Failed')]")
+                        If r.SelectSingleNode("//failure").ChildNodes.Count = 1 Then
+                            Console.WriteLine("Test {0} failed with error {1}.", r.Attributes.GetNamedItem("name").InnerText, r.SelectSingleNode("//failure").ChildNodes(0).InnerText)
+                        Else
+                            Console.WriteLine("Test {0} failed with error {1} with stacktrace {2}.", r.Attributes.GetNamedItem("name").InnerText, r.SelectSingleNode("//failure").ChildNodes(0).InnerText, r.SelectSingleNode("//failure").ChildNodes(1).InnerText)
+                        End If
+                    Next
+                    Throw New Exception(String.Format("Some of the {0} tests failed. Passed: {1} , failed {2}", result.Attributes.GetNamedItem("total").InnerText, result.Attributes.GetNamedItem("passed").InnerText, result.Attributes.GetNamedItem("failed").InnerText))
+                End If
+            End Using
+            Return returnvalue
+        End Function
+    End Class
+
+
+    Public Class Listener
+        Implements ITestEventListener
+
+        Public Sub OnTestEvent(report As String) Implements ITestEventListener.OnTestEvent
+            Console.WriteLine(report)
+        End Sub
+
+    End Class
+
+End Namespace</pre></div></div>
+
+<p>As you can see I have a filter on category for the above.</p>
+<p>This might be of use for you</p>
+<ul>
+<li><a href="https://github.com/nunit/docs/wiki/Test-Engine-API-Spec">NUnit.Engine.Api</a></li>
+<li><a href="https://github.com/nunit/nunit-console/blob/8cb7226c0ad683fe5eb7a4eee8989aff08dc4ccb/src/NUnitEngine/nunit.engine.tests/Services/TestFilterBuilderTests.cs">The tests to figure out what goes in the SelectWhere method.</a></li>
+<li><a href="https://github.com/nunit/docs/wiki/Test-Result-XML-Format">The testresults xml format</a></li>
+<li><a href="http://stackoverflow.com/questions/12092117/nunit-components-for-version-4-0-30319-of-the-clr-are-not-installed">One of the errors you might get and a solution</a></li>
+</ul>
+<p>And that&#8217;s it. Any questions?</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/running-nunit-tests-from-your-code/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Jetbrains rider the VB.Net IDE we have all been waiting for</title>
+		<link>/index.php/uncategorized/jetbrains-rider-the-vb-net-ide-we-have-all-been-waiting-for/</link>
+		<comments>/index.php/uncategorized/jetbrains-rider-the-vb-net-ide-we-have-all-been-waiting-for/#respond</comments>
+		<pubDate>Thu, 11 Feb 2016 10:19:22 +0000</pubDate>
+		<dc:creator><![CDATA[Christiaan Baes (chrissie1)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4356</guid>
+		<description><![CDATA[Apparently Jetbrains has been working on a .Net IDE that is based on IntelliJ. The blogpost about it was several weeks ago. And there is even a video demoiing it. Of course we all know demos can&#8217;t be trusted. But now you subscribe to receive early builds as soon as they are ready (copy pasted [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Apparently Jetbrains has been working on a .Net IDE that is based on IntelliJ.</p>
+<p>The <a href="https://blog.jetbrains.com/dotnet/2016/01/13/project-rider-a-csharp-ide/">blogpost</a> about it was several weeks ago.</p>
+<p>And there is even a video demoiing it. Of course we all know demos can&#8217;t be trusted. </p>
+<p>But now you <a href="https://blog.jetbrains.com/dotnet/2016/02/11/project-rider-subscribe-to-receive-early-builds-as-soon-as-they-are-ready/">subscribe to receive early builds as soon as they are ready</a> (copy pasted that from the blogpost).  </p>
+<p>So go ahead and do that and don&#8217;t forget to check VB.Net as your favorite language. </p>
+<p>They are trying to brand it as a C#-IDE but we all know it isn&#8217;t. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/jetbrains-rider-the-vb-net-ide-we-have-all-been-waiting-for/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Using Heka to forward logs to the elasticsearch</title>
+		<link>/index.php/uncategorized/using-heka-to-forward-logs-to-the-elasticsearch/</link>
+		<comments>/index.php/uncategorized/using-heka-to-forward-logs-to-the-elasticsearch/#respond</comments>
+		<pubDate>Wed, 10 Feb 2016 09:57:24 +0000</pubDate>
+		<dc:creator><![CDATA[Christiaan Baes (chrissie1)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4353</guid>
+		<description><![CDATA[Sometimes twitter can be useful. Yesterday I asked how people forward their linux logs to the logstash/elasticsearch server. And got this as one of the replies. Thanks Dan Barua and James Nugent. I&#8217;ve been setting up an ELK (Elastisearch, Logstash and Kibana) stack since last week and having heaps of fun doing so. You can [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Sometimes twitter can be useful.</p>
+<p>Yesterday I asked how people forward their linux logs to the logstash/elasticsearch server. And got this as one of the replies. </p>
+<p><a href="/wp-content/uploads/2016/02/twitter.png"><img src="/wp-content/uploads/2016/02/twitter-195x300.png" alt="twitter" width="195" height="300" class="alignnone size-medium wp-image-4354" srcset="/wp-content/uploads/2016/02/twitter-195x300.png 195w, /wp-content/uploads/2016/02/twitter.png 303w" sizes="(max-width: 195px) 100vw, 195px" /></a></p>
+<p>Thanks Dan Barua and James Nugent. </p>
+<p>I&#8217;ve been setting up an ELK (Elastisearch, Logstash and Kibana) stack since last week and having heaps of fun doing so. </p>
+<p>You can go to this post for the configuration <a href="http://blog.arnoudvermeer.nl/post/112602966185/replacing-logstash-with-heka">post</a> but first go <a href="https://github.com/mozilla-services/heka/releases">download the package</a> you need for your server and install it. If like me you have installed the deb package you will notice that heka starts running immediately.</p>
+<p>ALl you have to do now is update the \etc\heka\conf.d\00-hekad.toml file with the configuration in the previous link. Don&#8217;t forget to change the url to your elasticsearch server. </p>
+<p>Also don&#8217;t forget to give read access to the syslog file and the auth.log file.</p>
+<pre>sudo chmod 666 /var/log/syslog
+sudo chmod 666 /var/log/auth.log</pre>
+<p>For instance 444 might probably be enough but who knows.</p>
+<p>You can then check the heka log in /var/log/hekad.log</p>
+<p>And then you restart the service/daemon</p>
+<pre>sudo /etc/init.d/heka restart</pre>
+<p>Or you can reboot the server if you&#8217;re a windows admin. </p>
+<p>The logs will be in the logstash-* index.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/using-heka-to-forward-logs-to-the-elasticsearch/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Putting files into year folders using powershell</title>
+		<link>/index.php/uncategorized/putting-files-into-year-folders-using-powershell/</link>
+		<comments>/index.php/uncategorized/putting-files-into-year-folders-using-powershell/#respond</comments>
+		<pubDate>Wed, 10 Feb 2016 09:38:09 +0000</pubDate>
+		<dc:creator><![CDATA[Christiaan Baes (chrissie1)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[powershell]]></category>
+
+		<guid isPermaLink="false">/?p=4349</guid>
+		<description><![CDATA[Powershell is great (as am I) for automating boring little tasks. So the question came to put 18 thousand plus image files that were in one folder into folders per year of Date created. So to no longer keep you in suspense, here is the complete code PowerShell1 2 3 4 5 6 7 8 [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Powershell is great (as am I) for automating boring little tasks. </p>
+<p>So the question came to put 18 thousand plus image files that were in one folder into folders per year of Date created. </p>
+<p>So to no longer keep you in suspense, here is the complete code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$SourceDir</span> <span class="sy0">=</span> <span class="st0">&quot;&quot;</span>
+<span class="re0">$DestinationDir</span> <span class="sy0">=</span> <span class="st0">&quot;&quot;</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Source directory: &quot;</span> <span class="sy0">+</span> <span class="re0">$SourceDir</span>
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Destination directory:&quot;</span> <span class="sy0">+</span> <span class="re0">$DestinationDir</span>
+&nbsp;
+<span class="re0">$files</span> <span class="sy0">=</span> <span class="kw1">get-childitem</span> <span class="re0">$SourceDir</span> <span class="sy0">*</span>.<span class="sy0">*</span> <span class="kw4">-File</span> <span class="sy0">|</span><span class="kw1">Select-Object</span> <span class="kw5">-last</span> <span class="nu0">10</span>
+&nbsp;
+<span class="kw1">Write-Host</span> <span class="st0">&quot;Number of files to move:&quot;</span> <span class="re0">$files</span>.Count
+<span class="kw3">foreach</span><span class="br0">&#40;</span><span class="re0">$file</span> <span class="kw3">in</span> <span class="re0">$files</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="re0">$Directory</span> <span class="sy0">=</span> <span class="re0">$DestinationDir</span> <span class="sy0">+</span> <span class="st0">&quot;\&quot;</span> <span class="sy0">+</span> <span class="re0">$file</span>.LastWriteTime.Date.ToString<span class="br0">&#40;</span><span class="st0">&quot;yyyy&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw3">if</span><span class="br0">&#40;</span><span class="sy0">!</span><span class="br0">&#40;</span><span class="kw1">Test-Path</span> <span class="re0">$Directory</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Creating directory&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">New-Item</span> <span class="re0">$Directory</span> <span class="sy0">-</span><span class="kw2">type</span> directory
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;To directory:&quot;</span> <span class="re0">$Directory</span>
+&nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Moving file:&quot;</span> <span class="re0">$file</span>.ToString<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">Move-Item</span> <span class="re0">$file</span>.fullname <span class="re0">$Directory</span>
+&nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;File moved&quot;</span>
+<span class="br0">&#125;</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$SourceDir = ""
+$DestinationDir = ""
+
+Write-Host "Source directory: " + $SourceDir
+Write-Host "Destination directory:" + $DestinationDir
+
+$files = get-childitem $SourceDir *.* -File |Select-Object -last 10
+
+Write-Host "Number of files to move:" $files.Count
+foreach($file in $files)
+{
+    $Directory = $DestinationDir + "\" + $file.LastWriteTime.Date.ToString("yyyy")
+    if(!(Test-Path $Directory))
+    {
+        Write-Host "Creating directory"
+        New-Item $Directory -type directory
+    }
+    Write-Host "To directory:" $Directory
+    Write-Host "Moving file:" $file.ToString()
+    Move-Item $file.fullname $Directory
+    Write-Host "File moved"
+} </pre></div></div>
+
+<p>This only takes the last 10 files and it uses the LastWriteTime but you get the drift.</p>
+<p>Just fill in the Source and Destination Directories and you&#8217;re good to go.</p>
+<p>Most important parts.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$files</span> <span class="sy0">=</span> <span class="kw1">get-childitem</span> <span class="re0">$SourceDir</span> <span class="sy0">*</span>.<span class="sy0">*</span> <span class="kw4">-File</span> <span class="sy0">|</span><span class="kw1">Select-Object</span> <span class="kw5">-last</span> <span class="nu0">10</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$files = get-childitem $SourceDir *.* -File |Select-Object -last 10</pre></div></div>
+
+<p>Gets the files form the sourcedirectory and selects the last 10</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$Directory</span> <span class="sy0">=</span> <span class="re0">$DestinationDir</span> <span class="sy0">+</span> <span class="st0">&quot;\&quot;</span> <span class="sy0">+</span> <span class="re0">$file</span>.LastWriteTime.Date.ToString<span class="br0">&#40;</span><span class="st0">&quot;yyyy&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw3">if</span><span class="br0">&#40;</span><span class="sy0">!</span><span class="br0">&#40;</span><span class="kw1">Test-Path</span> <span class="re0">$Directory</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Write-Host</span> <span class="st0">&quot;Creating directory&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">New-Item</span> <span class="re0">$Directory</span> <span class="sy0">-</span><span class="kw2">type</span> directory
+&nbsp; &nbsp; <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$Directory = $DestinationDir + "\" + $file.LastWriteTime.Date.ToString("yyyy")
+    if(!(Test-Path $Directory))
+    {
+        Write-Host "Creating directory"
+        New-Item $Directory -type directory
+    }</pre></div></div>
+
+<p>Makes a new directory per year if it not already exists.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Move-Item</span> <span class="re0">$file</span>.fullname $Directory</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Move-Item $file.fullname $Directory</pre></div></div>
+
+<p>Moves the file.</p>
+<p>Simple and quick. All 18k files moved in less than a minute. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/putting-files-into-year-folders-using-powershell/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Nancy, Get, Post, Bind and javascript</title>
+		<link>/index.php/uncategorized/nancy-get-post-bind-and-javascript/</link>
+		<comments>/index.php/uncategorized/nancy-get-post-bind-and-javascript/#comments</comments>
+		<pubDate>Tue, 18 Aug 2015 06:17:12 +0000</pubDate>
+		<dc:creator><![CDATA[Christiaan Baes (chrissie1)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4096</guid>
+		<description><![CDATA[Something that always seemed to lack a bit of documentation was the Bind method. I know it works with a Post but it also works with a Get. Both are slightly different in how they pass their information to the server. You don&#8217;t see it when you have a form and do a normal submit [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Something that always seemed to lack a bit of documentation was the Bind method. I know it works with a Post but it also works with a Get. Both are slightly different in how they pass their information to the server. You don&#8217;t see it when you have a form and do a normal submit though.<br />
+In a RESTfull application you would use a POST to create a new object and a GET for getting information and not changing anything serverside.</p>
+<p>Of course there are many other reasons when you should use POST over GET or vice versa. </p>
+<p><a href="http://www.w3schools.com/tags/ref_httpmethods.asp" title="W3Schools">W3Schools</a></p>
+<p>For this we need some code. In the following example I&#8217;m using GET and POST wrong since the POST doesn&#8217;t create anything, but I&#8217;m just making a point. </p>
+<p>Here is a very simple module.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbnet"><thead><tr><td colspan="2"  class="head">vb.net</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Option</span> Strict Off
+<span class="kw1">Option</span> Explicit Off
+&nbsp;
+<span class="kw1">Imports</span> Nancy
+<span class="kw1">Imports</span> Nancy<span class="sy0">.</span><span class="me1">ModelBinding</span>
+&nbsp;
+<span class="kw1">Namespace</span> Modules
+&nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Class</span> ExhibitsModule
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Inherits</span> NancyModule
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Sub</span> <span class="kw1">New</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span><span class="kw1">Get</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="st0">&quot;&quot;</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="kw1">Function</span><span class="br0">&#40;</span>parameters<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> View<span class="br0">&#40;</span><span class="st0">&quot;index&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span><span class="kw1">Get</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="st0">&quot;/persons&quot;</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="kw1">Function</span><span class="br0">&#40;</span>parameters<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> MakePerson<span class="br0">&#40;</span>Bind<span class="br0">&#40;</span><span class="kw1">Of</span> Person<span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>Post<span class="br0">&#93;</span><span class="br0">&#40;</span><span class="st0">&quot;/persons&quot;</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="kw1">Function</span><span class="br0">&#40;</span>parameters<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">Return</span> MakePerson<span class="br0">&#40;</span>Bind<span class="br0">&#40;</span><span class="kw1">Of</span> Person<span class="br0">&#41;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Sub</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Function</span> MakePerson<span class="br0">&#40;</span>person <span class="kw1">As</span> Person<span class="br0">&#41;</span> <span class="kw1">As</span> <span class="kw2">String</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Return</span> person<span class="sy0">.</span><span class="me1">LastName</span> <span class="sy0">&amp;</span> <span class="st0">&quot; &quot;</span> <span class="sy0">&amp;</span> person<span class="sy0">.</span><span class="me1">FirstName</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Function</span>
+&nbsp;
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Class</span> Person
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Property</span> FirstName <span class="kw1">As</span> <span class="kw2">String</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Public</span> <span class="kw1">Property</span> LastName <span class="kw1">As</span> <span class="kw2">String</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Class</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">End</span> <span class="kw1">Class</span>
+<span class="kw1">End</span> <span class="kw1">Namespace</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Option Strict Off
+Option Explicit Off
+
+Imports Nancy
+Imports Nancy.ModelBinding
+
+Namespace Modules
+    Public Class ExhibitsModule
+        Inherits NancyModule
+
+        Public Sub New()
+            [Get]("") = Function(parameters)
+                            Return View("index")
+                        End Function
+            [Get]("/persons") = Function(parameters)
+                                    Return MakePerson(Bind(Of Person)())
+                                End Function
+            [Post]("/persons") = Function(parameters)
+                                     Return MakePerson(Bind(Of Person)())
+                                 End Function
+        End Sub
+
+        Public Function MakePerson(person As Person) As String
+            Return person.LastName &amp; " " &amp; person.FirstName
+        End Function
+
+
+        Public Class Person
+            Public Property FirstName As String
+            Public Property LastName As String
+        End Class
+
+    End Class
+End Namespace</pre></div></div>
+
+<p>The module has a way to open the view and a way to get and post data.<br />
+The get and post methods are exactly the same. </p>
+<p>In simple html (a razor view here) we can call both methods in our form by just changing the method. for the rest they are the same.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1">@Inherits Nancy.ViewEngines.Razor.NancyRazorViewBase(Of String)
+&nbsp;
+@Code
+&nbsp; &nbsp; Layout = Nothing
+End Code
+&nbsp;
+<span class="sc0">&lt;!DOCTYPE html&gt;</span>
+&nbsp;
+<span class="sc2">&lt;<span class="kw2">html</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">head</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">title</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">title</span>&gt;</span>
+&nbsp; &nbsp; 
+&nbsp;
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">head</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">body</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">div</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">form</span> <span class="kw3">action</span><span class="sy0">=</span><span class="st0">&quot;/persons&quot;</span> <span class="kw3">method</span><span class="sy0">=</span><span class="st0">&quot;GET&quot;</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">name</span><span class="sy0">=</span><span class="st0">&quot;FirstName&quot;</span> <span class="kw3">value</span><span class="sy0">=</span><span class="st0">&quot;testfirstnameget&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">name</span><span class="sy0">=</span><span class="st0">&quot;LastName&quot;</span> <span class="kw3">value</span><span class="sy0">=</span><span class="st0">&quot;testlastnameget&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">button</span>&gt;</span>Submit<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">button</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">form</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">form</span> <span class="kw3">action</span><span class="sy0">=</span><span class="st0">&quot;/persons&quot;</span> <span class="kw3">method</span><span class="sy0">=</span><span class="st0">&quot;POST&quot;</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">name</span><span class="sy0">=</span><span class="st0">&quot;FirstName&quot;</span> <span class="kw3">value</span><span class="sy0">=</span><span class="st0">&quot;testfirstnamepost&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">name</span><span class="sy0">=</span><span class="st0">&quot;LastName&quot;</span> <span class="kw3">value</span><span class="sy0">=</span><span class="st0">&quot;testlastnamepost&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">button</span>&gt;</span>Submit<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">button</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">form</span>&gt;</span> &nbsp; 
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">div</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">body</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">html</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">@Inherits Nancy.ViewEngines.Razor.NancyRazorViewBase(Of String)
+
+@Code
+    Layout = Nothing
+End Code
+
+&lt;!DOCTYPE html&gt;
+
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;&lt;/title&gt;
+    
+
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div&gt;
+        &lt;form action="/persons" method="GET"&gt;
+            &lt;input type="text" name="FirstName" value="testfirstnameget" /&gt;
+            &lt;input type="text" name="LastName" value="testlastnameget" /&gt;
+            &lt;button&gt;Submit&lt;/button&gt;
+        &lt;/form&gt;
+        &lt;form action="/persons" method="POST"&gt;
+            &lt;input type="text" name="FirstName" value="testfirstnamepost" /&gt;
+            &lt;input type="text" name="LastName" value="testlastnamepost" /&gt;
+            &lt;button&gt;Submit&lt;/button&gt;
+        &lt;/form&gt;   
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre></div></div>
+
+<p>These days of course nobody uses the plain old submit anymore since it reloads your page, which apparently is very bad.<br />
+So we can change our code to no longer submit but to react to an onclick event of the buttons. Don&#8217;t forget to make your buttons of type button so they don&#8217;t submit the form anymore.<br />
+And see the code below with added javascript.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+</pre></td><td class="de1"><pre class="de1">@Inherits Nancy.ViewEngines.Razor.NancyRazorViewBase(Of String)
+&nbsp;
+@Code
+&nbsp; &nbsp; Layout = Nothing
+End Code
+&nbsp;
+<span class="sc0">&lt;!DOCTYPE html&gt;</span>
+&nbsp;
+<span class="sc2">&lt;<span class="kw2">html</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">head</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">title</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">title</span>&gt;</span>
+&nbsp; &nbsp; 
+&nbsp;
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">head</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">body</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">div</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">form</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">id</span><span class="sy0">=</span><span class="st0">&quot;firstnameget&quot;</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">name</span><span class="sy0">=</span><span class="st0">&quot;FirstName&quot;</span> <span class="kw3">value</span><span class="sy0">=</span><span class="st0">&quot;testfirstnamegetjs&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">id</span><span class="sy0">=</span><span class="st0">&quot;lastnameget&quot;</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">name</span><span class="sy0">=</span><span class="st0">&quot;LastName&quot;</span> <span class="kw3">value</span><span class="sy0">=</span><span class="st0">&quot;testlastnamegetjs&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">button</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;button&quot;</span> <span class="kw3">onclick</span><span class="sy0">=</span><span class="st0">&quot;getjs()&quot;</span>&gt;</span>Submit<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">button</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">form</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">form</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">id</span><span class="sy0">=</span><span class="st0">&quot;firstnamepost&quot;</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">name</span><span class="sy0">=</span><span class="st0">&quot;FirstName&quot;</span> <span class="kw3">value</span><span class="sy0">=</span><span class="st0">&quot;testfirstnamepostjs&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">id</span><span class="sy0">=</span><span class="st0">&quot;lastnamepost&quot;</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">name</span><span class="sy0">=</span><span class="st0">&quot;LastName&quot;</span> <span class="kw3">value</span><span class="sy0">=</span><span class="st0">&quot;testlastnamepostjs&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">button</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;button&quot;</span> <span class="kw3">onclick</span><span class="sy0">=</span><span class="st0">&quot;postjs()&quot;</span>&gt;</span>Submit<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">button</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">form</span>&gt;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">div</span>&gt;&lt;<span class="kw2">ul</span> <span class="kw3">id</span><span class="sy0">=</span><span class="st0">&quot;result&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">ul</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">div</span>&gt;</span> &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">div</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;@Url.Content(&quot;</span>~<span class="sy0">/</span><span class="kw3">Content</span><span class="sy0">/</span>Scripts<span class="sy0">/</span>jquery-2.1.4.min.js<span class="st0">&quot;)&quot;</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; function postjs() {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var xhr = new XMLHttpRequest();
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var data = { FirstName: $(&quot;#firstnamepost&quot;).val(), LastName: $(&quot;#lastnamepost&quot;).val() };
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xhr.open(&quot;POST&quot;, &quot;/persons&quot;, true);
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xhr.send(JSON.stringify(data));
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xhr.onreadystatechange = function () {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (xhr.readyState == 4 <span class="sc1">&amp;&amp; xhr.status == 200) {</span>
+<span class="sc1"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;$(&quot;#result&quot;).append(&quot;&lt;li&gt;&quot; + xhr.responseText + &quot;&lt;/li&gt;&quot;);</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; };
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; &nbsp; &nbsp; function getjs() {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var xhr = new XMLHttpRequest();
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var data = {FirstName: $(&quot;#firstnameget&quot;).val(),LastName: $(&quot;#lastnameget&quot;).val()};
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xhr.open(&quot;GET&quot;, &quot;/persons?&quot; + $.param(data) , true);
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xhr.send();
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xhr.onreadystatechange = function () {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (xhr.readyState == 4 <span class="sc1">&amp;&amp; xhr.status == 200) {</span>
+<span class="sc1"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;$(&quot;#result&quot;).append(&quot;&lt;li&gt;&quot; + xhr.responseText + &quot;&lt;/li&gt;&quot;);</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; };
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">body</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">html</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">@Inherits Nancy.ViewEngines.Razor.NancyRazorViewBase(Of String)
+
+@Code
+    Layout = Nothing
+End Code
+
+&lt;!DOCTYPE html&gt;
+
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;&lt;/title&gt;
+    
+
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div&gt;
+        &lt;form&gt;
+            &lt;input id="firstnameget" type="text" name="FirstName" value="testfirstnamegetjs" /&gt;
+            &lt;input id="lastnameget" type="text" name="LastName" value="testlastnamegetjs" /&gt;
+            &lt;button type="button" onclick="getjs()"&gt;Submit&lt;/button&gt;
+        &lt;/form&gt;
+        &lt;form&gt;
+            &lt;input id="firstnamepost" type="text" name="FirstName" value="testfirstnamepostjs" /&gt;
+            &lt;input id="lastnamepost" type="text" name="LastName" value="testlastnamepostjs" /&gt;
+            &lt;button type="button" onclick="postjs()"&gt;Submit&lt;/button&gt;
+        &lt;/form&gt; 
+        &lt;div&gt;&lt;ul id="result"&gt;&lt;/ul&gt;&lt;/div&gt;       
+    &lt;/div&gt;
+    &lt;script src="@Url.Content("~/Content/Scripts/jquery-2.1.4.min.js")" type="text/javascript"&gt;&lt;/script&gt;
+    &lt;script type="text/javascript"&gt;
+        function postjs() {
+            var xhr = new XMLHttpRequest();
+            var data = { FirstName: $("#firstnamepost").val(), LastName: $("#lastnamepost").val() };
+            xhr.open("POST", "/persons", true);
+            xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+            xhr.send(JSON.stringify(data));
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 &amp;&amp; xhr.status == 200) {
+                    $("#result").append("&lt;li&gt;" + xhr.responseText + "&lt;/li&gt;");
+                };
+            }
+        }
+        function getjs() {
+            var xhr = new XMLHttpRequest();
+            var data = {FirstName: $("#firstnameget").val(),LastName: $("#lastnameget").val()};
+            xhr.open("GET", "/persons?" + $.param(data) , true);
+            xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+            xhr.send();
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 &amp;&amp; xhr.status == 200) {
+                    $("#result").append("&lt;li&gt;" + xhr.responseText + "&lt;/li&gt;");
+                };
+            }
+        }
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre></div></div>
+
+<p>I used some jquery magic to make the making of the queryparameters easier. </p>
+<p>In the Post you pass the data in the send method of the XMLHttpRequest in the GET method you add the data as queryparameters to the url. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/nancy-get-post-bind-and-javascript/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

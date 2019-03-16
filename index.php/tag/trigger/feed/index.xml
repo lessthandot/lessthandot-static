@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>trigger &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/trigger/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Triggers affect on SQL System Variables</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/triggers-affect-on-sql-system/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/triggers-affect-on-sql-system/#comments</comments>
+		<pubDate>Tue, 12 Mar 2013 19:35:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[@@rowcount]]></category>
+		<category><![CDATA[identity]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[trigger]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/triggers-affect-on-sql-system/</guid>
+		<description><![CDATA[A while back I ran into an issue where a user was complaining about @@IDENTITY not always returning the value they expected.]]></description>
+				<content:encoded><![CDATA[<p>A while back I ran into an issue where a user was complaining about @@IDENTITY not always returning the value they expected.  </p>
+<p>This was happening on a table that was setup using 3rd party cross database platform replication software.  The software used triggers to capture the changes to the table to send them over to an Oracle table and a DB2 table.  The issue was caused by the trigger inserting records into another table that also had an identity column and that was being returned instead of the one from the original insert.</p>
+<p>I used to also have a debate with a fellow DBA about @@ROWCOUNT.  I use it all the time and haven’t had any issues.  But I also wanted to know if triggers could affect it.<br />
+Here is some sample code that illustrates how triggers affect @@IDENTITY, @@ROWCOUNT and also demonstrates SCOPE_IDENTITY().</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> tblTest <span class="br0">&#40;</span>col1 <span class="kw1">INT</span> <span class="kw1">IDENTITY</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, col2 <span class="kw1">INT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>;
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TRIGGER</span> tr_ins_tblTest
+&nbsp; &nbsp; <span class="kw1">ON</span> tblTest
+&nbsp;<span class="kw1">AFTER</span> <span class="kw1">INSERT</span>
+<span class="kw1">AS</span> 
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; <span class="kw1">DECLARE</span> @<span class="kw1">int</span> <span class="kw1">AS</span> <span class="kw1">INT</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @<span class="kw1">int</span> <span class="sy0">=</span> col1
+&nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> inserted;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="kw1">INTO</span> tblTest <span class="br0">&#40;</span>col2<span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @<span class="kw1">int</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">SELECT</span>&nbsp; &nbsp;<span class="st0">'Inside Trigger 1'</span> <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Where</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">@@ROWCOUNT</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>RowCount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,@@<span class="kw1">IDENTITY</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Identity</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Scope</span> <span class="kw1">Identity</span><span class="br0">&#93;</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="co1">--really try to mess with @@ROWCOUNT</span>
+&nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="kw1">INTO</span> tblTest <span class="br0">&#40;</span>col2<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> <span class="nu0">10</span>
+&nbsp; &nbsp; <span class="kw1">WHERE</span> <span class="nu0">1</span> <span class="sy0">=</span> <span class="nu0">2</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">SELECT</span>&nbsp; &nbsp;<span class="st0">'Inside Trigger 2'</span> <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Where</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">@@ROWCOUNT</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>RowCount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,@@<span class="kw1">IDENTITY</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Identity</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Scope</span> <span class="kw1">Identity</span><span class="br0">&#93;</span>;
+&nbsp; &nbsp; 
+<span class="kw1">END</span>;
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> tblTest <span class="br0">&#40;</span>col2<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'10'</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">SELECT</span>&nbsp; &nbsp;<span class="st0">'Outside Trigger'</span>&nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Where</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">@@ROWCOUNT</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>RowCount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,@@<span class="kw1">IDENTITY</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Identity</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Scope</span> <span class="kw1">Identity</span><span class="br0">&#93;</span>;
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> tblTest;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE tblTest (col1 INT IDENTITY (1,1) NOT NULL, col2 INT NULL);
+
+GO
+
+CREATE TRIGGER tr_ins_tblTest
+    ON tblTest
+ AFTER INSERT
+AS 
+BEGIN
+	DECLARE @int AS INT;
+
+	SELECT @int	= col1
+	  FROM inserted;
+
+	INSERT INTO tblTest (col2) 
+	SELECT @int;
+
+	SELECT	 'Inside Trigger 1'	AS [Where]
+			,@@ROWCOUNT			AS [RowCount]
+			,@@IDENTITY			AS [Identity]
+			,SCOPE_IDENTITY()	AS [Scope Identity];
+
+	--really try to mess with @@ROWCOUNT
+	INSERT INTO tblTest (col2)
+	SELECT 10
+	WHERE 1 = 2;
+
+	SELECT	 'Inside Trigger 2'	AS [Where]
+			,@@ROWCOUNT			AS [RowCount]
+			,@@IDENTITY			AS [Identity]
+			,SCOPE_IDENTITY()	AS [Scope Identity];
+	
+END;
+
+GO
+
+INSERT INTO tblTest (col2) VALUES ('10');
+
+SELECT	 'Outside Trigger'	AS [Where]
+		,@@ROWCOUNT			AS [RowCount]
+		,@@IDENTITY			AS [Identity]
+		,SCOPE_IDENTITY()	AS [Scope Identity];
+
+GO
+
+DROP TABLE tblTest;</pre></div></div>
+
+<p>Here is the output from the above code:</p>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/reccount.JPG?mtime=1363124071"><img alt="" src="/wp-content/uploads/users/kconan/reccount.JPG?mtime=1363124071" width="327" height="144" /></a></div>
+<p>So we can see that @@ROWCOUNT is not affected by the trigger.  However we also see that @@IDENTITY can be affected by triggers and the way to get around it is to use SCOPE_IDENTITY() instead.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/triggers-affect-on-sql-system/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

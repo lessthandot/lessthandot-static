@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>sql 2016 &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/sql-2016/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>How to drop a Temporal Table</title>
+		<link>/index.php/uncategorized/how-to-drop-a-temporal-table/</link>
+		<comments>/index.php/uncategorized/how-to-drop-a-temporal-table/#comments</comments>
+		<pubDate>Fri, 03 Jul 2015 07:39:59 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[sql 2016]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[syndicated]]></category>
+		<category><![CDATA[temporal table]]></category>
+
+		<guid isPermaLink="false">/?p=3465</guid>
+		<description><![CDATA[No no, I didn&#8217;t say temporary, but temporal! SQL Server 2016 introduces a great new feature called Temporal Tables. Or in other words, system-versioned tables. We&#8217;ll see what catches on. In a gist, such a table keeps track of the history of its rows by the use of some audit columns (start and end date) [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify">No no, I didn&#8217;t say <em>temporary</em>, but <strong>temporal</strong>! SQL Server 2016 introduces a great new feature called <strong>Temporal Tables</strong>. Or in other words, system-versioned tables. We&#8217;ll see what catches on. In a gist, such a table keeps track of the history of its rows by the use of some audit columns (start and end date) and a history table. Sounds a bit like the love child of Change Data Capture and a Type 2 dimension.</p>
+<p style="text-align: justify">Anyway, I was testing this feature a bit (more specifically if they supported computed columns as promised in CTP 2.1) and I created a temporal table with the following query:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">TestTemporal</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span>ID <span class="kw1">int</span> <span class="kw1">primary</span> <span class="kw1">key</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,A <span class="kw1">int</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,B <span class="kw1">int</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,C <span class="kw1">AS</span> A <span class="sy0">*</span> B
+&nbsp; &nbsp; &nbsp; &nbsp; ,SysStartTime datetime2 GENERATED ALWAYS <span class="kw1">AS</span> <span class="kw1">ROW</span> <span class="kw1">START</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,SysEndTime datetime2 GENERATED ALWAYS <span class="kw1">AS</span> <span class="kw1">ROW</span> <span class="kw1">END</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,PERIOD <span class="kw1">FOR</span> SYSTEM_TIME <span class="br0">&#40;</span>SysStartTime,SysEndTime<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">WITH</span><span class="br0">&#40;</span>SYSTEM_VERSION<span class="sy0">IN</span>G <span class="sy0">=</span> <span class="kw1">ON</span><span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE dbo.TestTemporal
+		(ID int primary key
+		,A int
+		,B int
+		,C AS A * B
+		,SysStartTime datetime2 GENERATED ALWAYS AS ROW START NOT NULL
+		,SysEndTime datetime2 GENERATED ALWAYS AS ROW END NOT NULL
+		,PERIOD FOR SYSTEM_TIME (SysStartTime,SysEndTime)) WITH(SYSTEM_VERSIONING = ON);</pre></div></div>
+
+<p style="text-align: justify">This code only works in CTP2.1, not in earlier versions of SQL 2016 because of the computed column specification.<br />
+Anyway, of course I forgot to set my database so this table was created in the master database. I wanted to drop it, but I was greeted with this lovely message:</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2015/07/errormessage.png"><img class="alignnone size-full wp-image-3466" src="/wp-content/uploads/2015/07/errormessage.png" alt="errormessage" width="716" height="151" srcset="/wp-content/uploads/2015/07/errormessage.png 716w, /wp-content/uploads/2015/07/errormessage-300x63.png 300w" sizes="(max-width: 716px) 100vw, 716px" /></a></p>
+<p style="text-align: justify">Even the <em>Delete</em> action was missing from the table&#8217;s context menu.</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2015/07/nodelete.png"><img class="alignnone size-full wp-image-3467" src="/wp-content/uploads/2015/07/nodelete.png" alt="nodelete" width="312" height="364" srcset="/wp-content/uploads/2015/07/nodelete.png 312w, /wp-content/uploads/2015/07/nodelete-257x300.png 257w" sizes="(max-width: 312px) 100vw, 312px" /></a></p>
+<p style="text-align: justify">A quick look on the MSDN page <a href="https://msdn.microsoft.com/en-us/library/dn935015.aspx">Temporal Tables</a> teaches us that dropping a system-versioned table is a <em>disallowed Alter Schema operation</em>. No luck there. The answer came, as usual, through Twitter:</p>
+<blockquote class="twitter-tweet" lang="en">
+<p dir="ltr" lang="en"><a href="https://twitter.com/Ko_Ver">@Ko_Ver</a> did you try to remove temporal setting before dropping it?</p>
+<p>— Janos Berke (@JanosBerke) <a href="https://twitter.com/JanosBerke/status/615491933146861568">June 29, 2015</a></p></blockquote>
+<p style="text-align: justify">Turning the system-versioning off and dropping the table is the answer to our question (and to about any schema operation you want to do on a system-versioned table). If we execute such an ALTER TABLE script, we get the following:</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2015/07/after_alter.png"><img class="alignnone size-full wp-image-3468" src="/wp-content/uploads/2015/07/after_alter.png" alt="after_alter" width="830" height="99" srcset="/wp-content/uploads/2015/07/after_alter.png 830w, /wp-content/uploads/2015/07/after_alter-300x35.png 300w" sizes="(max-width: 830px) 100vw, 830px" /></a></p>
+<p style="text-align: justify">The temporal table is reduced to a normal table, which means it can be dropped as a normal table. But the history table is kept as well. This means you can always re-enable system-versioning if you want to.<br />
+The name of the history table is dbo.MSSQL_TemporalHistoryFor_xxx, where xxx is the object id of the main table. Something to keep in mind if you want to automate scripts. Or just specify a friendly name when enabling system-versioning.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/how-to-drop-a-temporal-table/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>SQL Server 2016 CTP 2.1 has been released</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/sql-server-2016-ctp-2-1-has-been-released/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/sql-server-2016-ctp-2-1-has-been-released/#respond</comments>
+		<pubDate>Mon, 29 Jun 2015 12:59:52 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[sql 2016]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[syndicated]]></category>
+
+		<guid isPermaLink="false">/?p=3432</guid>
+		<description><![CDATA[Microsoft is all about rapid release cycles nowadays. We already experienced this with Power BI, where monthly new features and improvements have been added. Now SQL Server appears to get the same treatment: SQL Server 2016 CTP 2.1 has just been released. There is nothing groundbreaking in this release &#8211; which can be considered as an [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Microsoft is all about rapid release cycles nowadays. We already experienced this with Power BI, where monthly new features and improvements have been added.<br />
+Now SQL Server appears to get the same treatment: <a href="http://blogs.technet.com/b/dataplatforminsider/archive/2015/06/24/sql-server-2016-community-technology-preview-2-1-is-available.aspx">SQL Server 2016 CTP 2.1 has just been released</a>. There is nothing groundbreaking in this release &#8211; which can be considered as an upgrade of CTP2 &#8211; but there are some additional functionalities and improvements in the database engine.</p>
+<p>If you have already installed CTP2, you can just upgrade it to CTP2.1 following the usual upgrade procedure. Just spin-up the SQL Server set-up, go to Installation and choose <i>Upgrade from a previous version of SQL Server</i>. Hit Next a few times, choose which instance and which features you want to upgrade and you&#8217;re all done.</p>
+<p>Before:</p>
+<p><a href="/wp-content/uploads/2015/06/version_1.png"><img class="alignnone size-full wp-image-3433" src="/wp-content/uploads/2015/06/version_1.png" alt="version_1" width="350" height="141" srcset="/wp-content/uploads/2015/06/version_1.png 350w, /wp-content/uploads/2015/06/version_1-300x120.png 300w" sizes="(max-width: 350px) 100vw, 350px" /></a></p>
+<p>After:</p>
+<p><a href="/wp-content/uploads/2015/06/version_2.png"><img class="alignnone size-full wp-image-3434" src="/wp-content/uploads/2015/06/version_2.png" alt="version_2" width="317" height="145" srcset="/wp-content/uploads/2015/06/version_2.png 317w, /wp-content/uploads/2015/06/version_2-300x137.png 300w" sizes="(max-width: 317px) 100vw, 317px" /></a></p>
+<p>One of the new features for example is the ability to use computed columns in a temporal table. Exciting! (OK, I&#8217;m just using this as an example that I actually upgraded my system)</p>
+<p><a href="/wp-content/uploads/2015/06/temporal_before.png"><img class="alignnone size-full wp-image-3437" src="/wp-content/uploads/2015/06/temporal_before.png" alt="temporal_before" width="973" height="317" srcset="/wp-content/uploads/2015/06/temporal_before.png 973w, /wp-content/uploads/2015/06/temporal_before-300x97.png 300w" sizes="(max-width: 973px) 100vw, 973px" /></a></p>
+<p>After the upgrade:</p>
+<p><a href="/wp-content/uploads/2015/06/temporal_after-e1435582654552.png"><img class="alignnone size-full wp-image-3441" src="/wp-content/uploads/2015/06/temporal_after-e1435582654552.png" alt="temporal_after" width="640" height="231" srcset="/wp-content/uploads/2015/06/temporal_after-e1435582654552.png 640w, /wp-content/uploads/2015/06/temporal_after-e1435582654552-300x108.png 300w" sizes="(max-width: 640px) 100vw, 640px" /></a></p>
+<p>&nbsp;</p>
+<p>Anyway, I hope we can see more incremental releases of SQL 2016 soon and dare I say with more exciting Business Intelligence features.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/sql-server-2016-ctp-2-1-has-been-released/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

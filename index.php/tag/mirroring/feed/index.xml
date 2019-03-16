@@ -1,0 +1,1071 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>mirroring &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/mirroring/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>How do you manage SQL Agent Jobs when using mirroring?</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/how-do-you-manage-sql/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/how-do-you-manage-sql/#comments</comments>
+		<pubDate>Fri, 25 Jan 2013 12:56:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[ha]]></category>
+		<category><![CDATA[ha/dr]]></category>
+		<category><![CDATA[jobs]]></category>
+		<category><![CDATA[maintenance]]></category>
+		<category><![CDATA[mirroring]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/how-do-you-manage-sql/</guid>
+		<description><![CDATA[I have a bunch of SQL Agent jobs that execute T-SQL against databases. A bunch of these databases are mirrored. Of course if the database is the principal then these jobs will work without a problem. But what happens if you failover? Now these jobs will&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I have a bunch of SQL Agent jobs that execute T-SQL against databases. A bunch of these databases are mirrored. Of course if the database is the principal then these jobs will work without a problem. But what happens if you failover? Now these jobs will start failing. You can either have the same jobs on both servers and have them enabled or disabled depending where the mirror or principal is. You can very easy enable or disable these whenever you failover. For example</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> msdb
+GO
+&nbsp;
+<span class="kw1">UPDATE</span> sysjobs
+<span class="kw1">SET</span> enabled <span class="sy0">=</span><span class="nu0">1</span>
+<span class="kw1">WHERE</span> name <span class="sy0">IN</span> <span class="br0">&#40;</span><span class="st0">''</span>,<span class="st0">''</span>....<span class="br0">&#41;</span> <span class="co1">--use a table that has all the jobs instead</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE msdb
+GO
+
+UPDATE sysjobs
+SET enabled =1
+WHERE name IN ('',''....) --use a table that has all the jobs instead</pre></div></div>
+
+<p>Or another way would be to check if the database is online to see if the job should continue running</p>
+<p>Here is such an example</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">IF</span> <span class="sy0">EXISTS</span><span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> &nbsp;<span class="nu0">1</span> &nbsp;<span class="kw1">FROM</span> sys.<span class="me1">databases</span>
+<span class="kw1">WHERE</span> state_desc <span class="sy0">=</span> <span class="st0">'ONLINE'</span>
+<span class="sy0">AND</span> collation_name <span class="kw1">IS</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="sy0">AND</span> name <span class="sy0">=</span> <span class="st0">'YourDB'</span><span class="br0">&#41;</span>
+<span class="kw1">BEGIN</span>
+<span class="kw1">PRINT</span> <span class="st0">'yep, good to go'</span>
+<span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">IF EXISTS(
+SELECT  1  FROM sys.databases
+WHERE state_desc = 'ONLINE'
+AND collation_name IS NOT NULL
+AND name = 'YourDB')
+BEGIN
+PRINT 'yep, good to go'
+END</pre></div></div>
+
+<p>The reason we also check for collation_name in addition to state_desc is documented in <a href="http://technet.microsoft.com/en-us/library/ms178534.aspx">Books On Line</a></p>
+<blockquote><p>A database that has just come online is not necessarily ready to accept connections. To identify when a database can accept connections, query the collation_name column of sys.databases or the Collation property of DATABASEPROPERTYEX. The database can accept connections when the database collation returns a non-null value. For AlwaysOn databases, query the database_state or database_state_desc columns of sys.dm_hadr_database_replica_states.</p></blockquote>
+<p>Yet another option would be to have a table with the &#8216;live&#8217; server for the database, this however is more used for jobs, SSIS packages and programs that live on other servers</p>
+<p>How do you manage your jobs when dealing with mirroring? Leave me a comment, I am interested in your approach.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/how-do-you-manage-sql/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Use the sys.database_mirroring DMV to quickly check if the databases are in principal or mirror role and what state they are in</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/use-the-sys-database_mirroring-dmv/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/use-the-sys-database_mirroring-dmv/#comments</comments>
+		<pubDate>Mon, 07 Jan 2013 15:39:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[ha/dr]]></category>
+		<category><![CDATA[mirroring]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/use-the-sys-database_mirroring-dmv/</guid>
+		<description><![CDATA[I have been using mirroring for about three years now and I must say it is one of the best features that have been added to SQL Server. We used to do plain old replication and log shipping in the past but almost all of those have been replaced by mirror&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I have been using mirroring for about three years now and I must say it is one of the best features that have been added to SQL Server. We used to do plain old replication and log shipping in the past but almost all of those have been replaced by mirroring. </p>
+<p>Someone at work asked me how to check what state the databases are in and if a database on one server is the principal or the mirror. There are a couple of ways you can check this. You can open up SSMS and expand the database folder. You will see something like the following next to the database name <em>(Mirror, Synchronized / Restoring&#8230;)</em> or you might see <em>(Principal, Synchronized)</em>, other states are possible, for example disconnected, synchronizing, suspended.</p>
+<p>Another way to see what is going on is to launch Database Mirroring Monitor. You launch the Database Mirroring Monitor by right clicking on the database, selecting Tasks, then click on Launch Database Mirroring Monitor&#8230;</p>
+<p>Another option is to check the error log, messages might look like these</p>
+<p><em>Message<br />
+Database mirroring is inactive for database &#8216;YourDB&#8217;. This is an informational message only. No user action is required.</p>
+<p>Message<br />
+The mirroring connection to &#8220;TCP://SomeServer.SomeNetwork:5022&#8221; has timed out for database &#8220;YourDB&#8221; after 10 seconds without a response.  Check the service and network connections.</em></p>
+<p>I myself like the sys.database_mirroring dynamic management view. This view will give you the state that the mirror is in, the partner name, mirror role, what the safety level is, the connection timeout and more. Here is a query I like to run</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1">&nbsp; 
+&nbsp; &nbsp;<span class="kw1">SELECT</span> &nbsp; <span class="kw2">db_name</span><span class="br0">&#40;</span>sd.<span class="br0">&#91;</span>database_id<span class="br0">&#93;</span><span class="br0">&#41;</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Database</span> Name<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,sd.<span class="me1">mirroring_state</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">AS</span> <span class="br0">&#91;</span>Mirror <span class="kw1">State</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,sd.<span class="me1">mirroring_state_desc</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>Mirror <span class="kw1">State</span><span class="br0">&#93;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,sd.<span class="me1">mirroring_partner_name</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>Partner Name<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,sd.<span class="me1">mirroring_role_desc</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">AS</span> <span class="br0">&#91;</span>Mirror <span class="kw1">Role</span><span class="br0">&#93;</span> &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,sd.<span class="me1">mirroring_safety_level_desc</span> &nbsp; &nbsp; &nbsp;<span class="kw1">AS</span> <span class="br0">&#91;</span>Safety <span class="kw1">Level</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,sd.<span class="me1">mirroring_witness_name</span>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">AS</span> <span class="br0">&#91;</span>Witness<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,sd.<span class="me1">mirroring_connection_timeout</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>Timeout<span class="br0">&#40;</span>sec<span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">FROM</span> sys.<span class="me1">database_mirroring</span> <span class="kw1">AS</span> sd
+&nbsp; &nbsp; <span class="kw1">WHERE</span> mirroring_guid <span class="kw1">IS</span> <span class="sy0">NOT</span> null
+&nbsp; &nbsp; <span class="kw1">ORDER</span> <span class="kw1">BY</span> <span class="br0">&#91;</span><span class="kw1">Database</span> Name<span class="br0">&#93;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  
+   SELECT	db_name(sd.[database_id])              AS [Database Name]
+		  ,sd.mirroring_state                  AS [Mirror State]
+		  ,sd.mirroring_state_desc             AS [Mirror State] 
+		  ,sd.mirroring_partner_name           AS [Partner Name]
+		  ,sd.mirroring_role_desc              AS [Mirror Role]  
+		  ,sd.mirroring_safety_level_desc      AS [Safety Level]
+		  ,sd.mirroring_witness_name		   AS [Witness]
+		  ,sd.mirroring_connection_timeout AS [Timeout(sec)]
+    FROM sys.database_mirroring AS sd
+    WHERE mirroring_guid IS NOT null
+    ORDER BY [Database Name];</pre></div></div>
+
+<p>Here are the different mirroring states and what it means, you can found this information here in Books On Line : http://msdn.microsoft.com/en-us/library/ms189284(v=sql.110).aspx</p>
+<blockquote><p><strong>SYNCHRONIZING</strong><br />
+The contents of the mirror database are lagging behind the contents of the principal database. The principal server is sending log records to the mirror server, which is applying the changes to the mirror database to roll it forward.<br />
+At the start of a database mirroring session, the database is in the SYNCHRONIZING state. The principal server is serving the database, and the mirror is trying to catch up.</p>
+<p><strong>SYNCHRONIZED</strong><br />
+When the mirror server becomes sufficiently caught up to the principal server, the mirroring state changes to SYNCHRONIZED. The database remains in this state as long as the principal server continues to send changes to the mirror server and the mirror server continues to apply changes to the mirror database.<br />
+If transaction safety is set to FULLautomatic failover and manual failover are both supported in the SYNCHRONIZED state, there is no data loss after a failover.<br />
+If transaction safety is off, some data loss is always possible, even in the SYNCHRONIZED state.</p>
+<p><strong>SUSPENDED</strong><br />
+The mirror copy of the database is not available. The principal database is running without sending any logs to the mirror server, a condition known as running exposed. This is the state after a failover.<br />
+A session can also become SUSPENDED as a result of redo errors or if the administrator pauses the session.<br />
+SUSPENDED is a persistent state that survives partner shutdowns and startups.</p>
+<p><strong>PENDING_FAILOVER</strong><br />
+This state is found only on the principal server after a failover has begun, but the server has not transitioned into the mirror role.<br />
+When the failover is initiated, the principal database goes into the PENDING_FAILOVER state, quickly terminates any user connections, and takes over the mirror role soon thereafter.</p>
+<p><strong>DISCONNECTED</strong><br />
+The partner has lost communication with the other partner.
+</p></blockquote>
+<p>Start using this dynamic management view to check the state of your mirrored databases. Also be aware that you can set thresholds, one way to set thresholds  is by using the Database Mirroring Monitor. Thresholds can be found after clicking on the Warnings tab  </p>
+<p><a href="/wp-content/uploads/blogs/DataMgmt/Denis/MirroringThresholds.PNG?mtime=1357579980"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/MirroringThresholds.PNG?mtime=1357579980" width="398" height="169" /></a></p>
+<p>What is your preferred way of checking what mirroring state the databases are in?</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/use-the-sys-database_mirroring-dmv/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Mirroring and Transactional Replication setup – Auto Failover</title>
+		<link>/index.php/datamgmt/dbprogramming/replication-and-mirroring-setup/</link>
+		<comments>/index.php/datamgmt/dbprogramming/replication-and-mirroring-setup/#comments</comments>
+		<pubDate>Tue, 30 Nov 2010 12:36:20 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[mirroring]]></category>
+		<category><![CDATA[replication]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[transactional replication]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/11/replication-and-mirroring-setup/</guid>
+		<description><![CDATA[Since mirroring has come to the SQL Server feature set, High Availability (HA) has become a much easier, inexpensive and available option. Prior to mirroring, third party software and hardware were the main options to achieve HA. This was due to replication never being accepted as a high availability option. With any solution like SQL Server, growth over time builds a better and more stable solution. This has been the fact with many features of SQL Server, including replication. Replication had some issues in previous versions of SQL Server. Maintaining the uptime and stability was not a trivial task. With replication, there is a more in-depth knowledge requirement to maintain it, while mirroring does not require as much in-depth knowledge to provide a solid solution. Do think that mirroring does not include a strict discipline of skills in order to make it a successful HA solution. Mirroring is simplistic from the outside, both in setup and maintainability. However, troubleshooting mirroring is a critical aspect to making it work for HA. In order to be successful, knowledge of the internals of mirroring is as important as replication.]]></description>
+				<content:encoded><![CDATA[<p> Since mirroring has come to the SQL Server feature set, High Availability (HA) has become a much easier, inexpensive and available option. Prior to mirroring, third party software and hardware were the main options to achieve HA. This was due to replication never being accepted as a high availability option. With any solution like SQL Server, growth over time builds a better and more stable solution. This has been the fact with many features of SQL Server, including replication. Replication had some issues in previous versions of SQL Server. Maintaining the uptime and stability was not a trivial task. With replication, there is a more in-depth knowledge requirement to maintain it, while mirroring does not require as much in-depth knowledge to provide a solid solution. Do think that mirroring does not include a strict discipline of skills in order to make it a successful HA solution. Mirroring is simplistic from the outside, both in setup and maintainability. However, troubleshooting mirroring is a critical aspect to making it work for HA. In order to be successful, knowledge of the internals of mirroring is as important as replication.</p>
+<p>What happens when replication is already in use for what it is more well-known for; syncing data between like data sources? When replication is already in use, mirroring is still a successful HA solution. This includes a high safety model with automatic failover. There are a few things that need to be done to make replication and mirroring function well together. These include the order of setup, and the settings and configurations for replication specifically.</p>
+<blockquote><p>Resources: Books online (BOL) has a starting point for mirroring with. http://technet.microsoft.com/en-us/library/ms151799.aspx<br />
+This resource also provides links to configuring replication with mirroring and log shipping with mirroring. All important reading and highly recommend outside of this article.
+</p></blockquote>
+<p><strong>Setup</strong></p>
+<p>If you followed the link above, BOL provides a basic listing of the order to setup mirroring with replication.</p>
+<ol>
+<li>Configure the Publisher.</li>
+<li>Configure database mirroring.</li>
+<li>Configure the mirror to use the same Distributor as the principal.</li>
+<li>Configure replication agents for failover.</li>
+<li>Add the principal and mirror to Replication Monitor.</li>
+</ol>
+<p>We will follow these steps while adding in a few catches and added details that need to be configured to ensure processing flows while not in a failover situation and after a failover situation.</p>
+<p><strong>Mirroring and Replication Landscape</strong></p>
+<p>In the end, the solution shown in the following diagram will be achieved. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_01.gif" alt="" title="" width="602" height="380" /></div>
+</p>
+<p>From the above diagram, you can see that three servers are involved. Server A acts as the principal as well as the publisher. </p>
+<ul>
+<li>Principal: The primary server in mirroring</li>
+<li>Mirror: The secondary server in mirroring</li>
+<li>Publisher: The primary source of replication</li>
+<li>Subscriber: The subscription to the published data in replication</li>
+</ul>
+<p>To follow the setup order, the first task is to setup the publisher in transactional replication.  This server also acts as the principal in mirroring (which will be setup later).</p>
+<blockquote><p>AdventureWorks will be used in this setup and can be found <a href="http://sqlserversamples.codeplex.com/">http://sqlserversamples.codeplex.com/</a><br />
+The SQL Server versions that are being used in this article are as follows<br />
+Server A: SQL Server 2008 R2 – Principal and Publisher – ONPNT_XPSXPS2008R2<br />
+Server B: SQL Server 2008 R2 – Mirror and Distributor – ONPNT_XPSR2Distributor<br />
+Server C: SQL Server 2005 – Subscriber – ONPNT_XPS<br />
+Setting up the distributor</p></blockquote>
+<p>Replication setup can be achieved with the built in wizards from SSMS as well as the replication stored procedures packed with SQL Server. If using the wizard to set up replication, it is highly recommended that the “script to file” option is selected in the last screen of the wizard. This will script out the complete configuration the wizard has done utilizing the stored procedures behind the scenes. This acts as a quick way to set replication back up if the system is lost. Copy these files to a share that is located somewhere else and is also part of a disk to disk HA or DR solution.</p>
+<p>Ensure that SQL Server Replication is installed on the SQL Server instance. If it is not, use the setup installation wizard from your media to install.<br />
+On Server B, acting as our remote distributor, setup is required prior to configuring Server A for publication of the tables we want to replicate.  To set the distributor up, follow these steps.</p>
+<p>Using the wizard: right click Replication in the tree view in SSMS and select, configure Distribution…</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_02.gif" alt="" title="" width="390" height="90" /></div>
+<p>Setup steps included in the wizard will be as follows:</p>
+<ol>
+<li>Distributor: Acts as its own Distributor</li>
+<li>Snapshot folder: default for this lab but share on network for true production environment</li>
+<li>Distribution Database: leave defaults to your disk configurations</li>
+<li>Publishers: leave distributor as publisher and add Server A as a publisher. XPS2008R2 in this test</li>
+<li>Distributor password: Enter the service credentials.  Needs access to Server A and B and share</li>
+<li>Wizard Actions: Check both configure and generate scripts</li>
+<li>Execute setup</li>
+</ol>
+<p>Each step shown below ordered left to right</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_03.gif" alt="" title="" width="720" height="654" /></div>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_04.gif" alt="" title="" width="719" height="327" /></div>
+</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_05.gif" alt="" title="" width="504" height="307" /></div>
+<p><strong>Move to the publisher now.</strong></p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_06.gif" alt="" title="" width="330" height="98" /></div>
+<p>In the wizard:</p>
+<ol>
+<li>Distributor: change the distributor to the remote distributor we setup prior</li>
+<li>Administrative Password: enter the administrator password to gain access to the remote distributor</li>
+<li>Publication Database: select AdventureWorks as the database</li>
+<li>Publication Type: select Transactional publication for the publication type</li>
+<li>Articles: select the articles (tables: Address, AddressType, Contact, ContactType and CountryRegion)</li>
+<li>Filtered table rows: no filters</li>
+<li>Snapshot Agent: check “Create a snapshot immediately and keep the snapshot available to initialize subscriptions”</li>
+<li>Agent Security: select the security settings as the “Run under the SQL Server Agent service account”</li>
+<li>Wizard Options: finish by selecting the Generate scripts option.</li>
+</ol>
+<p>These steps are shown in order below ordered left to right</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_07.gif" alt="" title="" width="695" height="640" /></div>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_08.gif" alt="" title="" width="698" height="318" /></div>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_09.gif" alt="" title="" width="709" height="638" /></div>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_10.gif" alt="" title="" width="356" height="320" /></div>
+<p>Recap: At this point we have a distributor role on R2Distributor, Server B; and a publication role on XPS2008R2, Server A. </p>
+<p>To finish the replication setup, create a subscription to the publication on ONPNT_XPS, Server C.  To do this, connect to the SQL Server in SSMS, right click the subscriptions and select New Subscriptions…</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_11.gif" alt="" title="" width="361" height="132" /></div>
+<p>Select XPS2008R2 (your own server name replaced here) as Publisher</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_12.gif" alt="" title="" width="498" height="238" /></div>
+<p>Through the wizard, make the following selections.</p>
+<ol>
+<li>Distribution Agent Location: Run all agents at the Distributor</li>
+<li>Subscribers: Subscriber (ONPNT_XPS), Subscription Database (AdventureWorks)</li>
+<li>Distribution Agent Security: Impersonate process account </li>
+<li>Synchronization Schedule: Run Continuously</li>
+<li>Initialize Subscriptions: Immediately</li>
+<li>Wizard Actions: Create subscriptions and Generate scripts</li>
+</ol>
+<p>Each step shown below ordered left to right</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_13.gif" alt="" title="" width="727" height="662" /></div>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_14.gif" alt="" title="" width="732" height="332" /></div>
+<p>We’ve successfully setup transactional replication at this point and can move to setting up the mirroring session.  The mirror will exist between Server A (Replication Publisher) and Server B (Replication Distributor).  To set mirroring up, refer to the following blog on <a href="/index.php/DataMgmt/DBAdmin/sql-server-2008-mirroring-setup">setting mirroring up with Developer Edition</a>.</p>
+<p>Once the mirror setup is completed, replication must be configured further to ensure a failover in the mirror is also followed with a failover in the replication.  To accomplish this, the agent profiles for all replication agents must have the –PublisherFailoverPartner set.  This ensures that in the event of a failover, the agents know what the mirror is.</p>
+<p>To set the agents, use the sp_add_agent_parameter procedure</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">exec</span> <span class="kw3">sp_add_agent_parameter</span> @profile_id <span class="sy0">=</span> <span class="nu0">1</span>, @parameter_name <span class="sy0">=</span> N<span class="st0">'-PublisherFailoverPartner'</span>, @parameter_value <span class="sy0">=</span> N<span class="st0">'ONPNT_XPSR2Distributor'</span>
+<span class="kw1">exec</span> <span class="kw3">sp_add_agent_parameter</span> @profile_id <span class="sy0">=</span> <span class="nu0">2</span>, @parameter_name <span class="sy0">=</span> N<span class="st0">'-PublisherFailoverPartner'</span>, @parameter_value <span class="sy0">=</span> N<span class="st0">'ONPNT_XPSR2Distributor'</span>
+<span class="kw1">exec</span> <span class="kw3">sp_add_agent_parameter</span> @profile_id <span class="sy0">=</span> <span class="nu0">3</span>, @parameter_name <span class="sy0">=</span> N<span class="st0">'-PublisherFailoverPartner'</span>, @parameter_value <span class="sy0">=</span> N<span class="st0">'ONPNT_XPSR2Distributor'</span>
+<span class="kw1">exec</span> <span class="kw3">sp_add_agent_parameter</span> @profile_id <span class="sy0">=</span> <span class="nu0">9</span>, @parameter_name <span class="sy0">=</span> N<span class="st0">'-PublisherFailoverPartner'</span>, @parameter_value <span class="sy0">=</span> N<span class="st0">'ONPNT_XPSR2Distributor'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">exec sp_add_agent_parameter @profile_id = 1, @parameter_name = N'-PublisherFailoverPartner', @parameter_value = N'ONPNT_XPSR2Distributor'
+exec sp_add_agent_parameter @profile_id = 2, @parameter_name = N'-PublisherFailoverPartner', @parameter_value = N'ONPNT_XPSR2Distributor'
+exec sp_add_agent_parameter @profile_id = 3, @parameter_name = N'-PublisherFailoverPartner', @parameter_value = N'ONPNT_XPSR2Distributor'
+exec sp_add_agent_parameter @profile_id = 9, @parameter_name = N'-PublisherFailoverPartner', @parameter_value = N'ONPNT_XPSR2Distributor'</pre></div></div>
+
+<p>The profile ID can be obtained by querying the <a href="http://msdn.microsoft.com/en-us/library/ms178540.aspx">MSAgent_Profiles</a> table in the MSDB database.  The agent types that will be contained in this table are:</p>
+<p>1 = Snapshot Agent<br />
+2 = Log Reader Agent<br />
+3 = Distribution Agent<br />
+4 = Merge Agent<br />
+9 = Queue Reader Agent</p>
+<p>Since profile IDs may be different on different installations, verify your profile ID by check this table.  Once the parameters are set, use the <a href="http://msdn.microsoft.com/en-us/library/ms188339.aspx">MSagent_parameters</a> table to verify by checking the parameter_name column for the value -PublisherFailoverPartner.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> MSagent_parameters <span class="kw1">WHERE</span> parameter_name <span class="sy0">=</span> <span class="st0">'-PublisherFailoverPartner'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM MSagent_parameters WHERE parameter_name = '-PublisherFailoverPartner'</pre></div></div>
+
+<p>If we were in a merge replication setup, profile 4 would also need to be set.</p>
+<p>The procedure sets the mirror name as the failover parameter.  Run this on the distributor (which is also acting as the mirror in our case).</p>
+<p><strong>Verification and failover test</strong></p>
+<p>Testing is everything when you have a more complex HA setup, such as mirroring with replication.  Taking testing in stages will allow for problem areas to be quickly resolved, rather than testing the end result and backtracking through your configurations.</p>
+<p>At this point mirroring and replication is functioning together.  The principal and mirror are acting in a synchronized state and replication is acting based off the distributor.  To test this setup, test mirroring by altering a record in AdventureWorks on the principal.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> AddressLine1 <span class="kw1">FROM</span> person.<span class="me1">Address</span> <span class="kw1">WHERE</span> AddressID <span class="sy0">=</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT AddressLine1 FROM person.Address WHERE AddressID = 1</pre></div></div>
+
+<p>The statement above results in, “1970 Napa Ct”.  Update the AddressLine1 value to, “1970 Napa Court” and ensure the changes flow to the subscriber of the publication.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> Person.<span class="me1">Address</span> <span class="kw1">SET</span> AddressLine1 <span class="sy0">=</span> <span class="st0">'1970 Napa Court'</span>
+<span class="kw1">WHERE</span> AddressID <span class="sy0">=</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE Person.Address SET AddressLine1 = '1970 Napa Court'
+WHERE AddressID = 1</pre></div></div>
+
+<p>Check the subscriber by running the same select.  You should see the changes made to the same record.  In the replication monitor we can also see the commands sent</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_15.gif" alt="" title="" width="607" height="249" /></div>
+<p>Our next step it to test a complete failover of the mirror and then make this same test to ensure that replication also fails over as it is detected.</p>
+<p>Right click the AdventureWorks database on the Principal and select properties.  Go to the mirroring page and click the Failover button</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_16.gif" alt="" title="" width="628" height="244" /></div>
+<p>Click Yes to the warning on failover.  The wizard screen will close when the failover is completed.  </p>
+<p>At this point replication is disconnected from the publisher on running commands.  We can see this by looking at the replication monitor and seeing retry attempts</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_17.gif" alt="" title="" width="628" height="104" /></div>
+<p>The default amount of time that is monitored for replication to failover is around 35 seconds.  Once replication agents failover to the mirror set in the failover partner parameter, the agent status in the monitor will resume the running state.</p>
+<p>To test the failover, run the same test as we performed earlier but in reverse order.  Update the mirror that is now acting as the principal and follow the replicated commands through to the subscriber to ensure the changes were committed there.</p>
+<p>In this case, update the same value back to the Ct over Court value.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> Person.<span class="me1">Address</span> <span class="kw1">SET</span> AddressLine1 <span class="sy0">=</span> <span class="st0">'1970 Napa Ct'</span>
+<span class="kw1">WHERE</span> AddressID <span class="sy0">=</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE Person.Address SET AddressLine1 = '1970 Napa Ct'
+WHERE AddressID = 1</pre></div></div>
+
+<p>Check on the subscriber now that the changes flowed as they should have</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> AddressLine1 <span class="kw1">FROM</span> person.<span class="me1">Address</span> <span class="kw1">WHERE</span> AddressID <span class="sy0">=</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT AddressLine1 FROM person.Address WHERE AddressID = 1</pre></div></div>
+
+<p>We see that the failover was successful and the value committed as, “1970 Napa Ct” and the distributor in the replication monitor shows the commands sent.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/mirror_repl/mirroring_replicaton_18.gif" alt="" title="" width="628" height="218" /></div>
+<p>Once verified, fail the mirroring session back to the original state and test again.</p>
+<p><strong>Primary concerns</strong></p>
+<p>The primary concern with putting replication to work on a database that is mirrored will fall into latency.  Replication latency will increase when certain mirroring operating modes are set or in the case a mirror is in a lengthy synchronizing state.  This is more the case when High Performance mirroring is set.   </p>
+<p>In some cases when replication is heavily used, multiple distributors are also utilized to balance loads across physical SQL Servers.  With mirroring and replication, the distributor must be the same for both the principal and the mirror.  This is due to the state of the mirror and requiring it to mimic the principal at all times.  </p>
+<p>Finally, unsupported replication types include: Immediate update Subscribers, Oracle publishers, peer-to-peer publishers and republishing.  </p>
+<p>This and other important notes that should be considered when working with mirroring and replication on the same database can be found in <a href="http://technet.microsoft.com/en-us/library/ms151799.aspx">this BOL document</a>.</p>
+<p>This entire solution can be scripted out both by the use of the Generate Scripts option and by altering the scripts to utilize parameters you pass in.  It is recommended that you at least save the generated scripts from the configurations so the setup can be restored quickly.  This includes mirroring scripts for the endpoints.  </p>
+<p>You can see a close example of scripting the replication setup on mirrored databases <a href="http://www.sqlservercentral.com/scripts/Replication/70508/">here</a> on SQLServerCentral.com.</p>
+<p>Thanks to Kendal Van Dyke (<a href="http://twitter.com/sqldba">Twitter</a> | <a href="http://www.kendalvandyke.com/">Blog</a>) (aka, the replication king) for the technical review of the article.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/replication-and-mirroring-setup/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>SQL Server and High Availability</title>
+		<link>/index.php/datamgmt/dbprogramming/sql-server-high-availability/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sql-server-high-availability/#respond</comments>
+		<pubDate>Fri, 11 Jun 2010 17:57:31 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[backup]]></category>
+		<category><![CDATA[disaster recovery]]></category>
+		<category><![CDATA[dr]]></category>
+		<category><![CDATA[ha]]></category>
+		<category><![CDATA[high availability]]></category>
+		<category><![CDATA[log shipping]]></category>
+		<category><![CDATA[mirroring]]></category>
+		<category><![CDATA[restore]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql university]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/sql-server-high-availability/</guid>
+		<description><![CDATA[Realistically, 100% is unachievable given the nature of computing.  There are needs for a SQL Server and Windows Server to be rebooted at least once a year.  This is to allow for updates on both SQL Server and Windows to be maintained.  So the ranking method we use for measuring high availability is the "nines" scale.  The five nines is a goal that most database administrators and teams set for their standards.  The five nines level is a height of availability that is truly an achievement and one to be proud of.]]></description>
+				<content:encoded><![CDATA[<p><img src="/wp-content/uploads/blogs/DataMgmt/sqlu_logo.gif" alt="" title="" width="150" height="166" align="left" />
+<p>Welcome to the last class of HA / DR week for SQL University.  It has been a great week discussing these topics with all of you.  We <a href="/index.php/DataMgmt/DBAdmin/sqlu-taking-a-break-for-recess">recapped</a> those classes in order to highlight the key points over the week yesterday.  So far we&#8217;ve covered a great deal but really have only scratched the surface of SQL Server features for HA and DR.  Today will be another scratch in the surface regarding the High Availability points for SQL Server.  Be sure to check the resources links through this article.  They will greatly add an extension to today and further build your knowledge of the vast amount of abilities we have at our disposal.  </p>
+<p>Now that HA / DR week is completed, please take a moment to rate this week (and others) by filling out the <a href="https://spreadsheets.google.com/a/sqlchicken.com/viewform?hl=en&amp;formkey=dDBoSW02QldrTTc2dER3WVZheUlEX3c6MQ#gid=0">SQL University Course Evaluation</a> and select HA/DR Week.  </p>
+<h2><strong>What is HA?</strong></h2>
+<p>High Availability (HA) for SQL Server can be defined in one sentence: Keep data available 100% of the time.   That really is the objective of HA and nothing short of that.</p>
+<p>Realistically, 100% is unachievable given the nature of computing.  There are needs for a SQL Server and Windows Server to be rebooted at least once a year.  This is to allow for updates on both SQL Server and Windows to be maintained.  So the ranking method we use for measuring high availability is the &#8220;nines&#8221; scale.  The five nines is a goal that most database<br />
+administrators and teams set for their standards.  The five nines level is a height of availability that is truly an achievement and one to be proud of.  </p>
+<p>The table below illustrates the availability calculation.  This table has been used for quite some time and has been adopted by IT teams as the measurement for downtime. Downtime equates to uptime (depends on if you are talking to a CTO, CEO or an IT manager how to phrase it).  </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ha_1.gif" alt="" title="" width="547" height="310" /></div>
+<p align="center"><i><a href="http://en.wikipedia.org/wiki/High_availability">High Availability</a></i>
+</p>
+<p>The six nines goal is almost unachievable but can be done in some infrastructures.  Why are the six nines almost out of reach?  Given that a reboot on Windows takes a little under 2 minutes, reaching only a 31 seconds downtime goal becomes a bit farfetched.  Even if clustering and mirroring is setup, the failover times still will add up to around 15 seconds per failover.  The five nines is a goal that you can achieve with a mid-level installation and still meet the needs to keep your systems up to date yearly.  </p>
+<p>Windows clustering has come a long way over the last few versions.  Windows Server 2008 in particular has a sound clustering service that is more stable than its predecessors (In this author’s opinion).  Windows clustering will give you the ability to automatically failover due to hardware failures and most Operating System failures.  The concept of this ability alone allows the setup to be valuable to HA strategies.  Clustering consists of two or more physical servers.  These physical servers act like a partnership and are always in communication with each other ensuring that their specific roles are being met.  These servers can be in a state of Active or Passive but one must be in a Active state at all times.  </p>
+<p>A benefit to Windows Clustering is the storage location of the actual databases.  This would be located on disk (NAS, SAN etc…) outside the physical servers.  Given this, we enhance HA by having the ability to replicate the disk along with the safety of the cluster acting in partnership with DR.  Mirroring can be added to the cluster fully enhancing the entire landscape of the true HA strategy.  Windows Server 2008 Clustering all together is a straight forward setup and deployment but will take added knowledge and research to ensure the cluster is configured to the specifics of each environment.  With any cluster, there is complexity in the configurations and ensuring the two servers stay in sync for programs, hardware and services but administrative tasks are much lighter than they were in the past.  </p>
+<h2><strong>Maintenance and downtime </strong></h2>
+<p>Downtime can be caused by any type of disruption to the availability of data.  Maintenance tasks like index rebuilding, updates and ETL loads all fall into that category.  When doing large index rebuild tasks, the tables may become unavailable to the users.  In the database view of this, they are simply locked at this time.  This equates to almost complete loss of the ability to access them though and thus, a failure in our HA strategy.  These tasks should be planned out careful to prevent this type of failure in HA.  </p>
+<p>Windows and SQL Server updates must be maintained.  This is not optional.  Every update should be analyzed carefully and the full extent of its impact on the systems taken into consideration.  Some updates may cause SQL Server services to stop or other supporting services that are needed to maintain availability.  If they are, the downtime should be planned carefully to prevent the HA landscape from doing its job of preventing loss and availability.  That means pausing mirroring or failing over nodes in a cluster to retain the availability of data services as much as possible.  </p>
+<h2><strong>Geo-Clustering </strong></h2>
+<p>Geo-Clustering allows us to plan High Availability across geographically located sites.  This is achieved through replication of disk to each site and essentially mirrors each system to the next.  This HA option of high availability as a hefty price tag on hardware and networking abilities.  Recently, Paul Randal (<a href="http://sqlskills.com/blogs/paul/">Blog</a> | <a href="http://twitter.com/paulrandal">Twitter</a>)published a White paper <a href="http://blogs.msdn.com/b/tommills/archive/2010/06/02/new-sql-server-2008-r2-high-availability-whitepaper-published.aspx"><i>Proven SQL Server Architectures for High Availability and Disaster Recovery</i></a>.  This went over HA setups (and DR) that are in use in businesses now and proven to work effectively.  This white paper goes into detail on actual in-place configurations in Geo-Clustering as well.  This class lucks out on the timing of this publication by us being able to link to it as a resource in understanding large business HA and Geo-Clustering.  </p>
+<h2><strong>Database Mirroring</strong></h2>
+<p>Database mirroring was introduced in SQL Server 2005 Standard and Enterprise editions.  Prior to the introduction of database mirroring, there was difficulty in achieving HA with SQL Server.  Clustering and disk replication were options but still limited.  With database mirroring the options for HA landscapes opens up greatly.  This doubled with the advancements in Windows Clustering added a great deal of enterprise abilities to SQL Server.  </p>
+<p>Our landscape for data services can take on a new form for HA and exist without Windows Clustering as well.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ha_2.gif" alt="" title="" width="405" height="386" /></div>
+<p>What this type of HA landscape provides is even more stripped down overhead in administrative burdens and we have cost savings opportunities to assist in providing a HA solution.</p>
+<p>In the diagram above, the landscape consists of two physical database servers.  Those database servers a standalone installations and active as each unique entity to the infrastructure.    Alias naming can be added to the scenario to ensure the clients access the database servers in the event of a failover.  Alias naming can be forgone with the changes in recent years to the ability of connections from applications to allow for a failover specification.  </p>
+<pre>Data Source=myServerAddress;Failover Partner=myMirrorServerAddress;Initial Catalog=myDataBase;Integrated Security=True;</pre>
+<p align="center"><i>Resource:  <a href="http://www.connectionstrings.com/sql-server-2008">ConnectionStrings.com</a></i></p>
+<p>We can see in the example connection string above the Failover parameter which allows us to make applications much smarter as opposed to recent years with actually developing tests in code to determine the availability of data services.  </p>
+<p>Another addition is added to the diagram that is provided with Enterprise Edition.  That is snapshots capabilities.  In this landscape (and clustering) a path can exist from another reporting server to snapshots that are taken of the mirror.  This reporting solution is a huge benefit to the entire structure of the data services by lower the activity on the OLTP side.  Reporting activity has always been an historical hardship of database administrators and keeping services for both reports and operations from preventing each other’s ability to serve the business.  </p>
+<h2><strong>Working with database mirroring</strong></h2>
+<p>To go deeper into database mirroring, we will work from a recent setup located at, <a href="/index.php/DataMgmt/DBAdmin/sql-server-2008-mirroring-setup">Mirroring Hands On with Developer Edition</a>.  In this setup, Developer edition is used to provide all of the possible configurations provided in mirroring.  The setup and purchase of Developer Edition is highly recommended to become familiar with these features.</p>
+<p>The primary features we lose when moving to Standard Edition are Asynchronous<br />
+Mirroring and Snapshot capabilities of the Mirror.  One important factor of snapshot abilities is, the snapshot cannot occur while the mirroring is in a synchronizing state or applying transactions.  In an asynchronous setup (High performance), depending on the number of transactions, this state can be harder to schedule for snapshot creations.  These two features are a large part of mirroring and the flexibility in configuring it.  Weigh in the needs of mirroring greatly and the loss of these features when not putting the budget in for Enterprise Edition.</p>
+<p>After going through the developer setup in the link above, we can start to look at options in mirroring and things to watch for.</p>
+<h2><strong>Operating Modes</strong></h2>
+<p>
+Database Mirroring allows for three operating modes.</p>
+<ul>
+<li>High Availability</li>
+<li>High protection</li>
+<li>High performance</li>
+</ul>
+<p>In order to achieve HA with out of the box SQL Server, we enlist in the High Availability operating mode.  This setup runs in a synchronous set of operations that apply transactions to the logs on both the mirror and principal prior to returning success commits back to the applications.  The mirroring landscape consists of three physical servers, the principal, the mirror and the witness.</p>
+<blockquote><p><span class="MT_red">Note: The witness can be any edition of SQL Server but the principal and mirror must be the same edition.  The principal can be a previous version than the mirror but this is only recommended in upgrade methods.  The witness can be located on the mirror but this is not recommended due to the chance of losing the mirror and thus, losing the witness.</span></p></blockquote>
+<p>The remaining two operating modes take the witness and automatic failover out of the landscape.  This is not optimal in achieving HA.  Without automation and the active ping in mirroring, the downtime is greater and human interaction is required.</p>
+<h2><strong>What can go wrong?</strong></h2>
+<p>The worst thing that can happen in database mirroring is losing the network behind it.  This can cause a complete loss of data services.<br />
+Another known problem is referred to as Split-brain.  In this situation, both the Principal and Mirror have taken on the role of a principal.  In the landscape in which alias’s are utilized this can be a severe problem to accessing the databases.</p>
+<p>Corruption (page errors) that occurs on the Principal will follow to the mirror.  Database mirroring does enlist in <i>automatic page-repair</i>.  This is now available in SQL Server 2008 and SQL Server 2008 R2.  The automated page-repair will attempt to repair any page errors that are sent to the mirror by requesting the transactions (or fresh copy of the pages) again from the principal.  This repair will work in some scenarios but if the corruption is too great and requires any type of loss in data, an error will persist.</p>
+<p>When a mirror does receive errors (even if capable of fixing), the mirror goes into a suspended state.  This suspended state will persist until the error is resolved.  If the error cannot be resolved by automation of the mirroring abilities, the mirror will stay in the suspended state.  This usually will cause a clean setup of the mirroring landscape.  In a worst case scenario, the errors that came from the principal are great enough that repairing the principal is the priority. </p>
+<p>Transaction log growth must be maintained in mirroring.  Database mirroring requires the databases to be in Full recovery.  This means that the transaction logs must be maintained and sized properly.  If they are not, the logs will grow and at some point the need to shrink them will undoubtedly occur.  These operations are not allowed in a mirror though and the mirror will need to be broken to do them.  It is highly recommended to take all the necessary steps to maintain a full recovery state.  Keep this in mind while performing index maintenance especially.</p>
+<h2><strong>Final Thoughts</strong></h2>
+<p>The combination of Windows Clustering and Database Mirroring will allow for the objective of data services to meet High Availability goals.  With Database Mirroring, we can achieve HA with the operating mode of High Availability while not needing a clustered environment (although recommended).  This landscape lowers cost and allows for flexibility in some applications that may have particular needs outside of the clustering scope.</p>
+<p>Achieving High Availability should be seamless to the user community.  Failover situations must be automated in order to retain HA and limited to no exposure to the users at the time a failover is needed.  Working with the applications and vendors to achieve these goals is sometimes required but often fully achievable.</p>
+<p>This concludes the SQL University DR/HA Week.  I hope you enjoyed talking about the topics and look forward to hearing all of your feedback on taking what we’ve discussed while planning your own data securing strategies with HA and DR.  As with all of the SQL University weeks, your feedback is greatly appreciated so we know how we are doing.  When you have a moment please take a moment to fill out the <a href="https://spreadsheets.google.com/a/sqlchicken.com/viewform?hl=en&amp;formkey=dDBoSW02QldrTTc2dER3WVZheUlEX3c6MQ#gid=0">SQL University Course Evaluation</a> and select HA/DR Week.  </p>
+<p>Thank you for attending once again and thanks to Jorge Segarra (<a href="http://sqlchicken.com/">Blog</a> | <a href="http://twitter.com/sqlchicken">Twitter</a>) for allowing me the pleasure of discussing all of these topics with you.  </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sql-server-high-availability/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL University &#8211;  Recess time!</title>
+		<link>/index.php/datamgmt/dbprogramming/sqlu-taking-a-break-for-recess/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sqlu-taking-a-break-for-recess/#respond</comments>
+		<pubDate>Thu, 10 Jun 2010 17:10:13 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[backup]]></category>
+		<category><![CDATA[disaster recovery]]></category>
+		<category><![CDATA[dr]]></category>
+		<category><![CDATA[ha]]></category>
+		<category><![CDATA[high availability]]></category>
+		<category><![CDATA[log shipping]]></category>
+		<category><![CDATA[mirroring]]></category>
+		<category><![CDATA[restore]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql university]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/sqlu-taking-a-break-for-recess/</guid>
+		<description><![CDATA[The recess bell just rang for SQL University HA / DR classrooms.  While all of the SQL kiddies are running around the playground and playing with the things they have learned over this semester, the chalkboard is going to get a workout so when they get back, they can take the notes they slacked on earlier.]]></description>
+				<content:encoded><![CDATA[<p>
+The recess bell just rang for SQL University HA / DR classrooms.  While all of the SQL kiddies are running around the playground and playing with the things they have learned over this semester, the chalkboard is going to get a workout.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/bart.gif" alt="" title="" width="628" height="339" /></div>
+<p align="center"><i>Image courtesy of <a href="http://www.addletters.com/pictures/bart-simpson-generator/233605.htm">Bart Simpson Chalkboard Generator</a> and <a href="http://toadworld.com/BLOGS/tabid/67/EntryID/543/Default.aspx">linkback to Jeff Smith excellent article</a></i></p>
+<p>
+Over the last week we’ve gone over a lot regarding HA and DR.  The first day we defined situations and the key factors that are needed to be successful in obtaining secure data services and high availability of those data services.  Any of these two strategies to protect our data against disasters, local and remote; always start with the definitions required to plan out the implementation.  We learned together that just throwing things like log shipping into the mix may not truly give us the protection we need.  This would happen if we leave important business entities out of our planning and document how our systems would come back from disasters.
+</p>
+<p>We done this over the week by showing the features that SQL Server has to offer without much added cost.  When budget is available, we also discussed briefly landscapes like Geo-clustering, SAN replication and truly next to real-time mirrored data centers for recovering in the event of disasters.  These were terms in passing so we didn’t venture off the scope of each class but their importance is there nonetheless. </p>
+<p>
+We defined a list of the important notes we set off to discuss that effect the decisions of how we can accomplish HA and DR</p>
+<ol>
+<li>Size of databases</li>
+<li>Network capabilities</li>
+<li>Budget</li>
+<li>Features available per edition of SQL Server</li>
+<li>Maintenance load</li>
+<li>Allowable downtime</li>
+<li>Personnel resources required</li>
+<li>Initial setup downtime</li>
+<li>Will DR fit into the HA strategy?</li>
+<li>Documentation – knowledge transfer</li>
+<li>Can we test this?</li>
+</ol>
+<p>Automation of Disaster and Recovery played an important part in our discussions.  Do we automate is the key to decide in your unique strategies.  DR typical is a manual failover process while HA only becomes HA when automation is playing into the events of a localized disaster.</p>
+<p>SQL Server backups were stressed on day two as the foundation of all that is DR (and HA recovery).  With careful planning and testing on both HA and DR, we achieve secure and always available data services.  But when even that strategy fails, we must turn to our backups to recover both the data and the DR and HA strategies themselves.  </p>
+<p>Today we discussed log shipping as a cost effective disaster and recovery method.  Log shipping is a great alternative when budgets are low.  Problems do arise in the effectiveness when our data services are larger than our check books though.  All-in-all, log shipping can provide security in a DR situation and leaving it as a possibility when strategizing is always good. </p>
+<p>So now we move to our last day and we will discuss High Availability.  The class will show database mirroring in our newer versions of SQL Server.  We’ll discuss things like split-brain scenarios in mirroring and certificate usage so we can mirror across different domains.  Finally, we need to briefly discuss SAN replication and geo-clustering again.  Although we will be brief on this topic, we want to emphasize them because when the budget is there, nothing really matches them for real-world HA.</p>
+<p><strong>Recess is now over so let’s get back to work!</strong></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sqlu-taking-a-break-for-recess/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Log Shipping for cheap DR</title>
+		<link>/index.php/datamgmt/dbprogramming/log-ship-to-dr-sqlu/</link>
+		<comments>/index.php/datamgmt/dbprogramming/log-ship-to-dr-sqlu/#comments</comments>
+		<pubDate>Thu, 10 Jun 2010 10:50:34 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[backup]]></category>
+		<category><![CDATA[disaster recovery]]></category>
+		<category><![CDATA[dr]]></category>
+		<category><![CDATA[ha]]></category>
+		<category><![CDATA[high availability]]></category>
+		<category><![CDATA[log shipping]]></category>
+		<category><![CDATA[mirroring]]></category>
+		<category><![CDATA[restore]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/log-ship-to-dr-sqlu/</guid>
+		<description><![CDATA[Welcome to day three of HA and DR week of SQL University.  Today we are going to look at cheap DR.  Yes, setting up DR can be inexpensive.  The best part of this strategy is it comes along with most of the editions of SQL Server.  The method is Log Shipping.  Log shipping (LS) has a bad name in the Disaster / Recovery (DR) world.  There are concerns with the ability to fail back to primary sites in the case of disasters, and LS is often thought of as a maintenance intense setup along with file mess.  Today’s class will go over some methods to handle these and other concerns, along with the simplicity of configuring and monitoring LS in SQL Server 2008 (R2).]]></description>
+				<content:encoded><![CDATA[<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqlu_logo.gif" alt="" title="" width="150" height="166" align="left" /></div>
+<p>Welcome to day three of HA and DR week of SQL University.  Today we are going to look at cheap DR.  Yes, setting up DR can be inexpensive.  The best part of this strategy is it comes along with most of the editions of SQL Server.  The method is Log Shipping.  </p>
+<p>Log shipping (LS) has a bad name in the Disaster / Recovery (DR) world.  There are concerns with the ability to fail back to primary sites in the case of disasters, and LS is often thought of as a maintenance intense setup along with file mess.  Today’s class will go over some methods to handle these and other concerns, along with the simplicity of configuring and monitoring LS in SQL Server 2008 (R2).
+</p>
+<p></p>
+<h2><strong>What is Log Shipping</strong></h2>
+<p>
+Log Shipping consists of three events.  Backup transaction log, Copy remotely and Restore to subscriber(s).  Any one primary (publisher or the logs) can have one or more secondary databases (subscriber to the logs).  </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/logship_7.gif" alt="" title="" width="500" height="444" /></div>
+<p>When configuring Log Shipping, all of the configuration settings are held in the MSDB database. </p>
+<p>These tables consist off the following</p>
+<blockquote><p>log_shipping_primary_databases<br />
+log_shipping_primary_secondaries<br />
+log_shipping_monitor_primary<br />
+log_shipping_monitor_history_detail<br />
+log_shipping_monitor_error_detail<br />
+log_shipping_secondary<br />
+log_shipping_secondary_databases<br />
+log_shipping_monitor_secondary</p></blockquote>
+<p>The system procedures for configuring log shipping are located in the master database.</p>
+<blockquote><p>sp_add_log_shipping_monitor_jobs<br />
+sp_add_log_shipping_primary<br />
+sp_add_log_shipping_secondary<br />
+sp_create_log_shipping_monitor_account<br />
+sp_delete_log_shipping_monitor_info<br />
+sp_delete_log_shipping_monitor_jobs<br />
+sp_delete_log_shipping_primary<br />
+sp_delete_log_shipping_secondary<br />
+sp_get_log_shipping_monitor_info<br />
+sp_log_shipping_get_date_from_file<br />
+sp_log_shipping_in_sync<br />
+sp_log_shipping_monitor_backup<br />
+sp_log_shipping_monitor_restore<br />
+sp_remove_log_shipping_monitor_account<br />
+sp_update_log_shipping_monitor_info</p></blockquote>
+<p>
+When Log Shipping is enabled and configured, all subscribers must be in either Recovering or Read-Only (Standby) status.  Placing a subscriber into a Read-Only mode is common, but when a log is applied to the subscriber, all connections must be closed.  This is due to the subscriber database being required to go into recovering so the log can be applied.  Often, subscribers are used for reporting so considering the state of connectivity to the database is critical in being effective for availability.</p>
+<p>Log shipping has some definite advantages on its side for being used in DR.  The overhead of the processing (backup, copy and restore) can be managed and, if thought through well, can leave a very small footprint on the normal operations of the database servers.  Maintenance is very minimal for both setup and administration.  Most database administrators already work closely with backup and restore, so log shipping is easy to learn.  The major cost in log shipping is disk for storage, a secondary SQL Server and the network backbone to handle the files moving across the lines.  This, compared to some DR cost overhead, is very minimal.
+</p>
+<p>
+In the following steps we will set up log shipping completely on a local default SQL Server instance.  </p>
+<blockquote><p><span class="MT_red">Note: as always, database size is a factor.  Databases in the Terybyte range can easily be logged shipped given the resources behind it.  Steps that are outlined will change greatly in time of execution due to the size of a database.  An initial restore for one will take some time at first.</span>  </p></blockquote>
+<h2><strong>Setting up Log Shipping with SSMS</strong></h2>
+<p>
+A few things should be prepared prior to configuring Log Shipping. </p>
+<ul>
+<li>Share location for the log backups on the publisher</li>
+<li>Share location for the log backups to be copied to on the subscribers</li>
+<li>Security setup for accessing these shares (Agent account by default)</li>
+</ul>
+<p>Log Shipping can be setup completely using T-SQL, but in the push for the “point, click and run” theory of SSMS, we will use it to setup, configure and get our lab running.</p>
+<p>Log shipping is available in every edition of SQL Server but Express.  In order to show our setup we will be using Developer Edition.  Developer Edition is available for a very low cost and is identical in features to Enterprise.  We will be using the AdventureWorks database to setup Log Shipping.  If you do not have this database, you can download it here.
+</p>
+<ol>
+<li>Open SSMS and connect to your SQL Server.</li>
+<li>Expand the databases tree, right click AdventureWorks and select properties</li>
+<li>Select Transaction Log Shipping on the right</li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/logship_1.gif" alt="" title="" width="628" height="561" /></div>
+<p>By default, Log Shipping is disabled on each database.  In order to go further, we need to check “Enable this as a primary database in a log shipping configuration”.  This will set the transaction log backups available for us to open and configure.</p>
+<blockquote><p><span class="MT_red">Note: If you have other transaction log backups running, they should be turned off prior to starting the new Log Shipping plans.</span></p></blockquote>
+<li>Click the &#8220;Backup Settings&#8221; button to open the configuration wizard.</li>
+<p>Earlier we mentioned preparing for Log Shipping and the shares required.  You can use admin shares (e.g. \onpnt_xpsd$) but this isn’t recommended as the admin shares should be for administrative purposes only.  For our setup we will be using the following for processing backups:</p>
+<p>\onpnt_xpspub_logs<br />
+\onpnt_xpssub_logs</p>
+<li>Enter your share into the “Network path to backup folder” field</li>
+<p>For now, we will leave the default 72 hours to retain log backups.  </p>
+<blockquote><p><span class="MT_red">Note: the retention of the log backups must be taken into consideration for recovery from backups.  Take into consideration the retention of other Full and Differential backups when setting this removal option.  You do not want to delete log backups that could be required to recover to a point in time by restores.</span></p></blockquote>
+<p>The log shipping configuration will add a SQL Server Agent job that will monitor the thresholds set when configuring them.  If the table log_shipping_monitor_primary shows a backup date greater than the backup thresh hold value, an error will be raised in SQL Server.   In order to actively be notified, operators need to be setup on the agent and the job so you will receive these errors as they occur. </p>
+<p>I would not recommend leaving the default Job name.  Make use of this name so you can easily find the job and know what it is for.  If you work on SQL Servers that have hundreds of jobs or Job Servers, using meaningful names in your environment make maintenance much faster and easier on everyone.</p>
+<p>The next step is to determine the interval of the log backups.  The default 15 minutes is common but in a high-transaction database, 15 minutes can mean severe loss of data in a disaster.  I recommend really putting some thought into this setting.  Ensure you do not hurt performance with backups tripping over themselves or occurring so often they cause problems.  At the same time, ensure that you are protecting against the least amount of loss the business will accept.</p>
+<p>Leave the default 15 minutes for now.  If you want to alter this schedule, click the Schedule button and the SQL Agent scheduling window will come up.  </p>
+<p>To show compression, next to &#8220;Set backup compression&#8221;, select Compress Backup.  If you are on an earlier version than 2008 R2 and any edition other than Enterprise or Developer, this option will not be available.  SQL Server 2008 R2 allows compression in Standard and Enterprise (including Developer).  Pre-R2, only Enterprise and Developer have this option. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/logship_2.gif" alt="" title="" width="628" height="646" /></div>
+<li>Click OK after ensuring everything is completed as shown above.</li>
+<p>The next step in the process is to set any subscribers and monitoring servers if you use them outside the publisher.  In preparation you can restore a full backup and bring the tail log into the AdventureWorks subscriber database.  This can also be done from the subscriber steps.</p>
+<li>Click Add under the Secondary databases</li>
+<li>Click Connect and connect to the instance you want to Log Ship to</li>
+<li>On the Initialize Secondary Database tab, select &#8220;Yes, generate a full backup of the primary…&#8221;</li>
+<p>This will back the AdventureWorks database up and restore it as the database we specify to be the subscriber.   Ensure if you do this lab on a single SQL Server to change the name of the Secondary database to something other than the default of the primary.  </p>
+<li>Click the restore options and ensure the data and log files go into the correct directories per your disk configurations. </li>
+<li>Select the Copy Files tab and enter the share we created earlier (\onpnt_xpssub_logs)</li>
+<p>We can leave the default schedule to restore again, but I still recommend changing the job name to a something more meaningful and easy to read </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/logship_3.gif" alt="" title="" width="628" height="543" /></div>
+<li>Click the Restore Transaction Log tab and select Standby Mode and Disconnect user in the database when restoring backups.  This will be required to prevent restore problems.</li>
+<li>Click OK and OK again to save all of our configurations.  </li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/logship_4.gif" alt="" title="" width="628" height="551" /></div>
+<p>After clicking OK, a dialog will be shown while the backup and restore of AdventureWorks runs.  The SQL Agent jobs that will control log shipping will also be created after these steps succeed. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/logship_5.gif" alt="" title="" width="628" height="334" /></div>
+<p>Once the restore is done and logs have shipped, you will start to notice them moving in the publication and subscriber shares</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/logship_6.gif" alt="" title="" width="628" height="282" /></div>
+</ol>
+<p>Now that LS is running we can look into the process and logging of the events.  The log_shipping_monitor_history table is extremely useful for validating the entire process between the instances.  The Message column has logged information that will explain in detail the process that is occurring:</p>
+<pre>select [message] from log_shipping_monitor_history_detail</pre>
+<p>Results:</p>
+<blockquote><p>Starting transaction log copy. Secondary ID: &#8217;07af9839-f962-40db-9392-2107e9cc2053&#8242;<br />
+Retrieving copy settings. Secondary ID: &#8217;07af9839-f962-40db-9392-2107e9cc2053&#8242;<br />
+Retrieved copy settings. Primary Server: &#8216;ONPNT_XPS&#8217;, Primary Database: &#8216;AdventureWorks&#8217;, Backup Source Directory: &#8216;\onpnt_xpspub_logs&#8217;, Backup Destination Directory: &#8216;\onpnt_xpssub_logs&#8217;, Last Copied File: &#8216;<none>&#8216;<br />
+Copying log backup files. Primary Server: &#8216;ONPNT_XPS&#8217;, Primary Database: &#8216;AdventureWorks&#8217;, Backup Source Directory: &#8216;\onpnt_xpspub_logs&#8217;, Backup Destination Directory: &#8216;\onpnt_xpssub_logs&#8217;<br />
+Checking to see if any previously copied log backup files that are required by the restore operation are missing. Secondary ID: &#8217;07af9839-f962-40db-9392-2107e9cc2053&#8242;<br />
+The copy operation was successful. Secondary ID: &#8217;07af9839-f962-40db-9392-2107e9cc2053&#8242;, Number of log backup files copied: 0<br />
+Starting transaction log copy. Secondary ID: &#8217;07af9839-f962-40db-9392-2107e9cc2053&#8242;</none></p></blockquote>
+<p>Another extremely practical usage of these tables is, in the event of a disaster, being able to later analyze data that may have been lost in log backups that did not get copied to secondary servers.  The log_shipping_secondary has a column, &#8220;last_copied_file&#8221;.  This column has helped me determine exactly where a subscribing database is at in the restores several times in the past.    </p>
+<p>SSMS and built in reporting already available also provides us with a great way to monitor conditions of log shipping.  Right click the database server in SSMS, scroll to reports and in standard reports, click the Transaction Log Shipping Status.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/logship_9.gif" alt="" title="" width="500" height="406" /></div>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/logship_10.gif" alt="" title="" width="1007" height="270" /></div>
+</p>
+<h2><strong>Catches but not pitfalls</strong></h2>
+<p>
+Now that log shipping is setup we should discuss some pitfalls to watch for.</p>
+<p>One big problem that comes up with any fully logged database is maintenance tasks.  Index maintenance is a prime example.  The growth in logging on the transaction log that happens from index maintenance while in Full recovery is large.  Once this maintenance and logging begins, the log grows and this means the backups grow as they do.  Coming up with the best time to do these types of maintenance tasks and the interval in which you should log ship the transaction logs is critical for this.  If you have a 10GB log file and you rebuild a 5GB Index, it will take the log space to do the rebuild.  This could cause growth in the log which is something we don’t really want happening a lot.  So if the scheduled log backup is set to keep the free space down in the log during these tasks and normal operations, you can manage the logs very well and keep them in check while performing to the best they can.</p>
+<p>
+Networks will need to be able to handle the files moving.  Imagine if you start to copy a 10GB file over the regular LAN that users are connected to and working on.  This happens in regular offices often.  Users copy large files down or up to user home directories and it slows the entire network.  The only way to clean it up is to stop the copy or wait for it to finish.  This can be the same problem if the network isn’t configured to handle it.  Meet with the network administrators and make sure everyone knows the traffic that will be added to the network. </p>
+<p>
+With any database that is shipped, mirrored or restored to another site, remember that logins, SQL Agent Jobs, configurations outside of the databases and objects such as endpoints or linked servers will not be sent.  These must be done outside of the normal tasks.  SSIS can assist in this with the use of SMO or the Transfer Server Objects Task.  PowerShell can also bring in a useful container to work these tasks on schedules.  It is a good idea to move these as SQL script files to the offsite server and apply them.  Test and test this often.</p>
+<h2><strong>Bell rang!</strong></h2>
+<p>Log shipping is a quick and great method for small to mid-size databases or databases that have a good foundation and planned strategy for dealing with the pitfalls of large logs.  Administration is light and monitoring is very well done and built into SQL Server for use.  There are added benefits of LSN tracking in the logs and file monitoring as well.  The log shipping system tables have a wealth of information in them that can be used for other tasks.  </p>
+<p>When planning your own DR strategy, leave log shipping on the list of options.  The cost factor and resource utilization may have it in the lead for being a good choice for your safety measures with Disaster / Recovery.  </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/log-ship-to-dr-sqlu/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>The SQL Server backup &#8211; foundation of any Disaster / Recovery</title>
+		<link>/index.php/datamgmt/dbprogramming/the-sql-server-backup-foundation-of-any/</link>
+		<comments>/index.php/datamgmt/dbprogramming/the-sql-server-backup-foundation-of-any/#comments</comments>
+		<pubDate>Tue, 08 Jun 2010 08:39:36 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[backup]]></category>
+		<category><![CDATA[disaster recovery]]></category>
+		<category><![CDATA[dr]]></category>
+		<category><![CDATA[ha]]></category>
+		<category><![CDATA[high availability]]></category>
+		<category><![CDATA[mirroring]]></category>
+		<category><![CDATA[restore]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/the-sql-server-backup-foundation-of-any/</guid>
+		<description><![CDATA[Welcome to our second class of HA and DR week of SQL University.  Today we are going to focus on the concept, “Backups are for sissies!”  OK, we’re really going to look at backup and restore for Disaster / Recovery (DR) and how being a sissy and always backing up our databases and testing out restores is a proven strategy for DR.   When all else fails and the walls are falling down on the database servers, backups will be your life preserver.  Backups are the foundation for Disaster and Recovery (DR).  Backups can also save you when high Availability (HA) completely fails you.   Let’s get started!]]></description>
+				<content:encoded><![CDATA[<p><div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqlu_logo.gif" alt="" title="" width="150" height="166" align="left" /></div>
+<p>Welcome to our second class for HA and DR week of <a href="http://sqlchicken.com/sql-university/">SQL University</a>.  Yesterday we went through defining HA and DR along with some common practices you can use.  Today we are going to focus on the concept, &#8220;Backups are for sissies!&#8221;  OK, we’re really going to look at backup and restore for Disaster / Recovery (DR) and how being a sissy and always backing up our databases and testing out restores is a proven strategy for DR.   </p>
+<p>When all else fails and the walls are falling down on the database servers, backups will be your life preserver.  Backups are the foundation for Disaster and Recovery (DR).  Backups can also save you when high Availability (HA) completely fails you.   Let’s get started!</p>
+<p></p>
+<h2>Define a backup</h2>
+<p>A full database backup contains a full representation of the database <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/transaction-log-size-cold-shrink-ldf">with enough of the transaction log in order to recover</a> everything when a restore is performed.  In SQL Server, we have several types of backups to help with various configurations and sizes of our databases.</p>
+<p><strong>Full Backup</strong> – Defined above as a full representation of the entire database and enough of the log to recover the point in which the backup was executed</p>
+<p><strong>Differential Backup</strong> – Differential backups add benefits to backup strategies by giving you a quicker recovery path.  These backups contain the changes between the previous full backup and when the differential was executed.  If you are recovering from a disaster and have a database in Full Recovery Model with transaction log backups, you are not required to restore the base, the differentials, and all the transaction log backups.  Only the base and the differential are required to bring you to the point in time of the differential backup.  </p>
+<p><strong>Transaction Log Backup</strong> – This type of backup contains the transactions since the last backup.  This only applies to databases in Full or Bulk-Logged Recovery Model.  For recovery to point-in-time, transaction log backups are needed, as well as required when in Full recovery to maintain the log files.  By default, the Model database is set to Full recovery model which dictates how new databases are created.  This means that any database you create without specifying default properties will adopt the Model’s recovery model.  A common practice is to alter the Model database and set the recovery model to Simple.  This will prevent out-of-control log growth when these types of backups are not put in place. </p>
+<p><strong>Partial Backup</strong> – Partial backups are primarily used when all you want is in the primary filegroup of a database.  This leaves all the other filegroups out of the backup and reduces the size of the overall backup file.  </p>
+<p><strong>File backups</strong> &#8211; File backups help with large databases and recovering only portions of the database. They are exactly what they are named: a method for backing up a file or filegroup in a SQL Server database. Given that some databases exceed the Terabyte size, a File backup can be very useful in protecting critical tables as one chunk in a File backup. They also can be used in ETL operations for a quick backup strategy and rollback point while not needing to recover an entire database if corruption occurs.</p>
+<h2>Last Resort Recovery</h2>
+<p>While taking backups into consideration in DR strategies, there is one primary goal: get them offsite. Database backups will not help a DBA recover if they are located on the same systems and in the same location as the primary databases. In order for backups to become a DR strategy, we need to get them offsite. This can include another location that only has one server powering a disk array, or a complete mirror of the data center itself. The backups will not help us if </p>
+<ol>
+<li>They are not run</li>
+<li>They are in the same site as the disaster</li>
+</ol>
+<p>Although backups are the foundation of DR, they are a slow method of restoring the databases. For Terabyte databases, a backup and restore can take several hours.  This downtime is money lost. Given the restore times, backups should complement DR with all the other strategies put in place to recover. Backups are the almighty in terms recovering when all else fails.     </p>
+<h2>Location of backups</h2>
+<p>
+The location of the backups is important in order to make them helpful in DR. The backups will always be required to be offsite from the primary locations, without exception. This includes all of the sites and their own unique databases. This means that each location can become a DR site for others for retaining the backup files offsite. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/back_rec_diagram.gif" alt="" title="" width="826" height="352" /></div>
+<p>In the diagram above, database servers A and B on Site 1 rely on the offsite backups on Site 2 for recovery. Site 2, however, has a local application and database server C that is unique to the facility. Having this database exist at Site 1 would be not utilizing resources well and could cause performance problems for the application in Site 2. In order to bring server C into the DR strategy, the database backups are sent offsite to Site 1.</p>
+<p>Getting backups offsite can consist of a few methods.  </p>
+<ol>
+<li>Backup to tape and physically ship them offsite</li>
+<li>Backup to repositories and move them on designated network lines or off hours</li>
+<li>Backup directly to the offsite via UNC paths</li>
+</ol>
+<p>Backing up to tape has been a common practice since the mainframe heydays.  It is cost effective and with newer tape abilities, multi-Terabyte single tapes can hold and retain data with expected shelf life of 50 to 100 years.   <a href="http://en.wikipedia.org/wiki/Linear_Tape-Open">LTO</a> truly has come a long way.  </p>
+<h2>Getting our backup file with BACKUP</h2>
+<p>
+The <a href="http://technet.microsoft.com/en-us/library/ms186865.aspx">BACKUP DATABASE</a> statement can be daunting at first glance so can the SSMS wizard and options.  </p>
+<p>Example:  Create a database DBA and we will run a full backup on it</p>
+<pre>CREATE DATABASE TEST_DR_BACKUP 
+GO
+ALTER DATABASE TEST_DR_BACKUP SET RECOVERY FULL
+GO</pre>
+<p>Now that we have a database to backup, let&#8217;s execute a typical full backup statement</p>
+<pre>BACKUP DATABASE TEST_DR_BACKUP
+TO DISK = N'C:TEST_DR_BACKUP.BAK'
+GO</pre>
+<p>This gives us a backup file in the C drive of TEST_DR_BACKUP.BAK.  The backup contains everything we need to recover the database as is.  If you notice, this backup statement was pretty quick.  If we add CHECKSUM and the COPY_ONLY option to this statement, the execution time will be slightly longer.</p>
+<pre>BACKUP DATABASE TEST_DR_BACKUP
+TO DISK = N'C:TEST_DR_BACKUP.BAK'
+WITH CHECKSUM,COPY_ONLY
+GO</pre>
+<p>Looking into the statement, we have several options to make our backups, &#8220;smart&#8221;.  One method that is extremely useful in DR is the COPY_ONLY option.  By using the COPY_ONLY option, we can create full backups of a database without affecting the LSN order in other backup strategies.  This is a powerful option given the need to get backups offsite while we are using backup strategies locally for other things.  </p>
+<p>Crude but effective copy methods with batch files, .NET development and even manual efforts can also be used for moving the existing backup files.  Automating these tasks is always a key operation to put into place.  Backup/Restore operations take time and the time of a DBA is expensive when you consider all the tasks we need to cover in our day-to-day operations.  Later, we will go over a proven automated strategy and feature in SQL Server.
+</p>
+<h2>Actually making a backup</h2>
+<p>
+Running backups can be as simple or complex as you want it to be.  In order to accomplish backup/restore as a recovery method, all that is needed is disk space or tape resources.  In some cases a lot of disk space will be required, but compression can bring the cost of these requirements down to a level that is much more manageable.  </p>
+<p>We also have options that can assist in preventing future problems by allowing DBAs to be proactive.  CHECKSUM option is one extremely useful option but has its own overhead on the backup executions.  CHECKSUM will allow you to detect media issues while performing the backup.  This will completely verify each page and detect if the page is torn.  Using CHECKSUM alone will cause the backup to fail and log an error of the media problems.  In order to prevent the error from stopping the backup operation, we can use the CONTINUE_AFTER_ERROR option.  This would allow the DBA to attempt a restore of the database to further detect the extent of the page errors along with compile a strategy for repairing them in the originating database.
+</p>
+<p>
+The second statement that can be used is the RESTORE VERIFYONLY statement.  This can be done after the backup has run completely, and will verify the page checksums without actually restoring the database itself.  It is important to understand that this is useful information but not a replacement for a complete restore test.  </p>
+<p>Example: We have a Full backup located at C:sql_full_backupdbadba_full_20100606.bak</p>
+<p>We could test this backup set by issuing the follow RESTORE VERIFYONLY statement</p>
+<pre>RESTORE VERIFYONLY
+FROM DISK = N'C:sql_full_backupdbadba_full_20100606.bak'
+GO </pre>
+<p>Resulting in the following information if errors are not found</p>
+<p><span class="MT_smaller">The backup set on file 1 is valid.</span></p>
+<p>In case of a torn page, the information would be written along with the page location.  This would allow us to go farther into the problem and formulate the repair steps.
+</p>
+<h2>Restore is part of the backup</h2>
+<p>
+For backups in DR to be useful, we must test them by restoring them on a consistent schedule.   Every backup has differences as does every database.  Those differences are the state of the data and the state of the hardware when the backup was taken.  Hardware problems can cause torn pages in a database and these issues will follow through to the backups.  If a backup was completely successful and things like CHECKSUM (defined earlier) are not used to log errors, a backup can possibly fail to restore successfully and more importantly, become useless in a recovery plan.  Best practice would be to restore every Full Backup and test the recovering levels of differentials and log backups in a Full Recovery model.  </p>
+<p>Automating these restore tests can help the process greatly.  SQL Server Integration Services has the facilities to do this for you.  Let’s look at a method with SSIS that can accomplish automating the restore process and reporting.  </p>
+<blockquote><p>Note: large databases will add complexity and even inabilities to use these methods.  File backups and other means that prevent automation will apply but should not forego testing by restoring.</p></blockquote>
+<p>Finding backups could be accomplished dynamically with expressions and variables.  For example, the backup file naming convention could us YYYYMMDD designating the day the backup was run.  A variable expression is used to find the specific file we want as</p>
+<pre>"C:\sql_full_backup\dba\dba_full_" +
+(DT_STR, 4, 1252)DATEPART("yyyy", @[System::ContainerStartTime]) + 
+RIGHT("0" + (DT_STR, 2, 1252)DATEPART("mm", @[System::ContainerStartTime]), 2) + 
+RIGHT("0" + (DT_STR, 2, 1252)DATEPART("dd", @[System::ContainerStartTime]), 2) + ".bak"</pre>
+<p>This can then be added to a File System Task for Copy as the source (as well as used in destinations). </p>
+<p>This package can then be run on the same day as the Full backup to find the correct file to perform our tasks on.  </p>
+<p>We can construct our package to perform the copy, restore the database and notify us of a successful restore or failures along the way.  After this is completed, we can also run ALTER statements on the restore location in order to put it into a state it will not cause problems (i.e.: log growth)  or run other application specific needs that may be part of our DR solution.  </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_restoring.gif" alt="" title="" width="298" height="286" align="center" /></div>
+<p>Running this process weekly (or on the Full backup day) can show problems that may otherwise not be found.  This will prevent the day when the backups are called into action for recovery when all other DR strategies have failed.</p>
+<h2>Closing with homework to read and practice</h2>
+<p>Given the abilities in the features available, the tasks of having backups offsite for DR are simplified greatly.  Backups are a cost effective and sound method for DR and HA recovery but only when tested out completely.  </p>
+<p>Make backups, make them often and test them by restoring them often.  Lastly, get them offsite even if that means paying for the storage of tapes.  </p>
+<p>Going farther:<br />
+<a href="http://technet.microsoft.com/en-us/library/ms175477.aspx">Technet, Backup Overview</a></p>
+<p><a href="http://msdn.microsoft.com/en-us/library/ms186865.aspx">BOL, BACKUP (Transact-SQL)</a></p>
+<p><a href="http://www.sqlskills.com/BLOGS/PAUL/post/Sample-corrupt-databases-to-play-with.aspx">Paul Randal’s corrupt database for testing</a></p>
+<blockquote><p>Why did I link to Paul&#8217;s corrupt database?  This is a valuable resource to test on.  Through backup and restore and through all of this week of blogs, use this database to really see if you can recover using a DR or HA strategy. </p></blockquote>
+<p>
+If you liked this SQL University post, please take a moment to fill out the <a href="https://spreadsheets.google.com/a/sqlchicken.com/viewform?hl=en&amp;formkey=dDBoSW02QldrTTc2dER3WVZheUlEX3c6MQ#gid=0">SQL University Course Evaluation</a> and select HA/DR Week.  Thank you!<br />
+<a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-university-and-why-you-should-be-att">SQL University and why you should be attending</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/the-sql-server-backup-foundation-of-any/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Mirroring Hands On with Developer Edition</title>
+		<link>/index.php/datamgmt/datadesign/sql-server-2008-mirroring-setup/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-server-2008-mirroring-setup/#comments</comments>
+		<pubDate>Sun, 09 May 2010 22:33:29 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[high availability]]></category>
+		<category><![CDATA[mirroring]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/sql-server-2008-mirroring-setup/</guid>
+		<description><![CDATA[Time to get Dirty!  Today we are going to get down into actually configuring a basic mirror using Developer Edition.  Developer Edition is a great tool that is extremely inexpensive.]]></description>
+				<content:encoded><![CDATA[<h2>Time to get our hands dirty</h2>
+<p>
+We&#8217;ve gone over <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/selling-a-mirror-short">Planning your hardware for SQL Server Mirroring</a> and <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/beef-is-in-the-mirror">Planning your SQL Server mirroring landscape</a>.  Today we are going to get down into actually configuring a basic mirror using Developer Edition.  Developer Edition is a great tool that is extremely inexpensive.  At the time of this writing, <a href="http://www.amazon.com/SQL-Server-2008-Developer-Edition/dp/B001B8EZR4">the cost was still only $47</a>.</p>
+<p>To set our mirror up we will need two instances.  The instances for our examples will be located on the same physical hardware.  </p>
+<blockquote><p>Note: Catch number one in this lab setup; when configuring mirroring in which the mirror, principal and/or witness are on the same physical machine, ensure that your endpoint ports are configured so each entry point is aware of its own path.  Example: You principal, mirror or witness cannot share the same port of 5022.   </p></blockquote>
+<p>
+When configuring mirroring, replication or log shipping on one local machine; be sure to document your configurations for each HA or DR test.  Documentation can save you from false errors and testing not functioning as it should.  Not doing this often will cause you headaches trying to debug configurations when in reality; the configuration problem is simply a problem with the instances colliding.</p>
+<p>So for example with this mirroring lab we are configuring, you may want to list something like the following</p>
+<ul>
+<li>Instance DEV2008_MIRRORLAB</li>
+<li>Using Port 7088 for Mirroing ENDPOINT</li>
+<li>Service Credentials set for security (account name)</li>
+<li>Mirroring set to High Performance mode</li>
+<li>Database in setup is AdventureWorks</li>
+</ul>
+<p>When setting up mirroring there are two points to troubleshoot if the mirror will not start synchronizing.  Those are:</p>
+<ol>
+<li>Restore of the tail log wasn’t done or successful – restore procedure as a whole</li>
+<li>Firewall preventing the endpoints from talking – test telnet to your ports</li>
+</ol>
+<p>Below is the setup used if you want to follow along exactly while configuring your own lab.</p>
+<ul>
+<li>Primary: SQL Server 2008 Developer Edition.  Named Instance: MACHINE2008DEV</li>
+<li>Secondary: SQL Server 2008 Developer Edition.  Named Instance: MACHINE2008DEVMIRROR</li>
+<li>Secondary: SQL Server 2008 Express Edition.  Named Instance: MACHINESQLEXPRESS</li>
+</ul>
+<p>The Express version of this setup will act as the witness for certain configurations we will work together on.  The database we will configure in these examples will be AdventureWorks.  This database is available for free download for SQL Server 2008 on <a href="http://msftdbprodsamples.codeplex.com/releases/view/37109">Codeplex</a></p>
+<p>
+We are going to jump right into setting the mirror up.  Our first configuration will step through showing how to set synchronous mirroring up with safety off.  This is also known as High Protection.  The reason for this configuration is to have confidence in your HA solution will commit all the data changes to the mirror before allowing a return command to the calling source.   </p>
+<h2>The preparation</h2>
+<p>
+In order to ensure the databases we want to mirror are ready for mirroring itself, we need to check a few things first.  Full recovery is a requirement of mirroring.  This is required for logging purposes.  To check that the AdventureWorks database is in Full Recovery, we can run the following</p>
+<pre>IF (DATABASEPROPERTYEX('AdventureWorks', 'RECOVERY') &lt;&gt; 'FULL')
+ BEGIN
+  ALTER DATABASE AdventureWorks SET RECOVERY FULL
+ END;
+ 
+--SELECT DATABASEPROPERTYEX('AdventureWorks', 'RECOVERY')</pre>
+<p>If you have an existing AdventureWorks database on the SQL Server you will be using for the mirror, you will need to know the mdf, ldf and any ndf’s and their locations.  </p>
+<p>You can check for these files using sysaltfiles</p>
+<pre>SELECT * FROM master.dbo.sysaltfiles</pre>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_0.gif" alt="" title="" width="478" height="89" /></div>
+</p>
+<p>
+Backing up the principal to get the mirror ready is the next major piece to preparation.  Without the full backup and any logs or differentials in between the tail end log backup, we will not be able to get the mirror into a synchronized state in which the process can successfully match where the logging is.  </p>
+<p>To create the Full and Tail end log backups, execute the following </p>
+<pre>BACKUP DATABASE AdventureWorks TO DISK = 'C:AdventureWorks_full_initial.bak'
+GO
+BACKUP LOG AdventureWorks TO DISK = 'C:AdventureWorks_taillog_initial.trn'
+GO</pre>
+<p><p>
+We can now restore the database to the mirror SQL Server.  In the case of our AdventureWorks database, we have two file groups as well.  These files groups pose no complication to the mirroring landscape other than they need to exist on the mirror as well as the principal.  The only place we need to reference them is in the restore of the database as well.</p>
+<pre>RESTORE DATABASE AdventureWorks 
+FROM DISK = 'C:AdventureWorks_full_initial.bak'
+WITH NORECOVERY,
+MOVE 'AdventureWorks_Data' TO N'C:sql2008NEEDTOMOVE_mirror.mdf',
+MOVE 'AdventureWorks_log' TO N'C:sql2008NEEDTOMOVE_mirror_log.ldf',
+MOVE 'YearF1' TO 'C:sql2008AdventureWork_YearF1.ndf',
+MOVE 'YearF2' TO 'C:sql2008AdventureWork_YearF2.ndf'
+,REPLACE,NORECOVERY
+GO
+RESTORE LOG AdventureWorks FROM DISK = 'C:AdventureWorks_taillog_initial.trn' WITH NORECOVERY
+GO</pre>
+</p>
+<h2>Jump right into configuring the mirror</h2>
+<p><h1>One way (SSMS)</h1>
+<p>Right click the database from Object Explorer and select Properties.</p>
+<p>In the Database Properties dialog, select Mirroring. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_1.gif" alt="" title="" width="525" height="469" /></div>
+<p>To set mirroring up we must go into the “Configure Security” wizard.   This is slightly off on what it means.  In this wizard we will in all, setup security, endpoints and the location of the instances.</p>
+<p>The first tab will ask if we want a witness or not.  A witness can be located on the mirror if needed but given the *free* status of SQL Express, it is a good choice to use as a witness.  This is best located off both the principal and mirror instances. </p>
+<p>We will select No here but by default it is set to Yes.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_2.gif" alt="" title="" width="546" height="491" /></div>
+<p>On the next screen we jump right into the principal instance selection.  The settings will be pre-filled out given the instance you started the wizard from.  The only change we will make here is the port to 7088</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_3.gif" alt="" title="" width="546" height="491" /></div>
+<p>At the next screen we will need to connect to the server that will act as our mirror.  </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_4.gif" alt="" title="" width="517" height="479" /></div>
+<p>Once the instance, change the port number to 7089.</p>
+<p>Security follows for both instances.  Enter the service accounts for your own environment and click, Next.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_5.gif" alt="" title="" width="535" height="481" /></div>
+<p>Once security is configured, the mirroring setup is complete.  Clicking Finish will complete the configuration.  This will also create the endpoints on the instances in order to start mirroring. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_6.gif" alt="" title="" width="535" height="481" /></div>
+<p></p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_7.gif" alt="" title="" width="376" height="153" /></div>
+<p>Once you exit the wizard, a dialog will come up asking if you want to start the mirror.  At this point we want to do the start up process so click Start.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_8.gif" alt="" title="" width="456" height="299" /></div>
+<p>Check it out, it works!</p>
+<pre>select * from sys.database_mirroring where mirroring_guid is not null</pre>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/setupmirror_9.gif" alt="" title="" width="628" height="127" /></div>
+</p>
+<p>
+In the real world, the mirroring_state_desc will say &#8220;Synchronizing&#8221; much longer than the amount of time it takes to execute this query.  The initial startup of the mirroring requires it to catch up, and with larger databases that are active, the synchronizing status can last minutes.<br />
+We now have a mirroring running in High Protection.  </p>
+<p>As with 99% of all SQL Server configurations, we can do this all with TSQL as well.  In some cases DBAs prefer this as it may expose options that are harder to get to from the wizards.  </p>
+<h2>The other way? T-SQL</h2>
+<p>To do this in TSQL the steps are much shorter.   Following the script below we can execute a series of statement to set the ENDPOINTs up, backup and restore the databases along with start the mirror by directing the partnership to each other.<br />
+Follow the steps commented to ensure each is executed on the correct instance.  </p>
+<p>First, to clean up the previous mirroring session we setup from SSMS, remove mirroring by executing this statement from the principal.  </p>
+<pre>ALTER DATABASE AdventureWorks SET PARTNER OFF;</pre>
+<p>Then drop the endpoints on both the principal and mirror by using </p>
+<pre>DROP ENDPOINT [Mirroring]</pre>
+<p>Use the BACKUP and RESTORE scripts and steps as discussed in the beginning of this post to prepare the databases for mirroring. </p>
+<p>Then run the following on the instances listed in comments and the order noted</p>
+<pre>--On the principle run
+--1
+CREATE ENDPOINT [Mirroring] 
+    AUTHORIZATION [service_account]
+    STATE=STARTED
+    AS TCP (LISTENER_PORT = 7088, LISTENER_IP = ALL)
+    FOR DATA_MIRRORING (ROLE = PARTNER, AUTHENTICATION = WINDOWS NEGOTIATE
+, ENCRYPTION = REQUIRED ALGORITHM RC4)
+--On the mirror run
+--2
+CREATE ENDPOINT [Mirroring] 
+    AUTHORIZATION [service_account]
+    STATE=STARTED
+    AS TCP (LISTENER_PORT = 7089, LISTENER_IP = ALL)
+    FOR DATA_MIRRORING (ROLE = PARTNER, AUTHENTICATION = WINDOWS NEGOTIATE
+, ENCRYPTION = REQUIRED ALGORITHM RC4)
+--3
+ALTER DATABASE AdventureWorks SET PARTNER= N'TCP://fully.qualified.domain.name.com:7088'
+
+--On the principle run
+--4
+ALTER DATABASE AdventureWorks SET PARTNER= N'TCP://fully.qualified.domain.name.com:7089'
+
+--on both instances
+--5 + 6
+EXEC sys.sp_dbmmonitoraddmonitoring</pre>
+<p>
+</p>
+<h2>Moving on with mirroring</h2>
+<p>
+We&#8217;ve managed to setup our mirror together and show that our data is all synchronized.  This is truly a huge accomplishment and you can see just how simple the base setup can be.  There is flexibility in using SSMS for the entire process or moving into TSQL.  For a High Availability solution, SQL Server mirroring can give you plenty of confidence in knowing the day a disaster to your server happens, your company can keep moving. </p>
+<p>Part 2 in the mirroring series will go over using the other two types of mirroring (High Availability and High Performance) and certificates for mirroring.
+</p></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-server-2008-mirroring-setup/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Planning your hardware for SQL Server Mirroring</title>
+		<link>/index.php/datamgmt/datadesign/selling-a-mirror-short/</link>
+		<comments>/index.php/datamgmt/datadesign/selling-a-mirror-short/#comments</comments>
+		<pubDate>Tue, 04 May 2010 11:26:08 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[high availability]]></category>
+		<category><![CDATA[mirroring]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/selling-a-mirror-short/</guid>
+		<description><![CDATA[Hardware can be a single point of high performance and a single point of failure.  In a mirroring situation, there is not a listing we can put on paper as to the best hardware and configuration we can make.  Each database server is configured as it requires for IO operations, memory usage etc…  RAID 1+0 would give you write performance on the mirror but at the cost of what if you database server that is active is on RAID 5?]]></description>
+				<content:encoded><![CDATA[<h2>A goal?</h2>
+<p>
+The second part to the mirroring series will discuss hardware selection.  Hardware can be a single point of high performance and a single point of failure.  In a mirroring situation, there is not a listing we can put on paper as to the best hardware and configuration we can make.  Each database server is configured as it requires for IO operations, memory usage etc…  RAID 1+0 would give you write performance on the mirror but at the cost of what if you database server that is active is on RAID 5?   We could also state that configuring the mirror instances hardware for high write and logging operations would be the best case scenario.  This of course would make the concept of a High Availability landscape performance better for us.  Remember that the application in the HA landscape must wait for SQL Server to commit on all sides of the mirroring instances prior to returning output.
+ </p>
+<p>
+As you can sense in the above statements, there is a resounding, “But” coming.  First, let’s define a mirror and the true description of High Availability.  </p>
+<p>High Availability has one goal.  That goal is to protect us from a disaster with limited disruption to our state of the business and data services provided.  No downtime!  In order to achieve that primary objective with mirroring, we must plan for the event the mirror itself becomes the primary source of data services.  Now, given a configuration of a mirror to allow for the absolute best performance we can imagine while in a synchronizing state, we can successfully achieve a high performance mirroring solution.  However, if we failover, does this configuration fit into our primary objective of limited interruption to the data going to the business?  In many cases, the answer to that question is no.
+</p>
+<h2>Let’s get to the point.</h2>
+<p>
+When configuring your hardware for your principal SQL Server instance, we spend countless hours making the hardware fit the aspects of the way data is written and retrieved for our unique variables.  Each component of the hardware set is chosen for the reasons of making the primary objective of serving the data to the business in the highest performing way that it can.  <strong><i>In the case when a mirror is introduced to this, hardware must be identical to the principal</i></strong>.  Yes, there is a higher cost in mirroring than initially thought.  That cost is the hardware you begged for in order to ignore the primary SQL Server(s) that runs the business.   There is some catches in your proposals for added cost of the mirror hardware.  Remember, licensing is still setup for SQL Server in which your mirror does not have to be licensed while completely acting as a mirror.  In an enterprise landscape, that can equate to thousands of dollars saved.  Thanks to Microsoft for that layout and please, never change it.
+</p>
+<p>
+Why does hardware need to be identical when it can possibly hurt the performance of the logging operations that goes along with a mirrored database?  The answer is quite simple.  Consider the event you failover to your mirror and the primary server has taken the, “worst case scenario”.  Always plan for the worst case scenario!  This is the event that we will make your heart jump out of your chest because you realize that the server is completely lost.   In this event, the mirror has quickly become your single largest data services asset to the business and there is no date set for the primary server being replaced.
+</p>
+<p>
+At this point if your mirror is configured to save costs and stripped to the bones, the phone will start ringing from the horrible performance that the business endures.  Even if the hardware is present on the mirror to handle the normal day-to-day transactions, if the mirror is configured outside the planned configurations that the primary once had, you will find yourself struggling to keep the performance of the mirror at the high level the primary was at.  In a worst case scenario the mirror then would require hours of reconfiguring it to perform to the business needs.  For instance, if we had 30GB of RAM on the principal but went cheap with 4GB on the mirror due to the mirror underutilizing RAM, the affects after the mirror becomes the principal would be extreme.   During that time, reboots would be prevalent and several minutes if not hours of downtime would follow.  We just lost our objective and failed to provide the solutions we needed to.   So when configuring and planning the hardware for your SQL Server mirror, sell the entire HA solution to the business to acquire the funds needed to be successful even in the event the mirror becomes the principal.
+</p>
+<h2>When the day is done</h2>
+<p></p>
+<p align="center">In the end when your principal database server looks like this</p>
+<p><div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/hardware_1.gif" alt="" title="" width="254" height="166" /></div>
+<p></p>
+<p align="center">Don’t mirror it to this</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/hardware_2.gif" alt="" title="" width="305" height="34" /></div>
+</p>
+<p></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/selling-a-mirror-short/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Planning your SQL Server mirroring landscape</title>
+		<link>/index.php/datamgmt/datadesign/beef-is-in-the-mirror/</link>
+		<comments>/index.php/datamgmt/datadesign/beef-is-in-the-mirror/#respond</comments>
+		<pubDate>Mon, 03 May 2010 12:29:15 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[high availability]]></category>
+		<category><![CDATA[mirroring]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/beef-is-in-the-mirror/</guid>
+		<description><![CDATA[Researching and obtaining the knowledge and test cases for configuring mirroring is a large part in putting SQL Server mirroring to work for your High Availability (HA) solution.  Before you start jumping into configuring mirroring, several questions should be researched and answered.  This ensures that the HA solution and mirroring will work for your environment and your business.  One of the highest achievements in mirroring is to ensure it will always be invisible to your user community.  After all, as DBAs, our position is one that truly is successful when the phones are not ringing and users forget who we are.  Our positions have little to no recognition from their view.  It’s a hard truth that we most of the time are far outside the spotlight, but one that is key to the role.]]></description>
+				<content:encoded><![CDATA[<p>
+Researching and obtaining the knowledge and test cases for configuring mirroring is a large part in putting SQL Server mirroring to work for your High Availability (HA) solution.  Before you start jumping into configuring mirroring, several questions should be researched and answered.  This ensures that the HA solution and mirroring will work for your environment and your business.  One of the highest achievements in mirroring is to ensure it will always be invisible to your user community.  After all, as DBAs, our position is one that truly is successful when the phones are not ringing and users forget who we are.  Our positions have little to no recognition from their view.  It’s a hard truth that we most of the time are far outside the spotlight, but one that is key to the role.
+</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt//mirror_plan_1.gif" alt="" title="" width="404" height="304" /></div>
+<h2>The business</h2>
+<p>Making HA invisible not only makes recovering seamless, responsive and allows for the business to achieve its own goals of making money but keeps the spotlight pointing in the right direction.<br />
+<br />
+A few key points to think about in the planning stages of mirroring start with the business.</p>
+<ul>
+<li>Does my business need to be “mirror aware”?</li>
+<li>If so, what actions and support do we need to successfully failover to the mirror?</li>
+</ul>
+<p>This is the utmost crucial point in why we put HA in the background.  The business needs to run.  That’s the fundamental basis for why HA is ever considered as an objective.  Don’t forget to have them involved in this planning.  If they are not and the business entities are required to be part in a failover, the situation simply adds a scenario that causes delay.</p>
+<h2>The backbone</h2>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt//mirror_plan_2.gif" alt="" title="" width="369" height="278" /></div>
+<ul>
+<li>Have in place the network backbone to handle the mirroring and full recovery</li>
+</ul>
+<p>Now let’s take a look at and even more critical part to the mirroring planning stages; the network.  Take a scenario of an index maintenance task.  When an index rebuilds, it causes a large amount of information to be written to the transaction logs.  This information in a mirroring landscape, no matter critical or not, is then sent to the mirror.  Is the rebuild maintenance handles several gigabytes of data, all of this will be sent across the network at the time of the maintenance.  You can already see, even in an off hour maintenance time, the amount of data that is being sent could very well could flood the network and send the mirror into a state of synchronizing.  This leaves vulnerability in your recovery plans.  </p>
+<h2>Time to learn</h2>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt//mirror_plan_3.gif" alt="" title="" width="313" height="210" /></div>
+<ul>
+<li>SQL Server mirroring research and knowledge</li>
+</ul>
+<p>The decision process must happen now from the SQL Server skills side.  Mirroring is not a hard HA solution to setup and manage.  Not many will argue that from a SQL Server perspective.  However, mirroring on the surface may seem simplistic, but the under armor of the HA solution has many points of failure if not thought out ahead of time.  </p>
+<p>Let’s take a look at a few of these “under armor” options.  First we look into the true safety on, full automated failover mirroring landscape.  In order to be success in implementing a automatic failover mirroring solution in SQL Server, you need 3 key pieces in place</p>
+<p>Principal, Mirror and Witness</p>
+<p>This solution will also require a synchronous mirroring mode.  In short, this requires committing of transactions on the mirror (and principal) prior to the application being sent the “ok” to move on.  If you are in a situation where that data being committed is large enough, the network comes back into contention as a major performance aspect.  The application itself will also be required to handle this delay.  Again, if the data and processing is extremely large in size or complex, timeouts can be more relevant than previously considered. </p>
+<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt//mirror_plan_4.gif" alt="" title="" width="254" height="205" align="left" /></div>
+<p>Next we can move to a performance added mirroring solution that runs in asynchronous mode.  High performance mirroring is only an option in Enterprise Editions.  There are no future changes for adding Standard to this feature.  Now cost is a major factor.   We all want Enterprise, but do we really need it?  With asynchronous (High Performance) mirroring, there is also no built in automatic failover options.  Although there are methods to get around this with monitoring the state of mirroring and acting on your own scheduled jobs to handle “automatic failover”, at this point it truly isn’t automatic.  In some cases asynchronous mirroring with your own failover scripts can be beneficial.  Finding your mirror in a state that you require a failover of your applications allows you to start reconfiguring them as needed.  Having the Failover switch in connection strings simply is not an option often.  This requires either registry changes, custom provider reconfiguring and in some cases, security modifications to handle the mirror successfully being utilized.<br />
+Synchronous mirroring can take on a different approach to safety as well.  In short, we can have safety without automated failover.  This type of landscape is good for environments that have the infrastructure and application support to handle the commit overhead of synchronous mirroring while not requiring or wanting automation of a witness.  Instead of reacting to a failover, we can react and failover.  This promotes a cleaner and more stable failover in theory.  </p>
+<p>All methods of mirroring have their place in your particular setup.  SQL Server allows us just enough options to allow us to manage a HA backbone to our data services.  </p>
+<p>The problems then would be? </p>
+<p>There are some issues with mirroring in general that can be addressed with utilizing the resources in the mirror itself. With Enterprise, we have snapshot capabilities.  This is extended by having the ability to run snapshots on our mirror databases.  With this we open reporting solutions off data sources that limit the problems that go along with reporting on OLTP based systems.  There are drawbacks to snapshots in asynchronous mirroring however.  Often, asynchronous mirroring leaves the mirror in “synchronizing” state.  This means the log is in a mode that we cannot issue a snapshot off of.  Keep this in mind when your database is large enough to the point a snapshot may take some time to create.  You will be required to snap the database at a period of low transaction times in order to prevent problems in the mirror itself.  </p>
+<h2>Hardware, hardware and more hardware</h2>
+<p>
+Hardware is the last in planning stages.  What type of system do I need to be successful in a mirroring landscape?  This question is asked often.  The recommendation for this is the mirror hardware as much as you mirror the databases.  If you have planned out and sized the hardware on the principal already, don’t skimp on the mirror.  In the case of a disaster in the event HA takes over and the mirror becomes the principal, the last thing wanted is a underpowered mirror that has only been sized enough to handle the mirroring itself.
+</p>
+<h2>By the end of the day</h2>
+<p>
+After all the planning and configurations have been put in place, SQL Server mirroring solutions will be sound and stable.  This allows for better sleeping and peace of mind that the systems can react on their own to what the nature of computing can throw at it.
+</p>
+</p>
+<p>This will start a series of blogs on mirroring from a request I received.  They will consists of the following topics so look for them to come</p>
+<ul>
+<li>Planning your SQL Server mirroring landscape</li>
+<li>Planning your hardware for SQL Server Mirroring</li>
+<li>Mirroring landscape hands on with Developer Edition</li>
+<li>Mirroring the default instance and other endpoint catches</li>
+<li>Mirroring modes (to sync or async)</li>
+<li>Customizing your failover routines in Mirroring</li>
+<li>Abuse your mirror for other tasks</li>
+</ul></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/beef-is-in-the-mirror/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>ldf &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/ldf/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Transaction Log expanding on restore after shrink</title>
+		<link>/index.php/datamgmt/dbprogramming/transaction-log-size-cold-shrink-ldf/</link>
+		<comments>/index.php/datamgmt/dbprogramming/transaction-log-size-cold-shrink-ldf/#comments</comments>
+		<pubDate>Thu, 27 May 2010 09:54:56 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[backup]]></category>
+		<category><![CDATA[ldf]]></category>
+		<category><![CDATA[restore]]></category>
+		<category><![CDATA[shrinkfile]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[transaction log]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/transaction-log-size-cold-shrink-ldf/</guid>
+		<description><![CDATA[The topic really does cause pain.  Shrinking a file in SQL Server is inherently a terrible action to take.  However, we all know that in some cases when maintenance was never setup and recovery models were not properly chosen, the need does come up.  An interesting topic came up on LTD today regarding moving an overloaded and unmaintained log file to a server that had less disk space than the original.  The first inclination would be to shrink the log and then backup/restore it to the new location.  Seeing as the full backup consists of the data and just enough log to recover, the assumption would be that you would only get this in the new database.  However, in this case, shrinking the log will not be the last step in the process.  The initial size of the log will also need to change.]]></description>
+				<content:encoded><![CDATA[<h2>My favorite topic, &#8220;The SHRINK!&#8221;</h2>
+<p>The topic really does cause pain.  Shrinking a file in SQL Server is inherently a terrible action to take.  However, we all know that in some cases when maintenance was never setup and recovery models were not properly chosen, the need does come up.  An interesting <a href="http://forum.lessthandot.com/viewtopic.php?f=17&amp;t=10917">topic</a> came up on LTD in the forums regarding moving an overloaded and unmaintained log file to a server that had less disk space than the original.  The first inclination would be to shrink the log and then backup/restore it to the new location.  Seeing as the full backup consists of the data and just enough log to recover, the assumption would be that you would only get this in the new database.  However, in this case, shrinking the log will not be the last step in the process.  The initial size of the log will also need to change.  </p>
+<h2>Let’s take a look…</h2>
+<p>
+In this case let’s say we have a database that is 300MB with a transaction log that is 3000MB.  </p>
+<p>The database is a test log shipping database we will pick on named, “LOGSHIP_PUB”</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/shrunk_1.gif" alt="" title="" width="628" height="134" /></div>
+<p>We can see by Size that we have the 300MB mdf and 3000MB log file.  </p>
+<p>Now assuming we ran a shrinkfile on the log file, we could use DBCC SQLPERF(logspace) to check the logs free space. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">table</span> #temp <span class="br0">&#40;</span>DatabaseName sysname, LogSize <span class="kw1">float</span>, SpaceUsedPerc <span class="kw1">float</span>, Status <span class="kw1">bit</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> #temp <span class="kw1">EXEC</span> <span class="br0">&#40;</span><span class="st0">'dbcc sqlperf(logspace)'</span><span class="br0">&#41;</span>
+<span class="kw1">select</span> SpaceUsedPerc <span class="kw1">from</span> #temp <span class="kw1">where</span> DatabaseName <span class="sy0">=</span> <span class="st0">'LOGSHIP_PUB'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create table #temp (DatabaseName sysname, LogSize float, SpaceUsedPerc float, Status bit)
+insert #temp EXEC ('dbcc sqlperf(logspace)')
+select SpaceUsedPerc from #temp where DatabaseName = 'LOGSHIP_PUB'</pre></div></div>
+
+<p>Resulting in 0.028… give or take a few thousands places.</p>
+<p>The initial thought may be to run a backup now and move the database over.   You should see if you run a full backup on the database, the size will only be around 2MB.  </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/shrunk_2.gif" alt="" title="" width="594" height="27" /></div>
+<p>The problem we will run into will be when this backup is restored.  Even knowing the backup shows the 2MB, this is only the data and log to the point of recovering retained in the backup.  You may find yourself copying this backup considering the restore to be limited to what is in it.  What will happen is the restore will take the Meta for the database and create the initial sizes for the files contained in it.  This will result in a required space of all the files initial sizes.  In our case that totals 3300MB + the padding required.  </p>
+<p>Best way to see is by example so let’s restore the database.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">RESTORE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>LOGSHIP_PUB_SECONDARY<span class="br0">&#93;</span> <span class="kw1">FROM</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'C:LOGSHIP_PUB_FULL.bak'</span> 
+&nbsp; &nbsp; <span class="kw1">WITH</span> &nbsp;<span class="kw1">FILE</span> <span class="sy0">=</span> <span class="nu0">1</span>, &nbsp;
+&nbsp; &nbsp; MOVE N<span class="st0">'LOGSHIP_PUB'</span> <span class="kw1">TO</span> N<span class="st0">'C:LOGSHIP_PUB_SECONDARY.mdf'</span>, &nbsp;
+&nbsp; &nbsp; MOVE N<span class="st0">'LOGSHIP_PUB_log'</span> <span class="kw1">TO</span> N<span class="st0">'C:LOGSHIP_PUB_SECONDARY_1.ldf'</span>, &nbsp;
+&nbsp; &nbsp; NOUNLOAD, &nbsp;<span class="kw2">REPLACE</span>, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">10</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">RESTORE DATABASE [LOGSHIP_PUB_SECONDARY] FROM  DISK = N'C:LOGSHIP_PUB_FULL.bak' 
+	WITH  FILE = 1,  
+	MOVE N'LOGSHIP_PUB' TO N'C:LOGSHIP_PUB_SECONDARY.mdf',  
+	MOVE N'LOGSHIP_PUB_log' TO N'C:LOGSHIP_PUB_SECONDARY_1.ldf',  
+	NOUNLOAD,  REPLACE,  STATS = 10
+GO</pre></div></div>
+
+<p>First thing we may notice is the time this restore takes.  It will be slightly more than expected from a 300MB database.  Your typical IO should give this in around a 2-3 seconds but given the need to expand the log(s) and any other files that may consist in the restore, the time will be lengthened slightly.  Of course this varies given different resources and even more when compression is involved.<br />
+Our successful restore…</p>
+<blockquote><p>SQL Server parse and compile time:<br />
+   CPU time = 0 ms, elapsed time = 1 ms.<br />
+63 percent processed.<br />
+100 percent processed.<br />
+Processed 200 pages for database &#8216;LOGSHIP_PUB_SECONDARY&#8217;, file &#8216;LOGSHIP_PUB&#8217; on file 1.<br />
+Processed 1 pages for database &#8216;LOGSHIP_PUB_SECONDARY&#8217;, file &#8216;LOGSHIP_PUB_log&#8217; on file 1.<br />
+RESTORE DATABASE successfully processed 201 pages in 93.555 seconds (0.016 MB/sec).</p></blockquote>
+<p>Checking our size and space utilized we should see the same results from the initial database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Select</span> <span class="br0">&#91;</span><span class="kw1">size</span><span class="br0">&#93;</span>,<span class="br0">&#91;</span>name<span class="br0">&#93;</span>,<span class="br0">&#91;</span>filename<span class="br0">&#93;</span> <span class="kw1">from</span> sysaltfiles</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Select [size],[name],[filename] from sysaltfiles</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/shrunk_3.gif" alt="" title="" width="543" height="50" /></div>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/shrunk_4.gif" alt="" title="" width="628" height="141" /></div>
+</p>
+<h2>So the bottom-line…</h2>
+<p>
+Moving databases using backup/restore is a good method if your activity allows for this method.  Just ensure a few things</p>
+<ul>
+<li>If log maintenance was not performed and you are stuck in Full recovery while finding the need for a shrink, you can do this successfully without a truncate_only but don’t forget to resize your files.</li>
+<li>Do the full backup after the resize to prevent longer restores and maintaining the disk usage you really require.</li>
+<li>A well maintained transaction log structure will prevent all of this.  You will know precisely the sizing requirements at this level.</li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/transaction-log-size-cold-shrink-ldf/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+	</channel>
+</rss>

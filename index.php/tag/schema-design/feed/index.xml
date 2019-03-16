@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>schema design &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/schema-design/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Server Types &#8211; Numeric vs Int</title>
+		<link>/index.php/datamgmt/datadesign/sql-server-types-numeric-vs-int/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-server-types-numeric-vs-int/#comments</comments>
+		<pubDate>Thu, 02 Sep 2010 12:20:43 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[schema design]]></category>
+		<category><![CDATA[sqlcop]]></category>
+		<category><![CDATA[tip]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/09/sql-server-types-numeric-vs-int/</guid>
+		<description><![CDATA[As I was working on a database yesterday I came across a curious sight, multiple columns defined as numeric(7,0), numeric(9,0), and so on. It seemed like someone was trying to provide the database with the most specific definition possible for a number of different pieces of data. Having never run into this particular practice, I immediately started searching for a reason. Was it smaller? faster? better?]]></description>
+				<content:encoded><![CDATA[<p>Generally when we are defining tables, the more specific the column definition the better. Yesterday, however, I ran into a case where better definition actually has increased storage use for no appreciable benefit.</p>
+<h2>Integers &#8211; Using Numeric vs Int</h2>
+<p>As I was working on the database I came across a curious sight, multiple columns defined as numeric(7,0), numeric(9,0), and so on. It seemed like someone was trying to provide the database with the most specific definition possible for a number of different pieces of data. Having never run into this particular practice, I immediately started searching for a reason. Was it smaller? faster? better?</p>
+<h3>Storage</h3>
+<p>Using a very specific, well-defined numeric has actually cost us storage space, not reduced it.  A numeric (or decimal) with a precision value of 1 to 9 requires 5 bytes and with 10-19 requires 9 bytes. Compare this to the many varieties of int:</p>
+<div class="tables">
+<table>
+<tr>
+<th>Digits</th>
+<th>Int Variety</th>
+<th>Int Bytes</th>
+<th>Numeric(*,0) Bytes</th>
+<th>Difference</th>
+</tr>
+<tr>
+<td>1 &#8211; 2</td>
+<td>tinyint</td>
+<td>1</td>
+<td>5</td>
+<td>4 bytes</td>
+</tr>
+<tr>
+<td>3 &#8211; 4</td>
+<td>smallint</td>
+<td>2</td>
+<td>5</td>
+<td>3 bytes</td>
+</tr>
+<tr>
+<td>5 &#8211; 9</td>
+<td>int</td>
+<td>4</td>
+<td>5</td>
+<td>1 byte</td>
+</tr>
+<tr>
+<td>10 &#8211; 18</td>
+<td>bigint</td>
+<td>8</td>
+<td>9</td>
+<td>1 byte</td>
+</tr>
+</table>
+</div>
+<p>So for every row and every index that includes this value, we lose storage space.</p>
+<p>References: <a href="http://msdn.microsoft.com/en-us/library/ms187745.aspx" title="Int reference on MSDN">Int reference on MSDN</a> and <a href="http://msdn.microsoft.com/en-us/library/ms187746.aspx" title="Numeric/Decimal reference on MSDN">Numeric/Decimal reference on MSDN</a></p>
+<h3>Performance #1</h3>
+<p>When SQL Server is asked to execute a math function (+,-,*,/), it uses a defined set of rules to determine the output type, then implicitly converts the arguments to that type (see <a href="http://msdn.microsoft.com/en-us/library/ms190476.aspx" title="Precision, Scale, and Length article on MSDN">this article</a> for a subset that relates to decimals). This means that in many cases there could be implicit conversions to numeric from int, so it&#8217;s possible someone believed we could try and tweak our performance by defining the field as numeric instead of an int. </p>
+<p>Let&#8217;s test out implicit conversions:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+</pre></td><td class="de1"><pre class="de1"><span class="coMULTI">/* ****** Creation of some number tables ****** */</span>
+<span class="kw1">Create</span> <span class="kw1">Table</span> NumberIntTest<span class="br0">&#40;</span>Num <span class="kw1">Int</span> <span class="kw1">Identity</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">Primary</span> <span class="kw1">Key</span><span class="br0">&#41;</span>
+go
+&nbsp;
+<span class="kw1">Set</span> <span class="kw1">NOCOUNT</span> <span class="kw1">ON</span>
+<span class="kw1">Begin</span> <span class="kw1">Tran</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberIntTest <span class="kw1">Default</span> <span class="kw1">Values</span>
+<span class="kw1">Commit</span> <span class="kw1">Tran</span>
+go <span class="nu0">100000</span>
+&nbsp;
+<span class="kw1">Create</span> <span class="kw1">Table</span> NumberNumericTest<span class="br0">&#40;</span>Num <span class="kw1">numeric</span><span class="br0">&#40;</span><span class="nu0">7</span>,<span class="nu0">0</span><span class="br0">&#41;</span> <span class="kw1">Primary</span> <span class="kw1">Key</span><span class="br0">&#41;</span>
+Go
+&nbsp;
+<span class="kw1">Set</span> <span class="kw1">NOCOUNT</span> <span class="kw1">ON</span>
+<span class="kw1">Begin</span> <span class="kw1">Tran</span>
+&nbsp; &nbsp; <span class="kw1">Insert</span> <span class="kw1">Into</span> NumberNumericTest<span class="br0">&#40;</span>Num<span class="br0">&#41;</span> <span class="kw1">Select</span> Num <span class="kw1">From</span> NumberIntTest <span class="kw1">WHERE</span> Num <span class="sy0">&gt;</span> <span class="nu0">10001</span>
+<span class="kw1">Commit</span> <span class="kw1">Tran</span>
+Go
+&nbsp;
+<span class="coMULTI">/* ****** Execute a variety of test scripts ****** */</span>
+<span class="kw1">DECLARE</span> @<span class="kw1">Start</span> <span class="kw1">DateTime</span>;
+<span class="kw1">DECLARE</span> @Garbage <span class="kw1">int</span>, @Junk <span class="kw1">numeric</span><span class="br0">&#40;</span><span class="nu0">7</span>,<span class="nu0">0</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">DECLARE</span> @<span class="kw1">Int</span> <span class="kw1">int</span>; <span class="kw1">SET</span> @<span class="kw1">Int</span> <span class="sy0">=</span> <span class="nu0">1</span>;
+<span class="kw1">DECLARE</span> @Num <span class="kw1">numeric</span><span class="br0">&#40;</span><span class="nu0">7</span>,<span class="nu0">0</span><span class="br0">&#41;</span>; <span class="kw1">SET</span> @Num <span class="sy0">=</span> <span class="nu0">1</span>;
+&nbsp;
+<span class="co1">-- Divide an int by an int</span>
+<span class="kw1">SELECT</span> @<span class="kw1">start</span> <span class="sy0">=</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>;
+<span class="kw1">SELECT</span> @Garbage <span class="sy0">=</span> Num<span class="sy0">/</span>@<span class="kw1">Int</span> <span class="kw1">FROM</span> NumberIntTest n;
+<span class="kw1">SELECT</span> <span class="kw2">DateDiff</span><span class="br0">&#40;</span>Millisecond, @<span class="kw1">Start</span>, <span class="kw2">GetDate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="co1">-- Divide a numeric(7,0) by an int</span>
+<span class="kw1">SELECT</span> @<span class="kw1">start</span> <span class="sy0">=</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>;
+<span class="kw1">SELECT</span> @Junk <span class="sy0">=</span> Num<span class="sy0">/</span>@<span class="kw1">Int</span> <span class="kw1">FROM</span> NumberNumericTest n;
+<span class="kw1">SELECT</span> <span class="kw2">DateDiff</span><span class="br0">&#40;</span>Millisecond, @<span class="kw1">Start</span>, <span class="kw2">GetDate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="co1">-- Divide a numeric(7,0) by a numeric(7,0)</span>
+<span class="kw1">SELECT</span> @<span class="kw1">start</span> <span class="sy0">=</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>;
+<span class="kw1">SELECT</span> @Junk <span class="sy0">=</span> Num<span class="sy0">/</span>@Num <span class="kw1">FROM</span> NumberNumericTest n;
+<span class="kw1">SELECT</span> <span class="kw2">DateDiff</span><span class="br0">&#40;</span>Millisecond, @<span class="kw1">Start</span>, <span class="kw2">GetDate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="co1">-- Divide an int by an int w/ explicit casting to numeric</span>
+<span class="kw1">SELECT</span> @<span class="kw1">start</span> <span class="sy0">=</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>;
+<span class="kw1">SELECT</span> @Junk <span class="sy0">=</span> Num<span class="sy0">/</span><span class="kw1">CAST</span><span class="br0">&#40;</span>@<span class="kw1">Int</span> <span class="kw1">as</span> <span class="kw1">numeric</span><span class="br0">&#40;</span><span class="nu0">7</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> NumberIntTest n;
+<span class="kw1">SELECT</span> <span class="kw2">DateDiff</span><span class="br0">&#40;</span>Millisecond, @<span class="kw1">Start</span>, <span class="kw2">GetDate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="co1">-- Divide an numeric(7,0) by an int w/ explicit casting</span>
+<span class="kw1">SELECT</span> @<span class="kw1">start</span> <span class="sy0">=</span> <span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span>;
+<span class="kw1">SELECT</span> @Junk <span class="sy0">=</span> Num<span class="sy0">/</span><span class="kw1">CAST</span><span class="br0">&#40;</span>@<span class="kw1">Int</span> <span class="kw1">as</span> <span class="kw1">numeric</span><span class="br0">&#40;</span><span class="nu0">7</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> NumberNumericTest n;
+<span class="kw1">SELECT</span> <span class="kw2">DateDiff</span><span class="br0">&#40;</span>Millisecond, @<span class="kw1">Start</span>, <span class="kw2">GetDate</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">/* ****** Creation of some number tables ****** */
+Create Table NumberIntTest(Num Int Identity(1,1) Primary Key)
+go
+
+Set NOCOUNT ON
+Begin Tran
+	Insert Into NumberIntTest Default Values
+	Insert Into NumberIntTest Default Values
+	Insert Into NumberIntTest Default Values
+	Insert Into NumberIntTest Default Values
+	Insert Into NumberIntTest Default Values
+	Insert Into NumberIntTest Default Values
+	Insert Into NumberIntTest Default Values
+	Insert Into NumberIntTest Default Values
+	Insert Into NumberIntTest Default Values
+	Insert Into NumberIntTest Default Values
+Commit Tran
+go 100000
+
+Create Table NumberNumericTest(Num numeric(7,0) Primary Key)
+Go
+
+Set NOCOUNT ON
+Begin Tran
+	Insert Into NumberNumericTest(Num) Select Num From NumberIntTest WHERE Num &gt; 10001
+Commit Tran
+Go
+
+/* ****** Execute a variety of test scripts ****** */
+DECLARE @Start DateTime;
+DECLARE @Garbage int, @Junk numeric(7,0);
+
+DECLARE @Int int; SET @Int = 1;
+DECLARE @Num numeric(7,0); SET @Num = 1;
+
+-- Divide an int by an int
+SELECT @start = GETDATE();
+SELECT @Garbage = Num/@Int FROM NumberIntTest n;
+SELECT DateDiff(Millisecond, @Start, GetDate());
+
+-- Divide a numeric(7,0) by an int
+SELECT @start = GETDATE();
+SELECT @Junk = Num/@Int FROM NumberNumericTest n;
+SELECT DateDiff(Millisecond, @Start, GetDate());
+
+-- Divide a numeric(7,0) by a numeric(7,0)
+SELECT @start = GETDATE();
+SELECT @Junk = Num/@Num FROM NumberNumericTest n;
+SELECT DateDiff(Millisecond, @Start, GetDate());
+
+-- Divide an int by an int w/ explicit casting to numeric
+SELECT @start = GETDATE();
+SELECT @Junk = Num/CAST(@Int as numeric(7,0)) FROM NumberIntTest n;
+SELECT DateDiff(Millisecond, @Start, GetDate());
+
+-- Divide an numeric(7,0) by an int w/ explicit casting
+SELECT @start = GETDATE();
+SELECT @Junk = Num/CAST(@Int as numeric(7,0)) FROM NumberNumericTest n;
+SELECT DateDiff(Millisecond, @Start, GetDate());</pre></div></div>
+
+<p>Initially I compared the execution plans and didn&#8217;t see much difference, but after some modifications (thanks George!) and additions we can see the differences between a number of different situations.</p>
+<p>Sample Results:</p>
+<div class="tables">
+<table>
+<tr>
+<th>Test</th>
+<th>time (ms)</th>
+</tr>
+<tr>
+<td>int/int &#8211; No Cast</td>
+<td>170</td>
+</tr>
+<tr>
+<td>numeric/int &#8211; Implicit Cast</td>
+<td>313</td>
+</tr>
+<tr>
+<td>numeric/numeric &#8211; Implicit Cast</td>
+<td>296</td>
+</tr>
+<tr>
+<td>int/CAST(int as numeric) &#8211; Implicit Cast</td>
+<td>320</td>
+</tr>
+<tr>
+<td>numeric/CAST(int as numeric)</td>
+<td>290</td>
+</tr>
+</table>
+</div>
+<p>In the second test&#8217;s plan we can see an example of that implicit cast:</p>
+<pre>numeric/int w/ Implicit Cast:
+
+  |--Compute Scalar(DEFINE:([Expr1002]=CONVERT_IMPLICIT(numeric(7,0),[utils].[dbo].[NumberNumericTest].[Num] as [n].[Num]/CONVERT_IMPLICIT(numeric(10,0),[@Int],0),0)))
+       |--Clustered Index Scan(OBJECT:([utils].[dbo].[NumberNumericTest].[PK__NumberNu__C7D08B630AD2A005] AS [n]))</pre>
+<p>So if we did have an integer that we need to operate on with a float value (the last case), the addition of a simple cast on the integer argument will bring the execution performance in line with having two numerics, meaning there is no gain in storing the value as a numeric(7,0).</p>
+<h3>Performance #2</h3>
+<p>The other potential performance impact is with auto-parameterization. Auto-parameterization occurs when you provide SQL Server with a non-parameterized SQL statement. The server determines a type for those parameters and parameterizes them (part of the magic that makes plans reusable for non-parameterized queries). I couldn&#8217;t find anything terribly recent, but as far back as SQL Server 6.5 and 7.0 the engine was documented as using the int type for any non-decimal value of 9 digits or less. This means that in the unlikely situation that you&#8217;re executing inline, non-parameterized SQL statements and have used numeric(*,0) types in your table definitions, you will actually be taking a performance hit for the implicit conversion from auto-parameterized integer to the numeric(*,0) field.</p>
+<p>And if that wasn&#8217;t bad enough, the same SQL Server documentation says that SQL Server treats integers as more exact than numeric and decimal types. It doesn&#8217;t specify why the document goes out of its way to share this information with us, but generally when someone goes out of their way to point out something like this in a document, I get a little nervous and tend to focus more heavily on their &#8216;recommended&#8217; practice (use int).</p>
+<p>More information on <a href="http://msdn.microsoft.com/en-us/library/ms186219.aspx" title="MSDN article on Simple Parameterization">Parameterization</a> and <a href="http://support.microsoft.com/kb/198625" title="KB article on SQL 7 Comparison Optimization">SQL 7 Comparison Optimization</a></p>
+<h2>The Wrap-up</h2>
+<p>So at the end of the day, using a numeric(*,0) requires more space, provides no appreciable benefit over explicit casting, and can actually harm you if you are executing non-parameterized SQL statements against your server.</p>
+<p>There are two options for finding these columns, using a SQL query like the one below or <a href="http://sqlcop.lessthandot.com/" title="Download the SQLCop application">downloading SQLCop</a> to check for this and many other common situations.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE, NUMERIC_PRECISION, NUMERIC_SCALE
+<span class="kw1">FROM</span> <span class="sy0">IN</span>F<span class="sy0">OR</span>MATION_SCHEMA.<span class="me1">COLUMNS</span> C
+<span class="kw1">WHERE</span> C.<span class="me1">DATA_TYPE</span> <span class="sy0">IN</span> <span class="br0">&#40;</span><span class="st0">'numeric'</span>,<span class="st0">'decimal'</span><span class="br0">&#41;</span> <span class="sy0">AND</span> NUMERIC_SCALE <span class="sy0">=</span> <span class="nu0">0</span> <span class="sy0">AND</span> NUMERIC_PRECISION <span class="sy0">&lt;=</span> <span class="nu0">18</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE, NUMERIC_PRECISION, NUMERIC_SCALE
+FROM INFORMATION_SCHEMA.COLUMNS C
+WHERE C.DATA_TYPE IN ('numeric','decimal') AND NUMERIC_SCALE = 0 AND NUMERIC_PRECISION &lt;= 18</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-server-types-numeric-vs-int/feed/</wfw:commentRss>
+		<slash:comments>14</slash:comments>
+		</item>
+	</channel>
+</rss>

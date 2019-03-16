@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>business intelligence &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/business-intelligence-2/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>How to drop a Temporal Table</title>
+		<link>/index.php/uncategorized/how-to-drop-a-temporal-table/</link>
+		<comments>/index.php/uncategorized/how-to-drop-a-temporal-table/#comments</comments>
+		<pubDate>Fri, 03 Jul 2015 07:39:59 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[sql 2016]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[syndicated]]></category>
+		<category><![CDATA[temporal table]]></category>
+
+		<guid isPermaLink="false">/?p=3465</guid>
+		<description><![CDATA[No no, I didn&#8217;t say temporary, but temporal! SQL Server 2016 introduces a great new feature called Temporal Tables. Or in other words, system-versioned tables. We&#8217;ll see what catches on. In a gist, such a table keeps track of the history of its rows by the use of some audit columns (start and end date) [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify">No no, I didn&#8217;t say <em>temporary</em>, but <strong>temporal</strong>! SQL Server 2016 introduces a great new feature called <strong>Temporal Tables</strong>. Or in other words, system-versioned tables. We&#8217;ll see what catches on. In a gist, such a table keeps track of the history of its rows by the use of some audit columns (start and end date) and a history table. Sounds a bit like the love child of Change Data Capture and a Type 2 dimension.</p>
+<p style="text-align: justify">Anyway, I was testing this feature a bit (more specifically if they supported computed columns as promised in CTP 2.1) and I created a temporal table with the following query:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">TestTemporal</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span>ID <span class="kw1">int</span> <span class="kw1">primary</span> <span class="kw1">key</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,A <span class="kw1">int</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,B <span class="kw1">int</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,C <span class="kw1">AS</span> A <span class="sy0">*</span> B
+&nbsp; &nbsp; &nbsp; &nbsp; ,SysStartTime datetime2 GENERATED ALWAYS <span class="kw1">AS</span> <span class="kw1">ROW</span> <span class="kw1">START</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,SysEndTime datetime2 GENERATED ALWAYS <span class="kw1">AS</span> <span class="kw1">ROW</span> <span class="kw1">END</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,PERIOD <span class="kw1">FOR</span> SYSTEM_TIME <span class="br0">&#40;</span>SysStartTime,SysEndTime<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">WITH</span><span class="br0">&#40;</span>SYSTEM_VERSION<span class="sy0">IN</span>G <span class="sy0">=</span> <span class="kw1">ON</span><span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE dbo.TestTemporal
+		(ID int primary key
+		,A int
+		,B int
+		,C AS A * B
+		,SysStartTime datetime2 GENERATED ALWAYS AS ROW START NOT NULL
+		,SysEndTime datetime2 GENERATED ALWAYS AS ROW END NOT NULL
+		,PERIOD FOR SYSTEM_TIME (SysStartTime,SysEndTime)) WITH(SYSTEM_VERSIONING = ON);</pre></div></div>
+
+<p style="text-align: justify">This code only works in CTP2.1, not in earlier versions of SQL 2016 because of the computed column specification.<br />
+Anyway, of course I forgot to set my database so this table was created in the master database. I wanted to drop it, but I was greeted with this lovely message:</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2015/07/errormessage.png"><img class="alignnone size-full wp-image-3466" src="/wp-content/uploads/2015/07/errormessage.png" alt="errormessage" width="716" height="151" srcset="/wp-content/uploads/2015/07/errormessage.png 716w, /wp-content/uploads/2015/07/errormessage-300x63.png 300w" sizes="(max-width: 716px) 100vw, 716px" /></a></p>
+<p style="text-align: justify">Even the <em>Delete</em> action was missing from the table&#8217;s context menu.</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2015/07/nodelete.png"><img class="alignnone size-full wp-image-3467" src="/wp-content/uploads/2015/07/nodelete.png" alt="nodelete" width="312" height="364" srcset="/wp-content/uploads/2015/07/nodelete.png 312w, /wp-content/uploads/2015/07/nodelete-257x300.png 257w" sizes="(max-width: 312px) 100vw, 312px" /></a></p>
+<p style="text-align: justify">A quick look on the MSDN page <a href="https://msdn.microsoft.com/en-us/library/dn935015.aspx">Temporal Tables</a> teaches us that dropping a system-versioned table is a <em>disallowed Alter Schema operation</em>. No luck there. The answer came, as usual, through Twitter:</p>
+<blockquote class="twitter-tweet" lang="en">
+<p dir="ltr" lang="en"><a href="https://twitter.com/Ko_Ver">@Ko_Ver</a> did you try to remove temporal setting before dropping it?</p>
+<p>— Janos Berke (@JanosBerke) <a href="https://twitter.com/JanosBerke/status/615491933146861568">June 29, 2015</a></p></blockquote>
+<p style="text-align: justify">Turning the system-versioning off and dropping the table is the answer to our question (and to about any schema operation you want to do on a system-versioned table). If we execute such an ALTER TABLE script, we get the following:</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2015/07/after_alter.png"><img class="alignnone size-full wp-image-3468" src="/wp-content/uploads/2015/07/after_alter.png" alt="after_alter" width="830" height="99" srcset="/wp-content/uploads/2015/07/after_alter.png 830w, /wp-content/uploads/2015/07/after_alter-300x35.png 300w" sizes="(max-width: 830px) 100vw, 830px" /></a></p>
+<p style="text-align: justify">The temporal table is reduced to a normal table, which means it can be dropped as a normal table. But the history table is kept as well. This means you can always re-enable system-versioning if you want to.<br />
+The name of the history table is dbo.MSSQL_TemporalHistoryFor_xxx, where xxx is the object id of the main table. Something to keep in mind if you want to automate scripts. Or just specify a friendly name when enabling system-versioning.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/how-to-drop-a-temporal-table/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>PASS BI VC recording is available now</title>
+		<link>/index.php/uncategorized/pass-bi-vc-recording-is-available-now/</link>
+		<comments>/index.php/uncategorized/pass-bi-vc-recording-is-available-now/#respond</comments>
+		<pubDate>Fri, 05 Dec 2014 12:18:57 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[SSIS]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[data warehouse]]></category>
+		<category><![CDATA[etl]]></category>
+		<category><![CDATA[pass]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[ssis]]></category>
+		<category><![CDATA[virtual chapter]]></category>
+
+		<guid isPermaLink="false">/?p=3115</guid>
+		<description><![CDATA[The recording of the webinar I did for the PASS BI virtual chapter is live! (Quick reminder: it was the same session as on the SQLServerDays: How to (not) torment your fellow SSIS developer?) I&#8217;m quite pleased with the recording, although I sound like a drunk German scientist sometimes. The slides can be downloaded here. Let [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>The recording of the <a href="/index.php/datamgmt/ssis/pass-bi-vc-how-to-not-torment-your-fellow-ssis-developer/">webinar </a>I did for the PASS BI virtual chapter is live!<br />
+(Quick reminder: it was the same session as on the SQLServerDays: <a style="color: #c04623" href="/index.php/uncategorized/speaking-at-sql-server-days-2014/">How to (not) torment your fellow SSIS developer?</a>)</p>
+<p>I&#8217;m quite pleased with the recording, although I sound like a drunk German scientist sometimes.</p>
+<p><iframe width="500" height="281" src="https://www.youtube.com/embed/-N7gxmAdceM?feature=oembed" frameborder="0" allowfullscreen></iframe></p>
+<p>The slides can be downloaded <a href="http://www.slideshare.net/KoenVerbeeck/sql-server-days-2014-how-to-not-torment-your">here</a>.</p>
+<p>Let me know in the comments if you like it or not!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/pass-bi-vc-recording-is-available-now/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Overview of Published Articles – 2014Q3</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/overview-of-published-articles-2014q3/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/overview-of-published-articles-2014q3/#comments</comments>
+		<pubDate>Fri, 24 Oct 2014 08:53:46 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[SSAS]]></category>
+		<category><![CDATA[SSIS]]></category>
+		<category><![CDATA[SSRS]]></category>
+		<category><![CDATA[articles]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[ssas]]></category>
+		<category><![CDATA[ssis]]></category>
+		<category><![CDATA[ssrs]]></category>
+		<category><![CDATA[tips]]></category>
+
+		<guid isPermaLink="false">/?p=3024</guid>
+		<description><![CDATA[Here is an overview of the articles I published in the third quarter of 2014. INTENSE SCHOOL MCSE Prep (SQL) – Using Parameters in Reporting Services Reports (Part 2) Book Review: SQL Server 2012 Integration Services Design Patterns MSSQLTIPS Adding Custom Reports to SQL Server Management Studio More Text Analysis with the SSIS Term Lookup [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Here is an overview of the articles I published in the third quarter of 2014.</p>
+<p><strong>INTENSE SCHOOL</strong></p>
+<ul>
+<li><a href="http://resources.intenseschool.com/mcse-prep-sql-using-parameters-in-reporting-services-reports-part-2/">MCSE Prep (SQL) – Using Parameters in Reporting Services Reports (Part 2)</a></li>
+<li><a href="http://resources.intenseschool.com/book-review-sql-server-2012-integration-services-design-patterns/">Book Review: SQL Server 2012 Integration Services Design Patterns</a></li>
+</ul>
+<p><strong>MSSQLTIPS</strong></p>
+<ul>
+<li><a href="http://www.mssqltips.com/sqlservertip/3291/adding-custom-reports-to-sql-server-management-studio/">Adding Custom Reports to SQL Server Management Studio</a></li>
+<li><a href="http://www.mssqltips.com/sqlservertip/3315/more-text-analysis-with-the-ssis-term-lookup-component/">More Text Analysis with the SSIS Term Lookup Component</a></li>
+<li><a href="http://www.mssqltips.com/sqlservertip/3356/custom-ssms-report-to-show-sql-server-tables-per-filegroup/">Custom SSMS report to show SQL Server tables per filegroup</a></li>
+</ul>
+<p>I have two more tips in the pipeline, one about formatting durations in SSAS and one about creating box plots in SSRS, so keep an eye on the <a href="http://www.mssqltips.com/">MSSQLTips</a> website.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/overview-of-published-articles-2014q3/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Tableau Data Visualization Cookbook – Review</title>
+		<link>/index.php/datamgmt/tableau-data-visualization-cookbook-review/</link>
+		<comments>/index.php/datamgmt/tableau-data-visualization-cookbook-review/#comments</comments>
+		<pubDate>Fri, 08 Aug 2014 11:48:45 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Book Review]]></category>
+		<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Data Management]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[data visualization cookbook]]></category>
+		<category><![CDATA[dataviz]]></category>
+		<category><![CDATA[review]]></category>
+		<category><![CDATA[syndicated]]></category>
+		<category><![CDATA[tableau]]></category>
+
+		<guid isPermaLink="false">/?p=2895</guid>
+		<description><![CDATA[After my review of Tableau Dashboard Cookbook, I read another book about Tableau, namely Tableau Data Visualization Cookbook by Ashutosh Nandeshwar. The book is published by Packt but I am relieved to say this time there were no significant editing issues. In fact it is quite well written and as far as I could tell [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify">After my review of <a href="/index.php/webdev/business-intelligence/tableau-dashboard-cookbook-by-jen-stirrup/">Tableau Dashboard Cookbook</a>, I read another book about Tableau, namely <a href="http://amzn.to/1RzPjkU">Tableau Data Visualization Cookbook</a> by Ashutosh Nandeshwar. The book is published by Packt but I am relieved to say this time there were no significant editing issues. In fact it is quite well written and as far as I could tell there were no spelling mistakes or typos (yeah those things can really bug me out when reading a book).</p>
+<p style="text-align: justify">The book promises “Over 70 recipes for creating visual stories with your data using Tableau”. That sounds like a lot and it is, because the book (the actual content, not counting preface, indexes …) is about 150 pages long. In other words, a little over 2 pages per recipe. In fact, I actually counted them (I have apparently nothing better to do). There are 74 recipes spread out over 147 pages, so 1.986 pages per recipe. Those are not long recipes. Some other numbers: the shortest recipe is 2 bullet points. It’s about adding a wildcard filter on a worksheet, but it actually builds upon a previous recipe, so it doesn’t count. The following scatter plot (created with Tableau of course) gives an overview of the various lengths of the recipes encountered in the book:</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/08/scatterplot.png"><img class="alignnone wp-image-2898" src="/wp-content/uploads/2014/08/scatterplot.png" alt="scatterplot" width="500" height="598" srcset="/wp-content/uploads/2014/08/scatterplot.png 573w, /wp-content/uploads/2014/08/scatterplot-250x300.png 250w" sizes="(max-width: 500px) 100vw, 500px" /></a></p>
+<p style="text-align: justify">There are quite a few very short recipes, which can easily be verified with a histogram:</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/08/histogram.png"><img class="alignnone wp-image-2897" src="/wp-content/uploads/2014/08/histogram.png" alt="histogram" width="500" height="521" srcset="/wp-content/uploads/2014/08/histogram.png 725w, /wp-content/uploads/2014/08/histogram-288x300.png 288w" sizes="(max-width: 500px) 100vw, 500px" /></a></p>
+<p style="text-align: justify">As you can notice, the distribution is a little bit skewed to the left (sorry for the sarcasm). Recipes with a length of 6 or shorter make up over 50% of the book. More statistics can be deduced from this box and whisker plot:</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/08/boxwhiskerplot.png"><img class="alignnone wp-image-2899" src="/wp-content/uploads/2014/08/boxwhiskerplot.png" alt="boxwhiskerplot" width="800" height="146" srcset="/wp-content/uploads/2014/08/boxwhiskerplot.png 973w, /wp-content/uploads/2014/08/boxwhiskerplot-300x54.png 300w" sizes="(max-width: 800px) 100vw, 800px" /></a></p>
+<p style="text-align: justify">What is my point in all this (aside from me giving the opportunity to myself to exercise creating some charts in Tableau)? The point is that this book is short and the recipes are too basic. 74 recipes in 150 pages, clearly the choice for quantity over quality has been made. It would have been much better if the bulk of those recipes were bundled into a few recipes who were longer but also more complex and challenging. Now most of the recipes just scratch the surface of a feature and never go into any depth. They are the equivalent of a recipe for boiling potatoes:</p>
+<ol style="text-align: justify">
+<li>Peel potatoes.</li>
+<li>Throw them in boiling water.</li>
+<li>Wait for 10 to 20 minutes, depending on type of potatoes.</li>
+<li>Bon appétit.</li>
+</ol>
+<p style="text-align: justify">Maybe in another chapter you get a recipe for cooking vegetables and in another for grilling meat, but you don’t get instructions to cook a lovely meal with all of the ingredients (and now I’m hungry…). There are three chapter dealing with almost the same basic stuff: creating visualizations with one measure, creating visualizations with two measures and finally creating visualizations with multiple measures. Those should be combined in one single chapter with just a couple of interesting recipes.</p>
+<p style="text-align: justify">Another issue is that the author sometimes doesn’t bother to give more information on how the resulting visualization should be interpreted (from time to time the resulting visualization looks nice, but is rubbish from a business perspective becomes it doesn’t really give useful insights). Anyway, this is just a detail. The author does include a lot of links to reference material however, which is certainly a big plus. He also gives some good advice about the different types of charts, for example what the downsides are of pie charts and stacked area charts and how to avoid them.</p>
+<p style="text-align: justify"><strong>Conclusion</strong></p>
+<p style="text-align: justify">The book is way too basic and this because of the overly simplistic recipes. Get this book only if you are an absolute beginner in Tableau and have never read anything about this tool or if you are an absolute novice in data visualizations tools. In my opinion, the <a href="/index.php/webdev/business-intelligence/tableau-dashboard-cookbook-by-jen-stirrup/">Tableau Dashboard Cookbook</a> by Jen Stirrup offers considerable more depth (despite the editing issues) and you’ll learn more tricks than in this book.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/tableau-data-visualization-cookbook-review/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Overview of Published Articles – 2014Q2</title>
+		<link>/index.php/webdev/business-intelligence/overview-of-published-articles-2014q2/</link>
+		<comments>/index.php/webdev/business-intelligence/overview-of-published-articles-2014q2/#respond</comments>
+		<pubDate>Wed, 09 Jul 2014 13:35:48 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[articles]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sqlfamily]]></category>
+
+		<guid isPermaLink="false">/?p=2822</guid>
+		<description><![CDATA[Here is an overview of the articles I published in the second quarter of 2014. Intense School MCSE Prep: The Integration Services Package and Project Deployment Models—Part 1 MCSE Prep: The Integration Services Package and Project Deployment Models—Part 2 MCSE Prep (SQL) – Using Parameters in Reporting Services Reports (Part 1) MSSQLTips Improve SSIS data [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Here is an overview of the articles I published in the second quarter of 2014.</p>
+<p><strong>Intense School</strong></p>
+<ul>
+<li><a href="http://resources.intenseschool.com/mcse-prep-the-integration-services-package-and-project-deployment-models-part-1/">MCSE Prep: The Integration Services Package and Project Deployment Models—Part 1</a></li>
+<li><a href="http://resources.intenseschool.com/mcse-prep-the-integration-services-package-and-project-deployment-models-part-2/">MCSE Prep: The Integration Services Package and Project Deployment Models—Part 2</a></li>
+<li><a href="http://resources.intenseschool.com/mcse-prep-using-parameters-in-reporting-services-reports-part-1/">MCSE Prep (SQL) – Using Parameters in Reporting Services Reports (Part 1)</a></li>
+</ul>
+<p><strong>MSSQLTips</strong></p>
+<ul>
+<li><a href="http://www.mssqltips.com/sqlservertip/3217/improve-ssis-data-flow-buffer-performance/">Improve SSIS data flow buffer performance</a></li>
+<li><a href="http://www.mssqltips.com/sqlservertip/3220/using-the-new-odata-source-in-sql-server-integration-services/">Using the New OData Source in SQL Server Integration Services</a></li>
+<li><a href="http://www.mssqltips.com/sqlservertip/3242/semiblocking-transformations-in-sql-server-integration-services-ssis/">Semi-blocking Transformations in SQL Server Integration Services SSIS</a></li>
+<li><a href="http://www.mssqltips.com/sqlservertip/3254/sorting-a-dimension-attribute-by-another-dimension-attribute-in-sql-server-analysis-services/">Sorting a dimension attribute by another dimension attribute in SQL Server Analysis Services</a></li>
+</ul>
+<p>Related posts:</p>
+<p><a href="/index.php/itprofessionals/professionaldevelopment/overview-of-published-articles-2014q1/">Overview of Published Articles – 2014Q1</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/business-intelligence/overview-of-published-articles-2014q2/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SSRS Nugget: displaying placeholders when no rows are returned</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/ssrs-nugget-displaying-placeholders-when-no-rows-are-returned/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/ssrs-nugget-displaying-placeholders-when-no-rows-are-returned/#comments</comments>
+		<pubDate>Thu, 15 May 2014 12:59:04 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[SSRS]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[reporting services]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[ssrs]]></category>
+		<category><![CDATA[syndicated]]></category>
+
+		<guid isPermaLink="false">/?p=2625</guid>
+		<description><![CDATA[A few days ago there was an interesting question on the forum: How can I get None in each cell of a table in the report if no rows are returned? If I use &#8220;No rows message&#8221; property, header is not displaying on the report but I would like to get headers along with &#8220;NONE&#8221; [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify"><span style="line-height: 1.5em">A few days ago there was an interesting question on the forum:</span></p>
+<blockquote><p>How can I get None in each cell of a table in the report if no rows are returned? If I use &#8220;No rows message&#8221; property, header is not displaying on the report but I would like to get headers along with &#8220;NONE&#8221; in each column if no rows returned.</p></blockquote>
+<p style="text-align: justify">So the “No rows message” property was not what the OP wanted. He still wanted to display the table with the header, but just a line with the value “None” for every cell. To test it out, I created a simple report pulling back some data from AdventureWorks. I used the following query:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp; &nbsp; &nbsp; &nbsp;ProductCategoryAlternateKey, EnglishProductCategoryName
+<span class="kw1">FROM</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;DimProductCategory;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT        ProductCategoryAlternateKey, EnglishProductCategoryName
+FROM            DimProductCategory;</pre></div></div>
+
+<p style="text-align: justify">Not exactly rocket science. This gives me the following tablix (I spent an insanely amount of time on the layout):</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/05/reportwithdata.png"><img class="alignnone size-full wp-image-2630" alt="reportwithdata" src="/wp-content/uploads/2014/05/reportwithdata.png" width="424" height="146" srcset="/wp-content/uploads/2014/05/reportwithdata.png 424w, /wp-content/uploads/2014/05/reportwithdata-300x103.png 300w" sizes="(max-width: 424px) 100vw, 424px" /></a></p>
+<p style="text-align: justify">What if the source query suddenly stops returning rows? I added WHERE 1 = 0 at the end of the query and I ran the report again (to remove caching, delete the .data cache file in the project folder).</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/05/reportonlyheader.png"><img class="alignnone size-full wp-image-2629" alt="reportonlyheader" src="/wp-content/uploads/2014/05/reportonlyheader.png" width="450" height="71" srcset="/wp-content/uploads/2014/05/reportonlyheader.png 450w, /wp-content/uploads/2014/05/reportonlyheader-300x47.png 300w" sizes="(max-width: 450px) 100vw, 450px" /></a></p>
+<p style="text-align: justify">Only the header is returned. Now we want to add a row with only “None” for values. To do this, we simply hardcode such a row into the table and only show it when necessary.</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/05/report_incorrect1.png"><img class="alignnone size-full wp-image-2628" alt="report_incorrect1" src="/wp-content/uploads/2014/05/report_incorrect1.png" width="448" height="103" srcset="/wp-content/uploads/2014/05/report_incorrect1.png 448w, /wp-content/uploads/2014/05/report_incorrect1-300x68.png 300w" sizes="(max-width: 448px) 100vw, 448px" /></a></p>
+<p style="text-align: justify">On the row visibility property, I used the following expression:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vb"><thead><tr><td colspan="2"  class="head">Visual Basic</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">=iif(CountRows() = 0,<span class="kw5">False</span>,<span class="kw5">True</span>)</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">=iif(CountRows() = 0,False,True)</pre></div></div>
+
+<p style="text-align: justify">You can find more info on CountRows <a href="http://technet.microsoft.com/en-us/library/ms156330(v=sql.100).aspx">here</a>. However, when I ran the report the extra row didn’t show up. Maybe I needed to add a scope as a parameter to the CountRows function? So I changed the expression to this, with <em>TablixTest</em> being the name of the Tablix:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vb"><thead><tr><td colspan="2"  class="head">Visual Basic</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">=iif(CountRows(“TablixTest”) = 0,<span class="kw5">False</span>,<span class="kw5">True</span>)</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">=iif(CountRows(“TablixTest”) = 0,False,True)</pre></div></div>
+
+<p style="text-align: justify">The line still didn’t show up. I changed the scope to <i>Detail</i> (in the hope it would count the detail lines), but no luck. To be honest, I don’t know much about scopes in SSRS. Then I had an idea: I added the extra row to the details of the tablix. What if I added it outside that group?</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/05/addrow_outsidegroup.png"><img class="alignnone size-full wp-image-2632" alt="addrow_outsidegroup" src="/wp-content/uploads/2014/05/addrow_outsidegroup.png" width="447" height="219" srcset="/wp-content/uploads/2014/05/addrow_outsidegroup.png 447w, /wp-content/uploads/2014/05/addrow_outsidegroup-300x146.png 300w" sizes="(max-width: 447px) 100vw, 447px" /></a></p>
+<p style="text-align: justify">I used the original expression again – without any scope &#8211; and when I ran the report, the row finally showed up!</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/05/reportwithoutdata.png"><img class="alignnone size-full wp-image-2631" alt="reportwithoutdata" src="/wp-content/uploads/2014/05/reportwithoutdata.png" width="430" height="77" srcset="/wp-content/uploads/2014/05/reportwithoutdata.png 430w, /wp-content/uploads/2014/05/reportwithoutdata-300x53.png 300w" sizes="(max-width: 430px) 100vw, 430px" /></a></p>
+<p style="text-align: justify">When the report is run again with rows returned, the line disappears as it should be.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/ssrs-nugget-displaying-placeholders-when-no-rows-are-returned/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Speaking at ITPROceed</title>
+		<link>/index.php/uncategorized/speaking-at-itproceed/</link>
+		<comments>/index.php/uncategorized/speaking-at-itproceed/#respond</comments>
+		<pubDate>Wed, 14 May 2014 11:14:27 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[bi]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[data visualization]]></category>
+		<category><![CDATA[itproceed]]></category>
+		<category><![CDATA[reporting services]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[ssrs]]></category>
+
+		<guid isPermaLink="false">/?p=2611</guid>
+		<description><![CDATA[I&#8217;m delighted to announce I will be giving a session at ITPROceed, a new event in Belgium for the IT Professional. From their website: ITPROceed is a joint effort between the ITProfessional User Groups with the strong support of Microsoft to bring you the best on the Cloud OS, System Center, SQL, Office 365, Windows [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;m delighted to announce I will be giving a session at <a href="http://www.itproceed.be/">ITPROceed</a>, a new event in Belgium for the IT Professional. From their website:</p>
+<blockquote><p>ITPROceed is a joint effort between the ITProfessional User Groups with the strong support of Microsoft to bring you the best on the Cloud OS, System Center, SQL, Office 365, Windows 8, Unified Communications, Lync, Azure and SharePoint.</p></blockquote>
+<p>My session is titled <em>Get More Out Of Your Data Visualizations</em>. The abstract is short and simple:</p>
+<p><em>With data you can tell important and compelling stories, if done right. In this session, we will review a few guidelines on how to create communicative visualizations and how this can be implemented in Excel and Reporting Services.<br />
+Because SSRS is often underestimated, we&#8217;ll finish off with some eye-catchers.</em></p>
+<p>There are other excellent sessions about SQL Server and Business Intelligence, so make sure to check out the <a href="http://www.itproceed.be/agenda">agenda</a>!<br />
+Tickets are almost sold out, so you better hurry!</p>
+<p><a href="http://www.itproceed.be/"><img class="alignnone size-full wp-image-2612" alt="itproceed_003" src="/wp-content/uploads/2014/05/itproceed_003.png" width="340" height="62" srcset="/wp-content/uploads/2014/05/itproceed_003.png 340w, /wp-content/uploads/2014/05/itproceed_003-300x54.png 300w" sizes="(max-width: 340px) 100vw, 340px" /></a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/speaking-at-itproceed/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Changing the 1000 separator in Power View</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/changing-the-1000-separator-in-power-view/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/changing-the-1000-separator-in-power-view/#respond</comments>
+		<pubDate>Tue, 11 Mar 2014 14:43:46 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Excel Reporting]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[SSRS]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[formatting]]></category>
+		<category><![CDATA[power bi]]></category>
+		<category><![CDATA[power view]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[syndicated]]></category>
+
+		<guid isPermaLink="false">/?p=2500</guid>
+		<description><![CDATA[Recently I was designing a simple Power View report on top of a multi-dimensional SSAS cube. Out of the box, one of the tables looked like this: For readability purposes, a 1000 separator is added to the numeric value. However, the comma was used, as is common in the United States. In Belgium (and other [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify">Recently I was designing a simple Power View report on top of a multi-dimensional SSAS cube. Out of the box, one of the tables looked like this:</p>
+<p style="text-align: justify"><a style="line-height: 1.5em" href="/wp-content/uploads/2014/03/Koen_Table1.png"><img class="alignnone size-full wp-image-2506" alt="Koen_Table1" src="/wp-content/uploads/2014/03/Koen_Table1.png" width="203" height="94" /></a></p>
+<p style="text-align: justify"><span style="line-height: 1.5em">For readability purposes, a 1000 se</span><span style="line-height: 1.5em">parator is added to the numeric value. However, the comma was used, as is common in the United States. In Belgium (and other countries in Europe), we use the single point as the 1000 separator and the comma as the decimal separator. Of course the business preferred to use the point as the separator. But where do we change this?</span></p>
+<p style="text-align: justify"><b>In Power View itself?</b></p>
+<p style="text-align: justify">When clicking on a cell in the table, you can change the formatting in the Home tab of the ribbon.</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/03/Koen_PowerViewFormat.png"><img class="alignnone size-full wp-image-2502" alt="Koen_PowerViewFormat" src="/wp-content/uploads/2014/03/Koen_PowerViewFormat.png" width="280" height="188" /></a></p>
+<p style="text-align: justify"><span style="line-height: 1.5em">First you have to set the type to </span><i style="line-height: 1.5em">Number</i><span style="line-height: 1.5em">, at which point you can select the </span><i style="line-height: 1.5em">comma style</i><span style="line-height: 1.5em">. Unfortunately, this only changes the type to </span><i style="line-height: 1.5em">Accounting</i><span style="line-height: 1.5em"> while using the same separators.</span></p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/03/Koen_Table2.png"><img class="alignnone size-full wp-image-2507" alt="Koen_Table2" src="/wp-content/uploads/2014/03/Koen_Table2.png" width="220" height="93" /></a></p>
+<p style="text-align: justify"><span style="line-height: 1.5em">There is no way to influence what kinds of separators are used. Remarkably, you can set the comma style on, but you cannot turn it off.</span></p>
+<p style="text-align: justify"><b>In the underlying cube?</b></p>
+<p style="text-align: justify">I vaguely remember that Excel from time to time picks up the formatting that is specified in the cube. Maybe Power View does the same. You can set the format string of a measure in the properties pane.</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/03/Koen_CubeFormat.png"><img class="alignnone size-full wp-image-2509" alt="Koen_CubeFormat" src="/wp-content/uploads/2014/03/Koen_CubeFormat.png" width="244" height="248" /></a></p>
+<p style="text-align: justify"><span style="line-height: 1.5em">This great article by Valentino Vranken (</span><a style="line-height: 1.5em" href="http://blog.hoegaerden.be/">blog</a><span style="line-height: 1.5em">|</span><a style="line-height: 1.5em" href="https://twitter.com/ValentinoV42">twitter</a><span style="line-height: 1.5em">) details the various options for format strings: </span><a style="line-height: 1.5em" href="http://blog.hoegaerden.be/2013/06/12/formatting-numbers-ssrs/">Formatting Numbers [SSRS]</a><span style="line-height: 1.5em">. Yes, it is about SSRS, but a lot of the concepts are true for other tools as well. However, when we delve deeper into </span><a style="line-height: 1.5em" href="http://msdn.microsoft.com/en-us/library/0c899ak8.aspx#SpecifierTh">custom format strings</a><span style="line-height: 1.5em">, it becomes clear that a format string does not dictate what symbol is used, but that this is determined by the culture. As per MSDN:</span></p>
+<p style="text-align: justify"><i>The NumberGroupSeparator and NumberGroupSizes properties of the current NumberFormatInfo object determine the character used as the number group separator and the size of each number group.</i></p>
+<p style="text-align: justify">So we need to look into the culture used when the Power View report is run. Since we are using Power View in SharePoint, it makes sense to take a look at SharePoint.</p>
+<p style="text-align: justify"><b>SharePoint to the rescue…</b></p>
+<p style="text-align: justify">Let’s take a look at the site settings.</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/03/Koen_SiteSettings.png"><img class="alignnone size-full wp-image-2505" alt="Koen_SiteSettings" src="/wp-content/uploads/2014/03/Koen_SiteSettings.png" width="154" height="276" /></a></p>
+<p style="text-align: justify"><span style="line-height: 1.5em">Regional settings make sense since we need to change locale information.</span></p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/03/Koen_RegionalSettings.png"><img class="alignnone size-full wp-image-2503" alt="Koen_RegionalSettings" src="/wp-content/uploads/2014/03/Koen_RegionalSettings.png" width="154" height="84" /></a></p>
+<p style="text-align: justify">And indeed, we can change to our beloved locale.</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/03/Koen_RegionalSettings2.png"><img class="alignnone  wp-image-2504" alt="Koen_RegionalSettings2" src="/wp-content/uploads/2014/03/Koen_RegionalSettings2.png" width="793" height="240" srcset="/wp-content/uploads/2014/03/Koen_RegionalSettings2.png 881w, /wp-content/uploads/2014/03/Koen_RegionalSettings2-300x90.png 300w" sizes="(max-width: 793px) 100vw, 793px" /></a></p>
+<p style="text-align: justify">When opening the report again Power View, we get our desired result:</p>
+<p style="text-align: justify"><a href="/wp-content/uploads/2014/03/Koen_Table3.png"><img class="alignnone size-full wp-image-2508" alt="Koen_Table3" src="/wp-content/uploads/2014/03/Koen_Table3.png" width="222" height="92" /></a></p>
+<p style="text-align: justify"><b>Conclusion</b></p>
+<p style="text-align: justify">The SharePoint regional site settings control how data is displayed in your Power View report.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/changing-the-1000-separator-in-power-view/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Data Visualization Tips &#038; Tricks at Community Day 2013</title>
+		<link>/index.php/datamgmt/ssrs/data-visualization-tips-tricks/</link>
+		<comments>/index.php/datamgmt/ssrs/data-visualization-tips-tricks/#comments</comments>
+		<pubDate>Wed, 12 Jun 2013 12:21:00 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[SSRS]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[community day]]></category>
+		<category><![CDATA[data visualization]]></category>
+		<category><![CDATA[sqlug]]></category>
+		<category><![CDATA[ssrs]]></category>
+		<category><![CDATA[user group]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/06/data-visualization-tips-tricks/</guid>
+		<description><![CDATA[In exactly one week I’ll be giving a session with my colleague Valentino Vranken (blog &#124; twitter) at the Belgian Community Day. We’ll be talking about Data Visualization. I’ll be talking about the tips: how do you need to visualize your data without the&#8230;]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify;">In exactly one week I’ll be giving a session with my colleague Valentino Vranken (<a href="http://blog.hoegaerden.be/">blog</a> | <a href="https://twitter.com/ValentinoV42">twitter</a>) at the <a href="http://www.communityday.be/">Belgian Community Day</a>. We’ll be talking about Data Visualization. I’ll be talking about the <em>tips</em>: how do you need to visualize your data without the audience scratching their eyes out because of the ugly colors you used? Why would or wouldn’t you use pie charts? And what’s the difference between an analytical dashboard and an operational dashboard? You can find answers on such question in this session.</p>
+<p style="text-align: justify;">Valentino will be talking about the <em>tricks</em>: little bits of wisdom on how to get things done in Reporting Services. We did the dry-run of the session yesterday and I definitely learned something from his part, so be sure to check it out!</p>
+<p style="text-align: justify;">The Community Day is on the 20<sup>th</sup> of June in the city of Mechelen. It combines the various user groups of Belgium (and some of the Netherlands) and gives you an astonishing 5 track agenda with over 30 sessions! So get yourself registered, come on over and get your learning cap on!</p>
+<p style="text-align: justify;"><a href="http://www.communityday.be/"><img src="/wp-content/uploads/users/koenverbeeck/ComDayBe2013/long.png?mtime=1370952579" alt="" width="600" height="90" /></a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/ssrs/data-visualization-tips-tricks/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Building a SharePoint 2013 BI Demo Environment Part 10 – Creating a BI site</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/sharepoint-2013-bi-part-10/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/sharepoint-2013-bi-part-10/#comments</comments>
+		<pubDate>Wed, 12 Jun 2013 11:59:00 +0000</pubDate>
+		<dc:creator><![CDATA[Koen Verbeeck]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Excel Reporting]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[SSAS]]></category>
+		<category><![CDATA[SSRS]]></category>
+		<category><![CDATA[business intelligence]]></category>
+		<category><![CDATA[demo environment]]></category>
+		<category><![CDATA[excel]]></category>
+		<category><![CDATA[power view]]></category>
+		<category><![CDATA[powerpivot]]></category>
+		<category><![CDATA[sharepoint 2013]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[ssas]]></category>
+		<category><![CDATA[ssrs]]></category>
+		<category><![CDATA[syndicated]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/06/sharepoint-2013-bi-part-10/</guid>
+		<description><![CDATA[In the final part of this series, we will create a BI subsite in our site collection. You can use this site as the starting point for your SharePoint BI demos. Browse to the PowerPivot site we created earlier in part 7 and go to Site Contents. Click on&#8230;]]></description>
+				<content:encoded><![CDATA[<p style="text-align: justify;">In the final part of this series, we will create a BI subsite in our site collection. You can use this site as the starting point for your SharePoint BI demos. Browse to the PowerPivot site we created earlier in <a href="/index.php/DataMgmt/business-intelligence-1/sharepoint-2013-bi-part-7">part 7</a> and go to <em>Site Contents</em>. Click on the <em>new subsite</em> link to create a new SharePoint site.</p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_01.png?mtime=1370461325"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_01.png?mtime=1370461325" alt="" width="335" height="373" /></a></p>
+<p><span style="text-align: justify;">In the following dialog, configure the name, URL, permissions and navigation. Select the </span><strong>Business Intelligence Center</strong><span style="text-align: justify;"> template, listed under Enterprise. Click </span><em>Create</em><span style="text-align: justify;"> to finish the configuration.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_02.png?mtime=1370461325"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_02.png?mtime=1370461325" alt="" width="445" height="732" /></a></p>
+<p><span style="text-align: justify;">Hold on! An error? It seems we need to activate the </span><em>SharePoint Publishing Infrastructure</em><span style="text-align: justify;"> feature at the collection level before we can create the site.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_03.png?mtime=1370461325"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_03.png?mtime=1370461325" alt="" width="638" height="244" /></a></p>
+<p><span style="text-align: justify;">So let’s activate this feature. Go to Site Settings &gt; Site Collection Features and activate the </span><strong>SharePoint Server Publishing Infrastructure</strong><span style="text-align: justify;"> feature.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_06.png?mtime=1370461325"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_06.png?mtime=1370461325" alt="" width="1000" height="107" /></a></p>
+<p><span style="text-align: justify;">Next go to Site Settings &gt; Site Features and activate </span><strong>SharePoint Server Publishing</strong><strong> if it isn&#8217;t already active</strong><span style="text-align: justify;">.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_04.png?mtime=1370461325"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_04.png?mtime=1370461325" alt="" width="996" height="105" /></a></p>
+<p><span style="text-align: justify;">Go back to create a BI subsite, fill in the details and hit </span><em>Create</em><span style="text-align: justify;">.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_07.png?mtime=1370461325"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_07.png?mtime=1370461325" alt="" width="607" height="203" /></a></p>
+<p><span style="text-align: justify;">What? Another error! The Performance Point features must also be activated before you can create a BI site. (I hope you are reading through this blog first before you actually try it out). Although I will probably not use Performance Point – like many other – I still need to enable it in order to create my site. So let’s do this.</span></p>
+<p style="text-align: justify;">Go to Central Administration &gt; System Settings &gt; Manage services on server and activate the Performance Point Service.</p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_01.png?mtime=1370461326"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_01.png?mtime=1370461326" alt="" width="893" height="402" /></a></p>
+<p><span style="text-align: justify;">Next go to Application Management &gt; Manage service applications. In the ribbon, click </span><em>New</em><span style="text-align: justify;"> and select </span><strong>PerformancePoint Service Application</strong><span style="text-align: justify;">.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_02.png?mtime=1370461326"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_02.png?mtime=1370461326" alt="" width="198" height="304" /></a></p>
+<p><span style="text-align: justify;">Configure the name for the service application and the database server.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_02a.png?mtime=1370461326"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_02a.png?mtime=1370461326" alt="" width="425" height="417" /></a></p>
+<p><span style="text-align: justify;">Create a new application pool and specify the security account. Click </span><em>Create</em><span style="text-align: justify;"> to finish.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_02b.png?mtime=1370461326"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_02b.png?mtime=1370461326" alt="" width="414" height="407" /></a></p>
+<p><span style="text-align: justify;">When the creation was successful, you’ll get a list of possible follow-up actions. Click </span><em>OK</em><span style="text-align: justify;">.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_03.png?mtime=1370461326"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_03.png?mtime=1370461326" alt="" width="375" height="345" /></a></p>
+<p><span style="text-align: justify;">Go to Site Settings &gt; Site Collection Features and enable the </span><strong>PerformancePoint Services Site Collection Features</strong><span style="text-align: justify;">.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_04a.png?mtime=1370461327"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_04a.png?mtime=1370461327" alt="" width="1181" height="124" /></a></p>
+<p><span style="text-align: justify;">Next go to Application Management &gt; Manage service applications. Click on the </span><em>PerformancePoint Service Application</em><span style="text-align: justify;"> and go to its settings.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_05a.png?mtime=1370461327"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_05a.png?mtime=1370461327" alt="" width="788" height="131" /></a></p>
+<p><span style="text-align: justify;">Configure the unattended service account to SPFarm and click </span><em>OK</em><span style="text-align: justify;"> at the bottom.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_05.png?mtime=1370461327"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_05.png?mtime=1370461327" alt="" width="841" height="228" /></a></p>
+<p><span style="text-align: justify;">Finally go to Application Management. Click on </span><em>Configure service application assocations</em><span style="text-align: justify;">.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_06.png?mtime=1370461327"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_06.png?mtime=1370461327" alt="" width="656" height="200" /></a></p>
+<p><span style="text-align: justify;">Verify if PerformancePoint is correctly associated with the web application.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_07.png?mtime=1370461327"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/EnablePerformancePoint_07.png?mtime=1370461327" alt="" width="724" height="159" /></a></p>
+<p><span style="text-align: justify;">Now PerformancePoint is enabled, you can finally create your BI site! Repeat the steps from the beginning of this blog post to create your site.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_08.png?mtime=1370461325"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_08.png?mtime=1370461325" alt="" width="613" height="322" /></a></p>
+<p><span style="text-align: justify;">All that’s left is to adjust this site to your preferences. This is for example how my Power View library looks like at the time of writing.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_09.png?mtime=1370461326"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/CreateSite_09.png?mtime=1370461326" alt="" width="906" height="564" /></a></p>
+<p><span style="text-align: justify;">If you want to use a SharePoint list as an OData source for your demos, you don’t need to install ADO.NET data services like in SharePoint 2010. This functionality is already present.</span></p>
+<p style="text-align: justify;"><a href="/media/users/koenverbeeck/SP2013DemoEnv/Part10/AlreadyInstalled.png?mtime=1370462164"><img src="/wp-content/uploads/users/koenverbeeck/SP2013DemoEnv/Part10/AlreadyInstalled.png?mtime=1370462164" alt="" width="606" height="292" /></a></p>
+<p><span style="text-align: justify;">This concludes the series on how to configure your own SharePoint 2013 BI demo environment! Have fun with creating some great demos!</span></p>
+<p style="text-align: justify;"><span style="text-align: justify;">Go back to </span><a style="text-align: justify;" href="/index.php/DataMgmt/business-intelligence-1/sharepoint-2013-bi-part-1">overview</a><span style="text-align: justify;">.</span><br style="text-align: justify;" /><span style="text-align: justify;">Previous part: <a href="/index.php/DataMgmt/business-intelligence-1/sharepoint-2013-bi-part-9">Installing Reporting Services</a></span><span style="text-align: justify;">.</span></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/sharepoint-2013-bi-part-10/feed/</wfw:commentRss>
+		<slash:comments>19</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,3167 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Steve Hughes (DataOnWheels) &#8211; LessthanDot</title>
+	<atom:link href="/index.php/author/flipster1971/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>T-SQL Window Functions &#8211; Part 4: Analytic Functions</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part-4/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part-4/#comments</comments>
+		<pubDate>Tue, 25 Sep 2012 14:13:00 +0000</pubDate>
+		<dc:creator><![CDATA[Steve Hughes (DataOnWheels)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/09/t-sql-window-functions-part-4/</guid>
+		<description><![CDATA[In the final installment of my series on SQL window functions, we will explore using analytic functions.  Analytic functions were introduced in SQL Server 2012 with the expansion of the OVER clause capabilities.  Analytic functions fall in to two primar&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In the final installment of my series on SQL window functions, we will explore using analytic functions.  Analytic functions were introduced in SQL Server 2012 with the expansion of the OVER clause capabilities.  Analytic functions fall in to two primary categories: values at a position and percentiles.  Four of the functions, LAG, LEAD, FIRST_VALUE and LAST_VALUE find a row in the partition and returns the desired value from that row.  CUME_DIST and PERCENT_RANK break the partition into percentiles and return a rank value for each row.  PERCENTILE_CONT and PERCENTILE_DISC a value at the requested percentile in the function for each row.  All of the functions and examples in this blog will only work with SQL Server 2012.<br />
+Once again, the following CTE will be used as the query in all examples throughout the post:</p>
+<p><code class="codespan">with CTEOrders as<br />
+	(select cast(1 as int) as OrderID, cast('3/1/2012' as date) as OrderDate, cast(10.00 as money) as OrderAmt, 'Joe' as CustomerName<br />
+	union select 2, '3/1/2012', 11.00, 'Sam'<br />
+	union select 3, '3/2/2012', 10.00, 'Beth'<br />
+	union select 4, '3/2/2012', 15.00, 'Joe'<br />
+	union select 5, '3/2/2012', 17.00, 'Sam'<br />
+	union select 6, '3/3/2012', 12.00, 'Joe'<br />
+	union select 7, '3/4/2012', 10.00, 'Beth'<br />
+	union select 8, '3/4/2012', 18.00, 'Sam'<br />
+	union select 9, '3/4/2012', 12.00, 'Joe'<br />
+	union select 10, '3/4/2012', 11.00, 'Beth'<br />
+	union select 11, '3/5/2012', 14.00, 'Sam'<br />
+	union select 12, '3/6/2012', 17.00, 'Beth'<br />
+	union select 13, '3/6/2012', 19.00, 'Joe'<br />
+	union select 14, '3/7/2012', 13.00, 'Beth'<br />
+	union select 15, '3/7/2012', 16.00, 'Sam'<br />
+	)<br />
+select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+   from CTEOrders;<br />
+</code></p>
+<h1>Position Value Functions: LAG, LEAD, FIRST_VALUE, LAST_VALUE</h1>
+<p>Who has not needed to use values from other rows in the current row for a report or other query?  A prime example is needing to know what the last order value was to calculate growth or just show the difference in the results.  This has never been easy in SQL Server until now.  All of these functions require the use of the OVER clause and the ORDER BY clause.  They all use the current row within the partition to find the row at the desired position.  </p>
+<p>The LAG and LEAD functions allow you to specify the offset or how many rows to look forward or backward and they support a default value in cases where the value returned would be null.    These functions do not support the use of ROWS or RANGE in the OVER clause.  The FIRST_VALUE and LAST_VALUE allow you to further define the partition using ROWS or RANGE if desired. </p>
+<p>The following example illustrates all of the functions with various variations on the parameters and settings.</p>
+<p><em>Update 10/19/2012: One of the readers pointed out confusion between column names in the results and the functions used.  This discrepancy has been resolved.</em></p>
+<p><code class="codespan">select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+	,LAG(OrderAmt) OVER (PARTITION BY CustomerName ORDER BY OrderID) as PrevOrdAmt<br />
+	,LEAD(OrderAmt, 2) OVER (PARTITION BY CustomerName ORDER BY OrderID) as NextTwoOrdAmt<br />
+	,LEAD(OrderDate, 2, '9999-12-31') OVER (PARTITION BY CustomerName ORDER BY OrderID) as NextTwoOrdDtNoNull<br />
+	,FIRST_VALUE(OrderDate) OVER (ORDER BY OrderID) as FirstOrdDt<br />
+	,LAST_VALUE(CustomerName) OVER (PARTITION BY OrderDate ORDER BY OrderID) as LastCustToOrdByDay<br />
+FROM CTEOrders</code></p>
+<h3>Results (with shortened column names):</h3>
+<table cellspacing="0" cellpadding="0" border="1">
+<tbody>
+<tr>
+<td valign="top" width="52">
+<p><b>ID</b></p>
+</td>
+<td valign="top" width="99">
+<p><b>OrderDate</b></p>
+</td>
+<td valign="top" width="53">
+<p><b>Amt</b></p>
+</td>
+<td valign="top" width="60">
+<p><b>Cust</b></p>
+</td>
+<td valign="top" width="120">
+<p><b>PrevOrdAmt</b></p>
+</td>
+<td valign="top" width="120">
+<p><b>NextTwoAmt</b></p>
+</td>
+<td valign="top" width="107">
+<p><b>NextTwoDt</b></p>
+</td>
+<td valign="top" width="89">
+<p><b>FirstOrd</b></p>
+</td>
+<td valign="top" width="90">
+<p><b>LastCust</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>1</p>
+</td>
+<td valign="top" width="99">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="53">
+<p>10</p>
+</td>
+<td valign="top" width="60">
+<p>Joe</p>
+</td>
+<td valign="top" width="120">
+<p>NULL</p>
+</td>
+<td valign="top" width="120">
+<p>12</p>
+</td>
+<td valign="top" width="107">
+<p>3/3/2012</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Joe</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>2</p>
+</td>
+<td valign="top" width="99">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="53">
+<p>11</p>
+</td>
+<td valign="top" width="60">
+<p>Sam</p>
+</td>
+<td valign="top" width="120">
+<p>NULL</p>
+</td>
+<td valign="top" width="120">
+<p>18</p>
+</td>
+<td valign="top" width="107">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Sam</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>3</p>
+</td>
+<td valign="top" width="99">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="53">
+<p>10</p>
+</td>
+<td valign="top" width="60">
+<p>Beth</p>
+</td>
+<td valign="top" width="120">
+<p>NULL</p>
+</td>
+<td valign="top" width="120">
+<p>11</p>
+</td>
+<td valign="top" width="107">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Beth</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>4</p>
+</td>
+<td valign="top" width="99">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="53">
+<p>15</p>
+</td>
+<td valign="top" width="60">
+<p>Joe</p>
+</td>
+<td valign="top" width="120">
+<p>10</p>
+</td>
+<td valign="top" width="120">
+<p>12</p>
+</td>
+<td valign="top" width="107">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Joe</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>5</p>
+</td>
+<td valign="top" width="99">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="53">
+<p>17</p>
+</td>
+<td valign="top" width="60">
+<p>Sam</p>
+</td>
+<td valign="top" width="120">
+<p>11</p>
+</td>
+<td valign="top" width="120">
+<p>14</p>
+</td>
+<td valign="top" width="107">
+<p>3/5/2012</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Sam</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>6</p>
+</td>
+<td valign="top" width="99">
+<p>3/3/2012</p>
+</td>
+<td valign="top" width="53">
+<p>12</p>
+</td>
+<td valign="top" width="60">
+<p>Joe</p>
+</td>
+<td valign="top" width="120">
+<p>15</p>
+</td>
+<td valign="top" width="120">
+<p>19</p>
+</td>
+<td valign="top" width="107">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Joe</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>7</p>
+</td>
+<td valign="top" width="99">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="53">
+<p>10</p>
+</td>
+<td valign="top" width="60">
+<p>Beth</p>
+</td>
+<td valign="top" width="120">
+<p>10</p>
+</td>
+<td valign="top" width="120">
+<p>17</p>
+</td>
+<td valign="top" width="107">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Beth</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>8</p>
+</td>
+<td valign="top" width="99">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="53">
+<p>18</p>
+</td>
+<td valign="top" width="60">
+<p>Sam</p>
+</td>
+<td valign="top" width="120">
+<p>17</p>
+</td>
+<td valign="top" width="120">
+<p>16</p>
+</td>
+<td valign="top" width="107">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Sam</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>9</p>
+</td>
+<td valign="top" width="99">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="53">
+<p>12</p>
+</td>
+<td valign="top" width="60">
+<p>Joe</p>
+</td>
+<td valign="top" width="120">
+<p>12</p>
+</td>
+<td valign="top" width="120">
+<p>NULL</p>
+</td>
+<td valign="top" width="107">
+<p>12/31/9999</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Joe</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>10</p>
+</td>
+<td valign="top" width="99">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="53">
+<p>11</p>
+</td>
+<td valign="top" width="60">
+<p>Beth</p>
+</td>
+<td valign="top" width="120">
+<p>10</p>
+</td>
+<td valign="top" width="120">
+<p>13</p>
+</td>
+<td valign="top" width="107">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Beth</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>11</p>
+</td>
+<td valign="top" width="99">
+<p>3/5/2012</p>
+</td>
+<td valign="top" width="53">
+<p>14</p>
+</td>
+<td valign="top" width="60">
+<p>Sam</p>
+</td>
+<td valign="top" width="120">
+<p>18</p>
+</td>
+<td valign="top" width="120">
+<p>NULL</p>
+</td>
+<td valign="top" width="107">
+<p>12/31/9999</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Sam</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>12</p>
+</td>
+<td valign="top" width="99">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="53">
+<p>17</p>
+</td>
+<td valign="top" width="60">
+<p>Beth</p>
+</td>
+<td valign="top" width="120">
+<p>11</p>
+</td>
+<td valign="top" width="120">
+<p>NULL</p>
+</td>
+<td valign="top" width="107">
+<p>12/31/9999</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Beth</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>13</p>
+</td>
+<td valign="top" width="99">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="53">
+<p>19</p>
+</td>
+<td valign="top" width="60">
+<p>Joe</p>
+</td>
+<td valign="top" width="120">
+<p>12</p>
+</td>
+<td valign="top" width="120">
+<p>NULL</p>
+</td>
+<td valign="top" width="107">
+<p>12/31/9999</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Joe</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>14</p>
+</td>
+<td valign="top" width="99">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="53">
+<p>13</p>
+</td>
+<td valign="top" width="60">
+<p>Beth</p>
+</td>
+<td valign="top" width="120">
+<p>17</p>
+</td>
+<td valign="top" width="120">
+<p>NULL</p>
+</td>
+<td valign="top" width="107">
+<p>12/31/9999</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Beth</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="52">
+<p>15</p>
+</td>
+<td valign="top" width="99">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="53">
+<p>16</p>
+</td>
+<td valign="top" width="60">
+<p>Sam</p>
+</td>
+<td valign="top" width="120">
+<p>14</p>
+</td>
+<td valign="top" width="120">
+<p>NULL</p>
+</td>
+<td valign="top" width="107">
+<p>12/31/9999</p>
+</td>
+<td valign="top" width="89">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="90">
+<p>Sam</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>If you really like subselects, you can also mix in some subselects and have a very creative SQL statement.  The following statement uses LAG and a subselect to find the first value in a partition.  I am showing this to illustrate some more of the capabilities of the function in case you have a solution that requires this level of complexity.</p>
+<p><code class="codespan">select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+	,LAG(OrderAmt,(select count(*)-1<br />
+from CTEOrders c<br />
+where c.CustomerName = CTEOrders.CustomerName<br />
+ and c.OrderID &lt;= CTEOrders.OrderID) , 0)<br />
+OVER (PARTITION BY CustomerName ORDER BY OrderDate, OrderID) as FirstOrderAmt<br />
+from CTEOrders</code></p>
+<h1>Percentile Functions: CUME_DIST, PERCENT_RANK, PERCENTILE_CONT, PERCENTILE_DISC</h1>
+<p>As I wrap up my discussion on window functions, the percentile based functions were the functions I knew the least about.  While I have already used the position value functions above, I have not yet needed to use the percentiles. So, that meant I had to work with them for a while so I could share their usage and have some samples for you to use.  </p>
+<p>The key differences in the four function have to do with ranks and values.  CUME_DIST and PERCENT_RANK return a ranking value while PERCENTILE_CONT and PERCENTILE_DISC return data values.  </p>
+<p>CUME_DIST returns a value that is greater than zero and lest than or equal to one (>0 and <=1) and represents the percentage group that the value falls into based on the order specified.  PERCENT_RANK returns a value between zero and one as well (>= 0 and <=1).  However, in PERCENT_RANK the first group is always represented as 0 whereas in CUME_DIST it represents the percentage of the group.  Both functions return the last percent group as 1.  In both cases, as the ranking percentages move from lowest to highest, each group’s percent value includes all of the earlier values in the calculation as well.  
+
+The following statement shows both of the functions using the default partition to determine the rankings of order amounts within our dataset.  
+
+<code class="codespan">select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+	,CUME_DIST() OVER (ORDER BY OrderAmt) CumDist<br />
+	,PERCENT_RANK() OVER (ORDER BY OrderAmt) PctRank<br />
+from CTEOrders</code></p>
+<h3>Results:</h3>
+<table cellspacing="0" cellpadding="0" border="1">
+<tbody>
+<tr>
+<td valign="top" width="67">
+<p><b>OrderID</b></p>
+</td>
+<td valign="top" width="87">
+<p><b>OrderDate</b></p>
+</td>
+<td valign="top" width="82">
+<p><b>OrderAmt</b></p>
+</td>
+<td valign="top" width="125">
+<p><b>CustomerName</b></p>
+</td>
+<td valign="top" width="98">
+<p><b>CumDist</b></p>
+</td>
+<td valign="top" width="133">
+<p><b>PctRank</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>1</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="98">
+<p>0.2</p>
+</td>
+<td valign="top" width="133">
+<p>0</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>3</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="98">
+<p>0.2</p>
+</td>
+<td valign="top" width="133">
+<p>0</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>7</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="98">
+<p>0.2</p>
+</td>
+<td valign="top" width="133">
+<p>0</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>2</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="98">
+<p>0.33333333</p>
+</td>
+<td valign="top" width="133">
+<p>0.214285714</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>10</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="98">
+<p>0.33333333</p>
+</td>
+<td valign="top" width="133">
+<p>0.214285714</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>6</p>
+</td>
+<td valign="top" width="87">
+<p>3/3/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="98">
+<p>0.46666667</p>
+</td>
+<td valign="top" width="133">
+<p>0.357142857</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>9</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="98">
+<p>0.46666667</p>
+</td>
+<td valign="top" width="133">
+<p>0.357142857</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>14</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>13</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="98">
+<p>0.53333333</p>
+</td>
+<td valign="top" width="133">
+<p>0.5</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>11</p>
+</td>
+<td valign="top" width="87">
+<p>3/5/2012</p>
+</td>
+<td valign="top" width="82">
+<p>14</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="98">
+<p>0.6</p>
+</td>
+<td valign="top" width="133">
+<p>0.571428571</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>4</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>15</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="98">
+<p>0.66666667</p>
+</td>
+<td valign="top" width="133">
+<p>0.642857143</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>15</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>16</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="98">
+<p>0.73333333</p>
+</td>
+<td valign="top" width="133">
+<p>0.714285714</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>5</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="98">
+<p>0.86666667</p>
+</td>
+<td valign="top" width="133">
+<p>0.785714286</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>12</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="98">
+<p>0.86666667</p>
+</td>
+<td valign="top" width="133">
+<p>0.785714286</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>8</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>18</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="98">
+<p>0.93333333</p>
+</td>
+<td valign="top" width="133">
+<p>0.928571429</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>13</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>19</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="98">
+<p>1</p>
+</td>
+<td valign="top" width="133">
+<p>1</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The last two functions, PERCENTILE_CONT and PERCENTILE_DISC, return the value at the percentile requested.  PERCENTILE_CONT will return the true percentile value whether it exists in the data or not.  For instance, if the percentile group has the values 10 and 20, it will return 15.  If PERCENTILE_DISC, is applied to the same group it will return 10.  It will return the smallest value in the percentile group, which in this case is 10.  Both functions ignore NULL values and do not use the ORDER BY, ROWS, or RANGE clauses with the PARTITION BY clause.  Instead, WITHIN GROUP is introduced which must contain a numeric data type and ORDER BY clause.  Only one column can be specified here.  Both functions need a percentile value which can be between 0.0 and 1.0.  </p>
+<p>The following script illustrates a couple of variations.  The first two functions return the median of the default partition.  Then next two return the median value for each day.  Finally, the last two functions return the low and high values within the partition.  The values segmented by the date partition highlight the key difference between the two functions.</p>
+<p><code class="codespan">select OrderID as ID<br />
+	,OrderDate as ODt<br />
+	,OrderAmt as OAmt<br />
+	,CustomerName as CName<br />
+	,PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY OrderAmt) OVER () PerCont05<br />
+	,PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY OrderAmt) OVER () PerDisc05<br />
+	,PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY OrderAmt) OVER (PARTITION BY OrderDate) PerContDt<br />
+	,PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY OrderAmt) OVER (PARTITION BY OrderDate) PerDiscDt<br />
+	,PERCENTILE_CONT(0) WITHIN GROUP (ORDER BY OrderAmt) OVER() PerCont0<br />
+from CTEOrders</code></p>
+<h3>Results</h3>
+<table cellspacing="0" cellpadding="0" border="1">
+<tbody>
+<tr>
+<td valign="top" width="27">
+<p><b>ID</b></p>
+</td>
+<td valign="top" width="77">
+<p><b>ODt</b></p>
+</td>
+<td valign="top" width="52">
+<p><b>OAmt</b></p>
+</td>
+<td valign="top" width="63">
+<p><b>CName</b></p>
+</td>
+<td valign="top" width="87">
+<p><b>PerCont05</b></p>
+</td>
+<td valign="top" width="82">
+<p><b>PerDisc05</b></p>
+</td>
+<td valign="top" width="87">
+<p><b>PerContDt</b></p>
+</td>
+<td valign="top" width="83">
+<p><b>PerDiscDt</b></p>
+</td>
+<td valign="top" width="77">
+<p><b>PerCont0</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>1</p>
+</td>
+<td valign="top" width="77">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="52">
+<p>10</p>
+</td>
+<td valign="top" width="63">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>10.5</p>
+</td>
+<td valign="top" width="83">
+<p>10.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>2</p>
+</td>
+<td valign="top" width="77">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="52">
+<p>11</p>
+</td>
+<td valign="top" width="63">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>10.5</p>
+</td>
+<td valign="top" width="83">
+<p>10.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>3</p>
+</td>
+<td valign="top" width="77">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="52">
+<p>10</p>
+</td>
+<td valign="top" width="63">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>15.0</p>
+</td>
+<td valign="top" width="83">
+<p>15.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>4</p>
+</td>
+<td valign="top" width="77">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="52">
+<p>15</p>
+</td>
+<td valign="top" width="63">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>15.0</p>
+</td>
+<td valign="top" width="83">
+<p>15.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>5</p>
+</td>
+<td valign="top" width="77">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="52">
+<p>17</p>
+</td>
+<td valign="top" width="63">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>15.0</p>
+</td>
+<td valign="top" width="83">
+<p>15.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>6</p>
+</td>
+<td valign="top" width="77">
+<p>3/3/2012</p>
+</td>
+<td valign="top" width="52">
+<p>12</p>
+</td>
+<td valign="top" width="63">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>12.0</p>
+</td>
+<td valign="top" width="83">
+<p>12.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>7</p>
+</td>
+<td valign="top" width="77">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="52">
+<p>10</p>
+</td>
+<td valign="top" width="63">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>11.5</p>
+</td>
+<td valign="top" width="83">
+<p>11.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>10</p>
+</td>
+<td valign="top" width="77">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="52">
+<p>11</p>
+</td>
+<td valign="top" width="63">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>11.5</p>
+</td>
+<td valign="top" width="83">
+<p>11.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>9</p>
+</td>
+<td valign="top" width="77">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="52">
+<p>12</p>
+</td>
+<td valign="top" width="63">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>11.5</p>
+</td>
+<td valign="top" width="83">
+<p>11.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>8</p>
+</td>
+<td valign="top" width="77">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="52">
+<p>18</p>
+</td>
+<td valign="top" width="63">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>11.5</p>
+</td>
+<td valign="top" width="83">
+<p>11.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>11</p>
+</td>
+<td valign="top" width="77">
+<p>3/5/2012</p>
+</td>
+<td valign="top" width="52">
+<p>14</p>
+</td>
+<td valign="top" width="63">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>14.0</p>
+</td>
+<td valign="top" width="83">
+<p>14.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>12</p>
+</td>
+<td valign="top" width="77">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="52">
+<p>17</p>
+</td>
+<td valign="top" width="63">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>18.0</p>
+</td>
+<td valign="top" width="83">
+<p>17.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>13</p>
+</td>
+<td valign="top" width="77">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="52">
+<p>19</p>
+</td>
+<td valign="top" width="63">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>18.0</p>
+</td>
+<td valign="top" width="83">
+<p>17.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>14</p>
+</td>
+<td valign="top" width="77">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="52">
+<p>13</p>
+</td>
+<td valign="top" width="63">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>14.5</p>
+</td>
+<td valign="top" width="83">
+<p>13.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="27">
+<p>15</p>
+</td>
+<td valign="top" width="77">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="52">
+<p>16</p>
+</td>
+<td valign="top" width="63">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>13</p>
+</td>
+<td valign="top" width="82">
+<p>13.00</p>
+</td>
+<td valign="top" width="87">
+<p>14.5</p>
+</td>
+<td valign="top" width="83">
+<p>13.00</p>
+</td>
+<td valign="top" width="77">
+<p>10</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>As I wrap up this post, I have to give a shout out to my daughter, Kristy, who is an honors math student.  She helped me get my head around this last group of functions.  Her honors math work and some statistical work she had done in science helped provide additional insight into the math behind the functions. (Kristy – you rock!)</p>
+<h1>Series Wrap Up</h1>
+<p>I hope this series helps everyone understand the power and flexibility in the window functions made available in SQL Server 2012.  If you happen to use Oracle, I know that many of these functions or there equivalent are also available in 11g and they also appear to be in 10g.  I have to admit my first real production usage was with Oracle 11g but has since used them with SQL Server 2012.  The expanded functionality in SQL Server 2012 is just one more reason to upgrade to the latest version.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part-4/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Window Functions &#8211; Part 3: Aggregate Functions</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part-03/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part-03/#comments</comments>
+		<pubDate>Mon, 17 Sep 2012 12:31:00 +0000</pubDate>
+		<dc:creator><![CDATA[Steve Hughes (DataOnWheels)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/09/t-sql-window-functions-part-03/</guid>
+		<description><![CDATA[This is part 3 in my series on SQL window functions.  In this post, we will explore using aggregation functions with T-SQL windows.  SQL Server supports most of the aggregation functions such as SUM and AVG in this context with the exceptions of GROUPIN&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This is part 3 in my series on SQL window functions.  In this post, we will explore using aggregation functions with T-SQL windows.  SQL Server supports most of the aggregation functions such as SUM and AVG in this context with the exceptions of GROUPING and GROUPING_ID.  However, prior to SQL Server 2012 only the PARTITION BY clause was supported which greatly limited the usability of aggregate window functions.  When support for the ORDER BY clause was introduced in SQL Server 2012, more complex business problems such as running totals could be solved without the extensive use of cursors or nested select statement.  In my experience, I used to try various ways to get around this limitation including pushing the data to .NET as it could solve this problem more efficiently.  However, this was not always possible when working with reporting.  Now that we are able to use SQL to solve the problem, more complex and low-performing solutions can be replaced with these window functions.  </p>
+<p>Once again, the following CTE will be used as the query in all examples throughout the post:</p>
+<p><code class="codespan">with CTEOrders as<br />
+	(select cast(1 as int) as OrderID, cast('3/1/2012' as date) as OrderDate, cast(10.00 as money) as OrderAmt, 'Joe' as CustomerName<br />
+	union select 2, '3/1/2012', 11.00, 'Sam'<br />
+	union select 3, '3/2/2012', 10.00, 'Beth'<br />
+	union select 4, '3/2/2012', 15.00, 'Joe'<br />
+	union select 5, '3/2/2012', 17.00, 'Sam'<br />
+	union select 6, '3/3/2012', 12.00, 'Joe'<br />
+	union select 7, '3/4/2012', 10.00, 'Beth'<br />
+	union select 8, '3/4/2012', 18.00, 'Sam'<br />
+	union select 9, '3/4/2012', 12.00, 'Joe'<br />
+	union select 10, '3/4/2012', 11.00, 'Beth'<br />
+	union select 11, '3/5/2012', 14.00, 'Sam'<br />
+	union select 12, '3/6/2012', 17.00, 'Beth'<br />
+	union select 13, '3/6/2012', 19.00, 'Joe'<br />
+	union select 14, '3/7/2012', 13.00, 'Beth'<br />
+	union select 15, '3/7/2012', 16.00, 'Sam'<br />
+	)<br />
+select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+   from CTEOrders;</code></p>
+<h1>Using PARTITION BY with Aggregate Functions</h1>
+<p>SQL Server 2005 and the newer versions supports the usage of the PARTITION BY clause by itself.  This allowed for some simple aggregate windows.  The following example shows SUM and AVG for different partitions of data.  The third function actually creates and average using a SUM and COUNT function.  </p>
+<p><code class="codespan">select CustomerName<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,SUM(OrderAmt) OVER(PARTITION BY CustomerName) CustomerTotal<br />
+	,AVG(OrderAmt) OVER(PARTITION BY OrderDate) AvgDailyAmt<br />
+	,CAST(COUNT(OrderID) OVER(PARTITION BY OrderDate) as DECIMAL(8,3)) / CAST(COUNT(OrderID) OVER() as DECIMAL(8,3)) PctOfTotalPerDay<br />
+   from CTEOrders<br />
+   order by OrderDate;</code></p>
+<p><em>NOTE: The COUNT aggregate returns an integer value.  In order to return the decimal, the values need to be explicitly converted to decimal types.  Otherwise, the result was rounding to zero for all results in this sample.</em></p>
+<h3>Results</h3>
+<table cellspacing="0" cellpadding="0" border="1">
+<tbody>
+<tr>
+<td valign="top" width="125">
+<p><b>CustomerName</b></p>
+</td>
+<td valign="top" width="87">
+<p><b>OrderDate</b></p>
+</td>
+<td valign="top" width="82">
+<p><b>OrderAmt</b></p>
+</td>
+<td valign="top" width="118">
+<p><b>CustomerTotal</b></p>
+</td>
+<td valign="top" width="102">
+<p><b>AvgDailyAmt</b></p>
+</td>
+<td valign="top" width="142">
+<p><b>PctOfTotalPerDay</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="118">
+<p>68</p>
+</td>
+<td valign="top" width="102">
+<p>10.5</p>
+</td>
+<td valign="top" width="142">
+<p>0.133333333</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="118">
+<p>76</p>
+</td>
+<td valign="top" width="102">
+<p>10.5</p>
+</td>
+<td valign="top" width="142">
+<p>0.133333333</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="118">
+<p>76</p>
+</td>
+<td valign="top" width="102">
+<p>14</p>
+</td>
+<td valign="top" width="142">
+<p>0.2</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>15</p>
+</td>
+<td valign="top" width="118">
+<p>68</p>
+</td>
+<td valign="top" width="102">
+<p>14</p>
+</td>
+<td valign="top" width="142">
+<p>0.2</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="118">
+<p>61</p>
+</td>
+<td valign="top" width="102">
+<p>14</p>
+</td>
+<td valign="top" width="142">
+<p>0.2</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>3/3/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="118">
+<p>68</p>
+</td>
+<td valign="top" width="102">
+<p>12</p>
+</td>
+<td valign="top" width="142">
+<p>0.066666667</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="118">
+<p>68</p>
+</td>
+<td valign="top" width="102">
+<p>12.75</p>
+</td>
+<td valign="top" width="142">
+<p>0.266666667</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="118">
+<p>61</p>
+</td>
+<td valign="top" width="102">
+<p>12.75</p>
+</td>
+<td valign="top" width="142">
+<p>0.266666667</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="118">
+<p>61</p>
+</td>
+<td valign="top" width="102">
+<p>12.75</p>
+</td>
+<td valign="top" width="142">
+<p>0.266666667</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>18</p>
+</td>
+<td valign="top" width="118">
+<p>76</p>
+</td>
+<td valign="top" width="102">
+<p>12.75</p>
+</td>
+<td valign="top" width="142">
+<p>0.266666667</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>3/5/2012</p>
+</td>
+<td valign="top" width="82">
+<p>14</p>
+</td>
+<td valign="top" width="118">
+<p>76</p>
+</td>
+<td valign="top" width="102">
+<p>14</p>
+</td>
+<td valign="top" width="142">
+<p>0.066666667</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="118">
+<p>61</p>
+</td>
+<td valign="top" width="102">
+<p>18</p>
+</td>
+<td valign="top" width="142">
+<p>0.133333333</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>19</p>
+</td>
+<td valign="top" width="118">
+<p>68</p>
+</td>
+<td valign="top" width="102">
+<p>18</p>
+</td>
+<td valign="top" width="142">
+<p>0.133333333</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>13</p>
+</td>
+<td valign="top" width="118">
+<p>61</p>
+</td>
+<td valign="top" width="102">
+<p>14.5</p>
+</td>
+<td valign="top" width="142">
+<p>0.133333333</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>16</p>
+</td>
+<td valign="top" width="118">
+<p>76</p>
+</td>
+<td valign="top" width="102">
+<p>14.5</p>
+</td>
+<td valign="top" width="142">
+<p>0.133333333</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h1>Using Subselects</h1>
+<p>As many of you know, subselect statements in SQL Server are supported, but harder to optimize in SQL Server versus Oracle.  Until window functions were introduced all of the items above could be solved by subselects, but performance would degrade as the results needed to work with larger sets of data.  With the improved functionality in SQL Server 2012, you should not need to use subselects to return row based aggregations.  Besides the performance implications, maintenance will also be much simpler as the SQL becomes more transparent.  For reference, here is the subselect syntax to return the same results as above:</p>
+<p><code class="codespan">select cte.CustomerName<br />
+	,cte.OrderDate<br />
+	,cte.OrderAmt<br />
+	,(select SUM(OrderAmt) from CTEOrders where CustomerName = cte.CustomerName) CustomerTotal<br />
+	,(select AVG(OrderAmt) from CTEOrders where OrderDate = cte.OrderDate) AvgDailyAmt<br />
+	,(select cast(COUNT(OrderID) as DECIMAL(8,3)) from CTEOrders where OrderDate = cte.OrderDate)<br />
+		/ (select cast(COUNT(OrderID) as DECIMAL(8,3)) from CTEOrders) AvgDailyAmt<br />
+   from CTEOrders cte<br />
+   order by cte.OrderDate;</code></p>
+<p>As you can see, while it is possible to solve the same function using the subselects, the code is already getting messier and with data sets larger than what we have here, you would definitely see performance degredation.</p>
+<h1>Some Thoughts on GROUP BY</h1>
+<p>While I am digressing, I wanted to also highlight some details concerning GROUP BY.  The one the biggest difficulties working with the GROUP BY clause and aggregates, every column must either be a part of the GROUP BY or have an aggregation associated with it.  The window functions help solve this problem as well.<br />
+In the following examples, the first query returns the sum of the amount by day.  This is pretty standard logic when working with aggregated queries in SQL.</p>
+<p><code class="codespan">select OrderDate<br />
+	,sum(OrderAmt) as DailyOrderAmt<br />
+from CTEOrders<br />
+group by OrderDate;</code></p>
+<p>However, if you wanted to see more details, but not include them in the aggregation, the following will not work.  </p>
+<p><code class="codespan">select OrderDate<br />
+	,OrderID<br />
+	,OrderAmt<br />
+	,sum(OrderAmt) as DailyOrderAmt<br />
+from CTEOrders<br />
+group by OrderDate<br />
+	,OrderID<br />
+	,OrderAmt;</code></p>
+<p>This SQL statement will reach row individually with the sum at the detail level.  You can solve this using the subselect above which is not recommended or you can use a window function.  </p>
+<p><code class="codespan">select OrderDate<br />
+	,OrderID<br />
+	,OrderAmt<br />
+	,sum(OrderAmt) OVER (PARTITION BY OrderDate) as DailyOrderAmt<br />
+from CTEOrders</code></p>
+<p>As you can see here and in previous examples the OVER clause allows you to manage the grouping based on the context specified in relationship to the current row.<br />
+One other twist on the GROUP BY clause.  First, I need to give credit to Itzik Ben-Gan for calling this to my attention at one of our Minnesota SQL Server User Group meetings.  In his usual fashion he was showing some T-SQL coolness and he showed an interesting error when using the OVER clause with the GROUP BY clause.</p>
+<p>The following will return an error because the first expression is an aggregate, but the second expression which is using the OVER clause is not.  Also note that in this example the OVER clause is being evaluated for the entire set of data.</p>
+<p><code class="codespan">select sum(OrderAmt)<br />
+	, sum(OrderAmt) over() as TotalOrderAmt<br />
+from CTEOrders<br />
+group by CustomerName</code></p>
+<p>The expression above returns the following error:<br />
+<span class="MT_red">Column &#8216;CTEOrders.OrderAmt&#8217; is invalid in the select list because it is not contained in either an aggregate function or the GROUP BY clause</span></p>
+<p>The goal of the statement above was to show the customer’s total order amount with the overall order amount.  The following statement resolves this issue because it is aggregating the aggregates.  The window is now summing the aggregated amount which are grouped on the customer name.</p>
+<p><code class="codespan">select sum(OrderAmt)<br />
+	, sum(sum(OrderAmt)) over() as TotalOrderAmt<br />
+from CTEOrders<br />
+group by CustomerName</code></p>
+<p>Thanks again to Itzik for bringing this problem and resolution to my attention.</p>
+<h1>Aggregates with ORDER BY</h1>
+<p>With the expansion of the OVER clause to include ORDER BY support with aggregates, window functions increased their value substantially.  One of the key business problems this allowed us to solve was a running aggregate.  </p>
+<p>The first example shows how to get a running total by customer based on date and order ID.  </p>
+<p><code class="codespan">select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+	,SUM(OrderAmt) OVER (PARTITION BY CustomerName ORDER BY OrderDate, OrderID) as RunningByCustomer<br />
+   from CTEOrders<br />
+   ORDER BY CustomerName, OrderDate;</code></p>
+<h3>Results</h3>
+<table cellspacing="0" cellpadding="0" border="1">
+<tbody>
+<tr>
+<td valign="top" width="67">
+<p><b>OrderID</b></p>
+</td>
+<td valign="top" width="87">
+<p><b>OrderDate</b></p>
+</td>
+<td valign="top" width="82">
+<p><b>OrderAmt</b></p>
+</td>
+<td valign="top" width="125">
+<p><b>CustomerName</b></p>
+</td>
+<td valign="top" width="158">
+<p><b>RunningByCustomer</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>3</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="158">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>7</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="158">
+<p>20</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>10</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="158">
+<p>31</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>12</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="158">
+<p>48</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>14</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>13</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="158">
+<p>61</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>1</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="158">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>4</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>15</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="158">
+<p>25</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>6</p>
+</td>
+<td valign="top" width="87">
+<p>3/3/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="158">
+<p>37</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>9</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="158">
+<p>49</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>13</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>19</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="158">
+<p>68</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>2</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="158">
+<p>11</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>5</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="158">
+<p>28</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>8</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>18</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="158">
+<p>46</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>11</p>
+</td>
+<td valign="top" width="87">
+<p>3/5/2012</p>
+</td>
+<td valign="top" width="82">
+<p>14</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="158">
+<p>60</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>15</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>16</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="158">
+<p>76</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>This next example is more creative.  It begins to show how powerful the window functions are.  In this statement, we are going to return the annual running total aggregated by day.  The differentiator here is that we use a DATEPART function in the OVER clause to achieve the desired results.</p>
+<p><code class="codespan">select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+	,SUM(OrderAmt) OVER (PARTITION BY datepart(yyyy, OrderDate) ORDER BY OrderDate) as AnnualRunning<br />
+   from CTEOrders<br />
+   ORDER BY OrderDate;</code></p>
+<h3>Results</h3>
+<table cellspacing="0" cellpadding="0" border="1">
+<tbody>
+<tr>
+<td valign="top" width="67">
+<p><b>OrderID</b></p>
+</td>
+<td valign="top" width="87">
+<p><b>OrderDate</b></p>
+</td>
+<td valign="top" width="82">
+<p><b>OrderAmt</b></p>
+</td>
+<td valign="top" width="125">
+<p><b>CustomerName</b></p>
+</td>
+<td valign="top" width="118">
+<p><b>AnnualRunning</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>1</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>21</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>2</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>21</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>3</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>63</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>4</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>15</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>63</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>5</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>63</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>6</p>
+</td>
+<td valign="top" width="87">
+<p>3/3/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>75</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>7</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>126</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>8</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>18</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>126</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>9</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>126</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>10</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>126</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>11</p>
+</td>
+<td valign="top" width="87">
+<p>3/5/2012</p>
+</td>
+<td valign="top" width="82">
+<p>14</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>140</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>12</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>176</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>13</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>19</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>176</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>14</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>13</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>205</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>15</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>16</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>205</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The ORDER BY clause creates an expanding group within the partition.  In the examples above, the partition was the customer.  Within each partition, ordered groups based on order date and order id are “created”.  At each row, the order date and order id groups are aggregated up to the current row’s group thus producing the running total.  If more than one row has the same order grouping, all of the rows in the group are aggregated into the total as shown in the second example above with the days and years. </p>
+<h1>Aggregates with ROWS</h1>
+<p>The ROWS clause is used to further define the partition by specifying which physical rows to include based on their proximity to the current row.  As noted in the first post in the series, ROWS requires the ORDER BY clause as this determines the orientation of the partition.  </p>
+<p>The following example uses the FOLLOWING keywords to find the next two purchases that the customer made. </p>
+<p><code class="codespan">select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+	,SUM(OrderAmt) OVER (PARTITION BY CustomerName ORDER BY OrderDate, OrderID ROWS BETWEEN 1 FOLLOWING and 2 FOLLOWING) as NextTwoAmts<br />
+   from CTEOrders<br />
+   order by CustomerName, OrderDate, OrderID;</code></p>
+<h3>Results</h3>
+<table cellspacing="0" cellpadding="0" border="1">
+<tbody>
+<tr>
+<td valign="top" width="67">
+<p><b>OrderID</b></p>
+</td>
+<td valign="top" width="87">
+<p><b>OrderDate</b></p>
+</td>
+<td valign="top" width="82">
+<p><b>OrderAmt</b></p>
+</td>
+<td valign="top" width="125">
+<p><b>CustomerName</b></p>
+</td>
+<td valign="top" width="118">
+<p><b>NextTwoAmts</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>3</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>21</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>7</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>28</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>10</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>30</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>12</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>13</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>14</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>13</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="118">
+<p>NULL</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>1</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>27</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>4</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>15</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>24</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>6</p>
+</td>
+<td valign="top" width="87">
+<p>3/3/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>31</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>9</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>19</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>13</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>19</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="118">
+<p>NULL</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>2</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>35</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>5</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>32</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>8</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>18</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>30</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>11</p>
+</td>
+<td valign="top" width="87">
+<p>3/5/2012</p>
+</td>
+<td valign="top" width="82">
+<p>14</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>16</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>15</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>16</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="118">
+<p>NULL</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>As we noted in the first blog, the last two rows in the partition only contain partial values.  For example, order ID 12 contains the sum of only one order, 14, and order ID 14 has now rows following it in the partition and returns NULL as a result.  When working with the ROWS clause this must be taken into account.  </p>
+<h1>Aggregates with RANGE</h1>
+<p>Lastly, adding the RANGE to the OVER clause allows you to create aggregates which go to the beginning or end of the partition.  RANGE is commonly used with UNBOUNDED FOLLOWING which goes to the end of the partition and UNBOUNDED PRECEDING which goes to the beginning of the partition.  One of the most common use would be to specify the rows from the beginning of the partition to the current row which allows for aggregations such as year to date.  </p>
+<p>In the example below, we are calculating the average order size over time to the current row.  This could be a very effective in a trending report.  </p>
+<p><code class="codespan">select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+	,AVG(OrderAmt) OVER (ORDER BY OrderID RANGE BETWEEN UNBOUNDED PRECEDING and CURRENT ROW) as AvgOrderAmt<br />
+   from CTEOrders<br />
+   order by OrderDate;</code></p>
+<h3>Results</h3>
+<table cellspacing="0" cellpadding="0" border="1">
+<tbody>
+<tr>
+<td valign="top" width="67">
+<p><b>OrderID</b></p>
+</td>
+<td valign="top" width="87">
+<p><b>OrderDate</b></p>
+</td>
+<td valign="top" width="82">
+<p><b>OrderAmt</b></p>
+</td>
+<td valign="top" width="125">
+<p><b>CustomerName</b></p>
+</td>
+<td valign="top" width="107">
+<p><b>AvgOrderAmt</b></p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>1</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="107">
+<p>10</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>2</p>
+</td>
+<td valign="top" width="87">
+<p>3/1/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="107">
+<p>10.5</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>3</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="107">
+<p>10.333333</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>4</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>15</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="107">
+<p>11.5</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>5</p>
+</td>
+<td valign="top" width="87">
+<p>3/2/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="107">
+<p>12.6</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>6</p>
+</td>
+<td valign="top" width="87">
+<p>3/3/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="107">
+<p>12.5</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>7</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>10</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="107">
+<p>12.142857</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>8</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>18</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="107">
+<p>12.875</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>9</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>12</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="107">
+<p>12.777777</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>10</p>
+</td>
+<td valign="top" width="87">
+<p>3/4/2012</p>
+</td>
+<td valign="top" width="82">
+<p>11</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="107">
+<p>12.6</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>11</p>
+</td>
+<td valign="top" width="87">
+<p>3/5/2012</p>
+</td>
+<td valign="top" width="82">
+<p>14</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="107">
+<p>12.727272</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>12</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>17</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="107">
+<p>13.083333</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>13</p>
+</td>
+<td valign="top" width="87">
+<p>3/6/2012</p>
+</td>
+<td valign="top" width="82">
+<p>19</p>
+</td>
+<td valign="top" width="125">
+<p>Joe</p>
+</td>
+<td valign="top" width="107">
+<p>13.538461</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>14</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>13</p>
+</td>
+<td valign="top" width="125">
+<p>Beth</p>
+</td>
+<td valign="top" width="107">
+<p>13.5</p>
+</td>
+</tr>
+<tr>
+<td valign="top" width="67">
+<p>15</p>
+</td>
+<td valign="top" width="87">
+<p>3/7/2012</p>
+</td>
+<td valign="top" width="82">
+<p>16</p>
+</td>
+<td valign="top" width="125">
+<p>Sam</p>
+</td>
+<td valign="top" width="107">
+<p>13.666666</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>As you can see, the latest versions of OVER clause supports powerful yet simple aggregations which can help in a multitude of reporting and business solutions. Up next, the last blog in the series – Analytic Functions which are all new in SQL Server 2012.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part-03/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Window Functions &#8211; Part 2: Ranking Functions</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part-2/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part-2/#respond</comments>
+		<pubDate>Tue, 11 Sep 2012 17:33:00 +0000</pubDate>
+		<dc:creator><![CDATA[Steve Hughes (DataOnWheels)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/09/t-sql-window-functions-part-2/</guid>
+		<description><![CDATA[This is part 2 in my series on SQL window functions.  In this post, we will explore using ranking functions.  SQL Server support four different ranking functions which are supported in SQL Server versions 2005 and forward.  All of these functions requir&#8230;]]></description>
+				<content:encoded><![CDATA[<p><html><br />
+This is part 2 in my series on SQL window functions.  In this post, we will explore using ranking functions.  SQL Server support four different ranking functions which are supported in SQL Server versions 2005 and forward.  All of these functions require the use of the OVER clause.<br />
+The following functions are classified as ranking functions:<br />
+•	ROW_NUMBER<br />
+•	RANK<br />
+•	DENSE_RANK<br />
+•	NTILE<br />
+Once again, the following CTE will be used as the query in all examples throughout the post:</p>
+<p><code class="codespan">with CTEOrders as<br />
+	(select cast(1 as int) as OrderID, cast('3/1/2012' as date) as OrderDate, cast(10.00 as money) as OrderAmt, 'Joe' as CustomerName<br />
+	union select 2, '3/1/2012', 11.00, 'Sam'<br />
+	union select 3, '3/2/2012', 10.00, 'Beth'<br />
+	union select 4, '3/2/2012', 15.00, 'Joe'<br />
+	union select 5, '3/2/2012', 17.00, 'Sam'<br />
+	union select 6, '3/3/2012', 12.00, 'Joe'<br />
+	union select 7, '3/4/2012', 10.00, 'Beth'<br />
+	union select 8, '3/4/2012', 18.00, 'Sam'<br />
+	union select 9, '3/4/2012', 12.00, 'Joe'<br />
+	union select 10, '3/4/2012', 11.00, 'Beth'<br />
+	union select 11, '3/5/2012', 14.00, 'Sam'<br />
+	union select 12, '3/6/2012', 17.00, 'Beth'<br />
+	union select 13, '3/6/2012', 19.00, 'Joe'<br />
+	union select 14, '3/7/2012', 13.00, 'Beth'<br />
+	union select 15, '3/7/2012', 16.00, 'Sam'<br />
+	)<br />
+select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+   from CTEOrders;</code></p>
+<p><h1>ROW_NUMBER</h1>
+<p>The ROW_NUMBER function will return a row number for each row within the partition based on the partition and order.  This function requires the use of the ORDER BY clause.  However, it is often used without the PARTITION BY clause as it will number the entire result set.  If PARTITION BY is used, then the row numbering starts over within the partition.  The following code shows how both of these work.  </p>
+<p><code class="codespan">select CustomerName<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,ROW_NUMBER() OVER(ORDER BY CustomerName) RowNumByCust<br />
+	,ROW_NUMBER() OVER(PARTITION BY OrderDate ORDER BY CustomerName) RowNumPart<br />
+   from CTEOrders<br />
+   order by CustomerName;</code></p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/RowNumberResults2.JPG?mtime=1346987735"><img src="/wp-content/uploads/blogs/DataMgmt/RowNumberResults2.JPG?mtime=1346987735" width="766" height="361" /></a></div>
+<h1>RANK and DENSE_RANK</h1>
+<p>While these are different functions with even different rules, it is easier to understand the difference when put side by side.  RANK and DENSE_RANK will order the rows based on the specified partition and apply a rank or number to them.  Both RANK and DENSE_RANK will assign the same rank to “ties”.  For example if rows 3 and 4 have the same value in the partition, they will have the same rank.  The difference is how it handles the next rank number in the series.  RANK does a “true” ordering and will apply the ranking based on the number of rows and skip numbers that are ties.  So, if you have a tie between the third and fourth row and the first two rows and the final row are unique the ranking is as follows:  1, 2, 3, 3, 5.  As you can see, 4 is missing. DENSE_RANK keeps the tie as well, however it does not skip any numbers in the sequence.  Here is the same example set based on using DENSE_RANK: 1, 2, 3, 3, 4.  As with the ROW_NUMBER function, the ORDER BY is required for these functions.</p>
+<p><code class="codespan">select CustomerName<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,RANK() OVER(ORDER BY CustomerName) RankByCust<br />
+	,DENSE_RANK() OVER(ORDER BY CustomerName) DenseByCust<br />
+	,RANK() OVER(PARTITION BY CustomerName ORDER BY OrderDate) RankByCustDt<br />
+	,DENSE_RANK() OVER(PARTITION BY CustomerName ORDER BY OrderDate) DenseByCustDt<br />
+   from CTEOrders<br />
+   order by CustomerName;</code></p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/RankResults2.JPG?mtime=1346987733"><img src="/wp-content/uploads/blogs/DataMgmt/RankResults2.JPG?mtime=1346987733" width="978" height="394" /></a></div>
+<h1>NTILE</h1>
+<p>The last of the ranking functions is NTILE.  NTILE groups the data into ordered and ranked groups based on the ORDER BY clause.  The number of groups used in the ranking are specified in the function itself.  So if you specify four groups to produce a quartile ranking, four ranked values, one through four, will be assigned to each group based on the order.  In many cases, the total numbers of rows is not divisible by the number of groups chosen.  For instance, if the number of groups is 4 but the total number of rows is 39, then the first three groups will return 10 rows and the final group will only return 9 rows.  The function will always frontload the results so the earliest groups will have the “extra” rows.   If a PARTITION BY clause is used, the NTILE ranking will applied within each partition.   As with the other ranking functions, the ORDER BY clause is required to use this function.</p>
+<p><code class="codespan">select CustomerName<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,NTILE(4) OVER(ORDER BY OrderDate) NtileByDt<br />
+	,NTILE(2) OVER(PARTITION BY OrderDate ORDER BY OrderAmt) NtileByDtAmt<br />
+   from CTEOrders<br />
+   order by OrderDate;</code></p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/NtileResults2.jpg?mtime=1346988047"><img src="/wp-content/uploads/blogs/DataMgmt/NtileResults2.JPG?mtime=1346988047" width="741" height="507" /></a></div>
+<p>Up next, using aggregate functions with window functions.</p>
+<p></html></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part-2/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Window Functions &#8211; Part 1: The OVER Clause</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part1/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part1/#comments</comments>
+		<pubDate>Thu, 06 Sep 2012 11:44:00 +0000</pubDate>
+		<dc:creator><![CDATA[Steve Hughes (DataOnWheels)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[order by]]></category>
+		<category><![CDATA[over]]></category>
+		<category><![CDATA[partition by]]></category>
+		<category><![CDATA[window function]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/09/t-sql-window-functions-part1/</guid>
+		<description><![CDATA[SQL Window functions were introduced in SQL Server 2005.  At the time, only a small set of functionality was available.  Window functions fill a need in the aggregation story for SQL Server.  Window functions allow the developer to use row level aggrega&#8230;]]></description>
+				<content:encoded><![CDATA[<p>SQL Window functions were introduced in SQL Server 2005.  At the time, only a small set of functionality was available.  Window functions fill a need in the aggregation story for SQL Server.  Window functions allow the developer to use row level aggregations without the penalty of using cursors to accomplish the same task.  Window functions allow you to segment a set of rows and then apply a function to that set of rows.  In many cases, you may choose an aggregation function.  However, other functions are also available including ranking and analytic functions.  In this four-part series, I will start by breaking apart the OVER clause which is the key to understanding window functions in SQL Server.  The following posts will expand on each group of window functions which use the OVER clause – ranking, aggregate, and analytic.</p>
+<p>Up until 2008 R2, SQL Server only supported a subset of window functions which focused on ranking and some aggregation functions.  With SQL Server 2012, Microsoft greatly expanded its support for window functions in T-SQL thus making fairly complex operations such as running totals much simpler to accomplish.  </p>
+<p>The following CTE will be used as the query in all examples throughout the post:<br />
+<code class="codespan">with CTEOrders as<br />
+	(select cast(1 as int) as OrderID, cast('3/1/2012' as date) as OrderDate, cast(10.00 as money) as OrderAmt, 'Joe' as CustomerName<br />
+	union select 2, '3/1/2012', 11.00, 'Sam'<br />
+	union select 3, '3/2/2012', 10.00, 'Beth'<br />
+	union select 4, '3/2/2012', 15.00, 'Joe'<br />
+	union select 5, '3/2/2012', 17.00, 'Sam'<br />
+	union select 6, '3/3/2012', 12.00, 'Joe'<br />
+	union select 7, '3/4/2012', 10.00, 'Beth'<br />
+	union select 8, '3/4/2012', 18.00, 'Sam'<br />
+	union select 9, '3/4/2012', 12.00, 'Joe'<br />
+	union select 10, '3/4/2012', 11.00, 'Beth'<br />
+	union select 11, '3/5/2012', 14.00, 'Sam'<br />
+	union select 12, '3/6/2012', 17.00, 'Beth'<br />
+	union select 13, '3/6/2012', 19.00, 'Joe'<br />
+	union select 14, '3/7/2012', 13.00, 'Beth'<br />
+	union select 15, '3/7/2012', 16.00, 'Sam'<br />
+	)<br />
+select OrderID<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,CustomerName<br />
+   from CTEOrders;<br />
+</code></p>
+<h1>Defining the Window with the OVER Clause</h1>
+<p>The purpose of the OVER clause is to define the window over which the function will be applied.  The default functionality is to define the window for the entire table.  As shown in the example below, the result is the same as if you had used an aggregation function without a GROUP BY clause.  Some of what makes OVER unique includes the fact different windows can be specified in a single SELECT statement as will be shown in later sections.  </p>
+<p><code class="codespan">...<br />
+select CustomerName<br />
+	,SUM(OrderAmt) OVER () as NoParm<br />
+   from CTEOrders;<br />
+</code></p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/NoParmResults.jpg?mtime=1346902398"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/NoParmResults.jpg?mtime=1346902398" width="301" height="239" /></a></div>
+<p>The OVER clause takes three additional arguments to change the scope of the clause &#8212; PARTITION BY, ORDER BY, and ROWS or RANGE.   </p>
+<h2>PARTITION BY</h2>
+<p>The PARTITION BY clause is used to reduce the scope of the window to which the aggregation applies.  This clause partitions the default or entire result set into partitions based on the criteria specified.  As a BI developer who has worked a lot with MDX and cubes this is the same concept as a slice.  The function will be applied to each partition independently.  At this point, we begin to see the real power of window functions.  While similar to the GROUP BY clause, the PARTITION BY clause allows you to specify different partitions within the same select statement.  The following example builds on the illustration above with no partition specified and a partition on the CustomerName field.</p>
+<p><code class="codespan">select CustomerName<br />
+	,SUM(OrderAmt) OVER () as NoParm<br />
+	,SUM(OrderAmt) OVER (PARTITION BY CustomerName) as PartByName<br />
+   from CTEOrders;<br />
+</code></p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/PartitionByResults.jpg?mtime=1346902402"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/PartitionByResults.jpg?mtime=1346902402" width="474" height="365" /></a></div>
+<h2>ORDER BY</h2>
+<p>The ORDER BY clause is used to order how the partitions apply the window function. For instance, when an ORDER BY is present in our current illustration, it will sum all of Beth’s order amounts, but will then add Joe’s to the total as he is the next in order.  In the following illustration, no partition is specified so the partition is still the whole table.  You can now see how partitions and ordering affect the window function.  </p>
+<p><code class="codespan">select CustomerName<br />
+	,SUM(OrderAmt) OVER () as NoParm<br />
+	,SUM(OrderAmt) OVER (PARTITION BY CustomerName) as PartByName<br />
+	,SUM(OrderAmt) OVER (ORDER BY CustomerName) as OrderByName<br />
+   from CTEOrders;<br />
+</code></p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/OrderByResults.jpg?mtime=1346902400"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/OrderByResults.jpg?mtime=1346902400" width="589" height="367" /></a></div>
+<p>As you can see, if no partition is specified the order will apply to the entire result set or the default partition.  This is particularly important to understand when using ranking functions with the OVER clause.  Before SQL Server 2012, the ORDER BY clause could only be used with ranking functions.  With the release of SQL Server 2012, the ORDER BY clause can now be used with ranking, aggregate, and analytic functions.</p>
+<p>The following image visually illustrates the how the PARTITION BY and ORDER BY clauses aggregate and rank data.</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/PartitionIllustration.JPG?mtime=1346938792"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/PartitionIllustration.JPG?mtime=1346938792" width="1220" height="506" /></a></div>
+<h2>ROWS or RANGE</h2>
+<p>The final clauses that can be used to define a partition are the ROWS and RANGE functions.  This functionality was introduced in SQL Server 2012.  These functions will specify a set of rows based on the position of the current row and as a result both functions require the use of the ORDER BY clause.  Because each partition is anchored to the current row, the rows or range specifications are based on their proximity to the current row.  A number of key words can be used with this clause to define the window frame used by the window functions.   </p>
+<p>•	CURRENT ROW: That’s what it means.  It identifies the current row as part of the ROWS or RANGE.  This key word is supported by ROWS and RANGE.<br />
+•	UNBOUNDED PRECEDING:  Go to the beginning of the partition.  This is supported by both ROWS and RANGE.<br />
+•	UNBOUNDED FOLLOWING:  Go to the end of the partition.  This is supported by both ROWS and RANGE.<br />
+•	<em>n</em> PRECEDING: This is used to specify the number of rows before the current row.  This is only supported by the ROWS clause.<br />
+•	<em>n</em> FOLLOWING:  This is used to specify the number of rows after the current row.  This is only supported by the ROWS clause.</p>
+<p><code class="codespan">select CustomerName<br />
+	,SUM(OrderAmt) OVER () as NoParm<br />
+	,SUM(OrderAmt) OVER (PARTITION BY CustomerName) as PartByName<br />
+	,SUM(OrderAmt) OVER (ORDER BY CustomerName) as OrderByName<br />
+	,SUM(OrderAmt) OVER (PARTITION BY CustomerName ORDER BY OrderDate, OrderID RANGE BETWEEN UNBOUNDED PRECEDING and CURRENT ROW) as RangeByDate<br />
+	,SUM(OrderAmt) OVER (PARTITION BY CustomerName ORDER BY OrderDate, OrderID ROWS BETWEEN 1 FOLLOWING and 2 FOLLOWING) as NextTwoAmts<br />
+   from CTEOrders;<br />
+</code></p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/RowRangeResults.jpg?mtime=1346902407"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/RowRangeResults.jpg?mtime=1346902407" width="936" height="371" /></a></div>
+<p>A couple of other notes regarding ROWS and RANGE.  In cases where the partition returns no rows, the value returned is NULL by default as seen in rows 5 and 10 above.  Also, if the partition only returns fewer rows than specified it will only apply to rows within the range.  In the example above, row 4 NextTwoAmts column will only return the sum of row 5 as it is the only row included in the partition. </p>
+<p>Finally, ROWS and RANGE react differently when only the CURRENT ROW is specified.  When CURRENT ROW is used by itself with the RANGE clause it will apply the function based on the partitioning and ordering.  However, when used with the ROWS clause, it will only return the current row regardless of the partition specification.</p>
+<p><code class="codespan">select CustomerName<br />
+	,OrderDate<br />
+	,OrderAmt<br />
+	,SUM(OrderAmt) OVER (PARTITION BY CustomerName ORDER BY OrderDate RANGE CURRENT ROW) as RangeRow<br />
+	,SUM(OrderAmt) OVER (PARTITION BY CustomerName ORDER BY OrderDate ROWS CURRENT ROW) as RowRow<br />
+   from CTEOrders;<br />
+</code></p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/CurrentRowResults.jpg?mtime=1346902397"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/CurrentRowResults.jpg?mtime=1346902397" width="656" height="235" /></a></div>
+<p>Stay tuned over the next three weeks where I will discuss ranking functions, aggregate functions and analytic functions.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/t-sql-window-functions-part1/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Choosing an Analysis Engine</title>
+		<link>/index.php/datamgmt/ssas/choosing-an-analysis-solution/</link>
+		<comments>/index.php/datamgmt/ssas/choosing-an-analysis-solution/#comments</comments>
+		<pubDate>Thu, 21 Jun 2012 16:46:00 +0000</pubDate>
+		<dc:creator><![CDATA[Steve Hughes (DataOnWheels)]]></dc:creator>
+				<category><![CDATA[SSAS]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/06/choosing-an-analysis-solution/</guid>
+		<description><![CDATA[With the introduction of the SQL Server PowerPivot for Excel and SharePoint in SQL Server 2008 R2, Microsoft gave us another analysis engine we could use with our data. While not embedded into the SQL Server stack at the time, it was clear that in-memor&#8230;]]></description>
+				<content:encoded><![CDATA[<p>With the introduction of the SQL Server PowerPivot for Excel and SharePoint in SQL Server 2008 R2, Microsoft gave us another analysis engine we could use with our data. While not embedded into the SQL Server stack at the time, it was clear that in-memory technologies are the next generation of analysis in Microsoft. </p>
+<h3><b>xVelocity</b> formerly known as Vertipaq</h3>
+<p>When it was initially released, the in-memory data solution was called Vertipaq. With the release of SQL Server 2012, the Vertipaq engine was rebranded to xVelocity which includes all of Microsoft’s in-memory technologies. In the case of SQL Server and PowerPivot, Vertipaq is called “xVelocity in-memory analytics engine”, which I will refer to as xVelocity for the duration of this blog.</p>
+<h3>The Engine Options</h3>
+<p>Now that we have covered the xVelocity impact and name change, I want to call out the three core data analysis engines Microsoft has made available through SQL Server. <em>(Note: I am referring to these as engines to differentiate between end user tools and those tools which store and organize data for use. Here an engine is used to store and organize data for analysis.)</em> Microsoft’s original data analysis engine was OLAP Services which has grown into Analysis Services – Multidimensional Model. Next came PowerPivot followed by Analysis Services –Tabular Model.</p>
+<h4>Analysis Services – Multidimensional Model</h4>
+<p>Being the original analysis and aggregation engine delivered by Microsoft, it has the most mature tools and largest following. While all three options have a heavy memory requirement, the Multidimensional model uses memory for caching. The actual database is stored in the file system and optimized for indexing and retrieval. Currently, the largest cube in the world is well over 20 Terabytes and continues to grow. However, to support these large cubes, storage systems must be configured to handle large amounts of random reads. The best techniques used today include short-stroking moving hard disk media (using only a percentage of the available disk space, usually the outer ring) and solid state disk drives. In order to be a high performing solution, the database needs to be deployed to properly configured storage with sufficient server memory to handle large amounts of cache.</p>
+<p>Beyond the storage difference, the multidimensional model natively supports MDX which is a powerful scripting language for complex queries. This language is supported in Excel, Reporting Services and a number of other reporting and dashboard tools. Furthermore, the multidimensional model is the only option that supports actions, many-to-many relationships, and writeback. You should also be aware that this model supports role-playing dimensions which is not currently supported in either of the in-memory options.  If you have a business need for any of these options, then multidimensional models are the correct engine for your solution. </p>
+<h4>PowerPivot</h4>
+<p>The next engine released by Microsoft was the PowerPivot add-in for SharePoint and Excel. This allows users to build an in-memory data store from disparate data sources in Excel and deploy it for shared use in SharePoint. One of the key goals behind this solution was the ability to create an analysis tool without needing the overhead of moving data to new server location via ETL. </p>
+<p>PowerPivot allows a user to add data into their PowerPivot tables from a variety of data sources including SQL Server, Oracle, Excel, text and even SSRS reports. Once the data has been “loaded” into the PowerPivot tables, the user can build relationships between the tables allowing for a “cube-like” experience without building a cube or ETL process. Once built and deployed to SharePoint, you can build reports against a PowerPivot data source in the same manner you would build a report against the multidimensional model. </p>
+<p>PowerPivot does support calculations and uses DAX as its native query language. This is the same query language used in the Tabular model and can be considered the query language for Microsoft’s in-memory data stores.<br />
+Finally, it is important to note that the size limit for a PowerPivot database is 2 GB. This is an “artificial” restriction that allows it to be uploaded into SharePoint. While this does hold a large amount of data because of the compression capability of xVelocity, it is still smaller in scope than either the multidimensional or tabular model options.</p>
+<h4>Analysis Services – Tabular Model</h4>
+<p>In SQL Server 2012, Microsoft introduced the tabular model. This is the “grown up” version of PowerPivot. The tabular model can be built with Visual Studio or migrated from PowerPivot for Excel. The tabular model is also an in-memory data store built on xVelocity. However, the tabular model is limited by the memory available on the server as opposed to the fixed 2 GB limit in PowerPivot. The primary design difference is that the tabular model supports partitions which support scoped data refresh reducing the update time for the model.  Beyond partitioning and database size, the capabilities in the tabular model and PowerPivot 2012 version are very similar.</p>
+<h3>Choosing the Right Engine</h3>
+<p>Now that you have an idea of each type of engine made available for analysis, you will need to choose which engine or what mix of engines will be appropriate for your environment. I would encourage you to evaluate the utilization of the data, the size of the data, and the quality of the data as your guides. </p>
+<p>First, if you want to take advantage of Power View, you will need to use an in-memory option. Power View requires the data source to use DAX and that is only supported by tabular models and PowerPivot at this time.  Because the drivers used by Reporting Services can reference the in-memory data from either source using MDX, you should have no other usage issues in reporting. </p>
+<p>The next consideration is the size. If you have a large set of data you will need to look at multidimensional or tabular models in Analysis Services. Either of these options supports larger data sets than PowerPivot. </p>
+<p>Finally, if your data is not very clean or very complex, you will need to move the data via ETL first. However, after it is moved you will be able to use any of the engines to work with that data. I would definitely encourage you to move the data into a star schema model so that it can be easily used by all analytic engines.</p>
+<p>As you start working with the solutions, you will likely find tabular models and PowerPivot easier to use. However, as your system mature and you have a more complex calculations or data structures such as many-to-many you will be better served working with the multidimensional model. </p>
+<h3>Wrap Up</h3>
+<p>A solid BI solution within any company will likely be a combination of each of these engines based on the business need. A natural progression could be a business user creates a PowerPivot source that is deployed to SharePoint. This eventually can get upgraded to tabular to support additional growth in users and data volume. From there, you can build out a multidimensional model to support more complex structures as the requirements grow. The one thing that is true about BI is that it will always change. So planning for change and involving the business in the process will help the BI solution be a central part of the business without becoming that database that no one uses.</p>
+<p>Keep your options open and use what is available to you to deliver the best solution you can to your users.  With Microsoft’s BI offerings you have a multiple engine options as well as a diverse set of visualization tools in SQL Server, SharePoint and Office.  In the end, if your BI solution is not usable or correct, it is not the right solution.</p>
+<p>For more information, check out Microsoft’s Business Intelligence site which has information on all of Microsoft’s offerings as well as the MSDN topic on Comparing Tabular and Multidimensional Solutions.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/ssas/choosing-an-analysis-solution/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+	</channel>
+</rss>

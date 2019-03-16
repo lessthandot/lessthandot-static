@@ -1,0 +1,937 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>html &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/html/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Create HTML from output of Perl::Critic</title>
+		<link>/index.php/webdev/perl/create-html-from-output-of/</link>
+		<comments>/index.php/webdev/perl/create-html-from-output-of/#comments</comments>
+		<pubDate>Sat, 22 Sep 2012 07:46:00 +0000</pubDate>
+		<dc:creator><![CDATA[Rob Earl]]></dc:creator>
+				<category><![CDATA[Perl]]></category>
+		<category><![CDATA[code quality]]></category>
+		<category><![CDATA[critic]]></category>
+		<category><![CDATA[html]]></category>
+		<category><![CDATA[perl]]></category>
+		<category><![CDATA[perlcritic]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/09/create-html-from-output-of/</guid>
+		<description><![CDATA[Perl::Critic is great. If you haven't tried it, you should. It has helped me improve the quality of my code no end.
+
+I wrote this script to make it easier to view the feedback in the context of the code itself. When run in a directory containing Perl&#8230;]]></description>
+				<content:encoded><![CDATA[<p><a href="http://search.cpan.org/~thaljef/Perl-Critic-1.118/lib/Perl/Critic.pm">Perl::Critic</a> is great. If you haven&#8217;t tried it, you should. It can help you improve the quality of your code no end.</p>
+<p>I wrote this script to make it easier to view the feedback in the context of the code itself. When run in a directory containing Perl code it&#8217;ll create a critic_html directory containing index.html summarizing the results:</p>
+<p><img src="/wp-content/uploads/blogs/WebDev/CriticHtml/critic-html-index.jpg" alt="critic_html/index.html" title="" /></p>
+<p>Clicking through to any of the files will give you all the violations found by Perl::Critic, inline with the code:</p>
+<p><img src="/wp-content/uploads/blogs/WebDev/CriticHtml/critic-html-code.jpg" alt="" title="" /></p>
+<p>In addition to Perl::Critic, the script uses Template::Toolkit to format the output. The code below and templates can be found in the attached <a href="/wp-content/uploads/blogs/WebDev/CriticHtml/critic_html.zip">critic_html.zip</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="perl"><thead><tr><td colspan="2"  class="head">Perl</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+</pre></td><td class="de1"><pre class="de1"><span class="co1">#!/usr/bin/perl</span>
+&nbsp;
+<span class="kw2">use</span> strict<span class="sy0">;</span>
+<span class="kw2">use</span> warnings<span class="sy0">;</span>
+&nbsp;
+<span class="kw2">use</span> Perl<span class="sy0">::</span><span class="me2">Critic</span><span class="sy0">;</span>
+<span class="kw2">use</span> Perl<span class="sy0">::</span><span class="me2">Critic</span><span class="sy0">::</span><span class="me2">Utils</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw2">use</span> Template<span class="sy0">;</span>
+<span class="kw2">use</span> Cwd <span class="kw3">qw</span><span class="br0">&#40;</span>abs_path<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw2">use</span> File<span class="sy0">::</span><span class="me2">Basename</span><span class="sy0">;</span>
+<span class="kw2">use</span> English <span class="kw3">qw</span><span class="br0">&#40;</span><span class="sy0">-</span>no_match_vars<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw2">use</span> constant SEVERITY &nbsp;<span class="sy0">=&gt;</span> <span class="nu0">1</span><span class="sy0">;</span> <span class="co1"># Include all violations.</span>
+<span class="kw2">use</span> constant SKIP_GOOD <span class="sy0">=&gt;</span> <span class="nu0">0</span><span class="sy0">;</span> <span class="co1"># Skip files with no violations?</span>
+&nbsp;
+<span class="kw3">mkdir</span> <span class="st_h">'critic_html'</span><span class="sy0">;</span>
+<span class="kw3">mkdir</span> <span class="st_h">'critic_html/src'</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw2">use</span> autodie<span class="sy0">;</span>
+&nbsp;
+<span class="co1"># Analyse all perl files below the current directory.</span>
+<span class="kw1">my</span> <span class="re0">@files</span> <span class="sy0">=</span> Perl<span class="sy0">::</span><span class="me2">Critic</span><span class="sy0">::</span><span class="me2">Utils</span><span class="sy0">::</span><span class="me2">all_perl_files</span><span class="br0">&#40;</span><span class="kw3">q</span><span class="br0">&#123;</span><span class="sy0">.</span><span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">my</span> <span class="re0">@summary</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span> <span class="co1"># Store statistics on each file processed.</span>
+&nbsp;
+<span class="kw1">foreach</span> <span class="kw1">my</span> <span class="re0">$file</span> <span class="br0">&#40;</span><span class="re0">@files</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1"># Create a new Critic for per file statistics.</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">$critic</span> <span class="sy0">=</span> Perl<span class="sy0">::</span><span class="me2">Critic</span><span class="sy0">-&gt;</span><span class="kw2">new</span><span class="br0">&#40;</span> <span class="st_h">'-severity'</span> <span class="sy0">=&gt;</span> SEVERITY <span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">$file_safe</span> <span class="sy0">=</span> <span class="re0">$file</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="re0">$file_safe</span> <span class="sy0">=~</span> <span class="co2">s/[W]/_/g</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">@violations</span> <span class="sy0">=</span> <span class="re0">$critic</span><span class="sy0">-&gt;</span><span class="me1">critique</span><span class="br0">&#40;</span><span class="re0">$file</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">next</span> <span class="kw1">if</span> <span class="br0">&#40;</span><span class="sy0">!</span><span class="re0">@violations</span> <span class="sy0">&amp;&amp;</span> SKIP_GOOD<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">push</span> <span class="re0">@summary</span><span class="sy0">,</span> <span class="br0">&#123;</span> <span class="st_h">'filename'</span> <span class="sy0">=&gt;</span> <span class="re0">$file</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="st_h">'link'</span> &nbsp; &nbsp; <span class="sy0">=&gt;</span> <span class="st0">&quot;src/$file_safe.html&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="st_h">'stats'</span> &nbsp; &nbsp;<span class="sy0">=&gt;</span> <span class="re0">$critic</span><span class="sy0">-&gt;</span><span class="me1">statistics</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">open</span> <span class="kw1">my</span> <span class="re0">$FH</span><span class="sy0">,</span> <span class="st_h">'&lt;'</span><span class="sy0">,</span> <span class="re0">$file</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">@lines</span> <span class="sy0">=</span> <span class="sy0">&lt;</span><span class="re0">$FH</span><span class="sy0">&gt;;</span>
+&nbsp; &nbsp; <span class="kw3">close</span> <span class="re0">$FH</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># Attach all violations to the line they were found on.</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">@violations_by_line</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">$line_number</span> <span class="sy0">=</span> <span class="nu0">1</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">foreach</span> <span class="kw1">my</span> <span class="re0">$line</span> <span class="br0">&#40;</span><span class="re0">@lines</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1"># Get all the violations for the current line.</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">@line_violations</span> <span class="sy0">=</span> <span class="kw3">grep</span> <span class="br0">&#123;</span> <span class="co5">$_</span><span class="sy0">-&gt;</span><span class="me1">line_number</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">==</span> <span class="re0">$line_number</span><span class="br0">&#125;</span> <span class="re0">@violations</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">push</span> <span class="re0">@violations_by_line</span><span class="sy0">,</span> <span class="br0">&#123;</span> <span class="st_h">'number'</span> &nbsp;<span class="sy0">=&gt;</span> <span class="re0">$line_number</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st_h">'content'</span> <span class="sy0">=&gt;</span> <span class="re0">$line</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st_h">'violations'</span> <span class="sy0">=&gt;</span> <span class="re0">@line_violations</span> <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$line_number</span><span class="sy0">++;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; write_html<span class="br0">&#40;</span><span class="st0">&quot;critic_html/src/$file_safe.html&quot;</span><span class="sy0">,</span> <span class="st_h">'codefile'</span><span class="sy0">,</span> <span class="br0">&#123;</span> <span class="st_h">'title'</span> <span class="sy0">=&gt;</span> <span class="st0">&quot;Critic Analysis of $file&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st_h">'lines'</span> <span class="sy0">=&gt;</span> <span class="re0">@violations_by_line</span> <span class="br0">&#125;</span> <span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+write_html<span class="br0">&#40;</span><span class="st_h">'critic_html/index.html'</span><span class="sy0">,</span> <span class="st_h">'index'</span><span class="sy0">,</span> <span class="br0">&#123;</span> <span class="st_h">'title'</span> <span class="sy0">=&gt;</span> <span class="st_h">'Perl::Critic::HTML Summary'</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st_h">'files'</span> <span class="sy0">=&gt;</span> <span class="re0">@summary</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw2">sub</span> write_html <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="br0">&#40;</span><span class="re0">$filename</span><span class="sy0">,</span> <span class="re0">$template</span><span class="sy0">,</span> <span class="re0">$data</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="co5">@_</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># Include templates from the install directory.</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">$tt</span> <span class="sy0">=</span> Template<span class="sy0">-&gt;</span><span class="kw2">new</span><span class="br0">&#40;</span><span class="br0">&#123;</span> <span class="st_h">'INCLUDE_PATH'</span> <span class="sy0">=&gt;</span> dirname<span class="br0">&#40;</span>abs_path<span class="br0">&#40;</span><span class="re0">$PROGRAM_NAME</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="st_h">'/templates'</span> <span class="br0">&#125;</span> <span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw3">print</span> <span class="st0">&quot;Writing $filenamen&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw3">open</span> <span class="kw1">my</span> <span class="re0">$FILE</span><span class="sy0">,</span> <span class="st_h">'&gt;'</span><span class="sy0">,</span> <span class="re0">$filename</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="re0">$tt</span><span class="sy0">-&gt;</span><span class="me1">process</span><span class="br0">&#40;</span><span class="re0">$template</span><span class="sy0">,</span> <span class="re0">$data</span><span class="sy0">,</span> <span class="re0">$FILE</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw3">close</span> <span class="re0">$FILE</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">return</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Perl::Critic;
+use Perl::Critic::Utils;
+
+use Template;
+use Cwd qw(abs_path);
+use File::Basename;
+use English qw(-no_match_vars);
+
+use constant SEVERITY  =&gt; 1; # Include all violations.
+use constant SKIP_GOOD =&gt; 0; # Skip files with no violations?
+
+mkdir 'critic_html';
+mkdir 'critic_html/src';
+
+use autodie;
+
+# Analyse all perl files below the current directory.
+my @files = Perl::Critic::Utils::all_perl_files(q{.});
+
+my @summary = (); # Store statistics on each file processed.
+
+foreach my $file (@files) {
+    # Create a new Critic for per file statistics.
+    my $critic = Perl::Critic-&gt;new( '-severity' =&gt; SEVERITY );
+
+    my $file_safe = $file;
+    $file_safe =~ s/[W]/_/g;
+
+    my @violations = $critic-&gt;critique($file);
+    next if (!@violations &amp;&amp; SKIP_GOOD);
+
+    push @summary, { 'filename' =&gt; $file,
+                     'link'     =&gt; "src/$file_safe.html",
+                     'stats'    =&gt; $critic-&gt;statistics() };
+
+    open my $FH, '&lt;', $file;
+    my @lines = &lt;$FH&gt;;
+    close $FH;
+
+    # Attach all violations to the line they were found on.
+    my @violations_by_line = ();
+    my $line_number = 1;
+    foreach my $line (@lines) {
+        # Get all the violations for the current line.
+        my @line_violations = grep { $_-&gt;line_number() == $line_number} @violations;
+        push @violations_by_line, { 'number'  =&gt; $line_number,
+                                    'content' =&gt; $line,
+                                    'violations' =&gt; @line_violations };
+        $line_number++;
+    }
+
+    write_html("critic_html/src/$file_safe.html", 'codefile', { 'title' =&gt; "Critic Analysis of $file",
+                                                                'lines' =&gt; @violations_by_line } );
+}
+
+write_html('critic_html/index.html', 'index', { 'title' =&gt; 'Perl::Critic::HTML Summary',
+                                                'files' =&gt; @summary });
+
+sub write_html {
+    my ($filename, $template, $data) = @_;
+
+    # Include templates from the install directory.
+    my $tt = Template-&gt;new({ 'INCLUDE_PATH' =&gt; dirname(abs_path($PROGRAM_NAME)).'/templates' } );
+    print "Writing $filenamen";
+    open my $FILE, '&gt;', $filename;
+    $tt-&gt;process($template, $data, $FILE);
+    close $FILE;
+
+    return;
+}</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/perl/create-html-from-output-of/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>What Does a Web Developer Need To Know</title>
+		<link>/index.php/webdev/uidevelopment/what-does-a-web-developer/</link>
+		<comments>/index.php/webdev/uidevelopment/what-does-a-web-developer/#comments</comments>
+		<pubDate>Tue, 28 Jun 2011 09:54:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[UI Development]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[competency]]></category>
+		<category><![CDATA[css]]></category>
+		<category><![CDATA[design]]></category>
+		<category><![CDATA[html]]></category>
+		<category><![CDATA[javascript]]></category>
+		<category><![CDATA[jsp]]></category>
+		<category><![CDATA[php]]></category>
+		<category><![CDATA[seo]]></category>
+		<category><![CDATA[table layout]]></category>
+		<category><![CDATA[w3c]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/06/what-does-a-web-developer/</guid>
+		<description><![CDATA[What is a web developer? Recently I was involved in a discussion about the skills a web developer is expected to have and how interesting it has been to watch common bad practices (like table layout and SQL injection) continue to spread. So in the nature of Denis's What does a SQL Server developer need to know? post, I present the web developer breakdown.]]></description>
+				<content:encoded><![CDATA[<p>What is a web developer? Recently I was involved in a discussion about the skills a web developer is expected to have and how interesting it has been to watch common bad practices (like table layout and SQL injection) continue to spread. So in the nature of Denis&#8217;s <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/what-does-a-sql-server" title="Read Denis's post">What does a SQL Server developer need to know?</a> post, I present the web developer breakdown.</p>
+<h2>What Level Am I?</h2>
+<p>Rather than try and attach years of experience to this scale, I&#8217;m going to present a list of major areas and skills, questions, or topics in each area. I&#8217;ve tried to capture whether I feel a skill is required to be an Intermediate or Advanced web developer. </p>
+<p>I put this list together based on my own experience, 20-30 web developer interview lists, and some feedback from others.</p>
+<p>Beginner: Knows some of the items on the list<br />
+Intermediate: Knows most intermediate items and some advanced<br />
+Advanced: Knows almost everything on the list</p>
+<style>
+.oneshottable { border: 1px solid #444444; border-collapse: collapse; width: 100%; margin-bottom: 12px; }
+.oneshottable th { background-color: #444444; color: white; text-transform: uppercase; font-weight: bold; padding: 4px;font-size: 90%; }
+.oneshottable td{ padding: 1px 2px; min-width: 20px; border-bottom: 1px solid #999999; font-size: 80%;}
+.oneshottable td.summary:first-child{ text-align: left; font-weight: normal; padding: 3px;}
+.oneshottable td:first-child{ text-align: center; font-weight: bold }
+</style>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">HTML</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">The ability to produce clean, valid, maintainable HTML is critical for a web developer. Current standards include HTML 4.01 (1999), XHTML 1 (2000), and the beginning of HTML 5 (2011)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>The effect of doctypes, can code a mostly valid site without looking up the rules</td>
+</tr>
+<tr>
+<td>A</td>
+<td>The effect of content-types and how to set or debug them</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows (and use) all of these without looking them up:  html, head, title, meta, script, style, link, body, a, strong, em, ul, ol, li, table, tr, th, td, h1-5, input, select, option, img, p, span, div, pre, textarea</td>
+</tr>
+<tr>
+<td>A</td>
+<td>And most of these: dl/dt/dd, thead, tbody, tfoot, abbr, acronym, applet, object, blockquote, iframe, label, map, optgroup, sup, sub, base, fieldset</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name/explain at least 15 of the new HTML5 tags</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows the escapes for &amp;, &lt;, &gt;, &copy;, ASCII characters (though you may have to look up the character code)</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can explain how HTTP works (headers, redirects, header requests, clientside caching)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows how to link to a position in a page</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">CSS</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Cascading Style Sheets are used to describe the way an HTML documented should be presented. CSS 1 was released in 1996 and the latest published recommendation is CSS 3. </td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between display inline, block, and inline-block and what the default value is for div, span, a, b</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between position static, relative, fixed, absolute</td>
+</tr>
+<tr>
+<td>I</td>
+<td>What z-index is and how to use it</td>
+</tr>
+<tr>
+<td>A</td>
+<td>How z-index is calculated by individual browsers</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between padding and margin</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between display: none and visibility: hidden</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Purpose and use of &#8220;media&#8221;</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Able to describe and calculate specificity</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows at least a few attribute selectors</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can describe pseudo-classes and know many without looking them up</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Javascript</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Javascript has become the defacto scripting language for web browsers, one of only a few ways to create client-side interactions consistently across available browsers. JavaScript was first shipped in 1995 as part of the Netscape browser.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>How to write a basic function, inline event handler, and a non-inline event handler (raw or w/ a package)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can write one or or more methods to make an AJAX call with reference material</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can write one or or more methods to make an AJAX call without reference material</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows at least one framework (jQuery, Prototype, YUI, Dojo, MooTools, …)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can create classes (function or literal)</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Knows and can use prototype (little &#8216;p&#8217;, not the framework)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can dynamically find and add elements to the page using DOM or a framework (without looking it up)</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Tools</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Along with standard languages, there are numerous tools available to help validate, evaluate, and improve existing websites. Similar to a spell-checking tool in a word processing application, these tools can help us catch errors and oversights in our websites.</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name at least one site, application, or organization that has an HTML validation tool</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name at least one site, application, or organization that has an CSS validation tool</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name at least one site, application, or organization that has an SEO scoring tool</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name at least one site, application, or organization that has an Accessibility evaluation tool</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Server-Side Programming</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">The shift to dynamic, server-generated websites in the mid-to-late 90&#8217;s was responsible for shifting the focus of the web from document retrieval to interactivity, commerce, and services.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows at least 2 server-side technologies &#8211; Perl, PHP, ASP 3, JSP, Java Servlets, CFM, ASP.Net (WebPages, Web Forms, MVC), Ruby on Rails, Python (WSGI, CGI, mod_python), etc</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Knows more than 4 of the above list</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can explain difference between stateful and stateless development</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can explain how sessions work</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can explain how cookies work</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between GET and POST and how known languages present this information</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Pros and cons of client-side vs server-side validation</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Understands the basics of (SOAP) web services, how to implement them, and how they work</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Data</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Most web applications have some form of data store behind them. Several forms of storage and caching mechanisms exist and being able to build a basic system often requires at least a basic level of knowledge in these areas.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can build databases, define queries, and debug on at least one major RDBMS</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Knows basics for normalization and can create a basic data model to describe their database</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can work with at least one NoSQL database or data cache</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can write match and search regular expressions</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can write match and search regular expressions without a reference in more than one language</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Web Server</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Using a server-side technology to generate HTML generally requires a web server. The two largest install bases are Microsoft IIS 7.5 and Apache 2.2.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Understands the basics of how the web server (Apache or IIS) works and can create a new site</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can explain URL rewriting and implement on at least one system</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Performance</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Tuning a website to run in an optimal fashion can sometimes be the difference between paying for a single server or multiple servers, between a responsive site and one that fails under load. </td>
+</tr>
+<tr>
+<td>A</td>
+<td>Understands and can implement data caching</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Understands and can implement page caching</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can use one or more page performance or load testing tools</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Tools/methods and purpose of minification of JS and CSS</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Understands and uses CDNs when possible</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Testing</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">As the technology behind the web has developed, tools to help automate some of the repetition involved in testing websites has likewise evolved.</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can use one or more automated tools for interface testing</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Security</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">As recent news stories have reminded us, security is an ongoing requirement for websites. Understanding the basics of security can help us build security in from day one rather than trying to squeeze it in at the end.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>SQL Injection &#8211; what it is, how to prevent it</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Cross site scripting &#8211; what it is, how to prevent it</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Cross Site Request Forgery &#8211; what it is, how to prevent it</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Understand hashing, salting, and importance of storing critical information in hashed or encrypted formats</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Cookies &#8211; Understand session hijacking and dangers of storing user information or identification</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Design Principles</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Being able to implement common design patterns without restoring to hacks is an important part of being a web developer (as opposed to a hobbiest). While it may prove impossible to build a site without some form of hack, hacks should not be the only tool in the toolbox.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Table Layout &#8211; what it is, why it&#8217;s bad (at least three reasons)</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can implement multi-column fixed, fluid, and elastic layouts without reference material</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Table Layout &#8211; and why using CSS for table layout (display: table, table-cell, etc) is not bad</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can explain and implement fixed, fluid (liquid), and elastic layouts</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can implement multi-column fixed, fluid, and elastic layouts without reference material</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Meta</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Metadata (data about data) is critical to helping people and search engines find resources in our sites and applications.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows purpose of description, keyword tags</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows purpose of robots.txt file</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Knows purpose and can implement sitemap.xml file</td>
+</tr>
+<tr>
+<td>A</td>
+<td>You know the basics for SEO</td>
+</tr>
+<tr>
+<td>A</td>
+<td>You&#8217;ve implemented some form of browser analytics</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Microformats </td>
+</tr>
+<tr>
+<td>A</td>
+<td>You know what WCAG is and how to test conformance</td>
+</tr>
+<tr>
+<td>A</td>
+<td>You know what semantic markup is</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Disqualifiers/Limiters</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">These are topics I consider to be critical to advancement. They reflect common misunderstandings or bad practices that an experienced web developer has to grow past in order to advance their skillset.</td>
+</tr>
+<tr>
+<td>B</td>
+<td>Backbutton doesn&#8217;t work w/ your sites, would prefer to disable it altogether</td>
+</tr>
+<tr>
+<td>B</td>
+<td>You protect images from download by implementing right click intercepts, layering transparent images in top, etc</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Implement performance tuning without before/after measurements</td>
+</tr>
+<tr>
+<td>B</td>
+<td>Table layout</td>
+</tr>
+</tbody>
+</table>
+<p><em>Note: Disqualifiers indicate that you won&#8217;t progress past [B]eginner or [I]ntermediate levels until you stop doing them and understand why doing them was a bad idea</em></p>
+<h2>What&#8217;s Missing</h2>
+<p>There are several things that were intentionally left out of this list. Some were hard to quantity in a general manner, others I was unsure how relevant they were. And I&#8217;m sure people will be kind enough to add additional oversights and revisions below.</p>
+<p>Missing Categories:</p>
+<ul>
+<li>Level of knowledge with server-side languages</li>
+<li>Project management skills</li>
+<li>Documentation and Modeling skills</li>
+<li>Design and Graphics skills</li>
+<li>Application Lifecycle Management &#8211; Source Control, Deployment, etc</li>
+</ul>
+<p>Extra items that didn&#8217;t make it in:</p>
+<ul>
+<li>Can implement RSS and ATOM feeds</li>
+<li>Can implement a web farm</li>
+<li>Implemented single-signon (openID, SAML, etc)</li>
+<li>Knows how to implement XML data islands (still relevant?)</li>
+<li>Knows how to create DTDs and/or XSDs</li>
+<li>Can write regular expressions without a reference</li>
+<li>Knows relevant tools for Yahoo (SiteExplorer), Google, Bing for managing site information</li>
+<li>Schema.org &#8211; it belongs in the Meta category but I didn&#8217;t know what level of skill, knowledge, or adoption I should include considering it&#8217;s newness and several other factors</li>
+</ul>
+<p>There is also the fact that we often get caught up maintaining or even adding on to a site that violates many of the skills and standards you see in this list. This doesn&#8217;t prevent us from writing good, clean, semantic sites the rest of the time and being forced to write poor code does not make on inherently less skilled.</p>
+<h2>A Brief Digression, or Why an App Dev is Not a Web Dev</h2>
+<p>At one point web development was seen as less exciting and far less complex than application development. It is still seen as extremely similar to application development, so much so that it is quite normal to hire a good or great application developer and expect them to be a good or great web developer. </p>
+<p>Unfortunately it doesn&#8217;t quite work that way, as web development has grown extremely complex since the first dynamic sites started showing up in the late 90&#8217;s. Doubly unfortunately, web development is based on a stateless model instead of the stateful one most application developers are used to, uses a fluid layout instead of the grid layout, and sneaks a lot of extra communications and caching into the mix. This is a series of paradigm shifts not unlike the one between procedural, object oriented, and functional programming.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/uidevelopment/what-does-a-web-developer/feed/</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+		</item>
+		<item>
+		<title>Bing, Google and Yahoo! announce Schema.org</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/bing-google-and-yahoo-announce/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/bing-google-and-yahoo-announce/#comments</comments>
+		<pubDate>Thu, 02 Jun 2011 15:32:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[html]]></category>
+		<category><![CDATA[markup]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/06/bing-google-and-yahoo-announce/</guid>
+		<description><![CDATA[Bing, Google and Yahoo! have announced Schema.org
+
+Here is the info
+
+
+Today we’re announcing schema.org, a new initiative from Yahoo!, Bing, and Google, to create and support a common set of schemas for structured data markup on web pages. With sch&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Bing, Google and Yahoo! have announced <a href="http://schema.org/">Schema.org</a></p>
+<p>Here is the info</p>
+<p>Today we’re announcing schema.org, a new initiative from Yahoo!, Bing, and Google, to create and support a common set of schemas for structured data markup on web pages. With schema.org, webmasters and developers can learn about structured data and improve how their sites appear in search results on Bing, Google, and Yahoo!. Information and tips are available on schema.org, a one-stop resource for webmasters looking to add markup to make their pages better understood by search engines.</p>
+<h2>What is Schema.org?</h2>
+<p>This site provides a collection of schemas, i.e., html tags, that webmasters can use to markup their pages in ways recognized by major search providers. Search engines including Bing, Google and Yahoo! rely on this markup to improve the display of search results, making it easier for people to find the right web pages.<br />
+Many sites are generated from structured data, which is often stored in databases. When this data is formatted into HTML, it becomes very difficult to recover the original structured data. Many applications, especially search engines, can benefit greatly from direct access to this structured data. On-page markup enables search engines to understand the information on web pages and provide richer search results in order to make it easier for users to find relevant information on the web. Markup can also enable new tools and applications that make use of the structure.<br />
+A shared markup vocabulary makes easier for webmasters to decide on a markup schema and get the maximum benefit for their efforts. So, in the spirit of sitemaps.org, Bing, Google and Yahoo! have come together to provide a shared collection of schemas that webmasters can use.</p>
+<p>Main site here: http://schema.org/</p>
+<p>getting started site is here: http://schema.org/docs/gs.html</p>
+<p>An example</p>
+<p>Orginal HTML</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1">Jane Doe
+<span class="sc2">&lt;<span class="kw2">img</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;janedoe.jpg&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp;
+Professor
+20341 Whitworth Institute
+405 Whitworth
+Seattle WA 98052
+(425) 123-4567
+<span class="sc2">&lt;<span class="kw2">a</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;mailto:jane-doe@xyz.edu&quot;</span>&gt;</span>jane-doe@illinois.edu<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">a</span>&gt;</span>
+&nbsp;
+Jane's home page:
+<span class="sc2">&lt;<span class="kw2">a</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;www.janedoe.com&quot;</span>&gt;</span>janedoe.com<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">a</span>&gt;</span>
+&nbsp;
+Graduate students:
+<span class="sc2">&lt;<span class="kw2">a</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;www.xyz.edu/students/alicejones.html&quot;</span>&gt;</span>Alice Jones<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">a</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">a</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;www.xyz.edu/students/bobsmith.html&quot;</span>&gt;</span>Bob Smith<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">a</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Jane Doe
+&lt;img src="janedoe.jpg" /&gt;
+
+Professor
+20341 Whitworth Institute
+405 Whitworth
+Seattle WA 98052
+(425) 123-4567
+&lt;a href="mailto:jane-doe@xyz.edu"&gt;jane-doe@illinois.edu&lt;/a&gt;
+
+Jane's home page:
+&lt;a href="www.janedoe.com"&gt;janedoe.com&lt;/a&gt;
+
+Graduate students:
+&lt;a href="www.xyz.edu/students/alicejones.html"&gt;Alice Jones&lt;/a&gt;
+&lt;a href="www.xyz.edu/students/bobsmith.html"&gt;Bob Smith&lt;/a&gt;</pre></div></div>
+
+<p>With MicroData</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">div</span> itemscope itemtype<span class="sy0">=</span><span class="st0">&quot;http://schema.org/Person&quot;</span>&gt;</span>
+&nbsp; <span class="sc2">&lt;<span class="kw2">span</span> itemprop<span class="sy0">=</span><span class="st0">&quot;name&quot;</span>&gt;</span>Jane Doe<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">span</span>&gt;</span>
+&nbsp; <span class="sc2">&lt;<span class="kw2">img</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;janedoe.jpg&quot;</span> itemprop<span class="sy0">=</span><span class="st0">&quot;image&quot;</span> <span class="sy0">/</span>&gt;</span>
+&nbsp;
+&nbsp; <span class="sc2">&lt;<span class="kw2">span</span> itemprop<span class="sy0">=</span><span class="st0">&quot;jobTitle&quot;</span>&gt;</span>Professor<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">span</span>&gt;</span>
+&nbsp; <span class="sc2">&lt;<span class="kw2">div</span> itemprop<span class="sy0">=</span><span class="st0">&quot;address&quot;</span> itemscope itemtype<span class="sy0">=</span><span class="st0">&quot;http://schema.org/PostalAddress&quot;</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">span</span> itemprop<span class="sy0">=</span><span class="st0">&quot;streetAddress&quot;</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; 20341 Whitworth Institute
+&nbsp; &nbsp; &nbsp; 405 N. Whitworth
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">span</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">span</span> itemprop<span class="sy0">=</span><span class="st0">&quot;addressLocality&quot;</span>&gt;</span>Seattle<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">span</span>&gt;</span>,
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">span</span> itemprop<span class="sy0">=</span><span class="st0">&quot;addressRegion&quot;</span>&gt;</span>WA<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">span</span>&gt;</span>
+&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">span</span> itemprop<span class="sy0">=</span><span class="st0">&quot;postalCode&quot;</span>&gt;</span>98052<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">span</span>&gt;</span>
+&nbsp; <span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">div</span>&gt;</span>
+&nbsp; <span class="sc2">&lt;<span class="kw2">span</span> itemprop<span class="sy0">=</span><span class="st0">&quot;telephone&quot;</span>&gt;</span>(425) 123-4567<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">span</span>&gt;</span>
+&nbsp; <span class="sc2">&lt;<span class="kw2">a</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;mailto:jane-doe@xyz.edu&quot;</span> itemprop<span class="sy0">=</span><span class="st0">&quot;email&quot;</span>&gt;</span>
+&nbsp; &nbsp; jane-doe@xyz.edu<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">a</span>&gt;</span>
+&nbsp;
+&nbsp; Jane's home page:
+&nbsp; <span class="sc2">&lt;<span class="kw2">a</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;www.janedoe.com&quot;</span> itemprop<span class="sy0">=</span><span class="st0">&quot;url&quot;</span>&gt;</span>janedoe.com<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">a</span>&gt;</span>
+&nbsp;
+&nbsp; Graduate students:
+&nbsp; <span class="sc2">&lt;<span class="kw2">a</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;www.xyz.edu/students/alicejones.html&quot;</span> itemprop<span class="sy0">=</span><span class="st0">&quot;colleagues&quot;</span>&gt;</span>
+&nbsp; &nbsp; Alice Jones<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">a</span>&gt;</span>
+&nbsp; <span class="sc2">&lt;<span class="kw2">a</span> <span class="kw3">href</span><span class="sy0">=</span><span class="st0">&quot;www.xyz.edu/students/bobsmith.html&quot;</span> itemprop<span class="sy0">=</span><span class="st0">&quot;colleagues&quot;</span>&gt;</span>
+&nbsp; &nbsp; Bob Smith<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">a</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">div</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;div itemscope itemtype="http://schema.org/Person"&gt;
+  &lt;span itemprop="name"&gt;Jane Doe&lt;/span&gt;
+  &lt;img src="janedoe.jpg" itemprop="image" /&gt;
+
+  &lt;span itemprop="jobTitle"&gt;Professor&lt;/span&gt;
+  &lt;div itemprop="address" itemscope itemtype="http://schema.org/PostalAddress"&gt;
+    &lt;span itemprop="streetAddress"&gt;
+      20341 Whitworth Institute
+      405 N. Whitworth
+    &lt;/span&gt;
+    &lt;span itemprop="addressLocality"&gt;Seattle&lt;/span&gt;,
+    &lt;span itemprop="addressRegion"&gt;WA&lt;/span&gt;
+    &lt;span itemprop="postalCode"&gt;98052&lt;/span&gt;
+  &lt;/div&gt;
+  &lt;span itemprop="telephone"&gt;(425) 123-4567&lt;/span&gt;
+  &lt;a href="mailto:jane-doe@xyz.edu" itemprop="email"&gt;
+    jane-doe@xyz.edu&lt;/a&gt;
+
+  Jane's home page:
+  &lt;a href="www.janedoe.com" itemprop="url"&gt;janedoe.com&lt;/a&gt;
+
+  Graduate students:
+  &lt;a href="www.xyz.edu/students/alicejones.html" itemprop="colleagues"&gt;
+    Alice Jones&lt;/a&gt;
+  &lt;a href="www.xyz.edu/students/bobsmith.html" itemprop="colleagues"&gt;
+    Bob Smith&lt;/a&gt;
+&lt;/div&gt;</pre></div></div>
+
+<p>What do you think, will you start implementing this?<br /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/bing-google-and-yahoo-announce/feed/</wfw:commentRss>
+		<slash:comments>12</slash:comments>
+		</item>
+	</channel>
+</rss>

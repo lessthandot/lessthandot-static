@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>niikola &#8211; LessthanDot</title>
+	<atom:link href="/index.php/author/niikola/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>MERGE bug when Foreign Key constraint is created on non-clustered index (2008RTM)</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/merge-bug-when-foreign-key/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/merge-bug-when-foreign-key/#comments</comments>
+		<pubDate>Fri, 10 Feb 2012 12:21:00 +0000</pubDate>
+		<dc:creator><![CDATA[niikola]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[merge]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/02/merge-bug-when-foreign-key/</guid>
+		<description><![CDATA[Few days ago my colleague showed me strange behavior of SQL Server's 2008  RTM MERGE statement. Although this is corrected in SP1 1 or more probably in CU1 (there is bug solved in CU1 connected to this - imo), I do believe it's worth to be mentioned.
+I&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Few days ago my colleague showed me strange behavior of SQL Server&#8217;s 2008  RTM MERGE statement. Although this is corrected in SP1 1 or more probably in CU1 (there is <a href="http://support.microsoft.com/kb/956718">bug solved in CU1</a> connected to this &#8211; imo), I do believe its worth to be mentioned.</p>
+<p>If you try to update parent column (column referenced by foreign key) even with the same value it fails with message &#8220;<span style="font-family: courier new,courier;">The MERGE statement conflicted with the REFERENCE constraint</span>&#8221; when index used for FK relationship is NONCLUSTERED. It does not matter if this index is primary key, unique constraint or non-filtered unique key (those are options you can use for FK). Moreover, it does not matter  if there is (or there&#8217;s not) some other clustered index. It also does not matter if child table has  indexes, clustered or non-clustered.</p>
+<p>How to reproduce:</p>
+<ul>
+<li>Create parent table with nonclustered index (using either primary key, unique constraint or unique index syntax) over some column.</li>
+<li>Create child table referencing above mentioned column.</li>
+<li>Insert values in both tables. One row per table is enough (child table should have not null reverencing column)</li>
+<li>Execute Merge statement on parent table updating referenced column to the same value.</li>
+</ul>
+<p> </p>
+<p>Example:</p>
+<p><span style="color: #888888;">&#8212; Create tables</span><br /><code>&lt;strong&gt;Create Table&lt;/strong&gt; tparent ( cCode &lt;strong&gt;&lt;span style="color: #888888;"&gt;varchar(2) not null&lt;/span&gt;&lt;/strong&gt;);&lt;br /&gt;&lt;strong&gt;Create table&lt;/strong&gt; tchild  ( cCode &lt;span style="color: #888888;"&gt;&lt;strong&gt;varchar(2) not null&lt;/strong&gt;&lt;/span&gt;);  &lt;/p&gt;
+&lt;p&gt;</code><code>&lt;span style="color: #888888;"&gt;-- Create non-clustered PK on parent table&lt;br /&gt;&lt;/span&gt;</code><code>&lt;span&gt;&lt;strong&gt;Alter Table&lt;/strong&gt; tparent &lt;br /&gt; &lt;strong&gt;add Constraint&lt;/strong&gt; PK_tparent&lt;br /&gt; &lt;strong&gt;Primary Key NONCLUSTERED&lt;/strong&gt; (cCode &lt;strong&gt;&lt;span style="color: #888888;"&gt;asc&lt;/span&gt;&lt;/strong&gt;);  &lt;/p&gt;
+&lt;p&gt;-&lt;/span&gt;</code><code>&lt;span&gt;&lt;span style="color: #888888;"&gt;- Create Foreign key&lt;/span&gt;&lt;/span&gt;</code><br /><code>&lt;span&gt;&lt;strong&gt;Alter Table &lt;/strong&gt;tchild                    &lt;br /&gt;&lt;strong&gt; add Constraint&lt;/strong&gt; fk_tchild_tparent&lt;br /&gt; &lt;strong&gt;Foreign Key&lt;/strong&gt; (cCode) &lt;br /&gt; &lt;strong&gt;References&lt;/strong&gt; tparent(cCode);&lt;/p&gt;
+&lt;p&gt;&lt;/span&gt;</code><code>&lt;span&gt;-&lt;/span&gt;</code><code>&lt;span&gt;&lt;span style="color: #888888;"&gt;- Create Foreign key&lt;/span&gt;&lt;/span&gt;</code><br /><code>&lt;span&gt;&lt;strong&gt;Insert Into&lt;/strong&gt; tparent(cCode) &lt;strong&gt;values &lt;/strong&gt;('AA');&lt;br /&gt;&lt;strong&gt;Insert Into &lt;/strong&gt;tchild(cCode)  &lt;strong&gt;values &lt;/strong&gt;('AA');&lt;/p&gt;
+&lt;p&gt;&lt;span style="color: #888888;"&gt;-- MERGE&lt;/span&gt;&lt;br /&gt;&lt;strong&gt;Merge &lt;/strong&gt;tparent &lt;span style="color: #888888;"&gt;&lt;strong&gt;as&lt;/strong&gt;&lt;/span&gt; trg&lt;br /&gt;&lt;strong&gt;Using &lt;/strong&gt;(&lt;strong&gt;Select&lt;/strong&gt; 'AA') &lt;span style="color: #888888;"&gt;&lt;strong&gt;as&lt;/strong&gt;&lt;/span&gt; src(cCode)&lt;br /&gt; &lt;strong&gt;on&lt;/strong&gt; src.cCode=trg.cCode&lt;br /&gt;&lt;strong&gt; When&lt;/strong&gt; &lt;strong&gt;Matched &lt;/strong&gt;&lt;br /&gt; &lt;strong&gt;Then Update Set&lt;/strong&gt; cCode=trg.cCode;&lt;br /&gt; &lt;/span&gt;</code></p>
+<p><code>&lt;span&gt;&lt;span style="color: #888888;"&gt;-- RESULT&lt;/span&gt;&lt;/span&gt;</code><br /><code>Msg 547, Level 16, State 0, Line 21&lt;br /&gt;&lt;span class="MT_red"&gt;The MERGE statement conflicted with the REFERENCE constraint "fk_tchild_tparent". &lt;br /&gt;The conflict occurred in database "tempdb", table "dbo.tchild", column 'cCode'.&lt;/span&gt;&lt;br /&gt;The statement has been terminated.</code></p>
+<p>UPDATE:</p>
+<p>Simmilar issue was found by Alexander Kuznetsov in <a href="http://sqlblog.com/blogs/alexander_kuznetsov/archive/2011/10/17/trusted-foreign-keys-allow-orphans-reject-valid-child-rows.aspx">&#8220;Trusted&#8221; Foreign Keys Allow Orphans, Reject Valid Child Rows</a> for SQL Server 2008 R2.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/merge-bug-when-foreign-key/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Delete all data in database (when you have FKs)</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/delete-all-data-in-database-when-you-hav/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/delete-all-data-in-database-when-you-hav/#comments</comments>
+		<pubDate>Fri, 21 May 2010 10:27:37 +0000</pubDate>
+		<dc:creator><![CDATA[niikola]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/delete-all-data-in-database-when-you-hav/</guid>
+		<description><![CDATA[Sometimes you have to &#8220;empty&#8221; the database, meaning you have to keep everything except data. One way is to script &#8220;everything&#8221;, drop DB and create it again. Another way is to delete data table by table, taking care of FK constraints, or to drop all FKs, then to remove data and at the end to [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Sometimes you have to &#8220;empty&#8221; the database, meaning you have to keep everything except data.</p>
+<p>One way is to script &#8220;everything&#8221;, drop DB and create it again.</p>
+<p>Another way is to delete data table by table, taking care of FK constraints, or to drop all FKs, then to remove data and at the end to restore FKs.</p>
+<p>Here are 2 scripts for creating SQL code to:</p>
+<p>1. a) Drop all existing FKs<br />
+   b) Truncate tables<br />
+   c) Create all FKs</p>
+<p>2. Delete data from all tables in proper order (kill children first parents later method :D)</p>
+<p><strong>Script 1. TRUNCATE with drop/create FKs</strong></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="sql"><thead><tr><td colspan="2"  class="head">SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> NOCOUNT <span class="kw1">ON</span>
+<span class="kw1">GO</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="st0">'USE ['</span> <span class="sy0">+</span> db_name<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span><span class="st0">']'</span>;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="st0">'ALTER TABLE '</span> <span class="sy0">+</span> 
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="st0">'['</span> <span class="sy0">+</span> s<span class="sy0">.</span>name <span class="sy0">+</span> <span class="st0">'].['</span> <span class="sy0">+</span> t<span class="sy0">.</span>name <span class="sy0">+</span> <span class="st0">']'</span> <span class="sy0">+</span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="st0">' DROP CONSTRAINT ['</span> <span class="sy0">+</span> f<span class="sy0">.</span>name <span class="sy0">+</span><span class="st0">']'</span>
+&nbsp; <span class="kw1">FROM</span> sys<span class="sy0">.</span>foreign_keys f
+&nbsp;<span class="kw1">INNER</span> <span class="kw1">JOIN</span> sys<span class="sy0">.</span><span class="kw1">TABLES</span> t <span class="kw1">ON</span> f<span class="sy0">.</span>parent_object_id<span class="sy0">=</span>t<span class="sy0">.</span>object_id
+&nbsp;<span class="kw1">INNER</span> <span class="kw1">JOIN</span> sys<span class="sy0">.</span>schemas s <span class="kw1">ON</span> t<span class="sy0">.</span>schema_id<span class="sy0">=</span>s<span class="sy0">.</span>schema_id
+&nbsp;<span class="kw1">WHERE</span> t<span class="sy0">.</span>is_ms_shipped<span class="sy0">=</span><span class="nu0">0</span>;
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="st0">'TRUNCATE TABLE '</span> <span class="sy0">+</span> <span class="st0">'['</span> <span class="sy0">+</span> s<span class="sy0">.</span>name <span class="sy0">+</span> <span class="st0">'].['</span> <span class="sy0">+</span> t<span class="sy0">.</span>name <span class="sy0">+</span> <span class="st0">']'</span> &nbsp; &nbsp; &nbsp;
+&nbsp; <span class="kw1">FROM</span> sys<span class="sy0">.</span><span class="kw1">TABLES</span> t
+&nbsp;<span class="kw1">INNER</span> <span class="kw1">JOIN</span> sys<span class="sy0">.</span>schemas s <span class="kw1">ON</span> t<span class="sy0">.</span>schema_id<span class="sy0">=</span>s<span class="sy0">.</span>schema_id
+&nbsp;<span class="kw1">WHERE</span> t<span class="sy0">.</span>is_ms_shipped<span class="sy0">=</span><span class="nu0">0</span>;
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="st0">'ALTER TABLE '</span> <span class="sy0">+</span> 
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="st0">'['</span> <span class="sy0">+</span> s<span class="sy0">.</span>name <span class="sy0">+</span> <span class="st0">'].['</span> <span class="sy0">+</span> t<span class="sy0">.</span>name <span class="sy0">+</span> <span class="st0">']'</span> <span class="sy0">+</span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="st0">' ADD CONSTRAINT ['</span> <span class="sy0">+</span> f<span class="sy0">.</span>name <span class="sy0">+</span> <span class="st0">']'</span> <span class="sy0">+</span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="st0">' FOREIGN KEY ('</span> <span class="sy0">+</span> &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;Stuff<span class="br0">&#40;</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="st0">', ['</span><span class="sy0">+</span>col_name<span class="br0">&#40;</span>fk<span class="sy0">.</span>parent_object_id<span class="sy0">,</span> fk<span class="sy0">.</span>parent_column_id<span class="br0">&#41;</span> <span class="sy0">+</span><span class="st0">']'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">FROM</span> sys<span class="sy0">.</span>foreign_key_columns fk
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHERE</span> constraint_object_id <span class="sy0">=</span> f<span class="sy0">.</span>object_id 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ORDER</span> <span class="kw1">BY</span> constraint_column_id
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FOR</span> XML Path<span class="br0">&#40;</span><span class="st0">''</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#41;</span><span class="sy0">,</span> <span class="nu0">1</span><span class="sy0">,</span><span class="nu0">2</span><span class="sy0">,</span><span class="st0">''</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">')'</span> <span class="sy0">+</span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="st0">' REFERENCES ['</span> <span class="sy0">+</span> 
+&nbsp; &nbsp; &nbsp; &nbsp;object_schema_name<span class="br0">&#40;</span>f<span class="sy0">.</span>referenced_object_id<span class="br0">&#41;</span><span class="sy0">+</span><span class="st0">'].['</span><span class="sy0">+</span>object_name<span class="br0">&#40;</span>f<span class="sy0">.</span>referenced_object_id<span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">'] ('</span> <span class="sy0">+</span>
+&nbsp; &nbsp; &nbsp; &nbsp;Stuff<span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="st0">', ['</span><span class="sy0">+</span>col_name<span class="br0">&#40;</span>fc<span class="sy0">.</span>referenced_object_id<span class="sy0">,</span> fc<span class="sy0">.</span>referenced_column_id<span class="br0">&#41;</span><span class="sy0">+</span><span class="st0">']'</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> sys<span class="sy0">.</span>foreign_key_columns fc
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">WHERE</span> constraint_object_id <span class="sy0">=</span> f<span class="sy0">.</span>object_id 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">ORDER</span> <span class="kw1">BY</span> constraint_column_id
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">FOR</span> XML Path<span class="br0">&#40;</span><span class="st0">''</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="nu0">1</span><span class="sy0">,</span><span class="nu0">2</span><span class="sy0">,</span><span class="st0">''</span><span class="br0">&#41;</span> <span class="sy0">+</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">')'</span> <span class="sy0">+</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">' ON DELETE '</span> <span class="sy0">+</span> <span class="kw1">REPLACE</span><span class="br0">&#40;</span>f<span class="sy0">.</span>delete_referential_action_desc<span class="sy0">,</span> <span class="st0">'_'</span><span class="sy0">,</span> <span class="st0">' '</span><span class="br0">&#41;</span> &nbsp;<span class="sy0">+</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">' ON UPDATE '</span> <span class="sy0">+</span> <span class="kw1">REPLACE</span><span class="br0">&#40;</span>f<span class="sy0">.</span>update_referential_action_desc <span class="sy0">,</span> <span class="st0">'_'</span><span class="sy0">,</span> <span class="st0">' '</span><span class="br0">&#41;</span> <span class="kw1">COLLATE</span> database_default 
+&nbsp; <span class="kw1">FROM</span> sys<span class="sy0">.</span>foreign_keys f
+&nbsp;<span class="kw1">INNER</span> <span class="kw1">JOIN</span> sys<span class="sy0">.</span><span class="kw1">TABLES</span> t <span class="kw1">ON</span> f<span class="sy0">.</span>parent_object_id<span class="sy0">=</span>t<span class="sy0">.</span>object_id
+&nbsp;<span class="kw1">INNER</span> <span class="kw1">JOIN</span> sys<span class="sy0">.</span>schemas s <span class="kw1">ON</span> t<span class="sy0">.</span>schema_id<span class="sy0">=</span>s<span class="sy0">.</span>schema_id
+&nbsp;<span class="kw1">WHERE</span> t<span class="sy0">.</span>is_ms_shipped<span class="sy0">=</span><span class="nu0">0</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET NOCOUNT ON
+GO
+
+Select 'USE [' + db_name() +']';
+
+Select 'ALTER TABLE ' + 
+       '[' + s.name + '].[' + t.name + ']' +
+       ' DROP CONSTRAINT [' + f.name +']'
+  From sys.foreign_keys f
+ Inner Join sys.tables t on f.parent_object_id=t.object_id
+ Inner Join sys.schemas s on t.schema_id=s.schema_id
+ Where t.is_ms_shipped=0;
+
+
+Select 'TRUNCATE TABLE ' + '[' + s.name + '].[' + t.name + ']'      
+  From sys.tables t
+ Inner Join sys.schemas s on t.schema_id=s.schema_id
+ Where t.is_ms_shipped=0;
+
+
+Select 'ALTER TABLE ' + 
+       '[' + s.name + '].[' + t.name + ']' +
+       ' ADD CONSTRAINT [' + f.name + ']' +
+       ' FOREIGN KEY (' +        
+       Stuff( (Select ', ['+col_name(fk.parent_object_id, fk.parent_column_id) +']'
+                 From sys.foreign_key_columns fk
+                Where constraint_object_id = f.object_id 
+                Order by constraint_column_id
+                  FOR XML Path('')
+            ), 1,2,'') + ')' +
+       ' REFERENCES [' + 
+       object_schema_name(f.referenced_object_id)+'].['+object_name(f.referenced_object_id) + '] (' +
+       Stuff((Select ', ['+col_name(fc.referenced_object_id, fc.referenced_column_id)+']' 
+                From sys.foreign_key_columns fc
+               Where constraint_object_id = f.object_id 
+               Order by constraint_column_id
+                 FOR XML Path('')),
+              1,2,'') +
+        ')' + 
+        ' ON DELETE ' + Replace(f.delete_referential_action_desc, '_', ' ')  +
+        ' ON UPDATE ' + Replace(f.update_referential_action_desc , '_', ' ') collate database_default 
+  From sys.foreign_keys f
+ Inner Join sys.tables t on f.parent_object_id=t.object_id
+ Inner Join sys.schemas s on t.schema_id=s.schema_id
+ Where t.is_ms_shipped=0;</pre></div></div>
+
+<p><strong>Script 2. DELETE in proper order</strong></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="sql"><thead><tr><td colspan="2"  class="head">SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> NOCOUNT <span class="kw1">ON</span>
+<span class="kw1">GO</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="st0">'USE ['</span> <span class="sy0">+</span> db_name<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span><span class="st0">']'</span>;
+;<span class="kw1">WITH</span> a <span class="kw1">AS</span> 
+<span class="br0">&#40;</span>
+&nbsp; &nbsp;<span class="kw1">SELECT</span> <span class="nu0">0</span> <span class="kw1">AS</span> lvl<span class="sy0">,</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; t<span class="sy0">.</span>object_id <span class="kw1">AS</span> tblID 
+&nbsp; &nbsp; &nbsp;<span class="kw1">FROM</span> sys<span class="sy0">.</span><span class="kw1">TABLES</span> t
+&nbsp; &nbsp; <span class="kw1">WHERE</span> t<span class="sy0">.</span>is_ms_shipped<span class="sy0">=</span><span class="nu0">0</span>
+&nbsp; &nbsp; &nbsp; <span class="kw1">AND</span> t<span class="sy0">.</span>object_id <span class="kw1">NOT</span> <span class="kw1">IN</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> f<span class="sy0">.</span>referenced_object_id <span class="kw1">FROM</span> sys<span class="sy0">.</span>foreign_keys f<span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="kw1">UNION</span> <span class="kw1">ALL</span>
+&nbsp; &nbsp;<span class="kw1">SELECT</span> a<span class="sy0">.</span>lvl <span class="sy0">+</span> <span class="nu0">1</span> <span class="kw1">AS</span> lvl<span class="sy0">,</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; f<span class="sy0">.</span>referenced_object_id <span class="kw1">AS</span> tblId
+&nbsp; &nbsp; &nbsp;<span class="kw1">FROM</span> a
+&nbsp; &nbsp; <span class="kw1">INNER</span> <span class="kw1">JOIN</span> sys<span class="sy0">.</span>foreign_keys f 
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">ON</span> a<span class="sy0">.</span>tblId<span class="sy0">=</span>f<span class="sy0">.</span>parent_object_id 
+&nbsp; &nbsp; &nbsp; <span class="kw1">AND</span> a<span class="sy0">.</span>tblID<span class="sy0">&lt;&gt;</span>f<span class="sy0">.</span>referenced_object_id
+<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="st0">'Delete from ['</span><span class="sy0">+</span> object_schema_name<span class="br0">&#40;</span>tblID<span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">'].['</span> <span class="sy0">+</span> object_name<span class="br0">&#40;</span>tblId<span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">']'</span> 
+&nbsp; <span class="kw1">FROM</span> a
+&nbsp;<span class="kw1">GROUP</span> <span class="kw1">BY</span> tblId 
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> <span class="kw1">MAX</span><span class="br0">&#40;</span>lvl<span class="br0">&#41;</span><span class="sy0">,</span><span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET NOCOUNT ON
+GO
+
+Select 'USE [' + db_name() +']';
+;With a as 
+(
+   Select 0 as lvl, 
+          t.object_id as tblID 
+     from sys.Tables t
+    Where t.is_ms_shipped=0
+      and t.object_id not in (Select f.referenced_object_id from sys.foreign_keys f)
+   UNION ALL
+   Select a.lvl + 1 as lvl, 
+          f.referenced_object_id as tblId
+     from a
+    inner join sys.foreign_keys f 
+       on a.tblId=f.parent_object_id 
+      and a.tblID&lt;&gt;f.referenced_object_id
+)
+Select 'Delete from ['+ object_schema_name(tblID) + '].[' + object_name(tblId) + ']' 
+  from a
+ Group by tblId 
+Order by Max(lvl),1</pre></div></div>
+
+<p>Note. Don&#8217;t forget to modify max column display size parameter in SSMS and preferably execute it in &#8220;result in text&#8221; mode (Ctrl-T)</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/delete-all-data-in-database-when-you-hav/feed/</wfw:commentRss>
+		<slash:comments>15</slash:comments>
+		</item>
+		<item>
+		<title>Table sizes</title>
+		<link>/index.php/datamgmt/dbadmin/table-sizes/</link>
+		<comments>/index.php/datamgmt/dbadmin/table-sizes/#comments</comments>
+		<pubDate>Thu, 18 Feb 2010 15:21:52 +0000</pubDate>
+		<dc:creator><![CDATA[niikola]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/02/table-sizes/</guid>
+		<description><![CDATA[I do not know if there is already code for table sizes (as used in SQL Server 2008 reports) but what I've seen on the net people are using cursors and  temporary tables (completely unnecessary). 
+
+NOTE (added later): 
+In order to update table sizes i&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I do not know if there is already code for table sizes (as used in SQL Server 2008 reports) but what I&#8217;ve seen on the net people are using cursors and  temporary tables (completely unnecessary). </p>
+<blockquote><p>NOTE (added later):<br />
+In order to update table sizes in sys.dm_db_partition_stats you can execute next DBCC (all tables for current database):<br />
+<code>DBCC UPDATEUSAGE (0) WITH NO_INFOMSGS, COUNT_ROWS</code> </p></blockquote>
+<pre>;WITH SpaceUsage AS 
+(
+   SELECT s.Name + '.' + o.Name as tblName,
+          case when i.index_id &amp;lt; 2 Then row_count else 0 end as nRows,
+          reserved_page_count as Reserved,
+          used_page_count     as Used,
+          case when i.index_id &amp;lt; 2 Then (in_row_used_page_count - in_row_data_page_count) 
+                                    else  p.used_page_count end as indUsed
+     FROM sys.dm_db_partition_stats p
+    INNER JOIN sys.objects          o ON o.object_id = p.object_id
+    INNER JOIN sys.schemas          s ON s.schema_id = o.schema_id
+     LEFT OUTER JOIN sys.indexes    i on i.object_id = p.object_id and i.index_id = p.index_id
+    WHERE o.type = 'U'
+      and o.is_ms_shipped = 0
+)                                                   
+Select tblName as [Table Name],
+       sum(nRows)             as [#Records],
+       sum(Reserved)      * 8 as [Reserved(KB)],
+       sum(Used-indUsed)  * 8 as [Data(KB)],
+       sum(indUsed)       * 8 as [Indexes(KB)],
+       sum(Reserved-used) * 8 as [Unused(KB)]
+  from SpaceUsage
+ Group By tblName
+ Order By [Reserved(KB)] Desc   </pre>
+<p>Here is a version with more details.</p>
+<pre>;WITH SpaceUsage AS 
+(
+   SELECT s.Name + '.' + o.Name as tblName,
+          Case When i.index_id = 0 then 0 else 1 end as nInd,
+          case when i.index_id &lt; 2 Then row_count else 0 end as nRows,
+          used_page_count     as Used,
+          reserved_page_count as Reserved,
+          case when i.index_id &lt;= 1 Then in_row_data_page_count           else 0 end as rowUsed,
+          case when i.index_id &lt;= 1 Then (in_row_used_page_count - in_row_data_page_count) 
+                                                                          else 0 end as cliUsed,
+          case when i.index_id &amp;lt;  1 Then p.used_page_count                else 0 end as indUsed,
+          case when i.index_id &amp;lt;= 1 Then lob_used_page_count              else 0 end as lobUsed,
+          case when i.index_id &amp;lt;= 1 Then row_overflow_used_page_count     else 0 end as ofwUsed,
+          case when i.index_id &amp;lt;= 1 Then in_row_reserved_page_count       else 0 end as rowRsvd,
+          case when i.index_id &amp;lt;= 1 Then row_overflow_reserved_page_count else 0 end as ofwRsvd,
+          case when i.index_id &amp;lt;= 1 Then lob_reserved_page_count          else 0 end as lobRsvd,
+          case when i.index_id &amp;gt;  1 Then reserved_page_count              else 0 end as indRsvd
+     FROM sys.dm_db_partition_stats p
+    INNER JOIN sys.objects          o ON o.object_id = p.object_id
+    INNER JOIN sys.schemas          s ON s.schema_id = o.schema_id
+     LEFT OUTER JOIN sys.indexes    i on i.object_id = p.object_id and i.index_id = p.index_id
+    WHERE o.type = 'U'
+      and o.is_ms_shipped = 0
+)                                                   
+Select tblName,
+       Sum(nInd)         as nInd,
+       sum(nRows)        as nRows,
+       sum(Used)     * 8 as UsedKB,
+       case when sum(nRows)&gt;0 Then (sum(Used)*8192)/Sum(nRows) else null end as avgBPR,
+       sum(Reserved) * 8 as ReservedKB,
+       sum(rowUsed)  * 8 as rowUsedKB,
+       sum(cliUsed)  * 8 as cliUsedKB,
+       sum(indUsed)  * 8 as indUsedKB,
+       sum(lobUsed)  * 8 as lobUsedKB,
+       sum(ofwUsed)  * 8 as ofwUsedKB,
+       sum(rowRsvd)  * 8 as rowRsvdKB,
+       sum(ofwRsvd)  * 8 as ofwRsvdKB,
+       sum(lobRsvd)  * 8 as lobRsvdKB,
+       sum(indRsvd)  * 8 as indRsvdKB
+  from SpaceUsage
+ Group By tblName
+ Order By ReservedKB Desc  </pre>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/table-sizes/feed/</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+		</item>
+	</channel>
+</rss>

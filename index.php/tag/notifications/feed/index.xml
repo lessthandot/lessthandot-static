@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>notifications &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/notifications/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2012 Day 12: Proactive notifications</title>
+		<link>/index.php/datamgmt/dbprogramming/proactive-notifications/</link>
+		<comments>/index.php/datamgmt/dbprogramming/proactive-notifications/#respond</comments>
+		<pubDate>Wed, 12 Dec 2012 08:42:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[errors]]></category>
+		<category><![CDATA[notifications]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/proactive-notifications/</guid>
+		<description><![CDATA[This is day twelve of the SQL Advent 2012 series of blog posts. Today we are going to look at SQL Server proactive notifications]]></description>
+				<content:encoded><![CDATA[<p>This is day twelve of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at SQL Server proactive notifications. In the <a href="/index.php/DataMgmt/business-intelligence-1/sql-server-maintenance">SQL Server Maintenance</a> post from yesterday I touched upon proactive notifications a little, today I want to dive a little deeper into this subject. </p>
+<p>The last thing you want as a DBA is to hear any of the following things from the end users</p>
+<ul>
+<li>The transaction log is full</li>
+<li>The database is very slow</li>
+<li>The latest backup we have is 9 days old</li>
+<li>The table that was created has 2 extra columns this morning</li>
+<li>Everything is locked up can&#8217;t get any results back from a query</li>
+<li>Deadlocks are occurring</li>
+</ul>
+<p>What you really want to have at your shop is a tool like <a href="http://www.quest.com/foglight-for-sql-server/">Quest Foglight</a>, <a href="http://www.confio.com/performance/sql-server/ignite/">Confio Ignite</a>, <a href="http://www.red-gate.com/products/dba/sql-monitor/">Red Gate SQL Monitor</a> or similar. The benefit of these tools is that there is a central location where you can look at all the alerts at a glance. You get a lot of stuff out of the box and all you have to do is tell it what server to start monitoring. I would suggest to start using the trial version to see if it is something that would be beneficial for your organization.</p>
+<p>Of course you can roll your own solution as well, this will involve work and unless your time is worthless or you are bored out of your mind after work I wouldn&#8217;t do it.</p>
+<h2>Utilize the logs</h2>
+<p>You need to scan the errorlog periodically to see if there are errors, you can automate this, no need to start opening log files every 5 minutes. create a SQL Agent job that runs every 5 minutes and checks if there are any errors since it last ran. You can use the xp_readerrorlog proc to read the error log from with sql server with T-SQL.</p>
+<p>Here is a small example of what you can do if you have this in a SQL Agent job that runs every 5 minutes or so, you can of course email yourself the results, dump the result into a table that is perhaps shown on a dashboard in the office, there are many possibilities.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--This will hold the rows</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #ErrorLog <span class="br0">&#40;</span>LogDate <span class="kw1">datetime</span>, ProcessInfo <span class="kw1">VarChar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span>, ErrorMessage <span class="kw1">VarChar</span><span class="br0">&#40;</span><span class="kw2">Max</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="co1">-- Dump the errorlog into the table</span>
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> #ErrorLog
+<span class="kw1">EXEC</span> master.<span class="me1">dbo</span>.<span class="me1">xp_readerrorlog</span>
+&nbsp;
+<span class="co1">-- Delete everything older than 5 minutes</span>
+<span class="co1">-- ideally you will store the max date when it ran last</span>
+<span class="kw1">DELETE</span> #ErrorLog
+<span class="kw1">WHERE</span> LogDate <span class="sy0">&lt;</span> &nbsp;<span class="kw2">DATEADD</span><span class="br0">&#40;</span>mi,<span class="sy0">-</span><span class="nu0">5</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="co1">-- Some stuff you want to check for</span>
+<span class="co1">-- Failed backups...you want to know this</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #ErrorLog
+<span class="kw1">WHERE</span> ErrorMessage <span class="sy0">LIKE</span><span class="st0">'BACKUP failed%'</span>
+&nbsp;
+<span class="co1">-- Why does it take so looong to grow a file, maybe rethink your settings</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #ErrorLog
+<span class="kw1">WHERE</span> ErrorMessage <span class="sy0">LIKE</span><span class="st0">'Autogrow of file%'</span>
+&nbsp;
+<span class="co1">-- What is going on any backups or statistic updates running at this time?</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #ErrorLog
+<span class="kw1">WHERE</span> ErrorMessage <span class="sy0">LIKE</span><span class="st0">'SQL Server has encountered %occurrence(s) of I/O requests taking longer than%'</span>
+&nbsp;
+<span class="co1">-- My mirror might not be up to date</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #ErrorLog
+<span class="kw1">WHERE</span> ErrorMessage <span class="sy0">LIKE</span><span class="st0">'The alert for '</span><span class="st0">'unsent log'</span><span class="st0">' has been raised%'</span>
+&nbsp;
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> #ErrorLog </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--This will hold the rows
+CREATE TABLE #ErrorLog (LogDate datetime, ProcessInfo VarChar(10), ErrorMessage VarChar(Max))
+
+-- Dump the errorlog into the table
+INSERT INTO #ErrorLog
+EXEC master.dbo.xp_readerrorlog
+
+-- Delete everything older than 5 minutes
+-- ideally you will store the max date when it ran last
+DELETE #ErrorLog
+WHERE LogDate &lt;  DATEADD(mi,-5,GETDATE())
+
+-- Some stuff you want to check for
+-- Failed backups...you want to know this
+SELECT * FROM #ErrorLog
+WHERE ErrorMessage LIKE'BACKUP failed%'
+
+-- Why does it take so looong to grow a file, maybe rethink your settings
+SELECT * FROM #ErrorLog
+WHERE ErrorMessage LIKE'Autogrow of file%'
+
+-- What is going on any backups or statistic updates running at this time?
+SELECT * FROM #ErrorLog
+WHERE ErrorMessage LIKE'SQL Server has encountered %occurrence(s) of I/O requests taking longer than%'
+
+-- My mirror might not be up to date
+SELECT * FROM #ErrorLog
+WHERE ErrorMessage LIKE'The alert for ''unsent log'' has been raised%'
+
+
+DROP TABLE #ErrorLog </pre></div></div>
+
+<p>Those are just small samples, you might want to look for other kind of messages from the errorlog</p>
+<p>
+<h2>The transaction log is full</h2>
+<p>You want to make sure that you know you are running out of space before you run out of space. I covered this in the <a href="/index.php/DataMgmt/business-intelligence-1/sql-server-maintenance">SQL Server Maintenance</a> post Take a look at the sections <em>Make sure that you have enough space left on the drives</em> and <em>Make sure that you have enough space left for the filegroups</em> In those two section I described what to look for and also supplied code that you can then plug into your own solution</p>
+<p>
+<h2>The database is very slow</h2>
+<p>This complaint you hear every now and then, I have seen this from time to time. There are several things that could be happening, here is a list</p>
+<p>Someone decided to take a backup of that 1 TB database in the middle of the day<br />
+The update statistics job is still running<br />
+Statistics are stale and haven&#8217;t been updated in a long time<br />
+The virus scan is running amok and nobody told it to ignore the database files<br />
+Someone decided to query all the data all at once</p>
+<p>If you have a tool like <a href="http://www.quest.com/foglight-for-sql-server/">Quest Foglight</a>, <a href="http://www.confio.com/performance/sql-server/ignite/">Confio Ignite</a>, <a href="http://www.red-gate.com/products/dba/sql-monitor/">Red Gate SQL Monitor</a> or similar then you can see what query ran at what time, what it did and how long it ran.</p>
+<p>You can of course also use sp_who2, BlkBy column and DBCC INPUTBUFFER to see what is going on</p>
+<p>If you like to use Dynamic Management Views, then take a look at Glenn Berry&#8217;s <a href="http://sqlserverperformance.wordpress.com/2012/12/06/sql-server-2005-diagnostic-information-queries-dec-2012/">SQL Server 2005 Diagnostic Information Queries (Dec 2012)</a> and <a href="http://sqlserverperformance.wordpress.com/2012/11/27/sql-server-2008-diagnostic-information-queries-nov-2012/">SQL Server 2008 Diagnostic Information Queries (Nov 2012)</a> posts, there is a .sql file in each post with all kind of queries to discover all kinds of stuff about your server. </p>
+<p>It could also be that your hardware is having issues, make sure the IOs look good and check the eventlog for any clues.</p>
+<p>
+<h2>The latest backup we have is 9 days old</h2>
+<p>The following query will give you for all the databases the last time it was backed up or display NEVER if it wasn&#8217;t backed up</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> s.<span class="me1">Name</span> <span class="kw1">AS</span> DatabaseName,<span class="st0">'Database backup was taken on &nbsp;'</span> <span class="sy0">+</span> 
+<span class="kw1">CASE</span> <span class="kw1">WHEN</span> <span class="kw2">MAX</span><span class="br0">&#40;</span>b.<span class="me1">backup_finish_date</span><span class="br0">&#41;</span> <span class="kw1">IS</span> <span class="sy0">NULL</span> <span class="kw1">THEN</span> <span class="st0">'NEVER!!!'</span> <span class="kw1">ELSE</span>
+<span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">12</span><span class="br0">&#41;</span>, <span class="br0">&#40;</span><span class="kw2">MAX</span><span class="br0">&#40;</span>b.<span class="me1">backup_finish_date</span><span class="br0">&#41;</span><span class="br0">&#41;</span>, <span class="nu0">101</span><span class="br0">&#41;</span> <span class="kw1">END</span> <span class="kw1">AS</span> LastBackUpTime
+<span class="kw1">FROM</span> sys.<span class="me1">sysdatabases</span> s
+<span class="kw1">LEFT</span> <span class="sy0">OUTER</span> <span class="sy0">JOIN</span> msdb.<span class="me1">dbo</span>.<span class="me1">backupset</span> b <span class="kw1">ON</span> b.<span class="me1">database_name</span> <span class="sy0">=</span> s.<span class="me1">name</span>
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> s.<span class="me1">Name</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT s.Name AS DatabaseName,'Database backup was taken on  ' + 
+CASE WHEN MAX(b.backup_finish_date) IS NULL THEN 'NEVER!!!' ELSE
+CONVERT(VARCHAR(12), (MAX(b.backup_finish_date)), 101) END AS LastBackUpTime
+FROM sys.sysdatabases s
+LEFT OUTER JOIN msdb.dbo.backupset b ON b.database_name = s.name
+GROUP BY s.Name</pre></div></div>
+
+<p>Here is what the output will look like</p>
+<pre>DatabaseName	LastBackUpTime
+--------------  ---------------------------------------
+model	        Database backup was taken on  NEVER!!!
+msdb	        Database backup was taken on  12/10/2012
+ReportServer	Database backup was taken on  NEVER!!!</pre>
+<p>As you can see that is not that great, all the databases should be backed up on a regular basis. Scroll up to the <em>Utilize the logs</em> section to see how you can check the errorlog for failed backup messages.</p>
+<p>
+<h2>Everything is locked up, you can&#8217;t get any results back from a query</h2>
+<p>Usually this indicates that there is an open transaction somewhere that has not finished or someone did the BEGIN TRAN  part but never did a COMMIT or ROLLBACK.</p>
+<p>Some people just restart the server to &#8216;fix&#8217; the issue, of course if you do that you will never know what the root cause is and you never know when it will happen again.</p>
+<p>We can easily show what happens when you have an open transaction, btw don&#8217;t do this on the production server.</p>
+<p>In 1 query window run this, replace SomeTable with a real table name.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BEGIN</span> <span class="kw1">TRAN</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1</span> <span class="sy0">*</span> <span class="kw1">FROM</span> SomeTable <span class="kw1">WITH</span><span class="br0">&#40;</span>UPDLOCK, <span class="kw1">HOLDLOCK</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BEGIN TRAN
+
+SELECT TOP 1 * FROM SomeTable WITH(UPDLOCK, HOLDLOCK)</pre></div></div>
+
+<p>You will get a message that the query completed successfully</p>
+<p>In another window run this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1</span> <span class="sy0">*</span> <span class="kw1">FROM</span> SomeTable <span class="kw1">WITH</span><span class="br0">&#40;</span>UPDLOCK, <span class="kw1">HOLDLOCK</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT TOP 1 * FROM SomeTable WITH(UPDLOCK, HOLDLOCK)</pre></div></div>
+
+<p>That query won&#8217;t return anything unless the first one is commited or rolled back<br />
+Now run this query below, the first column should have the text AWAITING COMMAND</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp; sys.<span class="me1">cmd</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,sys.<span class="me1">last_batch</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_type</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_subtype</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">DB_NAME</span><span class="br0">&#40;</span>lok.<span class="me1">resource_database_id</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_description</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_associated_entity_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">resource_lock_partition</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_mode</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_type</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_status</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_owner_type</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">request_owner_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,lok.<span class="me1">lock_owner_address</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">waiting_task_address</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">session_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">exec_context_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">wait_duration_ms</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">wait_type</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">resource_address</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">blocking_task_address</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">blocking_session_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">blocking_exec_context_id</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,wat.<span class="me1">resource_description</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;sys.<span class="me1">dm_tran_locks</span> lok
+<span class="sy0">JOIN</span> &nbsp; &nbsp;sys.<span class="me1">dm_os_waiting_tasks</span> wat
+<span class="kw1">ON</span> &nbsp; &nbsp; &nbsp;lok.<span class="me1">lock_owner_address</span> <span class="sy0">=</span> wat.<span class="me1">resource_address</span>
+<span class="sy0">JOIN</span>&nbsp; &nbsp; sys.<span class="me1">sysprocesses</span> sys <span class="kw1">ON</span> wat.<span class="me1">blocking_session_id</span> <span class="sy0">=</span> sys.<span class="me1">spid</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT   sys.cmd
+        ,sys.last_batch
+        ,lok.resource_type
+        ,lok.resource_subtype
+        ,DB_NAME(lok.resource_database_id)
+        ,lok.resource_description
+        ,lok.resource_associated_entity_id
+        ,lok.resource_lock_partition
+        ,lok.request_mode
+        ,lok.request_type
+        ,lok.request_status
+        ,lok.request_owner_type
+        ,lok.request_owner_id
+        ,lok.lock_owner_address
+        ,wat.waiting_task_address
+        ,wat.session_id
+        ,wat.exec_context_id
+        ,wat.wait_duration_ms
+        ,wat.wait_type
+        ,wat.resource_address
+        ,wat.blocking_task_address
+        ,wat.blocking_session_id
+        ,wat.blocking_exec_context_id
+        ,wat.resource_description
+FROM    sys.dm_tran_locks lok
+JOIN    sys.dm_os_waiting_tasks wat
+ON      lok.lock_owner_address = wat.resource_address
+JOIN	sys.sysprocesses sys ON wat.blocking_session_id = sys.spid</pre></div></div>
+
+<p>As you can see you have a blocking_session_id and a session_id, this will tell you which session_id is being blocked. You can now verify that the transaction session_id  is blocking the other id</p>
+<p>Go back to that first command window and execute a rollback</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ROLLBACK</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ROLLBACK</pre></div></div>
+
+<p>The query that had that second select should now be done as well, if you run that query that checks for the waits it should be clean as well.</p>
+<p>Of course you could have done the same excercise by running sp_who2, looking at the BlkBy column, finding out what that session is doing by running DBCC INPUTBUFFER(session_id) with that session_id</p>
+<p>
+<h2>Deadlocks are occurring</h2>
+<p>There is already a post written on LessThanDot explaining how you can get emailed when deadlocks occur. Ted Krueger wrote that post and it can be found here: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/proactive-deadlock-notifications">Proactive Deadlock Notifications</a></p>
+<h2>Summary</h2>
+<p>I only touched the surface of what can be done in this post. I want you to find out if there is any monitoring being done in your shop, who gets notified? I have worked in places where the end user was the proactive notification, as long as we fixed it before the business users started to complaint life was good. Manual notifications and homebrew solutions might work for a while but when you add more and more servers and you add more people to the team this becomes laborious and error prone.</p>
+<p>If there is one New Year&#8217;s resolution you should add next year, I would suggest proactive notifications. Get trial versions of the tools, try them out until January 1st and then decide if you think it is worth.</p>
+<p>That is all for day twelve of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/proactive-notifications/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>normalization &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/normalization/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2012 Day 16: Lack of database design and normalization</title>
+		<link>/index.php/datamgmt/datadesign/lack-of-database-design-and/</link>
+		<comments>/index.php/datamgmt/datadesign/lack-of-database-design-and/#respond</comments>
+		<pubDate>Sun, 16 Dec 2012 12:55:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[foreign keys]]></category>
+		<category><![CDATA[normal form]]></category>
+		<category><![CDATA[normalization]]></category>
+		<category><![CDATA[referential integrity]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/lack-of-database-design-and/</guid>
+		<description><![CDATA[This is day sixteen of the SQL Advent 2012 series of blog posts. Today we are going to look at the lack of database design and normalization.
+
+Normalize untill it hurts, denormalize until it works]]></description>
+				<content:encoded><![CDATA[<p>This is day sixteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at the lack of database design and normalization. Normalization and database design is a big enough topic that there are 500 page plus books written about it. This post will barely scratch the surface, if you want to know more about this topic pick up a book about it. <a href="http://www.amazon.com/gp/product/143020866X/002-3562882-4309664?ie=UTF8&amp;tag=sql08-20&amp;linkCode=xm2&amp;camp=1789&amp;creativeASIN=143020866X">Pro SQL Server 2008 Relational Database Design and Implementation</a> is one that I recommend. I did an interview with the author here: <a href="/index.php/DataMgmt/DataDesign/interview-with-louis-davidson-author-of-">Interview With Louis Davidson Author of Pro SQL Server 2008 Relational Database Design and Implementation</a></p>
+<h1>Normalize until it hurts, denormalize until it works</h1>
+<p>So what is normalization? Normalization is the process of organizing the columns and tables of a relational database to minimize redundancy and dependency. Normalization usually involves dividing large tables into smaller (and less redundant) tables and defining relationships between them. The objective is to isolate data so that additions, deletions, and modifications of a field can be made in just one table and then propagated through the rest of the database via the defined relationships.</p>
+<p>Let&#8217;s take a look at a simple example. Let&#8217;s say we have a book store and we want to capture the book title, the date the book was published as well as the author. We are keeping this very simple so no ISBN or publisher or any additional information.</p>
+<p>You might come up with a table like this right?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Books <span class="br0">&#40;</span>BookdId <span class="kw1">int</span>, Title <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, PublishDate <span class="kw1">datetime</span>, Author <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Books (BookdId int, Title varchar(100), PublishDate datetime, Author varchar(100))
+GO</pre></div></div>
+
+<p>One of the problems is that if an author wrote more than one book, the author will be stored in that table more than once. What it the authot is a woman and she gets married and decided to change her name, how will you know this is the same person?</p>
+<p>Let&#8217;s drop that table since we are going to recreate it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">TABLE</span> Books
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP TABLE Books
+GO</pre></div></div>
+
+<p>Now, let&#8217;s create two tables, we are going to create an Author table and a Books table. The Author table will hold the AuthotID, the last name as well as the first name. Now we can use the AuthorID and store that in the Books table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Create</span> <span class="kw1">Table</span> Authors <span class="br0">&#40;</span>AuthorID <span class="kw1">int</span>, FirstName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, LastName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Books <span class="br0">&#40;</span>BookdId <span class="kw1">int</span>, Title <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, PublishDate <span class="kw1">datetime</span>, AuthorID <span class="kw1">int</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Create Table Authors (AuthorID int, FirstName varchar(100), LastName varchar(100))
+GO
+
+CREATE TABLE Books (BookdId int, Title varchar(100), PublishDate datetime, AuthorID int)
+GO</pre></div></div>
+
+<p>So what is the problem with this so called design? Ever heard of a book that had more than one author? Of course you have there are many of those, this is especially true with technical books.</p>
+<p>Let&#8217;s drop those tables since we are going to recreate it.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">TABLE</span> Books, Authors
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP TABLE Books, Authors
+GO</pre></div></div>
+
+<p>Now what we have to add is a third table, this table will have just two columns, the BookID and the AuthorID, now you can handle many authors per book without a problem. The AuthorID column will now be eliminated from the Books table as well.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Create</span> <span class="kw1">Table</span> Authors <span class="br0">&#40;</span>AuthorID <span class="kw1">int</span>, FirstName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, LastName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Books <span class="br0">&#40;</span>BookdId <span class="kw1">int</span>, Title <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, PublishDate <span class="kw1">datetime</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> BookAuthors<span class="br0">&#40;</span>BookdId <span class="kw1">int</span>,AuthorID <span class="kw1">int</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Create Table Authors (AuthorID int, FirstName varchar(100), LastName varchar(100))
+GO
+
+CREATE TABLE Books (BookdId int, Title varchar(100), PublishDate datetime)
+GO
+
+CREATE TABLE BookAuthors(BookdId int,AuthorID int)
+GO</pre></div></div>
+
+<p>What else are we missing? How about some primary keys and foreign keys. We are going to make BookID and AuthorID a primary key. Those two columns will also be a foreign key in the BookAuthors tables. Since an author can&#8217;t write the same book twice, we will also make the combination of BookID and AuthorID a primary key in the BookAuthors table</p>
+<p>Here is what you will end up with</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/SimpleDB.PNG?mtime=1355567856"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/SimpleDB.PNG?mtime=1355567856" width="499" height="304" /></a></div>
+<p>Now, here is the code to add the primary keys and foreign keys to the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Books</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Books <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> 
+&nbsp; &nbsp; <span class="br0">&#40;</span>BookdID<span class="br0">&#41;</span> <span class="kw1">ON</span> <span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span>
+&nbsp;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.Books ADD CONSTRAINT
+	PK_Books PRIMARY KEY CLUSTERED 
+	(BookdID) ON [PRIMARY]
+
+GO</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">BookAuthors</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_BookAuthors <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> 
+&nbsp; &nbsp; <span class="br0">&#40;</span>BookdID,AuthorID<span class="br0">&#41;</span> &nbsp;<span class="kw1">ON</span> <span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span>
+&nbsp;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.BookAuthors ADD CONSTRAINT
+	PK_BookAuthors PRIMARY KEY CLUSTERED 
+	(BookdID,AuthorID)  ON [PRIMARY]
+
+GO</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Authors</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Authors <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> 
+&nbsp; &nbsp; <span class="br0">&#40;</span>AuthorID<span class="br0">&#41;</span> <span class="kw1">ON</span> <span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.Authors ADD CONSTRAINT
+	PK_Authors PRIMARY KEY CLUSTERED 
+	(AuthorID) ON [PRIMARY]</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>BookAuthors<span class="br0">&#93;</span> &nbsp;<span class="kw1">WITH</span> <span class="kw1">CHECK</span> <span class="kw1">ADD</span> &nbsp;<span class="kw1">CONSTRAINT</span> <span class="br0">&#91;</span>FK_BookAuthors_Authors<span class="br0">&#93;</span> <span class="kw1">FOREIGN</span> <span class="kw1">KEY</span><span class="br0">&#40;</span><span class="br0">&#91;</span>AuthorID<span class="br0">&#93;</span><span class="br0">&#41;</span>
+<span class="kw1">REFERENCES</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Authors<span class="br0">&#93;</span> <span class="br0">&#40;</span><span class="br0">&#91;</span>AuthorID<span class="br0">&#93;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>BookAuthors<span class="br0">&#93;</span> <span class="kw1">CHECK</span> <span class="kw1">CONSTRAINT</span> <span class="br0">&#91;</span>FK_BookAuthors_Authors<span class="br0">&#93;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE [dbo].[BookAuthors]  WITH CHECK ADD  CONSTRAINT [FK_BookAuthors_Authors] FOREIGN KEY([AuthorID])
+REFERENCES [dbo].[Authors] ([AuthorID])
+GO
+
+ALTER TABLE [dbo].[BookAuthors] CHECK CONSTRAINT [FK_BookAuthors_Authors]
+GO</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>BookAuthors<span class="br0">&#93;</span> &nbsp;<span class="kw1">WITH</span> <span class="kw1">CHECK</span> <span class="kw1">ADD</span> &nbsp;<span class="kw1">CONSTRAINT</span> <span class="br0">&#91;</span>FK_BookAuthors_Books<span class="br0">&#93;</span> <span class="kw1">FOREIGN</span> <span class="kw1">KEY</span><span class="br0">&#40;</span><span class="br0">&#91;</span>BookdID<span class="br0">&#93;</span><span class="br0">&#41;</span>
+<span class="kw1">REFERENCES</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Books<span class="br0">&#93;</span> <span class="br0">&#40;</span><span class="br0">&#91;</span>BookdID<span class="br0">&#93;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>BookAuthors<span class="br0">&#93;</span> <span class="kw1">CHECK</span> <span class="kw1">CONSTRAINT</span> <span class="br0">&#91;</span>FK_BookAuthors_Books<span class="br0">&#93;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE [dbo].[BookAuthors]  WITH CHECK ADD  CONSTRAINT [FK_BookAuthors_Books] FOREIGN KEY([BookdID])
+REFERENCES [dbo].[Books] ([BookdID])
+GO
+
+ALTER TABLE [dbo].[BookAuthors] CHECK CONSTRAINT [FK_BookAuthors_Books]
+GO</pre></div></div>
+
+<p>That is a lot of code, this is where modeling tools come in handy. You can use the diagramming tool in SQL Server Management Studio but it is not full feature like the ones below.</p>
+<p>CA <a href="http://erwin.com/products/data-modeler/standard-edition">ERwin Data Modeler</a><br />
+SAP (Sybase) <a href="http://www.sybase.com/products/modelingdevelopment/powerdesigner">PowerDesigner</a><br />
+Embarcadero <a href="http://www.embarcadero.com/products/er-studio">ER/Studio</a><br />
+IBM <a href="http://www-01.ibm.com/software/awdtools/systemarchitect/">Rational Systems Architect</a><br />
+Dell Quest <a href="http://www.quest.com/toad/http://www.quest.com/toad/">TOAD</a></p>
+<p>I have used ERwin  and Visio in the past but use PowerDesigner these days.</p>
+<p>Now how would you handle the name change for the author? You can introduce another table where you would have first and last name together with start and end dates, this now enables you to still have the author being one author for reporting purposes but you can now still represent the name correctly for a specific point in time. Another example of this would be the stock market, companies will change the ticker, Sun Microsystem change the ticker from SUNW to JAVA, sometimes they change the name as well, Apple dropped Computers from the name. You still want this to be the same company so you won&#8217;t just add another row otherwise how would you do historical charting?</p>
+<p>This is also why I like keys that don&#8217;t have meaning, these are called surrogate keys, now when you change everything in the row it doesn&#8217;t matter. I once worked with a system where&#8230;are you ready for this&#8230;&#8230;the primary key was the social security number, this key was then also used as a foreign key in another ten tables. Of course  some people would be reluctant to give their real social security number, they made up a number. Now the person with the real number signed up and couldn&#8217;t he would call customer support, they would track down the person with the fake number and now the SSN had to be changed in over 10 tables, since we didn&#8217;t have cascade update turned on, this had to be handled manually (and of course make sure to highlight the WHERE clause otherwise you are toast)</p>
+<p>Remember how we had that BookAuthors junction/lookup table? Sometimes you will actually see a comma delimited list of IDs in a varchar column. This is not the way to store more than one author for a book. This looks easier from an application point of view (however I disagree even here) but now you have to write some kind of row to column user defined function if you want to show all authors. Performance is also going to be a dud, an index can&#8217;t be used since your WHERE clause is not <a href="/index.php/DataMgmt/DBProgramming/sargable-queries">sargable</a>.</p>
+<p><strong>Unnormalized database</strong><br />
+This is a database which was never normalized to begin with </p>
+<p><strong>Denormalized database</strong><br />
+A denormalized database is a database that was normalized but some parts have been denormalized for performance or maintenance reasons</p>
+<p><strong>For you to research/lookup</strong></p>
+<p><strong>Keys</strong><br />
+There are many types of keys, some of them are just synonyms, here are some of them:  Candidate Key, Surrogate Key, Superkey, Natural Key, Alternate Key, Compound Key</p>
+<p><strong>Normal form</strong><br />
+Like I said at the beginning of the post there many more things to this topic than covered here. I did not talk about normal form at all, make sure that you research what all of these mean</p>
+<p>1NF	First normal form<br />
+2NF	Second normal form<br />
+3NF	Third normal form<br />
+EKNF	Elementary Key Normal Form<br />
+BCNF	Boyce–Codd normal form<br />
+4NF	Fourth normal form<br />
+5NF	Fifth normal form<br />
+DKNF	Domain/key normal form<br />
+6NF	Sixth normal form</p>
+<p>That is all for day sixteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/lack-of-database-design-and/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Use a database how it was intended to be used</title>
+		<link>/index.php/datamgmt/datadesign/use-a-database-how-it/</link>
+		<comments>/index.php/datamgmt/datadesign/use-a-database-how-it/#comments</comments>
+		<pubDate>Mon, 04 Apr 2011 23:40:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[design]]></category>
+		<category><![CDATA[normalization]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/04/use-a-database-how-it/</guid>
+		<description><![CDATA[Take a look at this piece of junk code, what pops up in your head when you look at this
+CREATE FUNCTION [dbo].[age](@set varchar(10))
+RETURNS TABLE
+AS
+BEGIN
+    IF  (@set = 'tall')
+         SELECT * from player where height &#62; 180
+    ELSE IF (&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Take a look at this piece of <del>junk</del> code, what pops up in your head when you look at this?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">FUNCTION</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>age<span class="br0">&#93;</span><span class="br0">&#40;</span>@<span class="kw1">set</span> <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">RETURNS</span> <span class="kw1">TABLE</span>
+<span class="kw1">AS</span>
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; <span class="kw1">IF</span> &nbsp;<span class="br0">&#40;</span>@<span class="kw1">set</span> <span class="sy0">=</span> <span class="st0">'tall'</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">from</span> player <span class="kw1">where</span> height <span class="sy0">&gt;</span> <span class="nu0">180</span>
+&nbsp; &nbsp; <span class="kw1">ELSE</span> <span class="kw1">IF</span> <span class="br0">&#40;</span>@<span class="kw1">set</span> <span class="sy0">=</span> <span class="st0">'average'</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">from</span> player <span class="kw1">where</span> height <span class="sy0">&gt;=</span> <span class="nu0">155</span> and height <span class="sy0">&lt;=</span><span class="nu0">175</span>
+&nbsp; &nbsp; <span class="kw1">ELSE</span> <span class="kw1">IF</span> <span class="br0">&#40;</span>@<span class="kw1">set</span> <span class="sy0">=</span> <span class="st0">'low'</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">from</span> player <span class="kw1">where</span> height <span class="sy0">&lt;</span> <span class="nu0">155</span>
+<span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE FUNCTION [dbo].[age](@set varchar(10))
+RETURNS TABLE
+AS
+BEGIN
+    IF  (@set = 'tall')
+         SELECT * from player where height &gt; 180
+    ELSE IF (@set = 'average')
+         SELECT * from player where height &gt;= 155 and height &lt;=175
+    ELSE IF (@set = 'low')
+         SELECT * from player where height &lt; 155
+END</pre></div></div>
+
+<p>If you are thinking <em>silly you, you can&#8217;t have an IF statement like that in a function</em>, then you have disappointed me. What you really should be saying is the following: <a href="http://stackoverflow.com/questions/5544269/tsql-if-else-statement-inside-table-valued-functions-cant-go-through/5544320#5544320">why are you hardcoding this, create a heights table and then grab all the heights that are valid for the range</a></p>
+<p>Yes, I grabbed this example from the following question: <a href="http://stackoverflow.com/questions/5544269/tsql-if-else-statement-inside-table-valued-functions-cant-go-through">TSQL &#8211; If..Else statement inside Table-Valued Functions &#8211; cant go through…</a>. As you can see several people answered with how to use a CASE statement instead. That is all nice and dandy but the information should be in a table instead</p>
+<h1>Single Source of Truth</h1>
+<p>The thing that is wrong with that piece of code posted is not the fact that the IF statement doesn&#8217;t work but the fact that a table was not used to store the info. If you are using a table then you can populate a drop down in a form, use the table in  the function, in other procedures, views etc etc. If you need to make a change, you do it in one place and one place only. </p>
+<p>This is a very important thing to understand, if you have the same information from 10 different sources all over the place hen when you need to make a change you are bound to make mistakes. Can you imagine if you need to store tax information, having this hardcoded like that? That is insanity.</p>
+<p>It is not difficult to create such a table.<br />
+Here is a sample table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Heights <span class="br0">&#40;</span>&nbsp; 
+&nbsp; &nbsp; HeightId <span class="kw1">int</span> <span class="kw1">primary</span> <span class="kw1">key</span> not null,
+&nbsp; &nbsp; HeightDescription <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> not null,
+&nbsp; &nbsp; StartRange <span class="kw1">smallint</span> not null,
+&nbsp; &nbsp; EndRange <span class="kw1">smallint</span> not null<span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Heights (	
+	HeightId int primary key not null,
+	HeightDescription varchar(20) not null,
+	StartRange smallint not null,
+	EndRange smallint not null)
+GO</pre></div></div>
+
+<p>Now let&#8217;s insert some data</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Heights <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="st0">'Small'</span>,<span class="nu0">0</span>,<span class="nu0">154</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Heights <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">2</span>,<span class="st0">'Average'</span>,<span class="nu0">155</span>,<span class="nu0">175</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Heights <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">3</span>,<span class="st0">'Tall'</span>,<span class="nu0">176</span>,<span class="nu0">300</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Heights values(1,'Small',0,154)
+INSERT Heights values(2,'Average',155,175)
+INSERT Heights values(3,'Tall',176,300)</pre></div></div>
+
+<p>Now if I want to know if 181 centimeters is considered tall or not, I can run this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> HeightDescription
+<span class="kw1">FROM</span> Heights
+<span class="kw1">WHERE</span> <span class="nu0">181</span> between StartRange and EndRange</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT HeightDescription
+FROM Heights
+WHERE 181 between StartRange and EndRange</pre></div></div>
+
+<p>Let&#8217;s continue by adding another table, this table will have some people and their height. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Players<span class="br0">&#40;</span>Player <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">200</span><span class="br0">&#41;</span>,Height <span class="kw1">smallint</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Players(Player varchar(200),Height smallint)
+GO</pre></div></div>
+
+<p>The following people are the shortest and tallest people on record</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Players <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'Robert Wadlow'</span>,<span class="nu0">272</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Players <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'John Rogan'</span>,<span class="nu0">267</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Players <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'June Rey Balawing'</span>,<span class="nu0">56</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Players <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'Gul Mohammed'</span>,<span class="nu0">57</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Players <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'Pauline Musters'</span>,<span class="nu0">58</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Players values('Robert Wadlow',272)
+INSERT Players values('John Rogan',267)
+INSERT Players values('June Rey Balawing',56)
+INSERT Players values('Gul Mohammed',57)
+INSERT Players values('Pauline Musters',58)</pre></div></div>
+
+<p>Now when I want to list all the tall people, my query looks like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> p.<span class="sy0">*</span> 
+<span class="kw1">FROM</span> Players p 
+<span class="sy0">JOIN</span> Heights h <span class="kw1">on</span> p.<span class="me1">Height</span> between h.<span class="me1">StartRange</span> and h.<span class="me1">EndRange</span>
+<span class="kw1">where</span> h.<span class="me1">HeightDescription</span> <span class="sy0">=</span> <span class="st0">'Tall'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT p.* 
+FROM Players p 
+JOIN Heights h on p.Height between h.StartRange and h.EndRange
+where h.HeightDescription = 'Tall'</pre></div></div>
+
+<p>When I want to list all the tall people, my query looks like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> p.<span class="sy0">*</span> 
+<span class="kw1">FROM</span> Players p 
+<span class="sy0">JOIN</span> Heights h <span class="kw1">on</span> p.<span class="me1">Height</span> between h.<span class="me1">StartRange</span> and h.<span class="me1">EndRange</span>
+<span class="kw1">where</span> h.<span class="me1">HeightDescription</span> <span class="sy0">=</span> <span class="st0">'Small'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT p.* 
+FROM Players p 
+JOIN Heights h on p.Height between h.StartRange and h.EndRange
+where h.HeightDescription = 'Small'</pre></div></div>
+
+<p>If tomorrow I decide that tall people have to be taller than 180 centimeters, I only have to change this in 1 place. This is much cleaner and also easily maintainable.</p>
+<p>P.S.<br />
+Yes, I know, instead of having a player column I should have at least first and last name columns (preferably in a person table) but in the day and age of internet induced ADD I didn&#8217;t feel it would add anything to the point I was trying to make in this post&#8230;&#8230;so forgive me</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/use-a-database-how-it/feed/</wfw:commentRss>
+		<slash:comments>11</slash:comments>
+		</item>
+		<item>
+		<title>Dealing with The row value(s) updated or deleted either do not make the row unique or they alter multiple rows errors</title>
+		<link>/index.php/datamgmt/datadesign/dealing-with-the-row-value-s-updated-or/</link>
+		<comments>/index.php/datamgmt/datadesign/dealing-with-the-row-value-s-updated-or/#comments</comments>
+		<pubDate>Wed, 08 Dec 2010 10:08:28 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[normalization]]></category>
+		<category><![CDATA[sql server denali]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/12/dealing-with-the-row-value-s-updated-or/</guid>
+		<description><![CDATA[Someone asked about this error this morning and I decided to turn it into a blog post. Basically the person was using the designer/editor in SSMS to delete a row, the table didn't have a key and the rows were not unique, he got the following error: The&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Someone asked about this error <a href="http://stackoverflow.com/questions/4386592/why-cannot-i-delete-edit-a-row-with-xml-value-in-ssms">this morning</a> and I decided to turn it into a blog post. Basically the person was using the designer/editor in SSMS to delete a row, the table didn&#8217;t have a key and the rows were not unique, he got the following error: <em>The row value(s) updated or deleted either do not make the row unique or they alter multiple rows</em>. Let&#8217;s see this in action and also take a look at how we can get around this.</p>
+<p>First create the following table.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test<span class="br0">&#40;</span>col1 <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">200</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;
+go
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> Test <span class="br0">&#40;</span>col1<span class="br0">&#41;</span> <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'&lt;ccc&gt;ddd&lt;/ccc&gt;'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> Test <span class="br0">&#40;</span>col1<span class="br0">&#41;</span> <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'&lt;ccc&gt;ddd&lt;/ccc&gt;'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test(col1 VARCHAR(200));
+go
+INSERT INTO Test (col1) VALUES('&lt;ccc&gt;ddd&lt;/ccc&gt;')
+INSERT INTO Test (col1) VALUES('&lt;ccc&gt;ddd&lt;/ccc&gt;')</pre></div></div>
+
+<p>Now, do the following, navigate to this table in Object Explorer, right click on the table, select the &#8220;Edit top 200 rows&#8221; option (see also below for image)</p>
+<p><img src="/wp-content/uploads/blogs/DataMgmt/200rows.png" alt="" title="" /></p>
+<p>Next, pick either of the 2 rows and hit the delete key on your keyboard<br />
+You will get the following dialog<br />
+<img src="/wp-content/uploads/blogs/DataMgmt//delete.png" alt="" title="" /></p>
+<p>Hit yes and you will get the following error dialog</p>
+<p>&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;<br />
+Microsoft SQL Server Management Studio<br />
+&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;<br />
+No rows were deleted.</p>
+<p>A problem occurred attempting to delete row 1.<br />
+Error Source: Microsoft.SqlServer.Management.DataTools.<br />
+Error Message: The row value(s) updated or deleted either do not make the row unique or they alter multiple rows(2 rows).</p>
+<p>Correct the errors and attempt to delete the row again or press ESC to cancel the change(s).</p>
+<p>This is really a limitation of the designer/tool. So when a human looks at that grid with the 2 rows, the human knows that it wants to delete the first row&#8230;.however since the 2 rows are completely identical SQL Server does not know which row to delete from the table.</p>
+<p>Of course this is also yet another reason to have a primary key on the table.</p>
+<h3>Solution</h3>
+<p>What can we do to resolve this? Easy, stop using the wizard and get familiar with Transact SQL. Open a new query window and then you can use either of these two queries</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DELETE</span> <span class="kw1">TOP</span> <span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> col1 <span class="sy0">=</span> <span class="st0">'&lt;ccc&gt;ddd&lt;/ccc&gt;'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DELETE TOP (1)
+FROM Test
+WHERE col1 = '&lt;ccc&gt;ddd&lt;/ccc&gt;'</pre></div></div>
+
+<p>The query above uses the TOP operator</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> rowcount <span class="nu0">1</span>
+&nbsp; &nbsp;
+<span class="kw1">DELETE</span>
+<span class="kw1">FROM</span> Test
+<span class="kw1">WHERE</span> col1 <span class="sy0">=</span> <span class="st0">'&lt;ccc&gt;ddd&lt;/ccc&gt;'</span>
+&nbsp; &nbsp;
+<span class="kw1">SET</span> rowcount <span class="nu0">0</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET rowcount 1
+   
+DELETE
+FROM Test
+WHERE col1 = '&lt;ccc&gt;ddd&lt;/ccc&gt;'
+   
+SET rowcount 0</pre></div></div>
+
+<p>The query above uses rowcount with a value of 1, this will only affect 1 row now. The set rowcount setting has been put on the deprecation list so be aware of that.</p>
+<h3>Who is really at fault here?</h3>
+<p>I think that both the person who creates a table like this and the tool itself is at fault. The tool is at fault because it should either give you an option of which row to delete somehow or if it knows that it is not unique it should not let you press the delete button.</p>
+<p>The person who creates such a table is also at fault because this table doesn&#8217;t conform to any database design guidelines like normal form. I know this is a simple example in this post, but believe me I have run into these kind of tables in production databases more than a dozen times. </p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/dealing-with-the-row-value-s-updated-or/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+	</channel>
+</rss>

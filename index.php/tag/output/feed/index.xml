@@ -1,0 +1,1010 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>output &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/output/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>OUTPUT Clause and @@identity, scope_identity()</title>
+		<link>/index.php/datamgmt/datadesign/output-clause-and-identity-scope_identity/</link>
+		<comments>/index.php/datamgmt/datadesign/output-clause-and-identity-scope_identity/#respond</comments>
+		<pubDate>Fri, 25 May 2012 14:06:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[dml]]></category>
+		<category><![CDATA[insert]]></category>
+		<category><![CDATA[output]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/05/output-clause-and-identity-scope_identity/</guid>
+		<description><![CDATA[Axel posted a post titled Catching the OUTPUT of your DML statements earlier today. I posted something about the OUPUT clause myself as part of my SQL Advent 2011 series here: SQL Advent 2011 Day 11: DML statements with the OUTPUT clause
+
+reading Axel&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Axel posted a post titled <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/catching-the-output-of-your">Catching the OUTPUT of your DML statements</a> earlier today. I posted something about the OUPUT clause myself as part of my SQL Advent 2011 series here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-11">SQL Advent 2011 Day 11: DML statements with the OUTPUT clause</a></p>
+<p>Reading Axel&#8217;s post where he describes how he can use this instead of a trigger got me thinking about how @@identity and scope_identity() would behave. You all know that when you have an insert trigger that inserts into a table with an identity column that @@identity will give you the value of the table that the trigger inserted into, scope_identity() will give you the id of the table that the trigger fired from.</p>
+<p>Let&#8217;s see what happens with the OUTPUT clause. First create these two simple tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestOutput <span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> not null,SomeCol <span class="kw1">date</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestOutput2 <span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> not null,ID2 <span class="kw1">INT</span>, SomeCol <span class="kw1">DATE</span>, IndentityVal <span class="kw1">INT</span>, ScopeIdentityVal <span class="kw1">int</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestOutput (id int identity not null,SomeCol date)
+GO
+
+CREATE TABLE TestOutput2 (id int identity not null,ID2 INT, SomeCol DATE, IndentityVal INT, ScopeIdentityVal int)
+GO</pre></div></div>
+
+<p>Before we start make sure that this returns 1</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT @@identity, scope_identity()</pre></div></div>
+
+<p>If it doesn&#8217;t return 1, run the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> TestOutput
+<span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+<span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> TestOutput
+<span class="kw1">SELECT</span> @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">TRUNCATE TABLE TestOutput
+INSERT TestOutput VALUES('20120101')
+TRUNCATE TABLE TestOutput
+SELECT @@identity, scope_identity()</pre></div></div>
+
+<p>Now we are set to go, we are inserting one row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput 
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>, @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">INTO</span> TestOutput2
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'20120525'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput 
+OUTPUT inserted.id,inserted.SomeCol, @@identity, scope_identity() INTO TestOutput2
+VALUES ('20120525')</pre></div></div>
+
+<p>If we do a select for both tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestOutput
+SELECT * FROM TestOutput2</pre></div></div>
+
+<p>We see the following</p>
+<pre>id	SomeCol
+-----   ----------
+1	2012-05-25</pre>
+<p>And here</p>
+<pre>id	ID2	SomeCol		IndentityVal	ScopeIdentityVal
+----    -----   ------------    ------------    ----------------
+1	1	2012-05-25	1		1</pre>
+<p>Not very useful since all the values are 1 so we don&#8217;t know where @@identity and scope_identity() get their values from</p>
+<p>Let&#8217;s just insert a bunch of rows in the TestOutput table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestOutput <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput VALUES('20120101')
+INSERT TestOutput VALUES('20120101')
+INSERT TestOutput VALUES('20120101')
+INSERT TestOutput VALUES('20120101')</pre></div></div>
+
+<p>Now if the do the insert with the OUTPUT clause again, the values will be different</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput 
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>, &nbsp; <span class="kw1">INTO</span> TestOutput2
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'20120526'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput 
+OUTPUT inserted.id,inserted.SomeCol,   INTO TestOutput2
+VALUES ('20120526')</pre></div></div>
+
+<p>Let&#8217;s see what we have</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestOutput
+SELECT * FROM TestOutput2</pre></div></div>
+
+<p>Here is the output</p>
+<pre>id	SomeCol
+--- ----------
+1	2012-05-25
+2	2012-01-01
+3	2012-01-01
+4	2012-01-01
+5	2012-01-01
+6	2012-05-26</pre>
+<p>The max value is 6 in the TestOutput table</p>
+<pre>id	ID2	SomeCol		IndentityVal	ScopeIdentityVal
+---     ---     --------        --------------  ------------------
+1	1 	2012-05-25	1		1
+2	6	2012-05-26	5		5</pre>
+<p>In the TestOutput2 table we have the value 5</p>
+<p>The output is 2 for both. Now you are probably asking yourself why 2 was not inserted but 5 into the output2 table<br />
+Run this statement now</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT @@identity, scope_identity()</pre></div></div>
+
+<p>The output of that is what will be inserted when you run the query below next</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput 
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>, @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">INTO</span> TestOutput2
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'20120525'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput 
+OUTPUT inserted.id,inserted.SomeCol, @@identity, scope_identity() INTO TestOutput2
+VALUES ('20120525')</pre></div></div>
+
+<p>If you run that the value 3 will be inserted</p>
+<p>Here is what <a href="http://msdn.microsoft.com/en-us/library/ms177564.aspx">Books On Line</a> has to say about the population of @@identity and scope_identity()</p>
+<blockquote><p>@@IDENTITY, SCOPE_IDENTITY, and IDENT_CURRENT return identity values generated only by the nested DML statement, and not those generated by the outer INSERT statement.</p></blockquote>
+<p>In other words when you use @@IDENTITY, SCOPE_IDENTITY, and IDENT_CURRENT when inserting into a table using the OUTPUT clause which then inserts into another table, the values are for the insert that happens from the output clause, in this case it is the ID from the output2 table</p>
+<p>But as you can see @@identity and scope_identity() are actually populated with the statement that ran before the current statement, just be aware of that</p>
+<p>Here is a quick test</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestOutput3 <span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> <span class="br0">&#40;</span><span class="nu0">1000</span>,<span class="nu0">1</span><span class="br0">&#41;</span> not null,SomeCol <span class="kw1">date</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestOutput3 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'20120101'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput3</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestOutput3 (id int identity (1000,1) not null,SomeCol date)
+GO
+
+
+INSERT TestOutput3 VALUES('20120101')
+
+SELECT * FROM TestOutput3</pre></div></div>
+
+<p>Output</p>
+<pre>id	SomeCol
+----    -----------
+1000	2012-01-01</pre>
+<p>Now when you run this again, it will insert the value 1000</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestOutput 
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>, @@<span class="kw1">identity</span>, <span class="kw2">scope_identity</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">INTO</span> TestOutput2
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'20120525'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestOutput 
+OUTPUT inserted.id,inserted.SomeCol, @@identity, scope_identity() INTO TestOutput2
+VALUES ('20120525')</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestOutput2</pre></div></div>
+
+<pre>id	ID2	SomeCol	     IndentityVal  ScopeIdentityVal
+-----   -----   ---------    ------------  --------------------
+1	1	2012-05-25	1	     1
+2	6	2012-05-25	5	     5
+3	7	2012-05-25	2	     2
+4	8	2012-05-25	3	     3
+5	9	2012-05-25	1000	     1000</pre>
+<p>If you do this now, you will get the value 5, the value 5 is the value of the identity column for the TestOutput2 table, we last inserted into this table via the OUTPUT clause</p>
+<p>So be aware when using @@identity and scope_identity(), they might not behave as you would expect them to behave.  The thing to remember is that @@identity and scope_identity() don&#8217;t return the values from the statement just executed but from the one that was just executed prior to the current statement. If you do use the OUTPUT clause, @@identity and scope_identity() will return the value from the table where the OUTPUT clause is inserting into. If you need the ID for the table that the OUTPUT clause inserted into, just grab @@identity or scope_identity() after the statement executed</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/output-clause-and-identity-scope_identity/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2011 Day 11: DML statements with the OUTPUT clause</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-11/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-11/#comments</comments>
+		<pubDate>Sun, 11 Dec 2011 10:11:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[delete]]></category>
+		<category><![CDATA[dml]]></category>
+		<category><![CDATA[insert]]></category>
+		<category><![CDATA[output]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-11/</guid>
+		<description><![CDATA[In my Are you ready for SQL Server 2012 or are you still partying like it is 1999? post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code tha&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>Today we are going to take a look at the OUTPUT clause as part of an INSERT, DELETE or UPDATE statement</p>
+<p>In yesterday&#8217;s post <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-10">SQL Advent 2011 Day 10: Upsert by using the Merge statement</a> I already showed the OUTPUT clause in one or two examples, in today&#8217;s post I will only focus on the OUTPUT clause</p>
+<p>First we need to create a test table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestOutput <span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> not null,SomeCol <span class="kw1">datetime</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestOutput (id int identity not null,SomeCol datetime)
+GO</pre></div></div>
+
+<p>
+<h2>OUTPUT clause and insert statements</h2>
+<p>This code uses a <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-5">Common Table Expression</a> combined with the <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-6">ROW_NUMBER</a> function to generate 10 rows. We then use the dateadd function to generate 10 different days. We insert these 10 rows into the TestOutput output table, this table has an identity column and the id will be generated by SQL Server. We use the output statement to return the id as well as the SomeCol column values. The nice thing with the OUTPUT clause compared to the SCOPE_IDENTITY function is that the OUTPUT clause will return all values, SCOPE_IDENTITY only returns the last value generated</p>
+<p>Run this code to see how it works</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">10</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> number
+<span class="kw1">from</span> sysobjects<span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestOutput
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>
+<span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>d,number,<span class="st0">'20110101'</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> CTE</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte AS(
+SELECT TOP 10 ROW_NUMBER() OVER(ORDER BY name) AS number
+from sysobjects)
+
+
+INSERT TestOutput
+OUTPUT inserted.id,inserted.SomeCol
+SELECT DATEADD(d,number,'20110101')
+FROM CTE</pre></div></div>
+
+<p>Output<br />
+
+<pre>id      SomeCol
+--      -----------------------
+1	2011-01-02 00:00:00.000
+2	2011-01-03 00:00:00.000
+3	2011-01-04 00:00:00.000
+4	2011-01-05 00:00:00.000
+5	2011-01-06 00:00:00.000
+6	2011-01-07 00:00:00.000
+7	2011-01-08 00:00:00.000
+8	2011-01-09 00:00:00.000
+9	2011-01-10 00:00:00.000
+10	2011-01-11 00:00:00.000</pre>
+<p></p>
+<p>If you check the table itself, you will see that you have exactly the same result as with the OUTPUT clause</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestOutput</pre></div></div>
+
+<p>
+<pre>id      SomeCol
+--      -----------------------
+1	2011-01-02 00:00:00.000
+2	2011-01-03 00:00:00.000
+3	2011-01-04 00:00:00.000
+4	2011-01-05 00:00:00.000
+5	2011-01-06 00:00:00.000
+6	2011-01-07 00:00:00.000
+7	2011-01-08 00:00:00.000
+8	2011-01-09 00:00:00.000
+9	2011-01-10 00:00:00.000
+10	2011-01-11 00:00:00.000</pre>
+<p></p>
+<p>Instead of outputting the results right back, you can insert them in a table, temporary table or table variable, I am showing you how to do it with a table variable</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @TableVar <span class="kw1">table</span> <span class="br0">&#40;</span>id <span class="kw1">int</span>,SomeDate <span class="kw1">datetime</span><span class="br0">&#41;</span>
+&nbsp;
+;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">10</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> number
+<span class="kw1">FROM</span> sysobjects<span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestOutput
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span> <span class="kw1">INTO</span> @TableVar
+<span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>d,number,<span class="st0">'20110101'</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> cte
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> @TableVar</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @TableVar table (id int,SomeDate datetime)
+
+;WITH cte AS(
+SELECT TOP 10 ROW_NUMBER() OVER(ORDER BY name) AS number
+FROM sysobjects)
+
+
+INSERT TestOutput
+OUTPUT inserted.id,inserted.SomeCol INTO @TableVar
+SELECT DATEADD(d,number,'20110101')
+FROM cte
+
+SELECT * FROM @TableVar</pre></div></div>
+
+<p>
+<pre>id      SomeCol
+--      -----------------------
+11	2011-01-02 00:00:00.000
+12	2011-01-03 00:00:00.000
+13	2011-01-04 00:00:00.000
+14	2011-01-05 00:00:00.000
+15	2011-01-06 00:00:00.000
+16	2011-01-07 00:00:00.000
+17	2011-01-08 00:00:00.000
+18	2011-01-09 00:00:00.000
+19	2011-01-10 00:00:00.000
+20	2011-01-11 00:00:00.000</pre>
+<h2>OUTPUT clause and delete statements</h2>
+<p>To return the rows that were deleted, you would use deleted.ColumnName instead of inserted.ColumnName.<br />
+In the code block below, we are deleting all rows that are 0 if we divide them by 5, this is accomplished by using the  modulo arithmetic operator which is % in T-SQL</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DELETE</span> TestOutput
+<span class="kw1">OUTPUT</span> deleted.<span class="me1">id</span>,deleted.<span class="me1">SomeCol</span>
+<span class="kw1">WHERE</span> id <span class="sy0">%</span> <span class="nu0">5</span> <span class="sy0">=</span> <span class="nu0">0</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DELETE TestOutput
+OUTPUT deleted.id,deleted.SomeCol
+WHERE id % 5 = 0</pre></div></div>
+
+<p>
+<pre>id      SomeCol
+--      -----------------------
+5	2011-01-06 00:00:00.000
+10	2011-01-11 00:00:00.000
+15	2011-01-06 00:00:00.000
+20	2011-01-11 00:00:00.000</pre>
+<p></p>
+<p>As you can see we get 4 rows back, if you check what is in the table now, you will see that those 4 rows are missing.</p>
+<p>
+<h2>OUTPUT clause and update statements</h2>
+<p>When you do an update statement, you will have the previous value (deleted) and the current value (inserted) available as part of the OUTPUT clause. Running the code below will output the value you had and the value that it got update to</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> TestOutput
+<span class="kw1">SET</span> SomeCol <span class="sy0">=</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>yy,<span class="nu0">1</span>,SomeCol<span class="br0">&#41;</span>
+<span class="kw1">OUTPUT</span> deleted.<span class="me1">id</span>,deleted.<span class="me1">SomeCol</span>,inserted.<span class="me1">SomeCol</span>
+<span class="kw1">WHERE</span> id in<span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">2</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE TestOutput
+SET SomeCol = dateadd(yy,1,SomeCol)
+OUTPUT deleted.id,deleted.SomeCol,inserted.SomeCol
+WHERE id in(1,2)</pre></div></div>
+
+<p>
+<pre>id      SomeCol                 SomeCol
+--      ----------------------- -----------------------
+1	2011-01-02 00:00:00.000	2012-01-02 00:00:00.000
+2	2011-01-03 00:00:00.000	2012-01-03 00:00:00.000</pre>
+<p></p>
+<p>That is all for today, come back tomorrow for another post</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-11/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Using T-SQL OUTPUT and MERGE To Link Old and New Keys</title>
+		<link>/index.php/datamgmt/datadesign/using-t-sql-output-and-merge/</link>
+		<comments>/index.php/datamgmt/datadesign/using-t-sql-output-and-merge/#comments</comments>
+		<pubDate>Tue, 13 Sep 2011 11:44:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[merge]]></category>
+		<category><![CDATA[output]]></category>
+		<category><![CDATA[t-sql]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/09/using-t-sql-output-and-merge/</guid>
+		<description><![CDATA[You don't catch me doing SQL posts that often, probably because I spend far more time working in a development world that seems to be moving further and further away from SQL. That being said, the database server is optimized towards handling large sets of data and data manipulations, so rather than second-guessing developers that know far more (and have far larger budgets), I like to take advantage of database-side solutions when I can. The time saved not dragging data back and forth on the network is an extra bonus.]]></description>
+				<content:encoded><![CDATA[<p>You don&#8217;t catch me doing SQL posts that often, probably because I spend far more time working in a development world that seems to be moving further and further away from SQL. That being said, the database server is optimized towards handling large sets of data and data manipulations, so rather than second-guessing developers that know far more (and have far larger budgets), I like to take advantage of database-side solutions when I can. The time saved not dragging data back and forth on the network is an extra bonus.</p>
+<p>Recently I needed the ability to transfer records (and control of the data) between two data structures on demand. The original data structure has grown up over the course of 10+ years as part of a larger system, while the newer, purpose-built data structures exist specifically to support this data and support newer capabilities. The tricky part is that the end user gets to pick and chose which records will be managed by the newer system and which will not, on demand.</p>
+<h2>Sample Table Schemas</h2>
+<p>To get us started, I&#8217;ve created some simplified, substitute table for the post. Using simpler tables that are far fewer in count will let us focus more on the problem at hand and less on my data definition skills.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">use</span> SampleStuff;
+Go
+&nbsp;
+<span class="co1">-- &quot;Original&quot; tables with columns for new keys</span>
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_User</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_User_Key &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Username&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_Work_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_Work_Phone_Key <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Orig_User_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; New_Phone_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_Home_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_Home_Phone_Key <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Orig_User_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; New_Phone_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>&nbsp; &nbsp; 
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="co1">-- And the &quot;New&quot; tables</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">New_User</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Username&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">New_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; New_Phone_Key &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Is_Work &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">bit</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">use SampleStuff;
+Go
+
+-- "Original" tables with columns for new keys
+
+CREATE TABLE dbo.Orig_User(
+	Orig_User_Key	int IDENTITY(1,1) NOT NULL,
+	Username		varchar(20) NOT NULL,
+	New_User_Key	int NULL
+);
+
+CREATE TABLE dbo.Orig_Work_Phone(
+	Orig_Work_Phone_Key int IDENTITY(1,1) NOT NULL,
+	Orig_User_Key		int NOT NULL,
+	Phone				varchar(20),
+	New_Phone_Key		int NULL
+);
+
+CREATE TABLE dbo.Orig_Home_Phone(
+	Orig_Home_Phone_Key int IDENTITY(1,1) NOT NULL,
+	Orig_User_Key		int NOT NULL,
+	Phone				varchar(20),
+	New_Phone_Key		int NULL	
+);
+
+-- And the "New" tables
+CREATE TABLE dbo.New_User(
+	New_User_Key	int IDENTITY(1,1) NOT NULL,
+	Username		varchar(20) NOT NULL
+)
+
+CREATE TABLE dbo.New_Phone(
+	New_Phone_Key	int IDENTITY(1,1) NOT NULL,
+	New_User_Key	int NOT NULL,
+	Phone			varchar(20) NOT NULL,
+	Is_Work			bit NOT NULL
+);</pre></div></div>
+
+<p><i>Note: For the sake of shorter examples, I&#8217;m going to provide examples on the User tables. We don&#8217;t actually need anything fancier than SCOPE_IDENTITY() until we get to the step where we transfer Phone records since we are doing one user at a time, but that&#8217;s why examples are so much easier than the real world.</i></p>
+<p>The tricky part of this transform is the ownership of the data. Due to some internal restrictions, the original data structure is going to be the master. This means the original record is responsible for holding both its own key and the key in the newer system. The transform needs to get the record from the original system, push it into the newer system (generating the new key), then update the new key back into the original record.</p>
+<p>If this was a one-shot ETL load, I would probably add a temporary column to the target tables to track the source keys, then update the new keys back into the source table and drop the temporary column. As you can imagine, this is an even less graceful solution when we put control into the users hands and operate at the individual record level (c&#8217;mon, it&#8217;s only a few hundred thousand table locks during peak hours).</p>
+<h2>The OUTPUT Statement</h2>
+<p>Added in SQL Server 2005 (6 years ago already?), OUTPUT can be used to return data from inside INSERT, UPDATE, DELETE, and MERGE statements. This solves the first part, giving us access to the new key when it&#8217;s generated. Well, almost.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #ID_Transfer<span class="br0">&#40;</span>new_key <span class="kw1">int</span>, old_key <span class="kw1">int</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">New_User</span><span class="br0">&#40;</span>Username<span class="br0">&#41;</span>
+<span class="kw1">OUTPUT</span> Inserted.<span class="me1">New_User_Key</span>, ??? <span class="kw1">INTO</span> #ID_Transfer
+<span class="kw1">SELECT</span> OU.<span class="me1">Username</span> <span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> OU
+<span class="kw1">WHERE</span> OU.<span class="me1">Orig_User_Key</span> <span class="sy0">=</span> @TargetUserKey;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #ID_Transfer(new_key int, old_key int);
+
+INSERT INTO dbo.New_User(Username)
+OUTPUT Inserted.New_User_Key, ??? INTO #ID_Transfer
+SELECT OU.Username FROM dbo.Orig_User OU
+WHERE OU.Orig_User_Key = @TargetUserKey;</pre></div></div>
+
+<p>While we can easily create a temporary table to capture the resulting New_User_Key that is generated on insert, we don&#8217;t have access to the table the data is coming from, so we don&#8217;t have the original key to populate next to that new key.</p>
+<p>Which brings us to MERGE.</p>
+<h2>The MERGE Statement</h2>
+<p>MERGE was added in SQL 2008 and allows us to define a source dataset, target data set, and rules to insert or update data from that source to the target. While we don&#8217;t really need the rules and update capability, what it also provides is simultaneous access to both datasets AND support for OUTPUT. Aha, I hear you saying.</p>
+<p>By forcing the merge to always perform an INSERT, we will satisfy our needs for inserting the data into the &#8220;New&#8221; tables as well as have the capability to capture both the original and new key in a single OUTPUT statement.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #ID_Transfer<span class="br0">&#40;</span>new_key <span class="kw1">int</span>, old_key <span class="kw1">int</span><span class="br0">&#41;</span>;
+&nbsp;
+MERGE <span class="kw1">INTO</span> dbo.<span class="me1">New_User</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>Target<span class="br0">&#93;</span>
+<span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> OU.<span class="me1">Orig_User_Key</span>, OU.<span class="me1">Username</span> <span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> OU <span class="kw1">WHERE</span> OU.<span class="me1">Orig_User_Key</span> <span class="sy0">=</span> @TargetUserKey<span class="br0">&#41;</span> <span class="kw1">AS</span> Source
+<span class="kw1">ON</span> <span class="nu0">1</span> <span class="sy0">=</span> <span class="nu0">0</span>
+<span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span>
+<span class="kw1">INSERT</span> <span class="br0">&#40;</span>Username<span class="br0">&#41;</span>
+<span class="kw1">VALUES</span><span class="br0">&#40;</span>source.<span class="me1">Username</span><span class="br0">&#41;</span>
+<span class="kw1">OUTPUT</span> <span class="sy0">IN</span>SERTED.<span class="me1">New_User_Key</span>, source.<span class="me1">Orig_USer_Key</span> <span class="kw1">INTO</span> #ID_Transfer;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #ID_Transfer(new_key int, old_key int);
+
+MERGE INTO dbo.New_User AS [Target]
+USING (SELECT OU.Orig_User_Key, OU.Username FROM dbo.Orig_User OU WHERE OU.Orig_User_Key = @TargetUserKey) AS Source
+ON 1 = 0
+WHEN NOT MATCHED THEN
+INSERT (Username)
+VALUES(source.Username)
+OUTPUT INSERTED.New_User_Key, source.Orig_USer_Key INTO #ID_Transfer;</pre></div></div>
+
+<p></p>
+<h2>Full Roundtrip</h2>
+<p>With the critical pieces out of the way, it&#8217;s easy now to create the full round-trip update.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #ID_Transfer<span class="br0">&#40;</span>new_key <span class="kw1">int</span>, old_key <span class="kw1">int</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">DECLARE</span> @TargetUserKey <span class="kw1">int</span>;
+<span class="kw1">SELECT</span> @TargetUserKey <span class="sy0">=</span> <span class="nu0">1</span>;
+&nbsp;
+MERGE <span class="kw1">INTO</span> dbo.<span class="me1">New_User</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>Target<span class="br0">&#93;</span>
+<span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> OU.<span class="me1">Orig_User_Key</span>, OU.<span class="me1">Username</span> <span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> OU <span class="kw1">WHERE</span> OU.<span class="me1">Orig_User_Key</span> <span class="sy0">=</span> @TargetUserKey<span class="br0">&#41;</span> <span class="kw1">AS</span> Source
+<span class="kw1">ON</span> <span class="nu0">1</span> <span class="sy0">=</span> <span class="nu0">0</span>
+<span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span>
+<span class="kw1">INSERT</span> <span class="br0">&#40;</span>Username<span class="br0">&#41;</span>
+<span class="kw1">VALUES</span><span class="br0">&#40;</span>source.<span class="me1">Username</span><span class="br0">&#41;</span>
+<span class="kw1">OUTPUT</span> <span class="sy0">IN</span>SERTED.<span class="me1">New_User_Key</span>, source.<span class="me1">Orig_USer_Key</span> <span class="kw1">INTO</span> #ID_Transfer;
+&nbsp;
+<span class="co1">-- and back-update original record with new key</span>
+<span class="kw1">UPDATE</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">SET</span> New_User_Key <span class="sy0">=</span> IT.<span class="me1">new_key</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> OU
+&nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> #ID_Transfer IT <span class="kw1">ON</span> IT.<span class="me1">old_key</span> <span class="sy0">=</span> OU.<span class="me1">Orig_User_Key</span>;
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> #ID_Transfer;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #ID_Transfer(new_key int, old_key int);
+
+DECLARE @TargetUserKey int;
+SELECT @TargetUserKey = 1;
+
+MERGE INTO dbo.New_User AS [Target]
+USING (SELECT OU.Orig_User_Key, OU.Username FROM dbo.Orig_User OU WHERE OU.Orig_User_Key = @TargetUserKey) AS Source
+ON 1 = 0
+WHEN NOT MATCHED THEN
+INSERT (Username)
+VALUES(source.Username)
+OUTPUT INSERTED.New_User_Key, source.Orig_USer_Key INTO #ID_Transfer;
+
+-- and back-update original record with new key
+UPDATE dbo.Orig_User
+SET New_User_Key = IT.new_key
+FROM dbo.Orig_User OU
+	INNER JOIN #ID_Transfer IT ON IT.old_key = OU.Orig_User_Key;
+
+DROP TABLE #ID_Transfer;</pre></div></div>
+
+<p>And we can see the updated values like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">20</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> O
+<span class="kw1">LEFT</span> <span class="sy0">JOIN</span> dbo.<span class="me1">New_User</span> N <span class="kw1">ON</span> N.<span class="me1">New_User_Key</span> <span class="sy0">=</span> O.<span class="me1">New_User_Key</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT TOP 20 *
+FROM dbo.Orig_User O
+LEFT JOIN dbo.New_User N ON N.New_User_Key = O.New_User_Key</pre></div></div>
+
+<p>So that was the first step, next is the phone numbers.</p>
+<h2>Homework/Practice</h2>
+<p>Given the sample tables above, it would now be fairly straightforward to apply this idea to the phone number tables, populating the data from the original two into the single new table and back-populating the new keys back into the original records. Rather than give you the final script, I&#8217;ll instead give you the pieces needed to get this far. </p>
+<p>Setup script:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">use</span> SampleStuff;
+Go
+&nbsp;
+<span class="coMULTI">/*</span>
+<span class="coMULTI">DROP TABLE dbo.New_Phone;</span>
+<span class="coMULTI">DROP TABLE dbo.New_User;</span>
+<span class="coMULTI">DROP TABLE dbo.Orig_Home_Phone;</span>
+<span class="coMULTI">DROP TABLE dbo.Orig_Work_Phone;</span>
+<span class="coMULTI">DROP TABLE dbo.Orig_User;</span>
+<span class="coMULTI">DROP TABLE dbo.Number;</span>
+<span class="coMULTI">*/</span>
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_User</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_User_Key &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Username&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_Work_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_Work_Phone_Key <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Orig_User_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; New_Phone_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_Home_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_Home_Phone_Key <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Orig_User_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; New_Phone_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>&nbsp; &nbsp; 
+<span class="br0">&#41;</span>;
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">New_User</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Username&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">New_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; New_Phone_Key &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Is_Work &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">bit</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+Go
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Number</span><span class="br0">&#40;</span>num <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>;
+GO
+&nbsp;
+<span class="kw1">SET</span> <span class="kw1">NOCOUNT</span> <span class="kw1">ON</span>;
+&nbsp;
+<span class="kw1">INSERT</span> dbo.<span class="me1">Number</span> <span class="kw1">DEFAULT</span> <span class="kw1">VALUES</span> ;
+<span class="kw1">WHILE</span> <span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">&lt;</span> <span class="nu0">500</span>
+&nbsp; &nbsp; <span class="kw1">INSERT</span> dbo.<span class="me1">Number</span> <span class="kw1">DEFAULT</span> <span class="kw1">VALUES</span> ;
+&nbsp; &nbsp; 
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_User</span><span class="br0">&#40;</span>Username<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="st0">'User #'</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>num <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Number</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_Work_Phone</span><span class="br0">&#40;</span>Orig_User_Key, Phone<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> Orig_User_Key, <span class="st0">'Phone '</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>Orig_User_Key <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">WHERE</span> Orig_User_Key <span class="sy0">%</span> <span class="nu0">2</span> <span class="sy0">=</span> <span class="nu0">0</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_Work_Phone</span><span class="br0">&#40;</span>Orig_User_Key, Phone<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> Orig_User_Key, <span class="st0">'Phone '</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>Orig_User_Key <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">WHERE</span> Orig_User_Key <span class="sy0">%</span> <span class="nu0">3</span> <span class="sy0">=</span> <span class="nu0">0</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_Home_Phone</span><span class="br0">&#40;</span>Orig_User_Key, Phone<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> Orig_User_Key, <span class="st0">'Phone '</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>Orig_User_Key <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">WHERE</span> Orig_User_Key <span class="sy0">%</span> <span class="nu0">3</span> <span class="sy0">=</span> <span class="nu0">0</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_Home_Phone</span><span class="br0">&#40;</span>Orig_User_Key, Phone<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> Orig_User_Key, <span class="st0">'Phone '</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>Orig_User_Key <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">WHERE</span> Orig_User_Key <span class="sy0">%</span> <span class="nu0">4</span> <span class="sy0">=</span> <span class="nu0">0</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">use SampleStuff;
+Go
+
+/*
+DROP TABLE dbo.New_Phone;
+DROP TABLE dbo.New_User;
+DROP TABLE dbo.Orig_Home_Phone;
+DROP TABLE dbo.Orig_Work_Phone;
+DROP TABLE dbo.Orig_User;
+DROP TABLE dbo.Number;
+*/
+
+CREATE TABLE dbo.Orig_User(
+	Orig_User_Key	int IDENTITY(1,1) NOT NULL,
+	Username		varchar(20) NOT NULL,
+	New_User_Key	int NULL
+);
+
+CREATE TABLE dbo.Orig_Work_Phone(
+	Orig_Work_Phone_Key int IDENTITY(1,1) NOT NULL,
+	Orig_User_Key		int NOT NULL,
+	Phone				varchar(20),
+	New_Phone_Key		int NULL
+);
+
+CREATE TABLE dbo.Orig_Home_Phone(
+	Orig_Home_Phone_Key int IDENTITY(1,1) NOT NULL,
+	Orig_User_Key		int NOT NULL,
+	Phone				varchar(20),
+	New_Phone_Key		int NULL	
+);
+
+
+CREATE TABLE dbo.New_User(
+	New_User_Key	int IDENTITY(1,1) NOT NULL,
+	Username		varchar(20) NOT NULL
+)
+
+CREATE TABLE dbo.New_Phone(
+	New_Phone_Key	int IDENTITY(1,1) NOT NULL,
+	New_User_Key	int NOT NULL,
+	Phone			varchar(20) NOT NULL,
+	Is_Work			bit NOT NULL
+);
+Go
+
+CREATE TABLE dbo.Number(num int IDENTITY(1,1) NOT NULL);
+GO
+
+SET NOCOUNT ON;
+
+INSERT dbo.Number DEFAULT VALUES ;
+WHILE SCOPE_IDENTITY() &lt; 500
+    INSERT dbo.Number DEFAULT VALUES ;
+    
+INSERT INTO dbo.Orig_User(Username)
+SELECT 'User #' + CAST(num as varchar)
+FROM dbo.Number;
+
+INSERT INTO dbo.Orig_Work_Phone(Orig_User_Key, Phone)
+SELECT Orig_User_Key, 'Phone ' + CAST(Orig_User_Key as varchar)
+FROM dbo.Orig_User
+WHERE Orig_User_Key % 2 = 0;
+
+INSERT INTO dbo.Orig_Work_Phone(Orig_User_Key, Phone)
+SELECT Orig_User_Key, 'Phone ' + CAST(Orig_User_Key as varchar)
+FROM dbo.Orig_User
+WHERE Orig_User_Key % 3 = 0;
+
+INSERT INTO dbo.Orig_Home_Phone(Orig_User_Key, Phone)
+SELECT Orig_User_Key, 'Phone ' + CAST(Orig_User_Key as varchar)
+FROM dbo.Orig_User
+WHERE Orig_User_Key % 3 = 0;
+
+INSERT INTO dbo.Orig_Home_Phone(Orig_User_Key, Phone)
+SELECT Orig_User_Key, 'Phone ' + CAST(Orig_User_Key as varchar)
+FROM dbo.Orig_User
+WHERE Orig_User_Key % 4 = 0;</pre></div></div>
+
+<p>Given those pieces above and some additional scripts, finishing the script should only take 5-10 minutes. Consider it a free practice problem <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/using-t-sql-output-and-merge/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+	</channel>
+</rss>

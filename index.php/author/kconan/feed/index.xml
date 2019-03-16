@@ -1,0 +1,686 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Kevin Conan &#8211; LessthanDot</title>
+	<atom:link href="/index.php/author/kconan/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Server Management: Compatibility Levels</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/sql-server-management-compatibility-levels/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/sql-server-management-compatibility-levels/#comments</comments>
+		<pubDate>Thu, 28 Mar 2013 11:12:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[compatibility level]]></category>
+		<category><![CDATA[dba]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/sql-server-management-compatibility-levels/</guid>
+		<description><![CDATA[So you think compatibility levels will solve all your problems?  Think again!]]></description>
+				<content:encoded><![CDATA[<p>There was a conversation on twitter today about SQL Server Compatibility Levels because someone’s vendor wanted them to use level 80 (SQL 2000) on a SQL 2012 Instance.  </p>
+<p>There are two issues with what that vendor wanted.  The first is that SQL Server only supports Current Version + 2.  Meaning SQL Server 2012 supports SQL Server 2005 and SQL Server 2008 (and 2008R2).  SQL Server 2008 and 2008R2 have the same major release number (10).  So what this vendor was asking for is not possible because compatibility levels in SQL Server 2012 only go back to 90 (SQL 2005).</p>
+<p>The second (and in my opinion the bigger) issue is why does the vendor want the compatibility level set back at all?  </p>
+<p>I’ve seen many people who thing that if you set the compatibility level back to a previous version, then everything that worked in that previous version will work now.  For example, they had a SQL 2005 Instance which they migrated to SQL 2012 and they think that setting the compatibility level at 90 means all the discontinued commands will go back to working.</p>
+<p>This is completely incorrect and a dangerous trap!  Compatibility levels are meant to partially run the database in the version you selected while you troubleshoot, fix and then change the compatibility level to the current version.  </p>
+<p>Doing a search on the internet, I cannot find anything directly from Microsoft about what the compatibility levels really do.  However, I’ve seen and experienced firsthand that they do not allow discontinued code to suddenly work.</p>
+<p>For example, in SQL 2005 you can use a command called “RAISEERROR” (note the use of two e’s in the middle).  If you try that command on a database in SQL 2012 (no matter what compatibility level you have it set at), it will not work because it was discontinued.</p>
+<p>What I’m trying to say is this, you cannot skip testing and removing discontinued code by using compatibility levels.  You must test, removed discontinued code and work on migrate deprecated code to a supported solution.  It like the old saying “If something appears too good to be true, it probably is too good to be true”.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/sql-server-management-compatibility-levels/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Triggers affect on SQL System Variables</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/triggers-affect-on-sql-system/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/triggers-affect-on-sql-system/#comments</comments>
+		<pubDate>Tue, 12 Mar 2013 19:35:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[@@rowcount]]></category>
+		<category><![CDATA[identity]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[trigger]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/triggers-affect-on-sql-system/</guid>
+		<description><![CDATA[A while back I ran into an issue where a user was complaining about @@IDENTITY not always returning the value they expected.]]></description>
+				<content:encoded><![CDATA[<p>A while back I ran into an issue where a user was complaining about @@IDENTITY not always returning the value they expected.  </p>
+<p>This was happening on a table that was setup using 3rd party cross database platform replication software.  The software used triggers to capture the changes to the table to send them over to an Oracle table and a DB2 table.  The issue was caused by the trigger inserting records into another table that also had an identity column and that was being returned instead of the one from the original insert.</p>
+<p>I used to also have a debate with a fellow DBA about @@ROWCOUNT.  I use it all the time and haven’t had any issues.  But I also wanted to know if triggers could affect it.<br />
+Here is some sample code that illustrates how triggers affect @@IDENTITY, @@ROWCOUNT and also demonstrates SCOPE_IDENTITY().</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> tblTest <span class="br0">&#40;</span>col1 <span class="kw1">INT</span> <span class="kw1">IDENTITY</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, col2 <span class="kw1">INT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>;
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TRIGGER</span> tr_ins_tblTest
+&nbsp; &nbsp; <span class="kw1">ON</span> tblTest
+&nbsp;<span class="kw1">AFTER</span> <span class="kw1">INSERT</span>
+<span class="kw1">AS</span> 
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; <span class="kw1">DECLARE</span> @<span class="kw1">int</span> <span class="kw1">AS</span> <span class="kw1">INT</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @<span class="kw1">int</span> <span class="sy0">=</span> col1
+&nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> inserted;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="kw1">INTO</span> tblTest <span class="br0">&#40;</span>col2<span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @<span class="kw1">int</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">SELECT</span>&nbsp; &nbsp;<span class="st0">'Inside Trigger 1'</span> <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Where</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">@@ROWCOUNT</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>RowCount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,@@<span class="kw1">IDENTITY</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Identity</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Scope</span> <span class="kw1">Identity</span><span class="br0">&#93;</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="co1">--really try to mess with @@ROWCOUNT</span>
+&nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="kw1">INTO</span> tblTest <span class="br0">&#40;</span>col2<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> <span class="nu0">10</span>
+&nbsp; &nbsp; <span class="kw1">WHERE</span> <span class="nu0">1</span> <span class="sy0">=</span> <span class="nu0">2</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">SELECT</span>&nbsp; &nbsp;<span class="st0">'Inside Trigger 2'</span> <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Where</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">@@ROWCOUNT</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>RowCount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,@@<span class="kw1">IDENTITY</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Identity</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Scope</span> <span class="kw1">Identity</span><span class="br0">&#93;</span>;
+&nbsp; &nbsp; 
+<span class="kw1">END</span>;
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> tblTest <span class="br0">&#40;</span>col2<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'10'</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">SELECT</span>&nbsp; &nbsp;<span class="st0">'Outside Trigger'</span>&nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Where</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">@@ROWCOUNT</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>RowCount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,@@<span class="kw1">IDENTITY</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Identity</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Scope</span> <span class="kw1">Identity</span><span class="br0">&#93;</span>;
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> tblTest;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE tblTest (col1 INT IDENTITY (1,1) NOT NULL, col2 INT NULL);
+
+GO
+
+CREATE TRIGGER tr_ins_tblTest
+    ON tblTest
+ AFTER INSERT
+AS 
+BEGIN
+	DECLARE @int AS INT;
+
+	SELECT @int	= col1
+	  FROM inserted;
+
+	INSERT INTO tblTest (col2) 
+	SELECT @int;
+
+	SELECT	 'Inside Trigger 1'	AS [Where]
+			,@@ROWCOUNT			AS [RowCount]
+			,@@IDENTITY			AS [Identity]
+			,SCOPE_IDENTITY()	AS [Scope Identity];
+
+	--really try to mess with @@ROWCOUNT
+	INSERT INTO tblTest (col2)
+	SELECT 10
+	WHERE 1 = 2;
+
+	SELECT	 'Inside Trigger 2'	AS [Where]
+			,@@ROWCOUNT			AS [RowCount]
+			,@@IDENTITY			AS [Identity]
+			,SCOPE_IDENTITY()	AS [Scope Identity];
+	
+END;
+
+GO
+
+INSERT INTO tblTest (col2) VALUES ('10');
+
+SELECT	 'Outside Trigger'	AS [Where]
+		,@@ROWCOUNT			AS [RowCount]
+		,@@IDENTITY			AS [Identity]
+		,SCOPE_IDENTITY()	AS [Scope Identity];
+
+GO
+
+DROP TABLE tblTest;</pre></div></div>
+
+<p>Here is the output from the above code:</p>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/reccount.JPG?mtime=1363124071"><img alt="" src="/wp-content/uploads/users/kconan/reccount.JPG?mtime=1363124071" width="327" height="144" /></a></div>
+<p>So we can see that @@ROWCOUNT is not affected by the trigger.  However we also see that @@IDENTITY can be affected by triggers and the way to get around it is to use SCOPE_IDENTITY() instead.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/triggers-affect-on-sql-system/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Using SELECT * in views gotcha</title>
+		<link>/index.php/datamgmt/dbadmin/using-select-in-views-gotcha/</link>
+		<comments>/index.php/datamgmt/dbadmin/using-select-in-views-gotcha/#comments</comments>
+		<pubDate>Tue, 12 Mar 2013 12:06:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[views]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/using-select-in-views-gotcha/</guid>
+		<description><![CDATA[If ever a DBA walked up a mountain and came back down with two stones that had 10 commandments written on them, “thou shalt not use SELECT *” would be one of them.  
+However, that same DBA would turn around and within 5 minutes use it themselves!]]></description>
+				<content:encoded><![CDATA[<p>If ever a DBA walked up a mountain and came back down with two stones that had 10 commandments written on them, “thou shalt not use SELECT *” would be one of them.  However, that same DBA would turn around and within 5 minutes use it themselves!</p>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/moses.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/moses.JPG?mtime=1363096883" width="233" height="311" /></a></div>
+<p>One place that DBAs use SELECT * is when they create views.  The idea is that you do actually want every column available to the view because the query that hits that view should limit which columns it wants returned.</p>
+<p>This works, but there is one big issue with it that most people learn the hard way.  If the schema of the source table that the view is selecting from changes, the view will NOT automatically update to include those changes.</p>
+<p>For example, let’s create a simple table with some data and a view over it (because we are using really simple code, I’m not going format visually the way I normally do).</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> tblViewExample <span class="br0">&#40;</span>col1 <span class="kw1">INT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>;
+GO
+<span class="kw1">CREATE</span> <span class="kw1">VIEW</span> vViewExample <span class="kw1">AS</span> <span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> tblViewExample
+GO
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">2</span><span class="br0">&#41;</span>;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span>;
+GO
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> vViewExample;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE tblViewExample (col1 INT NULL);
+GO
+CREATE VIEW vViewExample AS SELECT * FROM tblViewExample
+GO
+INSERT INTO vViewExample (col1) VALUES (1);
+INSERT INTO vViewExample (col1) VALUES (2);
+INSERT INTO vViewExample (col1) VALUES (3);
+GO
+SELECT * FROM vViewExample;</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/view1.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/view1.JPG?mtime=1363096883" width="67" height="83" /></a></div>
+<p>I did break the rule of no SELECT * again but it’s to demonstrate the point of this article.<br />
+So far everything is being returned as we expect it.  Now let’s change the schema of our table and see what happens.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> tblViewExample <span class="kw1">ADD</span> col2 <span class="kw1">INT</span> <span class="sy0">NULL</span>;
+GO
+<span class="kw1">UPDATE</span> tblViewExample <span class="kw1">SET</span> col2 <span class="sy0">=</span> col1 <span class="sy0">*</span> <span class="nu0">5</span>;
+GO
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> vViewExample;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE tblViewExample ADD col2 INT NULL;
+GO
+UPDATE tblViewExample SET col2 = col1 * 5;
+GO
+SELECT * FROM vViewExample;</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/view1.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/view1.JPG?mtime=1363096883" width="67" height="83" /></a></div>
+<p>Notice that col2 is missing even though the view is using SELECT *.  Let’s see what happens if we try to use the view to insert a new record with data in col2.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1, col2<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">5</span>, <span class="nu0">5</span><span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO vViewExample (col1, col2) VALUES (5, 5);</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/view2.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/view2.JPG?mtime=1363096883" width="245" height="38" /></a></div>
+<p>To fix the “broken” view, we have to rebuild it.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">VIEW</span> vViewExample;
+GO
+<span class="kw1">CREATE</span> <span class="kw1">VIEW</span> vViewExample <span class="kw1">AS</span> <span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> tblViewExample</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP VIEW vViewExample;
+GO
+CREATE VIEW vViewExample AS SELECT * FROM tblViewExample</pre></div></div>
+
+<p>Now let’s try the insert statement again and then the select statement.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1, col2<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">5</span>, <span class="nu0">5</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> vViewExample;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO vViewExample (col1, col2) VALUES (5, 5);
+
+SELECT * FROM vViewExample;</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/view3.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/view3.JPG?mtime=1363096883" width="108" height="102" /></a></div>
+<p>And of course, let’s clean up after ourselves!</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">VIEW</span> vViewExample;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> tblViewExample;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP VIEW vViewExample;
+DROP TABLE tblViewExample;</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/using-select-in-views-gotcha/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>SSMS &#8211; Enabling Ctrl+R Shortcut to show or hide query results/messages pane</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/ssms-enabling-ctrl-r-shortcut/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/ssms-enabling-ctrl-r-shortcut/#comments</comments>
+		<pubDate>Mon, 04 Mar 2013 14:58:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/ssms-enabling-ctrl-r-shortcut/</guid>
+		<description><![CDATA[Do you use Ctrl+R to hide or display the query results/messages pane in SSMS?  Have you installed SSMS 2012 and find that it does not work?]]></description>
+				<content:encoded><![CDATA[<p>Do you use Ctrl+R to hide or display the query results/messages pane in SSMS?  Have you installed SSMS 2012 and find that it does not work?  Does it drive you crazy because you think they pulled keyboard shortcut or because in some installs it works but not in others?</p>
+<p>Fear not, you can add this keyboard short-cut!</p>
+<ol>
+<li>In SSMS open the “Tools” menu and choose “Options…”.</li>
+<li>On the left, expand “Environment”, then expand “Keyboard” and then click on “Keyboard”.</li>
+<li>Choose “Window.ShowResultsPane” (you can type that into the “Show commands containing:” field to find it faster.  Choose “SQL Query Editor” from the “Use new shortcut in:” drop down list.</li>
+<li>Click into the “Press shortcut keys:” field and press Ctrl and R at the same time (the field should update to show “Ctrl +R”.</li>
+<li>Review the “Shortcut currently used by:” dropdown list to ensure there are no other short cuts using Ctrl +R for SQL Query Editor.</li>
+<li>Click the Assign button and then the OK button.</li>
+</ol>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/SSMSCtrlRSettings.JPG?mtime=1362416270"><img alt="" src="/wp-content/uploads/users/kconan/SSMSCtrlRSettings.JPG?mtime=1362416270" width="644" height="376" /></a></div>
+<p>And presto, the Ctrl+R functionality to hide or display the query results/messages pane in SSMS!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/ssms-enabling-ctrl-r-shortcut/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>SSRS &#8211; Micro Adjustments with the Arrow Keys</title>
+		<link>/index.php/datamgmt/ssrs/ssrs-micro-adjustments-with-the/</link>
+		<comments>/index.php/datamgmt/ssrs/ssrs-micro-adjustments-with-the/#comments</comments>
+		<pubDate>Tue, 26 Feb 2013 16:06:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[SSRS]]></category>
+		<category><![CDATA[adjustment]]></category>
+		<category><![CDATA[arrow]]></category>
+		<category><![CDATA[ssrs]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/ssrs-micro-adjustments-with-the/</guid>
+		<description><![CDATA[Does it every bother you when you use the Arrow Keys to move an object in your SSRS report that it jumps much further over than you really wanted?]]></description>
+				<content:encoded><![CDATA[<p>Does it every bother you when you use the Arrow Keys to move an object in your SSRS report that it jumps much further over than you really wanted?  Maybe you just wanted to nudge it a few pixels to the left but instead it is now over lapping the next object.</p>
+<p>I used to think that I had to either use my mouse to move it over or start playing with the position coordinates in the properties of the object.</p>
+<p>NOT ANYMORE!</p>
+<p>To make micro adjustments using the Arrow Keys, simply hold down the Ctrl Key at the same time.</p>
+<p>It may seem odd to post such a simple and short article, but this little tip saves me a fair amount of time and swearing at my computer.  I hope it does the same for you as well!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/ssrs/ssrs-micro-adjustments-with-the/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>SQL Server Licensing for Non-Production</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/sql-server-licensing-for-non-1/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/sql-server-licensing-for-non-1/#comments</comments>
+		<pubDate>Thu, 14 Feb 2013 12:25:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[licensing]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/sql-server-licensing-for-non-1/</guid>
+		<description><![CDATA[One of my favorite movie quotes comes from Under Siege 2 (slightly altered to avoid cursing):  “Assumption is the mother of all screw ups”.]]></description>
+				<content:encoded><![CDATA[<p>One of my favorite movie quotes comes from Under Siege 2 (slightly altered to avoid cursing):  “Assumption is the mother of all screw ups”.</p>
+<p>Before we go any further, if you are ever unsure about SQL Server Licensing, contact Microsoft (1-800-426-9400 open Monday through Friday 6:00 AM PST to 6:00 PM PST).  What is valid for me at this point in time may not be valid for you or even for myself at a different point in time.</p>
+<h1>The Back Story</h1>
+<p>One of my most recent “egg on my face” moments came from a discussion on twitter about SQL Server licensing in non-production environments.  A question came in on the #sqlhelp hashtag asking about a situation where the QA group at their company installed Enterprise Edition and the person wanted to know if they had to uninstall it and reinstall Developer Edition to be compliant with licensing.  </p>
+<div class="image_block"><a href="http://www.flickr.com/photos/xurble/376588066/"><img alt="court" src="/wp-content/uploads/users/kconan/neon question mark.jpg?mtime=1360851095" width="300" height="300" /></a></div>
+<p>At a previous company that I worked for, I was always told by the Database Manager that if the system was non-production, licensing was free.  So I chimed into the twitter conversation and was then challenged by Robert Davis (<a href="https://twitter.com/SQLSoldier">T</a>|<a href="http://www.sqlsoldier.com/ ">B</a>) that it should be verified by a licensing expert.  He challenged it based on that Enterprise Agreements can override regular licensing.  My previous employer had an Enterprise Agreement and my current one does not.</p>
+<h1>1st Assumption</h1>
+<p>My first assumption was that the licensing rules that applied to my previous employer would carry over to my current employer.  The problem with that assumption is something I already pointed out, one had an Enterprise Agreement and one did not.  So I really was not comparing apples to apples.</p>
+<p>Now I too had a stake in finding the correct answer this licensing question.  So I offered to the conversation to contact the licensing expert at the vendor from which my current employer purchases their licenses from.  After a couple of e-mails back and forth we had a mostly clear answer that because the production workflows never touch the non-production SQL Instances, you were indeed covered by the production licenses and did not need extra ones.  This turned out to NOT be true.</p>
+<h1>2nd Assumption</h1>
+<p>My second assumption was that someone who didn’t work directly from Microsoft can 100% be trusted with licensing questions.  SQL Server Licensing is well known for being complex and very difficult to understand.  I do not blame or think less of our software vendor for coming back with the wrong answer because I’m sure my preconceived thoughts on what the right answer is swayed them.</p>
+<p>I replied back on the twitter conversation with what I talked about with my vendor.  Fortunately Steinar Anderson (<a href="https://twitter.com/SQLSteinar">T</a>|<a href="http://www.sqlservice.se/blogg ">B</a>) challenged me again to go straight to Microsoft to verify what the correct answer is.</p>
+<h1>The truth (for my situation)</h1>
+<p>I called Microsoft’s Licensing and was able to get ahold of someone with a couple minutes and they told me that unless you have an Enterprise Agreement, Microsoft does not look at production and non-production differently.  You have to license each one.  For the non-production SQL Instances you can use Developer Edition but must have a license of it purchased for each person who will use any of the Developer Edition SQL Instances.</p>
+<p>So now I will leave you with two of the favorite DBA sayings about Licensing: “It depends” and “Always confirm with Microsoft about your licensing situation”.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/sql-server-licensing-for-non-1/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>SSRS &#8211; Linking one report to another report</title>
+		<link>/index.php/datamgmt/ssrs/ssrs-linking-one-report-to/</link>
+		<comments>/index.php/datamgmt/ssrs/ssrs-linking-one-report-to/#comments</comments>
+		<pubDate>Wed, 13 Feb 2013 18:09:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[SSRS]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[ssrs]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/ssrs-linking-one-report-to/</guid>
+		<description><![CDATA[When creating reports, I try to keep them simple, clean and with as little information as possible.]]></description>
+				<content:encoded><![CDATA[<p>When creating reports, I try to keep them simple, clean and with as little information as possible.  What I mean by as little information as possible is that I try to keep the information summarized so that the value of the report isn’t lost in a sea of details.  However, for some reports you still need those details to back up the summary and to allow for digging deeper into issues.</p>
+<p>What I have found works well is to add links in the summary report to the detail report.  This approach allows us to pass in parameters to it and still limit the detail report to just the information that is needed.  </p>
+<p>To create a link in a report, you go to the Text Box Properties of the text box that you want to be the link, choose Action on the left side and then the “Go to report” radio button option.  </p>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/SSRS - action.JPG?mtime=1360785989"><img alt="" src="/wp-content/uploads/users/kconan/SSRS - action.JPG?mtime=1360785989" width="580" height="525" /></a></div>
+<p>If you are using Visual Studio, the dropdown list under “Specify a report” will be populated with included reports in your project.  You can also use the expression builder to key in the name of the report you are linking to.  The name you key in is the published report name and the .rdl file name.  This screen also allows you to specify what parameters you want to pass into the detail report.</p>
+<p>When you publish the summary and detail reports, if you publish them to the same directory then the summary report will automatically find the detail report when the link is clicked.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/ssrs/ssrs-linking-one-report-to/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Getting SSRS Subscriptions for a Specific Date</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/getting-ssrs-subscriptions-for-a/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/getting-ssrs-subscriptions-for-a/#comments</comments>
+		<pubDate>Tue, 20 Nov 2012 20:32:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[SSRS]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/11/getting-ssrs-subscriptions-for-a/</guid>
+		<description><![CDATA[The Back Story
+
+
+This past weekend, work was being down on our exchange server, so e-mail was down most of Saturday.  What everyone (myself included) failed to realise was that this was going to impact scheduled reports from SSRS.
+
+So Monday mornin&#8230;]]></description>
+				<content:encoded><![CDATA[<h2>The Back Story</h2>
+<p>This past weekend, work was being done on our exchange server, so e-mail was down most of Saturday.  What everyone (myself included) failed to realize was that this was going to impact scheduled reports from SSRS.</p>
+<p>So Monday morning, I got an e-mail asking about which reports should have ran on the Saturday and who they would have gone to.</p>
+<p>It sounds like such a simple request that I figured it couldn&#8217;t be that hard to figure it out.  I was dead wrong.  </p>
+<h2>The Hurdles</h2>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/hurdles.jpg?mtime=1353450411"><img alt="" src="/wp-content/uploads/users/kconan/hurdles.jpg?mtime=1353450411" width="400" height="338" /></a></div>
+<p>After poking around in SSRS Web Interface, I quickly found that short of opening each and every subscription there was no way to find this information. Next I took a peek in the ReportServer database where SSRS is hosted and it looked pretty simple.  I peeked in a few tables and the column names all lined up nice for joining to the other tables.  But then I saw the first of two hurdles that wouldn&#8217;t be so easy to get past.</p>
+<h2>Subscriptions.ExtensionSettings</h2>
+<p>I found the e-mail addresses that each Subscription is e-mailed to.  The problem (or opportunity) is that it is buried in an XML field &#8211; Subscriptions.ExtensionSettings.  This is the first opportunity that I&#8217;ve really had to mess with XML in SQL in a long time so I figured it wouldn&#8217;t be too bad and I could figure out how to pluck what I needed.</p>
+<p>However, my heart sank when I hit the second hurdle.  </p>
+<h2>Schedule.RecurrenceType, Schedule.DaysOfWeek and Schedule.DaysOfMonth</h2>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/SSRS_Schedule.JPG?mtime=1353450271"><img alt="" src="/wp-content/uploads/users/kconan/SSRS_Schedule.JPG?mtime=1353450271" width="505" height="136" /></a></div>
+<p>The Schedule table has a series of fields where it stores the schedule &#8211; Schedule.RecurrenceType, Schedule.DaysOfWeek and Schedule.DaysOfMonth.  This one wasn&#8217;t going to be as straight forward to get past.  I remember something in the back of my mind about taking a number have to square it or something or another but it was all really fuzzy.</p>
+<h2>This can&#8217;t be the first time someone has had to solve this issue, who&#8217;s got a blog or forum post about it?!?!</h2>
+<p>At this point, I figured it was time to turn to the web.  This has to be an issue that others have come across, so how did they solve it?  After searching around for a while, I wasn&#8217;t able to find anyone who broke down the schedule fields.  In fact, the only responses from Microsoft on their forums was that they don&#8217;t support querying them!  It was time for some bigger guns so I turned to twitter and posted on #SQLHELP and #SSRSHELP.  </p>
+<p>After a little while and a couple of conversations, people gave me the idea of linking the Schedules to their jobs and pulling the schedules that way.  Linking the Schedules to their Jobs was easy.  However, the job schedules are also difficult to figure out because they are done in a similar way.</p>
+<h2>Ah, there&#8217;s light at the end of this tunnel!</h2>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/tunnel.jpg?mtime=1353450579"><img alt="" src="/wp-content/uploads/users/kconan/tunnel.jpg?mtime=1353450579" width="300" height="224" /></a></div>
+<p>The difference between job schedules and subscription schedules is that there ARE posts out there on how to decipher them!  Between the little I was able to find about the schedules and the information about the job schedules, now I had what I needed to decipher the Subscription Schedules.</p>
+<p>Remember, I needed to know what report subscriptions should have ran on a specific day.</p>
+<p>Schedule.RecurrenceType had 3 values that I needed:</p>
+<p>2 &#8211; The subscription runs multiple times during the day, every day.  So I want all subscriptions that have that setting.<br />
+4 &#8211; The subscription runs one or more days a week.  This is used in conjunction with Schedule.DaysOfWeek.<br />
+5 &#8211; The subscription runs on specific days of the month.  This is used in conjunction with Schedule.DaysOfMonth.</p>
+<p>I&#8217;m not going to explain bit wise, but here is a link to a BOL Article:</p>
+<p><a href="http://msdn.microsoft.com/en-us/library/ms174965.aspx">http://msdn.microsoft.com/en-us/library/ms174965.aspx</a></p>
+<p>Schedule.DaysOfWeek and Schedule.DaysOfMonth work off a bit checker (bit wise).  It&#8217;ll help if you think of the day of the week in terms of what number it is.  For example, Sunday = 1, Monday = 2, Tuesday = 3 etc.</p>
+<p>The first value (Sunday and the first of the month) use a bit value of 1.  After that you can figure out the bit value by taking 2 the power of the number you are looking for minus 1.  For example, for the 3rd, it would be 2 to the power of (3 &#8211; 1) which is 2 to the power of 2 which equals 4.</p>
+<p>So if we were looking for reports that ran on every Tuesday, the TSQL would be Schedule.RecurrenceType = 4 AND Schedule.DaysofWeek &amp; 4 = 4.</p>
+<h2>The Query</h2>
+<p>I cleaned up the query a little bit by having a variable called @Date that you would set to the date you want to know which subscriptions would have been run on.</p>
+<p>The query returns the Path to the Report, the Report Name, the owner of the Subscription and which E-Mail addresses it would have been sent to.</p>
+<p>This by no means a finished and completely polished query, but rather a good starting point for others to use for their purposes.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> &nbsp;@<span class="kw1">Date</span>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">DATETIME</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,@DaysOfWeek&nbsp; &nbsp; <span class="kw1">INT</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,@DaysOfMonth &nbsp; <span class="kw1">INT</span>;
+&nbsp; &nbsp; &nbsp; &nbsp; 
+<span class="kw1">SET</span> @<span class="kw1">Date</span> &nbsp; <span class="sy0">=</span> <span class="st0">'2012-11-17 00:00:00.000'</span>;
+&nbsp;
+<span class="kw1">SELECT</span> @DaysOfWeek&nbsp; <span class="sy0">=</span> <span class="kw1">CASE</span> <span class="kw2">DATEPART</span><span class="br0">&#40;</span>DW,@<span class="kw1">Date</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="nu0">1</span> <span class="kw1">THEN</span> <span class="nu0">1</span> &nbsp;<span class="co1">--Sunday</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="nu0">2</span> <span class="kw1">THEN</span> <span class="nu0">2</span> &nbsp;<span class="co1">--Monday</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="nu0">3</span> <span class="kw1">THEN</span> <span class="nu0">4</span> &nbsp;<span class="co1">--Tuesday</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="nu0">4</span> <span class="kw1">THEN</span> <span class="nu0">8</span> &nbsp;<span class="co1">--Wednesday</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="nu0">5</span> <span class="kw1">THEN</span> <span class="nu0">16</span> <span class="co1">--Thursday</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="nu0">6</span> <span class="kw1">THEN</span> <span class="nu0">32</span> <span class="co1">--Friday</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="nu0">7</span> <span class="kw1">THEN</span> <span class="nu0">64</span> <span class="co1">--Saturday</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">END</span>;&nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+<span class="kw1">SELECT</span> @DaysOfMonth <span class="sy0">=</span> <span class="kw1">CASE</span> <span class="kw2">DATEPART</span><span class="br0">&#40;</span>D,@<span class="kw1">Date</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="nu0">1</span> <span class="kw1">THEN</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ELSE</span> <span class="kw2">POWER</span><span class="br0">&#40;</span><span class="nu0">2</span>,<span class="br0">&#40;</span><span class="kw1">CAST</span><span class="br0">&#40;</span><span class="kw2">DATEPART</span><span class="br0">&#40;</span>D,@<span class="kw1">Date</span><span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">INT</span><span class="br0">&#41;</span> <span class="sy0">-</span> <span class="nu0">1</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">END</span>;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+<span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;SUB.<span class="me1">ReportPath</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,SUB.<span class="me1">ReportName</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,SUB.<span class="me1">ReportOwner</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,EMail.<span class="kw1">value</span><span class="br0">&#40;</span><span class="st0">'Value[1]'</span>,<span class="st0">'VARCHAR(1000)'</span><span class="br0">&#41;</span> <span class="kw1">as</span> EMailAddresses&nbsp; &nbsp; &nbsp; 
+&nbsp; <span class="kw1">FROM</span>&nbsp; <span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> &nbsp; C.<span class="br0">&#91;</span><span class="kw1">Path</span><span class="br0">&#93;</span> <span class="kw1">AS</span> ReportPath
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,C.<span class="me1">Name</span> <span class="kw1">AS</span> ReportName
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,U.<span class="me1">UserName</span> <span class="kw1">AS</span> ReportOwner
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw1">CONVERT</span><span class="br0">&#40;</span>XML,SB.<span class="me1">ExtensionSettings</span><span class="br0">&#41;</span> <span class="kw1">AS</span> Ext
+&nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> ReportServer.<span class="me1">dbo</span>.<span class="me1">ReportSchedule</span> RS
+&nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> ReportServer.<span class="me1">dbo</span>.<span class="me1">Schedule</span> S 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> S.<span class="me1">ScheduleID</span> <span class="sy0">=</span> RS.<span class="me1">ScheduleID</span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">AND</span> S.<span class="me1">RecurrenceType</span> <span class="sy0">=</span> <span class="nu0">2</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">OR</span> <span class="br0">&#40;</span>S.<span class="me1">RecurrenceType</span> <span class="sy0">=</span> <span class="nu0">4</span> <span class="sy0">AND</span> <span class="br0">&#40;</span>S.<span class="me1">DaysOfWeek</span> <span class="sy0">&amp;</span>amp; @DaysOfWeek <span class="sy0">=</span> @DaysOfWeek<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">OR</span> <span class="br0">&#40;</span>S.<span class="me1">RecurrenceType</span> <span class="sy0">=</span> <span class="nu0">5</span> <span class="sy0">AND</span> <span class="br0">&#40;</span>S.<span class="me1">DaysOfMonth</span> <span class="sy0">&amp;</span>amp; @DaysOfMonth <span class="sy0">=</span> @DaysOfMonth<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> ReportServer.<span class="me1">dbo</span>.<span class="br0">&#91;</span><span class="kw1">Catalog</span><span class="br0">&#93;</span> C 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> C.<span class="me1">ItemID</span> <span class="sy0">=</span> RS.<span class="me1">ReportID</span>
+&nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> ReportServer.<span class="me1">dbo</span>.<span class="me1">Subscriptions</span> SB 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> SB.<span class="me1">SubscriptionID</span> <span class="sy0">=</span> RS.<span class="me1">SubscriptionID</span>
+&nbsp; &nbsp; &nbsp; <span class="sy0">JOIN</span> ReportServer.<span class="me1">dbo</span>.<span class="me1">Users</span> U 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> U.<span class="me1">UserID</span> <span class="sy0">=</span> SB.<span class="me1">OwnerID</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#41;</span> SUB
+&nbsp;<span class="sy0">CROSS</span> APPLY Ext.<span class="me1">nodes</span><span class="br0">&#40;</span><span class="st0">'/ParameterValues/ParameterValue'</span><span class="br0">&#41;</span> <span class="kw1">AS</span> SubEMail<span class="br0">&#40;</span>EMail<span class="br0">&#41;</span> <span class="kw1">WHERE</span> &nbsp;EMail.<span class="kw1">value</span><span class="br0">&#40;</span><span class="st0">'Value[1]'</span>,<span class="st0">'VARCHAR(1000)'</span><span class="br0">&#41;</span> <span class="sy0">LIKE</span> <span class="st0">'%[^ ]@%'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE	 @Date			DATETIME
+		,@DaysOfWeek	INT
+		,@DaysOfMonth	INT;
+		
+SET @Date	= '2012-11-17 00:00:00.000';
+
+SELECT @DaysOfWeek	= CASE DATEPART(DW,@Date)
+						WHEN 1 THEN 1  --Sunday
+						WHEN 2 THEN 2  --Monday
+						WHEN 3 THEN 4  --Tuesday
+						WHEN 4 THEN 8  --Wednesday
+						WHEN 5 THEN 16 --Thursday
+						WHEN 6 THEN 32 --Friday
+						WHEN 7 THEN 64 --Saturday
+					  END;		
+						
+SELECT @DaysOfMonth	= CASE DATEPART(D,@Date)
+						WHEN 1 THEN 1
+						ELSE POWER(2,(CAST(DATEPART(D,@Date) AS INT) - 1))
+					  END;
+					  
+SELECT DISTINCT
+		 SUB.ReportPath
+		,SUB.ReportName
+		,SUB.ReportOwner
+		,EMail.value('Value[1]','VARCHAR(1000)') as EMailAddresses		
+  FROM	(
+	SELECT 	 C.[Path] AS ReportPath
+			,C.Name AS ReportName
+			,U.UserName AS ReportOwner
+			,CONVERT(XML,SB.ExtensionSettings) AS Ext
+	  FROM ReportServer.dbo.ReportSchedule RS
+	  JOIN ReportServer.dbo.Schedule S 
+	    ON S.ScheduleID = RS.ScheduleID
+	   AND S.RecurrenceType = 2
+	    OR (S.RecurrenceType = 4 AND (S.DaysOfWeek &amp;amp; @DaysOfWeek = @DaysOfWeek))
+	    OR (S.RecurrenceType = 5 AND (S.DaysOfMonth &amp;amp; @DaysOfMonth = @DaysOfMonth))
+	  JOIN ReportServer.dbo.[Catalog] C 
+	    ON C.ItemID = RS.ReportID
+	  JOIN ReportServer.dbo.Subscriptions SB 
+	    ON SB.SubscriptionID = RS.SubscriptionID
+	  JOIN ReportServer.dbo.Users U 
+	    ON U.UserID = SB.OwnerID
+		) SUB
+ CROSS APPLY Ext.nodes('/ParameterValues/ParameterValue') AS SubEMail(EMail) WHERE 	EMail.value('Value[1]','VARCHAR(1000)') LIKE '%[^ ]@%';</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/getting-ssrs-subscriptions-for-a/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>New Opportunities</title>
+		<link>/index.php/itprofessionals/other/new-opportunities/</link>
+		<comments>/index.php/itprofessionals/other/new-opportunities/#comments</comments>
+		<pubDate>Tue, 18 Sep 2012 12:44:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Other]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/09/new-opportunities/</guid>
+		<description><![CDATA[Over the last year many well known SQL DBAs have either changed companies or changed roles within their companies.  Now it is my turn to announce my change (not that I'm well known or even close the same league as the others!).
+This may seem a bit odd&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Over the last year many well known SQL DBAs have either changed companies or changed roles within their companies.  Now it is my turn to announce my change (not that I&#8217;m well known or even close the same league as the others!).</p>
+<p>This may seem a bit odd seeing how the last <a href="http://www.jasonstrate.com/2012/08/august-meme15-assignment/" target="_blank">#Meme15</a> Topic was one that I suggested.</p>
+<p><strong><em>What are 5 (or 10) reasons why you like your job?</em></strong></p>
+<p>The truth is that I wasn&#8217;t actively looking for a new job.  I happened to hear that this place was hiring and decided to apply to see what they were like.  I&#8217;ve been with Ashley Furniture for about 3 1/2 years now.  The DBA team there is an amazing well oiled machine of people who really support each other.  I&#8217;ve learned and grown by leaps and bounds over the years and am really grateful for the experience.</p>
+<p>This is my last week at Ashley Furniture and next week I will be starting City Brewery.  I am very excited about the new opportunity and the challenges it will pose.  City Brewery has a much smaller IT shop so I will be wearing many different hats including DBA and will even be getting my hands dirty with HighJump Development again.  A Canadian living in Wisconsin working at a Brewery has a nice ring to it!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/other/new-opportunities/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>#Meme15 &#8211; Why I love my job</title>
+		<link>/index.php/itprofessionals/professionaldevelopment/meme15-why-i-love-my-job/</link>
+		<comments>/index.php/itprofessionals/professionaldevelopment/meme15-why-i-love-my-job/#comments</comments>
+		<pubDate>Thu, 16 Aug 2012 11:15:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Professional Development]]></category>
+		<category><![CDATA[#meme15]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/08/meme15-why-i-love-my-job/</guid>
+		<description><![CDATA[This month's #Meme15 topic is one that I suggested to Jason State (B&#124;T): What are 5 (or 10) reasons why you like your job?
+
+In the last few months I've seen lots of people changing jobs (both from the SQL Community and from my company) and it got me th&#8230;]]></description>
+				<content:encoded><![CDATA[<p><a href="/media/users/kconan/meme15new.png?mtime=1331607208"><img style="float: right;" src="/wp-content/uploads/users/kconan/meme15new.png?mtime=1331607208" alt="" width="150" height="150" /></a></p>
+<p><span style="font-size: small;">This month&#8217;s <a href="http://www.jasonstrate.com/2012/08/august-meme15-assignment/" target="_blank">#Meme15</a> topic is one that I suggested to Jason State (<a title="Blog" href="http://www.jasonstrate.com/" target="_blank">B</a>|<a title="Twitter" href="http://twitter.com/stratesql">T</a>): What are 5 (or 10) reasons why you like your job?</span></p>
+<div class="image_block">
+<p class="MsoNormal" style="margin-bottom: 0.0001pt; line-height: normal; text-align: left;"><span style="font-size: 12pt;"><span style="font-size: small;">In the last few months I&#8217;ve seen lots of people changing jobs (both from the SQL Community and from my company) and it got me thinking about where I was at in my career.  At the end of some reflection I came the conclusion that I already knew, I love my job.</span></span></p>
+<p class="MsoNormal" style="margin-bottom: 0.0001pt; line-height: normal; text-align: left;"><span style="font-size: 12pt;"><span style="font-size: small;"> </span></span></p>
+<div class="image_block" style="text-align: left;"><span style="font-size: small; line-height: 14.25pt;">1)  Not pigeonholed. </span></div>
+<div class="image_block" style="text-align: left;"><span style="font-size: small; line-height: 14.25pt;">I get to play with and experience many many different aspects of SQL      Server.  I do things from Query Tuning, Maintenance Planning, SSIS,      Cluster Setup, Migrations and Replication.  What I did last week is      likely not what I&#8217;m doing this week.  I even dip into DB2 and Oracle      (but I maintain that I know nothing of either one!).</span><br /><span style="font-size: x-small;"><br /></span><span style="font-size: small; line-height: 14.25pt;">2)  Cutting edge. </span></div>
+<div class="image_block" style="text-align: left;"><span style="font-size: small; line-height: 14.25pt;">Within the first 3 months that SQL 2012 was release, I setup 3      clusters and about 30 instances with it.  I also went through SSWUG&#8217;s      SQL 2012 training series and have a nice certificate for completing it.</span><br /><span style="font-size: x-small;"><br /></span><span style="font-size: small; line-height: 14.25pt;">3)  SQL Saturdays      and Mad PASS. </span></div>
+<div class="image_block" style="text-align: left;"><span style="font-size: small; line-height: 14.25pt;">I may not be able to go to PASS, but I do get to      attend a few SQL Saturdays each year.  If you haven&#8217;t been to a SQL      Saturday or local SQL User Group, GO!  I&#8217;ve learned a ton at these      events both in the sessions and during hallway conversations.  I&#8217;ve      also made some great friends.</span><br /><span style="font-size: x-small;"><br /></span><span style="font-size: small; line-height: 14.25pt;">4)  DBA Team. </span></div>
+<div class="image_block" style="text-align: left;"><span style="font-size: small; line-height: 14.25pt;">I&#8217;m one of the lucky ones who is part of a DBA Team.  We&#8217;re a      large enough company that we actually have 6 DBAs plus a dedicated Manager.       I&#8217;ve learned a ton from my mentors and have even been able to turn      the tables once or twice and taught them!  It&#8217;s a hardworking group      and we all share the burden.</span><br /><span style="font-size: x-small;"><br /></span><span style="font-size: small; line-height: 14.25pt;">5)  Stability. </span></div>
+<div class="image_block" style="text-align: left;"><span style="font-size: small; line-height: 14.25pt;">I&#8217;ve worked for companies in the past where you aren&#8217;t sure if      they&#8217;re going to still be in business from month to month.  I&#8217;ve also      had a contract job where it was down to week to week.  I must be      getting older because stability is something that means more and more to      me.  While other companies were shrinking or go disappearing during      the Great Recession, my company actually grew and expanded.</span></div>
+<ol style="text-align: left;" type="1"> </ol>
+</div>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/professionaldevelopment/meme15-why-i-love-my-job/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

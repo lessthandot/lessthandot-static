@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>windows azure &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/windows-azure/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Real World Azure &#8211; Queue PopReceiptMismatch Bug</title>
+		<link>/index.php/desktopdev/mstech/real-world-azure-queue-popreceiptmismatch/</link>
+		<comments>/index.php/desktopdev/mstech/real-world-azure-queue-popreceiptmismatch/#respond</comments>
+		<pubDate>Mon, 09 Sep 2013 12:41:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[azure queue service]]></category>
+		<category><![CDATA[real world azure]]></category>
+		<category><![CDATA[unit testing]]></category>
+		<category><![CDATA[windows azure]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/09/real-world-azure-queue-popreceiptmismatch/</guid>
+		<description><![CDATA[This week I'm starting a new series on "Real World Azure". These are stories or issues I have run into while working with Azure in the "Real World". Today we're looking at a bug in the Azure API for Queue Services that appears to have been around for at&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This week I&#8217;m starting a new series on &#8220;Real World Azure&#8221;. These are stories or issues I have run into while working with Azure in the &#8220;Real World&#8221;. Today we&#8217;re looking at a bug in the Azure API for Queue Services that appears to have been around for at least the last two versions of the storage API (prior to 2011-08-18, or SDK 1.7).</p>
+<div style="background-color: #ffff99; padding: .5em; margin: 1em;">
+<h2 style="margin: .5em 0px;">Real World Azure</h2>
+<p>There are a lot of great resources out there on Azure, from demos to webcasts to white papers filled with architectural diagrams. This is to be expected. Microsoft products tend to focus on the 15 minute demo or polished architecture diagram in an enterprise whitepaper, a controlled exposure of only a subset of the functionality you will use in the real world.</p>
+<p>I have used Azure daily for years on live business and personal projects, not demos. From supporting production systems running hundred of millions of storage transactions to figuring out why a change to the Azure Management API limits sends certain legacy code into a death spiral to working directly with the APIs in 3-4 different languages to months where we had 2-4 active support cases at any time. These are examples found in the real, production usage.
+</p></div>
+<p>Today we&#8217;re looking at a longstanding bug in the <a href="http://www.windowsazure.com/en-us/develop/net/how-to-guides/queue-service/" title="Azure Queue Service on WindowsAzure.com">Azure Queue Service</a> that I&#8217;ve been struggling with lately. </p>
+<h2>What is the Azure Queue Service?</h2>
+<p>The Queue Service allows you to create Queues and Put and Get messages from those queues. Queues in the Queue Service are equally accessible from any number of other Azure services or sites, making it an excellent mechanism for communicating between services.</p>
+<p>The Queue uses a two-phase Get/Delete process for dequeueing Messages. When you Get the item, it goes invisible for a period of time you specify until you have finished and call Delete. If you have network problems, a system crash, or other unforeseen circumstances, the item resurfaces in it&#8217;s original position, allowing another of your resources to pick it up and finish executing it instead of losing it forever. </p>
+<div style="text-align: center; color: #666666; margin: .5em"">
+   <img src="http://tiernok.com/LTDBlog/RealWorldAzure/TwoStepDequeue.png" /><br />
+   GETting a Message makes it invisible, DELETEing removes it
+</div>
+<p>An Update method provides the ability to resurface the Message, extend the visibility timeout, or update the contents of the Message. This last option shows up in Microsoft examples where they have multi-phase work, so when a Message resurfaces you can pick the work up at the last step it reached instead of starting from the beginning (not my recommendation, but that&#8217;s another topic).</p>
+<p>The ability to break down work into atomic units and then spin up N units consuming items from that queue is a powerful tool for horizontally scaling work.</p>
+<h2>The PopReceipt &#8211; Not Just for GetMessage Calls</h2>
+<p>To prevent other processes from updating a Message that has been Get-ed, a unique PopReceipt is issued with the GetMessage response. Later UpdateMessage and DeleteMessage calls are required to have this PopReceipt to access the item. This prevents crosstalk or a Message resurfacing and being picked up by a second worker, then being updated or deleted by the original worker. Very handy.</p>
+<p>But wait, I thought this was all to resolve cases where the first system has gone down, why would it try to update that Message again if it&#8217;s down or rebooted?</p>
+<p>Setting aside the case where you were persisting the Message Id and PopReceipt somewhere that is accessible when your system un-crashes (don&#8217;t do that), there is one other catch to all of this. Every time you call UpdateMessage to extend the visibility timeout or update the content, a new PopReceipt is issued. This means that in order to continue processing it and complete (Update and Delete) you have to have perfect tracking of the latest PopReceipt throughout the lifetime of the job.  </p>
+<p>So when you have a network error (which is the subject of another post and numerous support tickets) and don&#8217;t receive the response to a successful UpdateMessage, you lose the last PopReceipt, even if you can continue and successfully complete processing and only lost one Update call out of 100 during the lifetime of a long-lived Message.</p>
+<h2>The PopReceiptMismatch Error</h2>
+<p>The Azure REST API outlines all of the errors you can expect to get back, nicely broken down into a <a href="http://msdn.microsoft.com/en-us/library/windowsazure/dd179357.aspx">common set of errors</a> and service-specific lists (<a href="http://msdn.microsoft.com/en-us/library/windowsazure/dd179446.aspx">Queue Service Errors</a>).</p>
+<p>The error code we are looking at is:</p>
+<div style="background-color: #EEEEEE; margin: .5em; padding: .5em">
+PopReceiptMismatch: Bad Request (400) &#8211; The specified pop receipt did not match the pop receipt for a dequeued message.
+</div>
+<p>The <a href="http://msdn.microsoft.com/en-us/library/windowsazure/dd179347.aspx">Delete Message</a> (Last updated Sept, 2011) documentation specifically outlines this scenario:</p>
+<blockquote><p>If a message with a matching pop receipt is not found, the service returns status code 400 (Bad Request), with additional error information indicating that the cause of the failure was a mismatched pop receipt.</p></blockquote>
+<p>The <a href="http://msdn.microsoft.com/en-us/library/windowsazure/hh452234.aspx">Update Message</a> (Last updated Sept, 2011) documentation is less specific but sounds like we should expect the same error (emphasis mine):</p>
+<blockquote><p>
+An Update Message operation will fail if the specified message does not exist in the queue, or if the specified <strong>pop receipt does not match</strong>
+</p></blockquote>
+<p>So it makes sense that if we GetMessage and somehow have an out of date PopReceipt or attempt to use a PopReceipt that belongs to a different item, we would receive a PopReceiptMismatch error.</p>
+<p><strong>Actual Response:</strong></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;?xml</span> <span class="re0">version</span>=<span class="st0">&quot;1.0&quot;</span> <span class="re0">encoding</span>=<span class="st0">&quot;utf-8&quot;</span><span class="re2">?&gt;</span></span>
+<span class="sc3"><span class="re1">&lt;Error<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp;<span class="sc3"><span class="re1">&lt;Code<span class="re2">&gt;</span></span></span>MessageNotFound<span class="sc3"><span class="re1">&lt;/Code<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp;<span class="sc3"><span class="re1">&lt;Message<span class="re2">&gt;</span></span></span>The specified message does not exist.
+RequestId:98bd9fb1-d32f-45bd-9159-c900a9b2fed3
+Time:2013-09-07T17:04:30.5469796Z<span class="sc3"><span class="re1">&lt;/Message<span class="re2">&gt;</span></span></span>
+<span class="sc3"><span class="re1">&lt;/Error<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;Error&gt;
+   &lt;Code&gt;MessageNotFound&lt;/Code&gt;
+   &lt;Message&gt;The specified message does not exist.
+RequestId:98bd9fb1-d32f-45bd-9159-c900a9b2fed3
+Time:2013-09-07T17:04:30.5469796Z&lt;/Message&gt;
+&lt;/Error&gt;</pre></div></div>
+
+<p>Wait, what? 404, MessageNotFound, &#8220;The specified message does not exist.&#8221;? </p>
+<p>That doesn&#8217;t match the documentation OR sound correct?</p>
+<h2>The PopReceiptMismatch Bug</h2>
+<p>I&#8217;ve written a series of unit tests that show that you receive &#8220;Item not found&#8221; from using an outdated PopReceipt, a PopReceipt from another queue&#8217;s item, and a fabricated PopReceipt. All cases where I would expect to receive the PopReceiptMismatch error.</p>
+<p><a href="https://github.com/tarwn/AzureQueueIssues/blob/master/PopReceiptMismatchReturnsWrongError.cs">AzureQueueIssues/PopReceiptMismatchReturnsWrongError.cs</a> (Full code available on Github)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> UpdateMessage_UsingIncorrectPopReceipt_Returns400PopReceiptMismatch<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// Create the queue client</span>
+&nbsp; &nbsp; <span class="kw1">var</span> queueClient <span class="sy0">=</span> _account<span class="sy0">.</span><span class="me1">CreateCloudQueueClient</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// Retrieve a reference to a queue</span>
+&nbsp; &nbsp; <span class="kw1">var</span> queue <span class="sy0">=</span> queueClient<span class="sy0">.</span><span class="me1">GetQueueReference</span><span class="br0">&#40;</span><span class="st0">&quot;unit-test&quot;</span> <span class="sy0">+</span> Guid<span class="sy0">.</span><span class="me1">NewGuid</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; queue<span class="sy0">.</span><span class="me1">CreateIfNotExists</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; queue<span class="sy0">.</span><span class="me1">Clear</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// let's queue up a sample message</span>
+&nbsp; &nbsp; <span class="kw1">var</span> message <span class="sy0">=</span> <span class="kw3">new</span> CloudQueueMessage<span class="br0">&#40;</span><span class="st0">&quot;test content&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="co1">// note the unecessary difference in terminology between API (Put) and reference SDK (Add)</span>
+&nbsp; &nbsp; queue<span class="sy0">.</span><span class="me1">AddMessage</span><span class="br0">&#40;</span>message<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// now we get the item and violate the first Get's popreceipt</span>
+&nbsp; &nbsp; <span class="kw1">var</span> queueMessage1 <span class="sy0">=</span> queue<span class="sy0">.</span><span class="me1">GetMessage</span><span class="br0">&#40;</span>TimeSpan<span class="sy0">.</span><span class="me1">FromSeconds</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">Sleep</span><span class="br0">&#40;</span>TimeSpan<span class="sy0">.</span><span class="me1">FromSeconds</span><span class="br0">&#40;</span><span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> queueMessage2 <span class="sy0">=</span> queue<span class="sy0">.</span><span class="me1">GetMessage</span><span class="br0">&#40;</span>TimeSpan<span class="sy0">.</span><span class="me1">FromSeconds</span><span class="br0">&#40;</span><span class="nu0">60</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="co1">// and just to be absolutely clear that we didn't get the same receipt a second time</span>
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreNotEqual</span><span class="br0">&#40;</span>queueMessage1<span class="sy0">.</span><span class="me1">PopReceipt</span>, queueMessage2<span class="sy0">.</span><span class="me1">PopReceipt</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// now lets harvest the error from using the first popreceipt</span>
+&nbsp; &nbsp; <span class="kw4">int</span> statusCode <span class="sy0">=</span> <span class="sy0">-</span><span class="nu0">1</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw4">string</span> status <span class="sy0">=</span> <span class="st0">&quot;not defined&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; queue<span class="sy0">.</span><span class="me1">UpdateMessage</span><span class="br0">&#40;</span>queueMessage1, TimeSpan<span class="sy0">.</span><span class="me1">FromSeconds</span><span class="br0">&#40;</span><span class="nu0">60</span><span class="br0">&#41;</span>, Microsoft<span class="sy0">.</span><span class="me1">WindowsAzure</span><span class="sy0">.</span><span class="me1">Storage</span><span class="sy0">.</span><span class="me1">Queue</span><span class="sy0">.</span><span class="me1">MessageUpdateFields</span><span class="sy0">.</span><span class="me1">Visibility</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">catch</span> <span class="br0">&#40;</span>StorageException exc<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; statusCode <span class="sy0">=</span> exc<span class="sy0">.</span><span class="me1">RequestInformation</span><span class="sy0">.</span><span class="me1">HttpStatusCode</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; status <span class="sy0">=</span> exc<span class="sy0">.</span><span class="me1">RequestInformation</span><span class="sy0">.</span><span class="me1">HttpStatusMessage</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// prove that the item is still valid and it was definately a popreceipt mismatch</span>
+&nbsp; &nbsp; queue<span class="sy0">.</span><span class="me1">UpdateMessage</span><span class="br0">&#40;</span>queueMessage2, TimeSpan<span class="sy0">.</span><span class="me1">FromSeconds</span><span class="br0">&#40;</span><span class="nu0">60</span><span class="br0">&#41;</span>, Microsoft<span class="sy0">.</span><span class="me1">WindowsAzure</span><span class="sy0">.</span><span class="me1">Storage</span><span class="sy0">.</span><span class="me1">Queue</span><span class="sy0">.</span><span class="me1">MessageUpdateFields</span><span class="sy0">.</span><span class="me1">Visibility</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">//cleanup</span>
+&nbsp; &nbsp; queue<span class="sy0">.</span><span class="me1">Delete</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// documented response</span>
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreEqual</span><span class="br0">&#40;</span>Error_PopReceiptMismatchMessage, status<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreEqual</span><span class="br0">&#40;</span>ErrorCode_PopReceiptMismatch, statusCode<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void UpdateMessage_UsingIncorrectPopReceipt_Returns400PopReceiptMismatch()
+{
+	// Create the queue client
+	var queueClient = _account.CreateCloudQueueClient();
+
+	// Retrieve a reference to a queue
+	var queue = queueClient.GetQueueReference("unit-test" + Guid.NewGuid().ToString());
+	queue.CreateIfNotExists();
+	queue.Clear();
+
+	// let's queue up a sample message
+	var message = new CloudQueueMessage("test content");
+	// note the unecessary difference in terminology between API (Put) and reference SDK (Add)
+	queue.AddMessage(message);
+
+	// now we get the item and violate the first Get's popreceipt
+	var queueMessage1 = queue.GetMessage(TimeSpan.FromSeconds(1));
+	Thread.Sleep(TimeSpan.FromSeconds(2));
+	var queueMessage2 = queue.GetMessage(TimeSpan.FromSeconds(60));
+	// and just to be absolutely clear that we didn't get the same receipt a second time
+	Assert.AreNotEqual(queueMessage1.PopReceipt, queueMessage2.PopReceipt);
+
+	// now lets harvest the error from using the first popreceipt
+	int statusCode = -1;
+	string status = "not defined";
+	try
+	{
+		queue.UpdateMessage(queueMessage1, TimeSpan.FromSeconds(60), Microsoft.WindowsAzure.Storage.Queue.MessageUpdateFields.Visibility);
+	}
+	catch (StorageException exc)
+	{
+		statusCode = exc.RequestInformation.HttpStatusCode;
+		status = exc.RequestInformation.HttpStatusMessage;
+	}
+
+	// prove that the item is still valid and it was definately a popreceipt mismatch
+	queue.UpdateMessage(queueMessage2, TimeSpan.FromSeconds(60), Microsoft.WindowsAzure.Storage.Queue.MessageUpdateFields.Visibility);
+
+	//cleanup
+	queue.Delete();
+
+	// documented response
+	Assert.AreEqual(Error_PopReceiptMismatchMessage, status);
+	Assert.AreEqual(ErrorCode_PopReceiptMismatch, statusCode);
+}</pre></div></div>
+
+<p>By getting a Message, allowing it&#8217;s visibility timeout to expire, and getting it a second time, we can ensure the original popreceipt is no longer valid.</p>
+<p>(and that I can&#8217;t spell definitely without spellcheck)</p>
+<p>In a <a href="http://social.msdn.microsoft.com/Forums/windowsazure/en-US/aab37e27-2f04-47db-9e1d-66fd224ac925/handling-queue-message-deletion-error">forum post from 2011</a> a microsoft representative said that the PopReceiptMismatch error is not supposed to be returned for all Pop Receipt Mismatches, only when you use a PopReceipt from another message/queue. His answer indicated that this was an error in the documentation (common response on the forums: service works right the way it is, the documentation must be incorrect). </p>
+<p>The cross-queue case is of course included in a test like the one above and available on Github. Spoiler: 404 Message does not exist.</p>
+<p><strong>Conclusion: </strong> When a Message does not exist or it exists but you have the wrong PopReceiptMismatch, you will receive &#8220;The specified message does not exist.&#8221;</p>
+<p>Here are the tests that I ran against live Azure and the latest emulator:</p>
+<style>
+dt, dd{
+   display: block !important;
+   float: none !important;
+}
+dd{
+   display: block !important;
+   float: none !important;
+   margin: .25em 0 1em 1em !important;
+}
+</style>
+<dl>
+<dt>UpdateMessage_UsingIncorrectPopReceipt_Returns400PopReceiptMismatch</dt>
+<dd>Fails, receives 404, Message does not exist</dd>
+<dt>UpdateMessage_UsingHandWrittenCode_Returns204NoContentOnSuccesfulUpdate</dt>
+<dd>Success, verifies code to consume API works for use in later tests</dd>
+<dt>UpdateMessage_UsingIncorrectPopReceiptFormat_ReturnsInvalidParameterAndNotPopReceiptMismatch</dt>
+<dd>Success, the Common Service Errors documentation is correct, this does not return PopReceiptMismatch as was outlined in the 2011 forum post</dd>
+<dt>UpdateMessage_UsingMadeUpButValidFormatPopReceipt_Returns400PopReceiptMismatch</dt>
+<dd>Fails, receives 404, Message does not exist</dd>
+</dl>
+<p>So either this is a bug in the Azure Service code, which continued through at least 2 later versions of the API and at least two versions of the Storage Emulator, or this was intended. Given the granularity and number of service errors defined throughout the rest of the service, the first case is more likely. </p>
+<p>As an additional level of confirmation, during a recent Azure support case, the person helping me was sidetracked off into other investigations because he also expected us to be receiving (400) PopReceiptMismatch for this situation. Even the Storage Analytics logs reflects this as a 404.</p>
+<h2>The Workaround</h2>
+<p>There isn&#8217;t one. </p>
+<p>Unfortunately there is no method we can call to determine if the Message actually still exists or not.</p>
+<p>The two resolutions I have considered require an absurd amount of extra development. One way would be to build a proxy or logging layer that logs every single call we make, centrally, and tracks the latest state every message is in per our calls out to the service. The next option would be to consume the Analytics logs and track the latest status available even if the individual HTTP call ran into an error during reception. Both of which seem like as much work as building our own queue service.</p>
+<h2>Questions</h2>
+<p>There are several things it would be nice to know:</p>
+<p><strong>1) Confirmation of this bug as well as an indication of when it will be fixed. </strong><br />
+Unfortunately it is entirely possible someone has built logic that relies on the incorrect error message (and how they tell which case it is, I have no idea), so I suspect an API version would be required to fix it safely.</p>
+<p><strong>2) Why hasn&#8217;t this been uncovered in Microsoft&#8217;s integration testing on the service? </strong><br />
+I have a custom SDK that consumes the API. One responsibility of this library is to map received errors into specific custom Exception types (I find these far easier to use then having one StorageException with codes, like the reference SDK from Microsoft). To build automated test cases for this library, I copied the Error Code tables from the documentation and made TestCase attributes with search/replace and some regex magic. A similar method could be used for Integration tests. Add in a tool like <a href="http://fitnesse.org/">FitNesse</a>, and their MSDN documentation could serve as the list of test cases automatically.</p>
+<p><strong>3) Why does the PopReceipt change on Updates?</strong><br />
+Why do the PopReceipts change on Updates at all? I can&#8217;t think of a single valid case where this is useful. In fact this smells an awful lot like a developer taking a shortcut while working on the Azure service and calling or re-using logic from GetMessage and getting this extra behavior by accident. I haven&#8217;t been able to find an answer to this question yet.</p>
+<p>More Real World Azure to come. Technical issues, how to work with support and their limitations, my personal known issues list, and so on.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/real-world-azure-queue-popreceiptmismatch/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Windows Azure, SQL Azure and .NET Services pricing announced</title>
+		<link>/index.php/datamgmt/datadesign/windows-azure-sql-azure-and-net-services/</link>
+		<comments>/index.php/datamgmt/datadesign/windows-azure-sql-azure-and-net-services/#comments</comments>
+		<pubDate>Tue, 14 Jul 2009 12:55:42 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[.net services]]></category>
+		<category><![CDATA[sql azure]]></category>
+		<category><![CDATA[windows azure]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/07/windows-azure-sql-azure-and-net-services/</guid>
+		<description><![CDATA[Microsoft announced pricing for Azure. Today, during the Microsoft Worldwide Partner Conference 2009 Microsoft announced the business and partner model for the Windows Azure platform including service level agreements and support programs. Windows Azure, SQL Azure and .NET Services will be commercially available at the Professional Developer Conference 2009 and Microsoft hopes you will continue [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Microsoft announced pricing for Azure.</p>
+<p>Today, during the Microsoft Worldwide Partner Conference 2009 Microsoft announced the business and partner model for the Windows Azure platform including service level agreements and support programs.</p>
+<p>Windows Azure, SQL Azure and .NET Services will be commercially available at the Professional Developer Conference 2009 and Microsoft  hopes you will continue building on the Community Technology Preview (CTP) at no cost today.    </p>
+<p>Upon commercial availability Microsoft  will offer Windows Azure through a consumption-based pricing model, allowing partners and customers to pay only for the services that they consume.</p>
+<p><strong>Windows Azure:</strong><br />
+ Compute @  $0.12 / hour<br />
+ Storage @ $0.15 / GB stored<br />
+ Storage Transactions @ $0.01 / 10K</p>
+<p><strong>SQL Azure:</strong><br />
+ Web Edition – Up to 1 GB relational database @ $9.99<br />
+ Business Edition – Up to 10 GB relational database @ $99.99 </p>
+<p><strong>.NET Services:</strong><br />
+ Messages @ $0.15/100K message operations , including Service Bus messages and Access Control tokens</p>
+<p>Bandwidth across all three services will be charged at $0.10 in / $0.15 out / GB</p>
+<p>You can read more here: http://blogs.msdn.com/windowsazure/archive/2009/07/14/confirming-commercial-availability-and-announcing-business-model.aspx</p>
+<p>Brent Ozar also has a nice post here: http://www.brentozar.com/archive/2009/07/sql-azure-pricing-10-for-1gb-100-for-10gb/</p>
+<p>So how long before you move to the cloud?</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/windows-azure-sql-azure-and-net-services/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

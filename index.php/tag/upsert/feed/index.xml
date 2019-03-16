@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>upsert &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/upsert/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2011 Day 10: Upsert by using the Merge statement</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-10/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-10/#respond</comments>
+		<pubDate>Sat, 10 Dec 2011 13:44:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[merger]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[tip]]></category>
+		<category><![CDATA[upsert]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-10/</guid>
+		<description><![CDATA[In my Are you ready for SQL Server 2012 or are you still partying like it is 1999? post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code tha&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>Today we are going to take a look at how to do an upsert by using the MERGE statement. If you do not know what an upsert is, it basically will update rows in the table if there are already rows that match your condition, otherwise it will insert into the table</p>
+<p>First let&#8217;s take a look at how you would do this before SQL Server 2008</p>
+<p>Create this simple table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestMerge <span class="br0">&#40;</span>id <span class="kw1">int</span> not null, SomeName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> not null<span class="br0">&#41;</span>
+go
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestMerge <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="st0">'Denis1'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestMerge <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">2</span>,<span class="st0">'Denis2'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestMerge <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">3</span>,<span class="st0">'Denis3'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestMerge <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">4</span>,<span class="st0">'Denis4'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestMerge <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">5</span>,<span class="st0">'Denis5'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestMerge <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">6</span>,<span class="st0">'Denis6'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestMerge <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">7</span>,<span class="st0">'Denis7'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestMerge (id int not null, SomeName varchar(100) not null)
+go
+
+
+INSERT TestMerge values(1,'Denis1')
+INSERT TestMerge values(2,'Denis2')
+INSERT TestMerge values(3,'Denis3')
+INSERT TestMerge values(4,'Denis4')
+INSERT TestMerge values(5,'Denis5')
+INSERT TestMerge values(6,'Denis6')
+INSERT TestMerge values(7,'Denis7')</pre></div></div>
+
+<p>One way to do an upsert in the pre 2008 days is to do the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> TestMerge
+<span class="kw1">SET</span> SomeName <span class="sy0">=</span> <span class="st0">'Denis10'</span>
+<span class="kw1">WHERE</span> id <span class="sy0">=</span> <span class="nu0">10</span>
+<span class="kw1">IF</span> <span class="kw2">@@ROWCOUNT</span> <span class="sy0">=</span> <span class="nu0">0</span>
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> TestMerge <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">10</span>,<span class="st0">'Denis10'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestMerge
+<span class="kw1">DELETE</span> TestMerge <span class="kw1">WHERE</span> ID &nbsp;<span class="sy0">=</span><span class="nu0">10</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE TestMerge
+SET SomeName = 'Denis10'
+WHERE id = 10
+IF @@ROWCOUNT = 0
+INSERT INTO TestMerge VALUES (10,'Denis10')
+
+SELECT * FROM TestMerge
+DELETE TestMerge WHERE ID  =10</pre></div></div>
+
+<p>As you can see, we do an update, if @@ROWCOUNT is 0, there were no rows update, this means we have to do an insert</p>
+<p>Here is another way</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">IF</span> <span class="sy0">EXISTS</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="nu0">1</span> <span class="kw1">FROM</span> TestMerge
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHERE</span> ID <span class="sy0">=</span> <span class="nu0">10</span><span class="br0">&#41;</span>
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; <span class="kw1">UPDATE</span> TestMerge
+&nbsp; &nbsp; <span class="kw1">SET</span> SomeName <span class="sy0">=</span> <span class="st0">'Denis11'</span>
+&nbsp; &nbsp; <span class="kw1">WHERE</span> id <span class="sy0">=</span> <span class="nu0">10</span>
+<span class="kw1">END</span>
+<span class="kw1">ELSE</span>
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="kw1">INTO</span> TestMerge <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">10</span>,<span class="st0">'Denis10'</span><span class="br0">&#41;</span>
+<span class="kw1">END</span>
+&nbsp;
+<span class="kw1">DELETE</span> TestMerge <span class="kw1">WHERE</span> ID &nbsp;<span class="sy0">=</span><span class="nu0">10</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">IF EXISTS (SELECT 1 FROM TestMerge
+			WHERE ID = 10)
+BEGIN
+	UPDATE TestMerge
+	SET SomeName = 'Denis11'
+	WHERE id = 10
+END
+ELSE
+BEGIN
+	INSERT INTO TestMerge VALUES (10,'Denis10')
+END
+
+DELETE TestMerge WHERE ID  =10</pre></div></div>
+
+<p>As you can see we check if we have a row with the id that we are looking for, if the exists check returns true, we update, otherwise we are doing an insert</p>
+<h2>Merge</h2>
+<p>Now here is how it is done in SQL Server 2008 and up</p>
+<p>Be aware that when you use the MERGE statement, you need to terminate it with a semi-colon, otherwise you&#8217;ll get the following message</p>
+<p>Msg 10713, Level 15, State 1, Line 10<br />
+A MERGE statement must be terminated by a semi-colon (;).</p>
+<p>Here is an example to look at, I added comments so that you can see what is going on</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @ID <span class="kw1">int</span> <span class="sy0">=</span> <span class="nu0">9</span>, @Name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'BLA10'</span>
+&nbsp;
+MERGE TestMerge <span class="kw1">AS</span> target <span class="co1">-- this is the table you are upadting/insert into</span>
+&nbsp; &nbsp; <span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> @ID, @Name<span class="br0">&#41;</span> <span class="kw1">AS</span> source <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span> <span class="co1">-- variables mapped to the columns</span>
+&nbsp; &nbsp; <span class="kw1">ON</span> <span class="br0">&#40;</span>target.<span class="me1">id</span> <span class="sy0">=</span> source.<span class="me1">id</span><span class="br0">&#41;</span> &nbsp; <span class="co1">-- this is the key column we want to join on</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> MATCHED <span class="kw1">THEN</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="co1">-- if we have a match then we update</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UPDATE</span> <span class="kw1">SET</span> SomeName <span class="sy0">=</span> source.<span class="me1">SomeName</span> &nbsp;<span class="co1">-- update the SomeName column</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span> &nbsp; &nbsp; &nbsp; &nbsp;<span class="co1">-- if we don't match then we do an insert</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span> &nbsp; &nbsp;<span class="co1">-- do an insert</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">VALUES</span> <span class="br0">&#40;</span>source.<span class="me1">id</span>, source.<span class="me1">SomeName</span><span class="br0">&#41;</span>; &nbsp;<span class="co1">--these values are the ones in the </span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">-- variables mapped to the column</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @ID int = 9, @Name varchar(100) = 'BLA10'
+
+MERGE TestMerge AS target -- this is the table you are upadting/insert into
+    USING (SELECT @ID, @Name) AS source (id, SomeName) -- variables mapped to the columns
+    ON (target.id = source.id)   -- this is the key column we want to join on
+    WHEN MATCHED THEN			 -- if we have a match then we update
+        UPDATE SET SomeName = source.SomeName  -- update the SomeName column
+    WHEN NOT MATCHED THEN        -- if we don't match then we do an insert
+        INSERT (id, SomeName)    -- do an insert
+        VALUES (source.id, source.SomeName);  --these values are the ones in the 
+											  -- variables mapped to the column</pre></div></div>
+
+<p>Let&#8217;s run an example, this will add a row with the id 9 and the value in the SomeName column will be BLA</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @ID <span class="kw1">int</span> <span class="sy0">=</span> <span class="nu0">9</span>, @Name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'BLA9'</span>
+&nbsp;
+MERGE TestMerge <span class="kw1">AS</span> target
+&nbsp; &nbsp; <span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> @ID, @Name<span class="br0">&#41;</span> <span class="kw1">AS</span> source <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">ON</span> <span class="br0">&#40;</span>target.<span class="me1">id</span> <span class="sy0">=</span> source.<span class="me1">id</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> MATCHED <span class="kw1">THEN</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UPDATE</span> <span class="kw1">SET</span> SomeName <span class="sy0">=</span> source.<span class="me1">SomeName</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span> &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">VALUES</span> <span class="br0">&#40;</span>source.<span class="me1">id</span>, source.<span class="me1">SomeName</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestMerge</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @ID int = 9, @Name varchar(100) = 'BLA9'
+
+MERGE TestMerge AS target
+    USING (SELECT @ID, @Name) AS source (id, SomeName)
+    ON (target.id = source.id)
+    WHEN MATCHED THEN 
+        UPDATE SET SomeName = source.SomeName
+	WHEN NOT MATCHED THEN	
+	    INSERT (id, SomeName)
+	    VALUES (source.id, source.SomeName);
+
+SELECT * FROM TestMerge</pre></div></div>
+
+<p>
+<pre>Output
+--------------
+1	Denis1
+2	Denis2
+3	Denis3
+4	Denis4
+5	Denis5
+6	Denis6
+7	Denis7
+9	BLA9</pre>
+<p>As you can see the row got added.</p>
+<p>Now let&#8217;s try to use the same ID but we will change the value from BLA9 to BLA10</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @ID <span class="kw1">int</span> <span class="sy0">=</span> <span class="nu0">9</span>, @Name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'BLA10'</span>
+&nbsp;
+MERGE TestMerge <span class="kw1">AS</span> target
+&nbsp; &nbsp; <span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> @ID, @Name<span class="br0">&#41;</span> <span class="kw1">AS</span> source <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">ON</span> <span class="br0">&#40;</span>target.<span class="me1">id</span> <span class="sy0">=</span> source.<span class="me1">id</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> MATCHED <span class="kw1">THEN</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UPDATE</span> <span class="kw1">SET</span> SomeName <span class="sy0">=</span> source.<span class="me1">SomeName</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span> &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">VALUES</span> <span class="br0">&#40;</span>source.<span class="me1">id</span>, source.<span class="me1">SomeName</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestMerge</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @ID int = 9, @Name varchar(100) = 'BLA10'
+
+MERGE TestMerge AS target
+    USING (SELECT @ID, @Name) AS source (id, SomeName)
+    ON (target.id = source.id)
+    WHEN MATCHED THEN 
+        UPDATE SET SomeName = source.SomeName
+	WHEN NOT MATCHED THEN	
+	    INSERT (id, SomeName)
+	    VALUES (source.id, source.SomeName);
+
+SELECT * FROM TestMerge</pre></div></div>
+
+<p>
+<pre>Output
+--------------
+1	Denis1
+2	Denis2
+3	Denis3
+4	Denis4
+5	Denis5
+6	Denis6
+7	Denis7
+9	BLA10</pre>
+<p>And as you can see for the row with ID 9, the SomeName column was updated.</p>
+<p>You can actually output from the MERGE statement directly what action it is taking and what the value before and after is, very similar with the <em>inserted </em>and <em>deleted </em>pseudo tables in triggers.  All we have to do is add</p>
+<p>OUTPUT deleted.*, $action, inserted.*</p>
+<p>Deleted.* will have the values before the update and inserted will have the value what it was updated to, $action will have the value UPDATE, INSERT or DELETE</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @ID <span class="kw1">int</span>, @Name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> @ID <span class="sy0">=</span> <span class="nu0">9</span>,@Name <span class="sy0">=</span> <span class="st0">'BLA9'</span>
+&nbsp;
+MERGE TestMerge <span class="kw1">AS</span> target
+&nbsp; &nbsp; <span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> @ID, @Name<span class="br0">&#41;</span> <span class="kw1">AS</span> source <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">ON</span> <span class="br0">&#40;</span>target.<span class="me1">id</span> <span class="sy0">=</span> source.<span class="me1">id</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> MATCHED <span class="kw1">THEN</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UPDATE</span> <span class="kw1">SET</span> SomeName <span class="sy0">=</span> source.<span class="me1">SomeName</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span> &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">VALUES</span> <span class="br0">&#40;</span>source.<span class="me1">id</span>, source.<span class="me1">SomeName</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">OUTPUT</span> deleted.<span class="sy0">*</span>, $action, inserted.<span class="sy0">*</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @ID int, @Name varchar(100)
+SELECT @ID = 9,@Name = 'BLA9'
+
+MERGE TestMerge AS target
+    USING (SELECT @ID, @Name) AS source (id, SomeName)
+    ON (target.id = source.id)
+    WHEN MATCHED THEN 
+        UPDATE SET SomeName = source.SomeName
+			WHEN NOT MATCHED THEN	
+	    INSERT (id, SomeName)
+	    VALUES (source.id, source.SomeName)
+	    OUTPUT deleted.*, $action, inserted.*;</pre></div></div>
+
+<p>
+<pre>Output
+id	SomeName    $action	id	SomeName
+9	BLA10	    UPDATE	9	BLA9</pre>
+<p>Let&#8217;s run the same exact statement again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @ID <span class="kw1">int</span>, @Name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> @ID <span class="sy0">=</span> <span class="nu0">9</span>,@Name <span class="sy0">=</span> <span class="st0">'BLA9'</span>
+&nbsp;
+MERGE TestMerge <span class="kw1">AS</span> target
+&nbsp; &nbsp; <span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> @ID, @Name<span class="br0">&#41;</span> <span class="kw1">AS</span> source <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">ON</span> <span class="br0">&#40;</span>target.<span class="me1">id</span> <span class="sy0">=</span> source.<span class="me1">id</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> MATCHED <span class="kw1">THEN</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UPDATE</span> <span class="kw1">SET</span> SomeName <span class="sy0">=</span> source.<span class="me1">SomeName</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span> &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">VALUES</span> <span class="br0">&#40;</span>source.<span class="me1">id</span>, source.<span class="me1">SomeName</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">OUTPUT</span> deleted.<span class="sy0">*</span>, $action, inserted.<span class="sy0">*</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @ID int, @Name varchar(100)
+SELECT @ID = 9,@Name = 'BLA9'
+
+MERGE TestMerge AS target
+    USING (SELECT @ID, @Name) AS source (id, SomeName)
+    ON (target.id = source.id)
+    WHEN MATCHED THEN 
+        UPDATE SET SomeName = source.SomeName
+			WHEN NOT MATCHED THEN	
+	    INSERT (id, SomeName)
+	    VALUES (source.id, source.SomeName)
+	    OUTPUT deleted.*, $action, inserted.*;</pre></div></div>
+
+<p>
+<pre>Output
+id	SomeName    $action	id	SomeName
+9	BLA9	    UPDATE	9	BLA9</pre>
+<p>See what happened, an update was fired but nothing needed to change, what if we don&#8217;t want the update to fire in that case? Here is what we can do<br />
+Instead of</p>
+<p>WHEN MATCHED THEN </p>
+<p>Add a condition that will check if the SomeName  is the same in both the source and the target</p>
+<p>WHEN MATCHED AND target.SomeName <> source.SomeName THEN </p>
+<p>Now when you run this, you won&#8217;t get any output</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @ID <span class="kw1">int</span>, @Name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> @ID <span class="sy0">=</span> <span class="nu0">9</span>,@Name <span class="sy0">=</span> <span class="st0">'BLA9'</span>
+&nbsp;
+MERGE TestMerge <span class="kw1">AS</span> target
+&nbsp; &nbsp; <span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> @ID, @Name<span class="br0">&#41;</span> <span class="kw1">AS</span> source <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">ON</span> <span class="br0">&#40;</span>target.<span class="me1">id</span> <span class="sy0">=</span> source.<span class="me1">id</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> MATCHED <span class="sy0">AND</span> target.<span class="me1">SomeName</span> <span class="sy0">&lt;&gt;</span> source.<span class="me1">SomeName</span> <span class="kw1">THEN</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UPDATE</span> <span class="kw1">SET</span> SomeName <span class="sy0">=</span> source.<span class="me1">SomeName</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span> &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">VALUES</span> <span class="br0">&#40;</span>source.<span class="me1">id</span>, source.<span class="me1">SomeName</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">OUTPUT</span> deleted.<span class="sy0">*</span>, $action, inserted.<span class="sy0">*</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @ID int, @Name varchar(100)
+SELECT @ID = 9,@Name = 'BLA9'
+
+MERGE TestMerge AS target
+    USING (SELECT @ID, @Name) AS source (id, SomeName)
+    ON (target.id = source.id)
+    WHEN MATCHED AND target.SomeName &lt;&gt; source.SomeName THEN 
+        UPDATE SET SomeName = source.SomeName
+			WHEN NOT MATCHED THEN	
+	    INSERT (id, SomeName)
+	    VALUES (source.id, source.SomeName)
+	    OUTPUT deleted.*, $action, inserted.*;</pre></div></div>
+
+<p>Besides variable, you can also use another table as a source</p>
+<p>First create this table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestMerge2 <span class="br0">&#40;</span>id <span class="kw1">int</span> not null, SomeName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> not null<span class="br0">&#41;</span>
+go
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestMerge2 <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="st0">'Denis1 from table existing'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestMerge2 <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">12</span>,<span class="st0">'Denis12 from table new'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestMerge2 (id int not null, SomeName varchar(100) not null)
+go
+
+
+INSERT TestMerge2 values(1,'Denis1 from table existing')
+INSERT TestMerge2 values(12,'Denis12 from table new')</pre></div></div>
+
+<p>Now we are going to change this line </p>
+<p>USING (SELECT @ID, @Name) AS source</p>
+<p>Change it to the following</p>
+<p>USING (SELECT id, SomeName from TestMerge2) AS source</p>
+<p>That will tell the merge statement to use the TestMerge2 table as the source</p>
+<p>Now run the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1">MERGE TestMerge <span class="kw1">AS</span> target
+&nbsp; &nbsp; <span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> id, SomeName <span class="kw1">from</span> TestMerge2<span class="br0">&#41;</span> <span class="kw1">AS</span> source <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">ON</span> <span class="br0">&#40;</span>target.<span class="me1">id</span> <span class="sy0">=</span> source.<span class="me1">id</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">WHEN</span> MATCHED <span class="sy0">AND</span> target.<span class="me1">SomeName</span> <span class="sy0">&lt;&gt;</span> source.<span class="me1">SomeName</span> <span class="kw1">THEN</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UPDATE</span> <span class="kw1">SET</span> SomeName <span class="sy0">=</span> source.<span class="me1">SomeName</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span> &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="br0">&#40;</span>id, SomeName<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">VALUES</span> <span class="br0">&#40;</span>source.<span class="me1">id</span>, source.<span class="me1">SomeName</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">OUTPUT</span> deleted.<span class="sy0">*</span>, $action, inserted.<span class="sy0">*</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">MERGE TestMerge AS target
+    USING (SELECT id, SomeName from TestMerge2) AS source (id, SomeName)
+    ON (target.id = source.id)
+    WHEN MATCHED AND target.SomeName &lt;&gt; source.SomeName THEN 
+        UPDATE SET SomeName = source.SomeName
+			WHEN NOT MATCHED THEN	
+	    INSERT (id, SomeName)
+	    VALUES (source.id, source.SomeName)
+	    OUTPUT deleted.*, $action, inserted.*;</pre></div></div>
+
+<p>Output</p>
+<pre>id	SomeName	$action	id	SomeName
+NULL	NULL		INSERT	12	Denis12 from table new
+1	Denis1		UPDATE	1	Denis1 from table existing</pre>
+<p>Now, let&#8217;s see what is in the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestMerge</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestMerge</pre></div></div>
+
+<pre>id	SomeName
+1	Denis1 from table existing
+2	Denis2
+3	Denis3
+4	Denis4
+5	Denis5
+6	Denis6
+7	Denis7
+9	BLA9
+12	Denis12 from table new</pre>
+<p>As you can see the table contains what we expected</p>
+<p>Hopefully this post gave you some ideas on how to use the MERGE statement to do upserts.  Come back tomorrow for the next post in this series</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-10/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

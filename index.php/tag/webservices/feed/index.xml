@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>webservices &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/webservices/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Sharing ASP.net Session State Between Web Applications With SQL Server &#8211; Part I</title>
+		<link>/index.php/webdev/serverprogramming/aspnet/sharing-asp-net-session-state-between-we/</link>
+		<comments>/index.php/webdev/serverprogramming/aspnet/sharing-asp-net-session-state-between-we/#comments</comments>
+		<pubDate>Fri, 23 Jan 2009 17:15:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[mvc]]></category>
+		<category><![CDATA[sqlserver]]></category>
+		<category><![CDATA[webservices]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/01/sharing-asp-net-session-state-between-we/</guid>
+		<description><![CDATA[I recently needed to implement a shared session between a few different applications, and didn't find a whole lot on the interwebs about how to do this (I'm starting a second life as a web developer though, it could be that I just don't know all the ter&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I recently needed to implement a shared session between a few different applications, and didn&#8217;t find a whole lot on the interwebs about how to do this (I&#8217;m starting a second life as a web developer though, it could be that I just don&#8217;t know all the terms the cool kids are using).  It ended up being a bit easier than I thought it would be, but then again everything is easy when the great folks at LessThanDot&#8217;s <a href="http://forum.lessthandot.com/viewforum.php?f=27">ASP.net Forum</a> are there to bail me out <img src="https://s.w.org/images/core/emoji/2/72x72/1f609.png" alt="😉" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p>Anyway, because I had trouble finding this information I figured it was worth throwing together a blog post to get it all in one place.  I&#8217;ll try to cover everything here, including the session state installation.  In order to test, I set up an ASP.net MVC project (using the <strong>beta</strong> release), an ASP.net webservice project, and a local SQL Server instance to maintain the session state (all this is running on the one computer for now, so it feels silly, but remember the goal is to eventually get each component onto its own server.  I named them &#8220;SessionTest.Services&#8221; and &#8220;SessionTest.Site&#8221;.  So go ahead and set that up, I&#8217;ll still be here I swear.</p>
+<p>Wow, you are quick!  But you&#8217;re just getting started, there&#8217;s some more things to do.  First, lets install the SQL Server session state on localhost.  You&#8217;ll need to fire up command prompt to do this and run the command: </p>
+<p><code class="codespan">C:WindowsMicrosoft.NETFrameworkv2.0.50727aspnet_regsql.exe -ssadd -sstype c -S ALEXCOMPUTER -d ASPState -E</code></p>
+<p>The parameters here mean:</p>
+<ul>
+<li><strong>ssadd:</strong> Add Session State</li>
+<li><strong>sstype c: Session State type = &#8220;custom&#8221; (not really, but we need to rename the database)</strong></li>
+<li><strong>-S ALEXCOMPUTER:</strong> Server to install the session state db on.  I already have it installed on mine, so you can go ahead and replace this with your computer name.  I really appreciate the offer though</li>
+<li><strong>d ASPState:</strong> Name for the database (this is what ASP.net expects)</li>
+<li><strong>E:</strong> Signal for the Session State database to use current windows credentials for authentication (when you deploy to the server, you&#8217;ll need to grant access to the service account that ASP.net is running under</li>
+</ul>
+<p>It&#8217;ll take a minute or so, but eventually it will finish, and it will tell you so.  When its&#8217; done, lets mosey on over to Visual Studio.</p>
+<p>First thing to do here is add a reference to your class library project to both the webservice and the the website project, so that we can share types.  Or type in this case.  May as well add that type to the class library now as well.</p>
+<p>First thing we want to do is get the MVC project ready.  I got rid of everything in the Views folder except for the About and Index pages in Views/Home.  I also got rid of the Account controller.  Feel free to do this if you want, but I suppose it isn&#8217;t necessary.  One thing that is necessary, since we want to use jQuery to get the webservice value eventually, is to reference the jQuery script.  So just add this to the bottom of the page called Site.Master (before the closing html tag):</p>
+<p><code class="codespan">&lt;script type="text/javascript" src="../../Scripts/jquery-1.2.6.min.js" /&gt;</code></p>
+<p>Next, we want to add a simple form to Index.aspx.  This form just has one text input, and a submit button.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">form</span> <span class="kw3">id</span><span class="sy0">=</span><span class="st0">&quot;mainForm&quot;</span> runat<span class="sy0">=</span><span class="st0">&quot;server&quot;</span> <span class="kw3">action</span><span class="sy0">=</span><span class="st0">&quot;/Home/Entered&quot;</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">p</span>&gt;</span>Give it a try: <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">name</span><span class="sy0">=</span><span class="st0">&quot;inputValue&quot;</span> <span class="sy0">/</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">p</span>&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc2">&lt;<span class="kw2">input</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;submit&quot;</span> <span class="kw3">id</span><span class="sy0">=</span><span class="st0">&quot;submitter&quot;</span> <span class="sy0">/</span>&gt;</span>
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">form</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    &lt;form id="mainForm" runat="server" action="/Home/Entered"&gt;
+        &lt;p&gt;Give it a try: &lt;input type="text" name="inputValue" /&gt;&lt;/p&gt;
+        &lt;input type="submit" id="submitter" /&gt;
+&lt;/form&gt;</pre></div></div>
+
+<p>You notice its&#8217; action is the page Home/Entered, which currently does not exist.  So we need to add a new MVC Content Page with that name.  In the page attributes, set EnableViewStateMac=&#8221;false&#8221;.  Within the content place holder, we can add this HTML:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">p</span>&gt;</span>Entered Value was: <span class="sc2">&lt;%<span class="sy0">=</span> Session<span class="br0">&#91;</span><span class="st0">&quot;enteredValue&quot;</span><span class="br0">&#93;</span>.ToString<span class="br0">&#40;</span><span class="br0">&#41;</span> %&gt;&lt;<span class="sy0">/</span><span class="kw2">p</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">p</span>&gt;</span>Try getting it from the service:<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">p</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">p</span>&gt;&lt;<span class="kw2">input</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;button&quot;</span> <span class="kw3">id</span><span class="sy0">=</span><span class="st0">&quot;retrieveButton&quot;</span> <span class="kw3">text</span><span class="sy0">=</span><span class="st0">&quot;retrieve it!&quot;</span> <span class="kw3">onclick</span><span class="sy0">=</span><span class="st0">&quot;retrieve()&quot;</span> <span class="sy0">/</span>&gt;&lt;<span class="kw2">input</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text&quot;</span> <span class="kw3">id</span><span class="sy0">=</span><span class="st0">&quot;retrievedValue&quot;</span> <span class="sy0">/</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">p</span>&gt;</span>
+<span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span>&gt;</span>
+&nbsp; &nbsp; function retrieve() {
+&nbsp; &nbsp; }
+<span class="sc2">&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;p&gt;Entered Value was: &lt;%= Session["enteredValue"].ToString() %&gt;&lt;/p&gt;
+&lt;p&gt;Try getting it from the service:&lt;/p&gt;
+&lt;p&gt;&lt;input type="button" id="retrieveButton" text="retrieve it!" onclick="retrieve()" /&gt;&lt;input type="text" id="retrievedValue" /&gt;&lt;/p&gt;
+&lt;script type="text/javascript"&gt;
+    function retrieve() {
+    }
+&lt;/script&gt;</pre></div></div>
+
+<p>The javascript is not implemented yet to retrieve the value yet, but at this point there is just one thing we need to do to get the pages working, and that is add a new ActionResult to the HomeController for our new &#8220;Entered&#8221; page.  All this action will really be doing is placing the input from the form submission into the session.  So, </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> ActionResult Entered<span class="br0">&#40;</span><span class="kw4">String</span> inputValue<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Session<span class="br0">&#91;</span><span class="st0">&quot;enteredValue&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> inputValue<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> View<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public ActionResult Entered(String inputValue)
+{
+    Session["enteredValue"] = inputValue;
+    return View();
+}</pre></div></div>
+
+<p>Now, you can run the page and you should be able to enter a value in Index, and see it on the &#8220;Entered&#8221; page.  So, we can tell that our traditional (in process) session is working.  Now let&#8217;s change it to use the database.  In the main web.config (not the one in the Views folder) we&#8217;ll need to add a SessionState entry within system.web (I usually do this at the bottom, having a common place to look makes my life easier).  So we add this entry:</p>
+<p><code class="codespan">&lt;sessionState mode="SQLServer" sqlConnectionString="Data Source=127.0.0.1; Integrated Security=SSPI" cookieless="false" timeout="20"/&gt;</code></p>
+<p>Now, as long as your local SQL Server instance is accepting TCP/IP connections, it should work just as before.  And this post is getting long, so this will be the end of part I.</p>
+<p>Stay tuned for the exciting conclusion, where we will set up the webservice and the client-side interaction.  In fact, tune in here:<a href="/index.php/WebDev/ServerProgramming/ASPNET/sharing-asp-net-session-state-between-ap">Sharing ASP.net session state with SQL Server, Part II</a></p>
+<p>Got a question on ASP.net?  Check out our <a href="http://forum.lessthandot.com/viewforum.php?f=27">ASP.net Forum</a>!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/aspnet/sharing-asp-net-session-state-between-we/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+	</channel>
+</rss>

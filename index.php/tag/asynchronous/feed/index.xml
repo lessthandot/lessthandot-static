@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>asynchronous &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/asynchronous/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Threadsafe Incrementing in C#</title>
+		<link>/index.php/desktopdev/mstech/csharp/threadsafe-incrementing-in-c/</link>
+		<comments>/index.php/desktopdev/mstech/csharp/threadsafe-incrementing-in-c/#comments</comments>
+		<pubDate>Wed, 02 Jul 2014 10:54:49 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[C#]]></category>
+		<category><![CDATA[asynchronous]]></category>
+		<category><![CDATA[threading]]></category>
+
+		<guid isPermaLink="false">/?p=2799</guid>
+		<description><![CDATA[Recently I&#8217;ve had the opportunity to review a number of different parallel C# methods that were performing work over a collection of items. Nearly all of them have used ++ to increment parent or global variables from inside threaded contexts. Unfortunately the ++ operator is not guaranteed to be threadsafe in C#. So let&#8217;s take [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Recently I&#8217;ve had the opportunity to review a number of different parallel C# methods that were performing work over a collection of items. Nearly all of them have used ++ to increment parent or global variables from inside threaded contexts. Unfortunately the ++ operator <a href="http://stackoverflow.com/questions/4628243/is-the-operator-thread-safe" title="Eric Lippert's explanation on StackOverflow">is not guaranteed to be threadsafe in C#</a>.</p>
+<p>So let&#8217;s take a simple code example using ++ and convert it to a threadsafe one.</p>
+<h2>The Wrong Way To Do It</h2>
+<p>This is unrealistic example, I&#8217;m simply taking a list of work and sleeping for a random amount of time as a substitute for some real work. Pretend that it&#8217;s doing something complex like database work, file conversions, or something else useful and time consuming.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">int</span> DoWorkPoorly<span class="br0">&#40;</span>List<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span> workToProcess<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw4">int</span> statusCounter <span class="sy0">=</span> <span class="nu0">0</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw4">int</span> totalCount <span class="sy0">=</span> workToProcess<span class="sy0">.</span><span class="me1">Count</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; Parallel<span class="sy0">.</span><span class="kw1">ForEach</span><span class="br0">&#40;</span>workToProcess, <span class="br0">&#40;</span>work<span class="br0">&#41;</span> <span class="sy0">=&gt;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> r <span class="sy0">=</span> <span class="kw3">new</span> Random<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">Sleep</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw4">int</span><span class="br0">&#41;</span><span class="br0">&#40;</span>r<span class="sy0">.</span><span class="me1">NextDouble</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">10</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;Completed {0} of {1} items on thread {2}&quot;</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">++</span>statusCounter, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; totalCount, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">CurrentThread</span><span class="sy0">.</span><span class="me1">ManagedThreadId</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;Completed {0} of {1} &nbsp;items on thread {2}&quot;</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; statusCounter, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; totalCount,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">CurrentThread</span><span class="sy0">.</span><span class="me1">ManagedThreadId</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> statusCounter<span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public int DoWorkPoorly(List&lt;string&gt; workToProcess)
+{
+    int statusCounter = 0;
+    int totalCount = workToProcess.Count;
+
+    Parallel.ForEach(workToProcess, (work) =&gt;
+    {
+        var r = new Random();
+        Thread.Sleep((int)(r.NextDouble() * 10));
+
+        Console.WriteLine(String.Format("Completed {0} of {1} items on thread {2}", 
+                                        ++statusCounter, 
+                                        totalCount, 
+                                        Thread.CurrentThread.ManagedThreadId));
+    });
+
+    Console.WriteLine(String.Format("Completed {0} of {1}  items on thread {2}", 
+                                    statusCounter, 
+                                    totalCount,
+                                    Thread.CurrentThread.ManagedThreadId));
+    return statusCounter;
+}</pre></div></div>
+
+<p>Call this with 10 or 100 items, and you may not see a problem. When I extend this to 1,000 or 10,000 then I start consistently losing up to 1.5% of the increments.</p>
+<p>For a progress bar, this is probably ok, but for program logic or attempting to report an accurate number of results, this isn&#8217;t going to work.</p>
+<h2>Interlocked.Increment</h2>
+<p>Luckily, there is a built in method we can use to safely increment that shared integer.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">int</span> DoWorkInterlocked<span class="br0">&#40;</span>List<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span> workToProcess<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw4">int</span> statusCounter <span class="sy0">=</span> <span class="nu0">0</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw4">int</span> totalCount <span class="sy0">=</span> workToProcess<span class="sy0">.</span><span class="me1">Count</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; Parallel<span class="sy0">.</span><span class="kw1">ForEach</span><span class="br0">&#40;</span>workToProcess, <span class="br0">&#40;</span>work<span class="br0">&#41;</span> <span class="sy0">=&gt;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> r <span class="sy0">=</span> <span class="kw3">new</span> Random<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">Sleep</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw4">int</span><span class="br0">&#41;</span><span class="br0">&#40;</span>r<span class="sy0">.</span><span class="me1">NextDouble</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">10</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; Interlocked<span class="sy0">.</span><span class="me1">Increment</span><span class="br0">&#40;</span><span class="kw1">ref</span> statusCounter<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;Completed {0} of {1} &nbsp;items on thread {2}&quot;</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; statusCounter, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; totalCount, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">CurrentThread</span><span class="sy0">.</span><span class="me1">ManagedThreadId</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;Completed {0} of {1} &nbsp;items on thread {2}&quot;</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; statusCounter, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; totalCount, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">CurrentThread</span><span class="sy0">.</span><span class="me1">ManagedThreadId</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> statusCounter<span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public int DoWorkInterlocked(List&lt;string&gt; workToProcess)
+{
+    int statusCounter = 0;
+    int totalCount = workToProcess.Count;
+
+    Parallel.ForEach(workToProcess, (work) =&gt;
+    {
+        var r = new Random();
+        Thread.Sleep((int)(r.NextDouble() * 10));
+        
+        Interlocked.Increment(ref statusCounter);
+        Console.WriteLine(String.Format("Completed {0} of {1}  items on thread {2}", 
+                                        statusCounter, 
+                                        totalCount, 
+                                        Thread.CurrentThread.ManagedThreadId));
+    });
+
+    Console.WriteLine(String.Format("Completed {0} of {1}  items on thread {2}", 
+                                    statusCounter, 
+                                    totalCount, 
+                                    Thread.CurrentThread.ManagedThreadId));
+    return statusCounter;
+}</pre></div></div>
+
+<p>Interlocked provides some methods to handle incrementing, decrementing, adding 64-bit values (which also isn&#8217;t threadsafe), and so on. On a similar run of 100,000 items, this method is safe where the first one was not.</p>
+<h2>Decouple Your Output</h2>
+<p>There is one final step. The prior examples push status messages to the console from whatever thread we happen to be on. Behind the scenes, they are fighting over access to the console, writing in non-sequential order, and writing more updates than we really need. At the end of the day, we want an accurate total number and enough updates to show us (humans) that it&#8217;s making progress, we don&#8217;t need all the messages and we especially don&#8217;t need all of our little workers fighting over a single constrained resource.</p>
+<p>If we take the responsibility for reporting status out of the parallel action and instead spin it off onto it&#8217;s own task, we preserve our accurate total but have more control over reporting progress at a reasonable pace (and always in order). And in this particular case, as a by product of not fighting over a constrained resource, we gain an absurd amount of performance.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">int</span> DoWorkInterlockedWithAsyncStatus<span class="br0">&#40;</span>List<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span> workToProcess<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> statusCounter <span class="sy0">=</span> <span class="nu0">0</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw4">int</span> totalCount <span class="sy0">=</span> workToProcess<span class="sy0">.</span><span class="me1">Count</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// monitor and output progress</span>
+&nbsp; &nbsp; <span class="kw1">var</span> cancellationTokenSource <span class="sy0">=</span> <span class="kw3">new</span> CancellationTokenSource<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> outputTask <span class="sy0">=</span> Task<span class="sy0">.</span><span class="me1">Factory</span><span class="sy0">.</span><span class="me1">StartNew</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">=&gt;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">while</span> <span class="br0">&#40;</span><span class="sy0">!</span>cancellationTokenSource<span class="sy0">.</span><span class="me1">IsCancellationRequested</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;Completed {0} of {1} &nbsp;items on thread {2}&quot;</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; statusCounter, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; totalCount, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">CurrentThread</span><span class="sy0">.</span><span class="me1">ManagedThreadId</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; cancellationTokenSource<span class="sy0">.</span><span class="me1">Token</span><span class="sy0">.</span><span class="me1">WaitHandle</span><span class="sy0">.</span><span class="me1">WaitOne</span><span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; Console<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;Completed {0} of {1} &nbsp;items on thread {2}&quot;</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;statusCounter, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;totalCount, 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Thread<span class="sy0">.</span><span class="me1">CurrentThread</span><span class="sy0">.</span><span class="me1">ManagedThreadId</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; Parallel<span class="sy0">.</span><span class="kw1">ForEach</span><span class="br0">&#40;</span>workToProcess, <span class="br0">&#40;</span>work<span class="br0">&#41;</span> <span class="sy0">=&gt;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> r <span class="sy0">=</span> <span class="kw3">new</span> Random<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">Sleep</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw4">int</span><span class="br0">&#41;</span><span class="br0">&#40;</span>r<span class="sy0">.</span><span class="me1">NextDouble</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">*</span> <span class="nu0">10</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; Interlocked<span class="sy0">.</span><span class="me1">Increment</span><span class="br0">&#40;</span><span class="kw1">ref</span> statusCounter<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; cancellationTokenSource<span class="sy0">.</span><span class="me1">Cancel</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; outputTask<span class="sy0">.</span><span class="me1">Wait</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> statusCounter<span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public int DoWorkInterlockedWithAsyncStatus(List&lt;string&gt; workToProcess)
+{
+    var statusCounter = 0;
+    int totalCount = workToProcess.Count;
+
+    // monitor and output progress
+    var cancellationTokenSource = new CancellationTokenSource();
+    var outputTask = Task.Factory.StartNew(() =&gt; {
+        while (!cancellationTokenSource.IsCancellationRequested) 
+        {
+            Console.WriteLine(String.Format("Completed {0} of {1}  items on thread {2}", 
+                                            statusCounter, 
+                                            totalCount, 
+                                            Thread.CurrentThread.ManagedThreadId));
+
+            cancellationTokenSource.Token.WaitHandle.WaitOne(5);
+	}
+
+        Console.WriteLine(String.Format("Completed {0} of {1}  items on thread {2}", 
+                                         statusCounter, 
+                                         totalCount, 
+                                         Thread.CurrentThread.ManagedThreadId));
+    });
+
+    Parallel.ForEach(workToProcess, (work) =&gt;
+    {
+        var r = new Random();
+        Thread.Sleep((int)(r.NextDouble() * 10));
+
+        Interlocked.Increment(ref statusCounter);
+    });
+
+    cancellationTokenSource.Cancel();
+    outputTask.Wait();
+    return statusCounter;
+}</pre></div></div>
+
+<p>Separating the two responsibilities nets us a an order of magnitude performance increase, but more importantly it moves that responsibility off to the side where it can be managed independently. If the human needs more or less frequent updates, or if we need to report that update to a specific thread (like the UI thread), we have a single place to manage it from that doesn&#8217;t add drag to the actual work being done.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/csharp/threadsafe-incrementing-in-c/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,1285 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>sql server integration services &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/sql-server-integration-services/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Run SSIS Package from Stored Procedure</title>
+		<link>/index.php/datamgmt/dbprogramming/execute-ssis-from-sql/</link>
+		<comments>/index.php/datamgmt/dbprogramming/execute-ssis-from-sql/#comments</comments>
+		<pubDate>Mon, 29 Nov 2010 11:41:31 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/11/execute-ssis-from-sql/</guid>
+		<description><![CDATA[There are a few methods to execute a SQL Server Integration Services (SSIS) package from T-SQL.  Very often the use of xp_cmdshell is the first choice to accomplish this task.  Xp_cmdshell has primarily been a system administration extended stored procedure.  Many types of extended stored procedures such as this one are meant for tasks that are either manual or very refined and controlled tasks.  This is all due to the requirements of the levels of sysadmin roles - or CONTROL SERVER to be exact.  Further on this topic, xp_cmdshell is disabled by default because it has been a known attack method.  Having the ability to execute xp_cmdshell exposes operating system level access.  In worst case scenarios, the SQL Server Service account is also a domain account with either Domain Admin rights or rights to other resources on the domain that are sensitive or open to damaging effects to the business.  To expose xp_cmdshell then opens one of the highest security risks relating to SQL Server.]]></description>
+				<content:encoded><![CDATA[<p>There are a few methods to execute a SQL Server Integration Services (SSIS) package from T-SQL.  Very often the use of xp_cmdshell is the first choice to accomplish this task.  Xp_cmdshell has primarily been a system administration extended stored procedure.  Many types of extended stored procedures such as this one are meant for tasks that are either manual or very refined and controlled tasks.  This is all due to the requirements of the levels of sysadmin roles &#8211; or CONTROL SERVER to be exact.  Further on this topic, xp_cmdshell is disabled by default because it has been a known attack method.  Having the ability to execute xp_cmdshell exposes operating system level access.  In worst case scenarios, the SQL Server Service account is also a domain account with either Domain Admin rights or rights to other resources on the domain that are sensitive or open to damaging effects to the business.  To expose xp_cmdshell then opens one of the highest security risks relating to SQL Server. </p>
+<p>SSIS execution has many options.  DTEXEC is a very common command line method to executing any DTSX file (SSIS Package) and has a vast amount of control with the ability of switches to set conditional values given the executing circumstances.  DTEXEC can be manually executed from an OS level perspective.  This leads to xp_cmdshell and a number one method of execution solution.  However, the security risks apply once xp_cmdshell is enabled to accomplish this.  Securing this method can be accomplished with steps to either secure the calling account to limited domain access.  Another problem often arises in the needs of the SSIS processing itself.  SSIS packages are often developed for the primary use of importing, transforming and inserting data from a wide range of sources that are not SQL Server.  These sources may include files such as csv or txt, Excel and other Office Application files, Database servers like Oracle, DB2 or MySQL, Flat File or Desktop Database Applications: MS Access, FoxPro, Dbase.</p>
+<p>Using the calling account with heightened security rights fixes the problem of access.  Pushing the security away from the calling method and into the SSIS Package itself is often a secure and internal controlling method.  The reasoning for this is the internal settings we can use to encrypt and otherwise promote other resources of securing sensitive data.  Using the SQL Server Agent we can also utilize a built in structure to directly call SSIS packages.  This requires the need to allow the Agent Service account the access we require.  This is typically a much more controlled account that is only allowed access to areas that are designated to accomplish jobs defined by business needs or system processing needs.  Going further, controlling the execution by use of proxy accounts can restrict access only to executing the SSIS packages and thus passing the proxy account to be authenticated to either directory services, executables outside SQL Server or database access.</p>
+<p>To show this alternative and possibly more secure solution to executing an SSIS package from a stored procedure, the outlined process below can be used as a guideline.  The process consists of a data flow task that will consume the results of a stored procedure and pump them into a table.  The database being utilized will be AdventureWorks and the version of SQL Server is 2008 R2.  </p>
+<p>The diagram below shows the flow of the starting point being the agent execution, step execution containing the SSIS package and then ending on the success and normal logging of the agent services.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_2.gif" alt="" title="" width="432" height="454" /></div>
+<p>The SSIS package flow itself will follow the following chart</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_3.gif" alt="" title="" width="402" height="332" /></div>
+<p><strong>Setting up a proxy for SSIS</strong></p>
+<p>In preparation for setting the procedure to call the agent job, we need to create a proxy account.  Setting up a proxy account to be used for calling a step a SQL Server Agent job starts with the creation of credentials in SQL Server.<br />
+A credential can be created with SSMS or T-SQL.  With T-SQL, the CREATE CREDENTIAL statement is used.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> CREDENTIAL EmpImportUser <span class="kw1">WITH</span> <span class="kw1">IDENTITY</span> <span class="sy0">=</span><span class="st0">'EmpImportUser'</span>
+,SECRET <span class="sy0">=</span> <span class="st0">'EmployeeImportAccount'</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CREDENTIAL EmpImportUser WITH IDENTITY ='EmpImportUser'
+,SECRET = 'EmployeeImportAccount'
+GO</pre></div></div>
+
+<p>In SSMS, right click the Credentials tree under Security and select New Credential. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_4.gif" alt="" title="" width="309" height="193" /></div>
+<p>The minimum requirement for the creation of a credential is the name and Windows identity that it will map to and store the password.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_5.gif" alt="" title="" width="628" height="254" /></div>
+<p>The Credential is then utilized in the creation of the proxy account so the step in the job can be executed under the context of the credential with the stored password.  </p>
+<p>Adding a proxy can be accomplished with SSMS and T-SQL as well.  With T-SQL, the sp_add_proxy procedure is executed with mapping to the credential.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> msdb.<span class="me1">dbo</span>.<span class="me1">sp_add_proxy</span> @proxy_name<span class="sy0">=</span>N<span class="st0">'ImportUser'</span>,@credential_name<span class="sy0">=</span>N<span class="st0">'ImportUser'</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; @enabled<span class="sy0">=</span><span class="nu0">1</span>
+GO
+&nbsp;
+<span class="kw1">EXEC</span> msdb.<span class="me1">dbo</span>.<span class="me1">sp_grant_proxy_to_subsystem</span> @proxy_name<span class="sy0">=</span>N<span class="st0">'ImportUser'</span>, @subsystem_id<span class="sy0">=</span><span class="nu0">11</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC msdb.dbo.sp_add_proxy @proxy_name=N'ImportUser',@credential_name=N'ImportUser', 
+		@enabled=1
+GO
+
+EXEC msdb.dbo.sp_grant_proxy_to_subsystem @proxy_name=N'ImportUser', @subsystem_id=11
+GO</pre></div></div>
+
+<p>With SSMS, right click the Proxies tree under the SQL Server Agent section</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_6.gif" alt="" title="" width="317" height="170" /></div>
+<p>Ensure that the subsystem for this proxy is mapped to SSIS.  </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_7.gif" alt="" title="" width="628" height="449" /></div>
+<p>Now complete the security setup by creating the login for machinenameImportUser with mappings to the AdventureWorks database.  Later, we will grant the necessary permissions to the database and tables.  The ImportUser login also needs to be mapped to MSDB and added to the db_ssisoperator role to allow the acount to execute SSIS packages.</p>
+<p><strong>SSIS Package Creation</strong></p>
+<p>Recall from the SSIS diagram in the beginning of this article that the package that will be used consists of an Execute SQL Task to ensure the table is dropped and recreated, the Data Flow Task consisting of a source and destination.  Once the SQL Task is successful, the precedence moves to a single Data Flow task and so on.  In order to make this flexible in changing the value and retaining the security we require a SQL Server Table configuration to be used in the SSIS package.  A variable will be created named ID and will hold the value of the EmployeeID that we request.  This will be used later when we show the creation of the procedure to call this process itself.  This variable will be held in the configuration so we can access the value and update it by means of T-SQL UPDATE statements.  This method allows the updating of the ID in the agent job by means of an UPDATE statement and securing down to the table level itself.</p>
+<p>Another variable will act as the SqlCommand of the source in the data flow task.  This will allow the dynamic setting of the parameter in the SqlCommand value of the source.  Without the SqlCommand being formed at run-time, the statement would not be able to maintain a changing parameter for EmployeeID.  This would then make the execution of the procedure limiting and unusable when parameters are required.</p>
+<p>The Execute SQL Task will be a direct input of the following statement</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">IF</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'dbo.EmpManagers'</span><span class="br0">&#41;</span> <span class="kw1">IS</span> <span class="sy0">NULL</span>
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; <span class="kw1">CREATE</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>EmpManagers<span class="br0">&#93;</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span>RecursionLevel<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>EmployeeID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>FirstName<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">nvarchar</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>LastName<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">nvarchar</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ManagerID<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">int</span><span class="br0">&#93;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ManagerFirstName<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">nvarchar</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>ManagerLastName<span class="br0">&#93;</span> <span class="br0">&#91;</span><span class="kw1">nvarchar</span><span class="br0">&#93;</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>
+<span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">IF OBJECT_ID('dbo.EmpManagers') IS NULL
+BEGIN
+	CREATE TABLE [dbo].[EmpManagers](
+	[RecursionLevel] [int] NULL,
+	[EmployeeID] [int] NULL,
+	[FirstName] [nvarchar](50) NULL,
+	[LastName] [nvarchar](50) NULL,
+	[ManagerID] [int] NULL,
+	[ManagerFirstName] [nvarchar](50) NULL,
+	[ManagerLastName] [nvarchar](50) NULL)
+END</pre></div></div>
+
+<p>This statement checks if the table exists.  If the table does not, it will be created.  So this required CREATE TABLE rights to our user as well.  If the create failed for any reason, a failed precedence would be used to handle the event along with event handlers.  </p>
+<p>Once the Execute SQL Task is successful, the flow moves to the Data Flow Task.  Initially, the ADO.NET Source takes a SqlCommand of<br />
+EXEC dbo.uspGetEmployeeManagers @EmployeeID=4</p>
+<p>This will allow the mappings to be performed before we add the expression to build the execute procedure statement at run-time.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_8.gif" alt="" title="" width="387" height="278" /></div>
+<p>The ADO.NET Destination now can point directly to the table, &#8220;dbo&#8221;.&#8221;EmpManagers&#8221;.<br />
+Once the Execute SQL Task and Data Flow Task are completed, move to create the variables for EmployeeID and SqlCmd.<br />
+EmployeeID will be named ID and a data type of Int32 matching the INT parameter data type in the procedure uspGetExployeeManagers.  The SqlCmd variable will be a string data type and hold the following expression:<br />
+&#8220;EXEC dbo.uspGetEmployeeManagers @EmployeeID=&#8221; +  (DT_WSTR, 10) @[User::ID]<br />
+If the variable has the value 4 preset, this expression evaluated will result in:<br />
+EXEC dbo.uspGetEmployeeManagers @EmployeeID=5</p>
+<p><strong>Package Configuration</strong></p>
+<p>Package configurations assist SSIS in becoming reusable and dynamic.  They also are used to secure sensitive data such as passwords, data sources and user accounts.  For our use, the ID variable will be held in a SQL Server Table Configuration.  Many configuration types exist.  XML File for example can be used to hold configurations in an XML formatted file.  This however will mean we need added security to that file itself.  In this process we are attempting to secure this calling method as far as we can.  Taking the file aspect out of the equation helps us do this.  </p>
+<p>To see how to create a configuration file follow the steps outlined here.</p>
+<p>Below shows a select of the table after completing the creation of the SQL Server Table Configuration.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_9.gif" alt="" title="" width="628" height="151" /></div>
+<p><strong>The SQL Agent Job</strong></p>
+<p>SQL Agent Jobs can be created with T-SQL and SSMS.  SSMS is a good control to use for agent jobs as you do not gain much in configurations with using the T-SQL procedures themselves.  The use of the procedures is good when SSMS is not an option or has failed.</p>
+<p>To create the job to call the SSIS package, right click the Jobs node in the SQL Agent tree and select, New Job.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_10.gif" alt="" title="" width="372" height="118" /></div>
+<p>The name of our job will be CallSSIS and will consist of one step.  The step will be a SQL Server Integration Services type and connect to the instance that the package created earlier was deployed to.  Recall the proxy account that was created earlier was named, ImportUser.  This proxy account should be selected as the Run as account.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_11.gif" alt="" title="" width="400" height="195" /></div>
+<p>Once this is completed, save the job.  Executing the job at this point is a good idea to ensure no problems exist.  This allows for troubleshooting internal problems either to the security of the proxy account or the SSIS package itself.  Adding the procedure to call the job at this point without testing the job would add a level to the process that would increase the difficulty of troubleshooting any problems.</p>
+<p><strong>The controlling procedure</strong></p>
+<p>Now that all of the pieces have been created the procedure that will perform the actual execution of the SSIS package by means of starting the SQL Agent job itself can be created.</p>
+<p>To start a job from T-SQL the system procedure sp_start_job is used.  Sp_start_job takes several parameters as we can see below</p>
+<blockquote><p>Execute sp_start_job<br />
+     {   [@job_name =] &#8216;job_name&#8217;<br />
+       | [@job_id =] job_id }<br />
+     [ , [@error_flag =] error_flag]<br />
+     [ , [@server_name =] &#8216;server_name&#8217;]<br />
+     [ , [@step_name =] &#8216;step_name&#8217;]<br />
+     [ , [@output_flag =] output_flag]</p></blockquote>
+<p>To successfully call sp_start_job, we are only required the job name or job id.  The remaining parameters can be left NULL.  So to call the CallSSIS job the execute statement would be:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Exec</span> msdb.<span class="me1">dbo</span>.<span class="kw3">sp_start_job</span> @job_name <span class="sy0">=</span> N<span class="st0">'CallSSIS'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Exec msdb.dbo.sp_start_job @job_name = N'CallSSIS'</pre></div></div>
+
+<p>Note that the parameters are in Unicode and should be converted as such.</p>
+<p>With any statement, error handling should be used.  In this example, adding the TRY…CATCH and utilizing RAISERROR can be used to handle exceptions in the execution of sp_start_job.</p>
+<p>The complete stored procedure, CallUpEmpCheck, would be as follows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">PROCEDURE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>CallUpEmpCheck<span class="br0">&#93;</span> 
+<span class="br0">&#40;</span>@ID <span class="kw1">INT</span> <span class="sy0">=</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>
+<span class="kw1">AS</span>
+&nbsp; &nbsp; <span class="kw1">IF</span> @ID <span class="kw1">IS</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span> &nbsp;
+&nbsp; &nbsp; &nbsp;<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">UPDATE</span> dbo.<span class="br0">&#91;</span>SSIS Configurations<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">SET</span> ConfiguredValue <span class="sy0">=</span> @ID
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHERE</span> PackagePath <span class="sy0">=</span> <span class="st0">'Package.Variables[User::ID].Properties[Value]'</span>;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Exec</span> msdb.<span class="me1">dbo</span>.<span class="kw3">sp_start_job</span> @job_name <span class="sy0">=</span> N<span class="st0">'CallSSIS'</span>;
+&nbsp; &nbsp; &nbsp;<span class="kw1">END</span>
+&nbsp; &nbsp; <span class="kw1">ELSE</span>
+&nbsp; &nbsp; &nbsp;<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">RAISERROR</span><span class="br0">&#40;</span><span class="st0">'Send right to catch!'</span>,<span class="nu0">16</span>,<span class="nu0">1</span><span class="br0">&#41;</span>;
+&nbsp; &nbsp; &nbsp;<span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PROCEDURE [dbo].[CallUpEmpCheck] 
+(@ID INT = NULL)
+AS
+    IF @ID IS NOT NULL  
+	 BEGIN
+		UPDATE dbo.[SSIS Configurations]
+		SET ConfiguredValue = @ID
+		WHERE PackagePath = 'Package.Variables[User::ID].Properties[Value]';
+		Exec msdb.dbo.sp_start_job @job_name = N'CallSSIS';
+	 END
+	ELSE
+	 BEGIN
+	    RAISERROR('Send right to catch!',16,1);
+	 END</pre></div></div>
+
+<p>Once the procedure is created we are ready to execute and test the process completely through.  Note that the UPDATE statement has been added to the procedure to ensure the EmplyeeID that we pass is updated in the configuration table.</p>
+<p><strong>Security</strong></p>
+<p>Earlier the ImportUser login was created and added to the operator role for SSIS in order to execute SSIS packages.  In order to work with the tables in this process further right must be granted.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">GRANT</span> <span class="kw1">UPDATE</span> <span class="kw1">ON</span> dbo.<span class="br0">&#91;</span>SSIS Configurations<span class="br0">&#93;</span> <span class="kw1">TO</span> <span class="br0">&#91;</span>ONPNT_XPSImportUser<span class="br0">&#93;</span>
+<span class="kw1">GRANT</span> <span class="kw1">INSERT</span> <span class="kw1">ON</span> dbo.<span class="me1">EmpManagers</span> <span class="kw1">TO</span> <span class="br0">&#91;</span>ONPNT_XPSImportUser<span class="br0">&#93;</span>
+<span class="kw1">GRANT</span> <span class="kw1">SELECT</span> <span class="kw1">ON</span> dbo.<span class="me1">EmpManagers</span> <span class="kw1">TO</span> <span class="br0">&#91;</span>ONPNT_XPSImportUser<span class="br0">&#93;</span>
+<span class="kw1">GRANT</span> <span class="kw1">CREATE</span> <span class="kw1">TABLE</span> <span class="kw1">TO</span> <span class="br0">&#91;</span>ONPNT_XPSImportUser<span class="br0">&#93;</span>
+<span class="kw1">GRANT</span> <span class="kw1">EXECUTE</span> <span class="kw1">ON</span> dbo.<span class="me1">uspGetEmployeeManagers</span> <span class="kw1">TO</span> <span class="br0">&#91;</span>ONPNT_XPSImportUser<span class="br0">&#93;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">GRANT UPDATE ON dbo.[SSIS Configurations] TO [ONPNT_XPSImportUser]
+GRANT INSERT ON dbo.EmpManagers TO [ONPNT_XPSImportUser]
+GRANT SELECT ON dbo.EmpManagers TO [ONPNT_XPSImportUser]
+GRANT CREATE TABLE TO [ONPNT_XPSImportUser]
+GRANT EXECUTE ON dbo.uspGetEmployeeManagers TO [ONPNT_XPSImportUser]</pre></div></div>
+
+<p>This may seem like a lot of security for this user and in the context of AdventureWorks, CREATE TABLE is a higher level setting.  When we put this into perspective to the SQL Server and even the context of AdventureWorks, the security is restricted to the configuration table, which is only damaging on execution of the SSIS package.  Then the SELECT rights due to the SSIS processing in the data flow task and the INSERT.  These are limited to the EmpManagers table which is related (in our demo) to the one user run processing.  The user at that point is owner of that table and process.  So we secured to a point much more controlled than the alternatives of SQL Server level rights by moving down to table rights and procedure execution rights.</p>
+<p><strong>Execution of the work</strong></p>
+<p>Executing this setup is the final test. Use the following execute procedure statement to start the process</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> dbo.<span class="br0">&#91;</span>CallUpEmpCheck<span class="br0">&#93;</span> @ID <span class="sy0">=</span> <span class="nu0">5</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC dbo.[CallUpEmpCheck] @ID = 5</pre></div></div>
+
+</p>
+<p>The resulting message in the query window will be:</p>
+<blockquote><p>(1 row(s) affected)<br />
+Job &#8216;CallSSIS&#8217; started successfully.</p></blockquote>
+<p>The first message is from the update to the configuration table and the second message is returned from the sp_start_job execution.</p>
+<p>Validating the data has been inserted into the EmpManagers table:</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/callssisfromproc_12.gif" alt="" title="" width="622" height="260" /></div>
+<p><strong>The downfall</strong></p>
+<p>There is an obvious problem with this method.  Error handling the call itself to SSIS is difficult.  The options to handle this are to verify the logging from the SSIS execution, the SQL Agent job logs them or push event handlers in the SSIS package itself to have a much more dominant role in the handling of a failed execution.  As long as we capture the starting point of execution (the procedure), the middle tier of the process (the AW procedure) and the final stage of the insertion of the data, we accomplish the task.  </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/execute-ssis-from-sql/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+		<item>
+		<title>Using SSIS to import a directory of images</title>
+		<link>/index.php/datamgmt/dbprogramming/ssis-import-images-table/</link>
+		<comments>/index.php/datamgmt/dbprogramming/ssis-import-images-table/#comments</comments>
+		<pubDate>Wed, 24 Nov 2010 18:02:45 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[import image]]></category>
+		<category><![CDATA[rapid development]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/11/ssis-import-images-table/</guid>
+		<description><![CDATA[SQL Server provides database professionals with several paths in order to import and export data in and out of many data sources and file services.  One main task, the Foreach Loop Container, allows for processing large (or small) groups of files with one contained and manageable process.  Tasks that once were difficult and required larger scale development efforts have now moved into the realm of the rapid development methodology.  Rapid Development is defined as requiring a much lower amount of resources in order to push a process into a production environment.  Resources can contain any one of the main components in developing strategies such as management, developers, infrastructure changes and so on.  The resources take time in planning stages, developing stages and testing stages.  Accomplishing this methodology is done by placing each of these on top of each other in a sense.  Planning is done alongside developing and testing.]]></description>
+				<content:encoded><![CDATA[<p>SQL Server provides database professionals with several paths in order to import and export data in and out of many data sources and file services.  One main task, the Foreach Loop Container, allows for processing large (or small) groups of files with one contained and manageable process.  Tasks that once were difficult and required larger scale development efforts have now moved into the realm of the rapid development methodology.  Rapid Development is defined as requiring a much lower amount of resources in order to push a process into a production environment.  Resources can contain any one of the main components in developing strategies such as management, developers, infrastructure changes and so on.  The resources take time in planning stages, developing stages and testing stages.  Accomplishing this methodology is done by placing each of these on top of each other in a sense.  Planning is done alongside developing and testing. </p>
+<p>SSIS promotes this in a way just by the imagery that the designer, BIDS (Business Intelligence Studio), uses while you develop packages.  From most SSIS packages, you can compile a flow chart in great detail.  Jumping ahead on the topic and task at hand; take the example below of the finished package for importing a directory of images into a table in a SQL Server database.</p>
+<p><div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_01.gif" alt="" title="" width="328" height="311" /></div>
+<p>With the steps shown we can write a flowchart as shown below</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_02.gif" alt="" title="" width="394" height="371" /></div>
+</p>
+<p>The process in both representations is readable in the same manner.  Process starts, then checks and if required, creates an archive directory and then processes the images internally in a subprocess (container).  This added benefit of the way BIDS and the visual aspects of the development studio helps promote rapid development and quick documentation.  All of this means lower to mid-level complex processing initiatives can be developed faster.</p>
+<p>Remember, with any process, the complexity and depth of the requirements are considered if the longer planning process can be performed while developing them.  Planning out a process before hand when a certain point is passed, should be performed.  Combining the planning, development and testing at one time can cause the initiative to be longer if misused.</p>
+<p>Back to the process at hand&#8230;</p>
+<p>The outlined flow and package above has the goal of iterating through a folder and inserting the images found in it into a SQL Server database.  Some of the dynamic needs in this are:</p>
+<ol>
+<li>Passing the type of images to insert</li>
+<li>Passing the directory to look in</li>
+<li>All connections to SQL Server</li>
+</ol>
+<p>For error handling, each insert will be allowed to error only those insert statement.  This means the package should not exit with an error state simply because one image failed to insert.  Event handlers can be used to accomplish this.<br />
+The following statements will create the supporting database and tables.  Setting up the main table to insert into and the primary error handling table initially will help speed the process of developing our package up.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>IMAGES<span class="br0">&#93;</span> <span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'IMAGES'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:Program FilesMicrosoft SQL ServerMSSQL10_50.XPS2008R2MSSQLDATAIMAGES.mdf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 14336KB , MAXSIZE <span class="sy0">=</span> UNLIMITED, FILEGROWTH <span class="sy0">=</span> 1024KB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'IMAGES_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:Program FilesMicrosoft SQL ServerMSSQL10_50.XPS2008R2MSSQLDATAIMAGES_log.ldf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 1792KB , MAXSIZE <span class="sy0">=</span> 2048GB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">10</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> WebImages 
+<span class="br0">&#40;</span> 
+&nbsp; &nbsp; ImageName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span> not <span class="sy0">NULL</span> <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span>, 
+&nbsp; &nbsp; ImageSource <span class="kw1">varbinary</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span> not null 
+<span class="br0">&#41;</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> WebImageImportErrorLog
+<span class="br0">&#40;</span> 
+&nbsp; &nbsp; ImageName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; ErrorDesc <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">2000</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; PackageID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; ExeDateTime <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; UserExeName <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span>
+<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE [IMAGES] ON  PRIMARY 
+( NAME = N'IMAGES', FILENAME = N'C:Program FilesMicrosoft SQL ServerMSSQL10_50.XPS2008R2MSSQLDATAIMAGES.mdf' , SIZE = 14336KB , MAXSIZE = UNLIMITED, FILEGROWTH = 1024KB )
+ LOG ON 
+( NAME = N'IMAGES_log', FILENAME = N'C:Program FilesMicrosoft SQL ServerMSSQL10_50.XPS2008R2MSSQLDATAIMAGES_log.ldf' , SIZE = 1792KB , MAXSIZE = 2048GB , FILEGROWTH = 10%)
+GO
+CREATE TABLE WebImages 
+( 
+    ImageName varchar(50) not NULL PRIMARY KEY, 
+    ImageSource varbinary(max) not null 
+)
+CREATE TABLE WebImageImportErrorLog
+( 
+    ImageName varchar(50),
+    ErrorDesc VARCHAR(2000),
+    PackageID VARCHAR(255),
+    ExeDateTime VARCHAR(50),
+    UserExeName VARCHAR(255)
+)</pre></div></div>
+
+<p>To insert an image into the table WebImages, use OPENROWSET with SINGLE_BLOB.  This method is shown as</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> WebImages <span class="br0">&#40;</span>ImageName, ImageSource<span class="br0">&#41;</span> 
+<span class="kw1">SELECT</span> 
+&nbsp; &nbsp; <span class="st0">'C:UsersonpntDocumentsImages 001.jpg'</span> ImageName
+&nbsp; &nbsp; ,BulkColumn
+<span class="kw1">FROM</span> 
+<span class="kw1">OPENROWSET</span> <span class="br0">&#40;</span><span class="kw1">BULK</span> <span class="st0">'C:UsersonpntDocumentsImages 001.jpg'</span>, S<span class="sy0">IN</span>GLE_BLOB<span class="br0">&#41;</span> <span class="kw1">AS</span> Images </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO WebImages (ImageName, ImageSource) 
+SELECT 
+	'C:UsersonpntDocumentsImages 001.jpg' ImageName
+	,BulkColumn
+FROM 
+OPENROWSET (BULK 'C:UsersonpntDocumentsImages 001.jpg', SINGLE_BLOB) AS Images </pre></div></div>
+
+<p>Notice that we set the ImageName to a primary key.  This is due to the table following the same constraints as directory services.  No file may exist in the same location with the same name.  We propagate this concept to the table.</p>
+<p><strong>Create the package &#8211; Preparation</strong></p>
+<p>Variables are a key to making this process reusable and portable.  For this example, four variables will be utilized.</p>
+<ul>
+<li>SqlInsertCmd: Used to build the INSERT statement based on the image currently being processed</li>
+<li>ArchiveDirectory: Mentioned earlier to create the archive folder once images are processed</li>
+<li>ImageFileFocus: The place holder of the image being processed<br />
+SourceDirectory: Directory to work on that is holding the images</li>
+</ul>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_03.gif" alt="" title="" width="331" height="151" /></div>
+<p>Data types for these variables are all strings.  The scope will primarily be set to the package level with a few set to the container level.<br />
+Create the variables as shown above after moving the following into the control flow window.</p>
+<p>File System Task, Foreach Loop Container with an Execute SQL Task and File System<br />
+Task within the container</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_04.gif" alt="" title="" width="148" height="211" /></div>
+<p><strong>Archive Task</strong></p>
+<p>The first task that needs to be accomplished is the archive directory.  In order to prevent unwanted errors to be logged be reprocessing images on each execution of the package, we want to move the images to a folder that is designated as processed already.  This can be accomplished with a File System Task and the create directory operation.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_05.gif" alt="" title="" width="442" height="170" /></div>
+<p>Set the UseDirectoryIfExists to True so if the directory exists already, we do not unintentionally remove or overwrite the directory.  This may cause unwanted loss of images that exist in the directory. The Archive directory for this example is set in the directory that is being processed so using the source directory while adding the “Archive” additional path is sufficient.  This is done in the ArchiveDirectory variable as an expression</p>
+<p>@[User::SourceDirectory] + &#8220;\Archive&#8221;</p>
+<p><strong>The container</strong></p>
+<p>The Foreach Loop Container is truly the core processing mechanism in this package.  With the Foreach Loop Container, iterating all files in a specified directory is made simple in a sense.  It is simple due to the limited requirement of properties to get the container looping through the files.</p>
+<p>The key properties that are required to set the container are directory (Folder), file extensions, resulting return of string that will be the file currently focused on and a variable mapping.  The variable mapping is used to set a variable to the file that is currently being processed by the container so it can be passed to other tasks within the container.</p>
+<p>To set the properties for the container to process the directory from the variable SourceDirectory, use expressions.  This will set the property at runtime.  This allows us to quickly change where the processing will occur if the folder is changing often, the moved or the package is going to be used for other tasks.  Set the expression by going to the Collection window in the Foreach Loop Editor, click the ellipse to open the Property Expression Editor and select Directory for Property and set the Expression to the variable, @[User::SourceDirectory]. (shown below)</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_06.gif" alt="" title="" width="482" height="169" /></div>
+<p>Use a hardcoded folder value for the setup and enter in “.jpg” (or the image types you want to import) in the Files text box.</p>
+<p><strong>Execute SQL Task – INSERT</strong></p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_07.gif" alt="" title="" width="628" height="272" /></div>
+<p><strong>Error Handling</strong></p>
+<p>Event Handlers are used to catch any issues that may arise when inserting the image into SQL Server.  The most common error that will come up with the process is a primary key violation.  This is due to the primary key being the file name (or image) in the table WebImages.  In the case an image was placed in the folder again or the archive process failed, there is a chance for the image to be inserted again.  This is not ideal in this processing and would be set as a secondary processing design to update the table.  That design would be set with either child package or a variable setting to validate the tasks to begin processing in the package itself.  (for a later discussion)<br />
+To setup the event handler:<br />
+While the Execute SQL Task is highlighted, click the Event Handlers tab.  Click the link to create the OnError event handler for the SQL task.  Bring an Execute SQL Task over into the window.</p>
+<p>The connection for the task will be to the IMAGES database created earlier, and an  insert into the error table also created earlier.  The system level information and image file name will be inserted into the error table so they can be analyzed later.  To insert the system variables, use the insert statement shown below</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> WebImageImportErrorLog 
+<span class="br0">&#40;</span><span class="br0">&#91;</span>ImageName<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ErrorDesc<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>PackageID<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>ExeDateTime<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; ,<span class="br0">&#91;</span>UserExeName<span class="br0">&#93;</span><span class="br0">&#41;</span>
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span>?,?,?,?,?<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO WebImageImportErrorLog 
+([ImageName]
+      ,[ErrorDesc]
+      ,[PackageID]
+      ,[ExeDateTime]
+      ,[UserExeName])
+VALUES (?,?,?,?,?)</pre></div></div>
+
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_08.gif" alt="" title="" width="628" height="363" /></div>
+</p>
+<p>Set ByPassPrepare to True so the statement is not parsed.<br />
+Move to the to the Parameter Mapping section.  Each ? will map based on the ordinal positions mapped.  This is set by the Parameter Name as shown below. </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_09.gif" alt="" title="" width="628" height="137" /></div>
+</p>
+<p>The last property to set is a system variable in order to manage the errors when they occur.  </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_10.gif" alt="" title="" width="628" height="117" /></div>
+<p>Set the Propagate system variable to False so the errors do not flow back up to the container and stop the processing of the next image.</p>
+<p><strong>Archive the processed image</strong></p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_11.gif" alt="" title="" width="628" height="261" /></div>
+<p>The File System Task to perform the archive task will utilize the Move file type.  Using the ImageFileFocus variable for the source, the last setting required is the archive directory path.  The file name is not required on the move.<br />
+Set the DelayValidation to true or the variable setting will cause it to error given it is empty until the package is executed.</p>
+<p><strong>Processing</strong></p>
+<p>Putting this all together we arrive at the package outlined in the beginning of this discussion.  Executing this package initially and then a second time will show the normal process of inserting all images into the WebImages table along with the error handling and logging put in place.</p>
+<p>Execute the package initially</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_12.gif" alt="" title="" width="104" height="146" /></div>
+</p>
+<p>Once complete, validate the WebImages table by selecting the contents </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_13.gif" alt="" title="" width="516" height="137" /></div>
+</p>
+<p>To test the event handler error logging, move the images back into the root directory from the archive directory and execute the package a second time.  While processing, the Execute SQL Task will start to throw errors based on the primary key violation.  This can be seen by selecting from the WebImageErrorLog table</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_image_14.gif" alt="" title="" width="628" height="140" /></div>
+<p><strong>Closing</strong></p>
+<p>SSIS and the Foreach Loop Container allow for quick setup and processing of entire directory contents.   Within the container, the use of T-SQL, Data Flow Tasks and other processing can be used to fully validate, transform and import data while iterating through those files.  This promotes rapid development methods and allows for shorter and less costly initiatives to transport from development to testing and into production.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/ssis-import-images-table/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>The History of SQL Server Integration Services</title>
+		<link>/index.php/datamgmt/datadesign/history-of-ssis/</link>
+		<comments>/index.php/datamgmt/datadesign/history-of-ssis/#comments</comments>
+		<pubDate>Mon, 11 Oct 2010 09:53:52 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server history]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/10/history-of-ssis/</guid>
+		<description><![CDATA[SQL Server has taken on many levels of growth over the years as a relational database management system.  SQL Server has taken on roughly twelve major releases; code names were adopted 10 major releases ago.    During the time of these releases, Microsoft has enriched the features that ship with the SQL Server Engine itself.  These features started with SQL Server 7.0 and the release of OLAP; code name, Plato.  With Plato, came a direction to fulfill the goal of bringing SQL Server to an enterprise level.  Also packaged with SQL Server 7.0 was Data Transformations Services (DTS).  DTS was a milestone as it provided the ability to broaden the range of abilities to work natively with SQL Server and Bulk type operations.  Job scheduling capabilities were also increased in the ability to work more freely with more complex tasks.  These tasks were housed directly in SQL Server (with respect to outside binaries and data stores).  SQL Server 7.0 made a foundation for the years to come.]]></description>
+				<content:encoded><![CDATA[<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sql60_logo.gif" alt="" title="" width="300" height="236" align="left" /></div>
+<p>The history of any product is important to fully understanding the product itself.  With the knowledge of the foundation of a products birth, we can start to learn the depth of where it has come as it has aged over the years.  SQL Server and all its features are no different.  We may find ourselves disliking a product before taking full advantage of the abilities offered.   </p>
+<p>SQL Server has had many levels of growth over the years as a relational database management system.  <strong>SQL Server</strong> has taken on roughly twelve major releases; code names were adopted 10 major releases ago.  Throughout these releases, Microsoft has enriched the features that ship with the SQL Server Engine itself.  These features started with SQL Server 7.0 and the release of OLAP; code name, Plato.  With Plato, came a direction to fulfill the goal of bringing SQL Server to an enterprise level.  Also packaged with SQL Server 7.0 was Data Transformations Services (DTS).  DTS was a milestone as it provided the ability to broaden the range of abilities to work natively with SQL Server and Bulk type operations.  Job scheduling capabilities were also increased in the ability to work more freely with more complex tasks.  These tasks were housed directly in SQL Server (with respect to outside binaries and data stores).  SQL Server 7.0 provided a foundation for the years to come. </p>
+<blockquote><p>SQL Server 2000 DTS<br />
+http://technet.microsoft.com/en-us/library/cc917688.aspx</p></blockquote>
+<p>Was SQL Server 7.0 Enterprise Edition truly an enterprise product?  The answer to this question has been asked and opinions are always voiced.  It was a stepping stone.  That is the opinion of the author of this article.  Moving into the future from SQL Server 7.0, SQL Server 2000 code name, Shiloh was released.  SQL Server 2000 had with it changes for the better within the performance of SQL Server itself.  DTS, <strong>SQL Server Reporting Services</strong> (SSRS) and <strong>SQL Server Analysis Services</strong> (SSAS) were built up and enriched.  Although SSRS at this time was an add-in, the reporting foundation also had begun to develop.  Still the questioned remained if SQL Server 2000 had met the level that the path SQL Server was meant to follow of truly being an enterprise database management system.</p>
+<p>SQL Server 2005 will probably stick in most database professional’s minds for decades and versions to come.  Why?  SQL Server 2005 released with it major database engine changes and also a truly enriched features listing.  SQL Server Integrated Services (SSIS) was one of these features.  SSIS was the calling that ETL for SQL Server needed to move forward.  To be direct: SSIS was in no way an upgraded version of DTS.  DTS was extinct from SQL Server 2005 all together.  Legacy components were developed to manage large and small installations that based ETL on DTS in order to make transitions less complicated.  These components (<strong>Microsoft SQL Server 2000 DTS Designer Components</strong>) gave us the ability to edit and execute DTS on SQL Server 2005 to some extent.  This development was meant as an interim while conversions to SSIS were completed.  DTS run-time components are a deprecated feature.  At the time of this article’s creation and the current release of SQL Server 2008 R2, DTS run-time in 32-bit was still available.</p>
+<blockquote><p>SQL Server 2000 DTS Designer Components<br />
+http://www.microsoft.com/downloads/details.aspx?FamilyID=d09c1d60-a13c-4479-9b91-9e8b9d835cdc<br />
+SQL Server Integrated Services Home Page<br />
+http://www.microsoft.com/sqlserver/2008/en/us/integration.aspx </p></blockquote>
+<p>SQL Server 2008 R2 is the most recent release of SSIS.  We will stay with this being mentioned as SSIS 2008 as no new features were added to the major release of 2008 R2.  With the 2008 release of SQL Server, some changes had also been made to enhance the abilities of the ETL platform.  Caching and full utilization of multi-core platforms are a few large steps in the performance abilities of SSIS.  With these and many other changes, DTS to SSIS itself, there are sometimes painful steps to make in learning the best practices and best method of utilizing them.  This is part of most major releases or changes to existing releases.</p>
+<p>Why is this all important?<br />
+The history of any product is important to know and follow.  This assists in learning and understanding the current architecture of the product.  Granted, learning SSIS does not mean we should run out and install SQL Server 7.0 in order to write your first DTS package.  Remember, DTS and SSIS are completely different ETL platforms and set of tools, components and tasks.  SSIS however is something that we can start from 2005 release and move forward with.</p>
+<p>Take the process of deciding which version to purchase.  Even with a base landscape falling primarily under SQL Server 2005 Engines, SQL Server 2008 may be the best choice.  Lookup Caching options themselves may be the turning point on that choice.  Knowing the differences and the changes over the history of the product will help us make better decisions like these.</p>
+<p>Knowing the history of SSIS can also play an important step in development of SSIS itself.  For example; the ActiveX Script Task remains a task in SSIS 2008.  This task allows the execution of sequentially interpreted scripting languages (or non-compiled) VBScript and Jscript.  This task may be viewed as beneficial to many developing SSIS packages as there is exposure to other resources and more complex processing of external objects.  However, with SSIS 2005, VSA (Visual Studio for Applications) environment was available, making developing in VB.NET as an option.  This exposed the power of VSA and exposing a large number of namespaces to SSIS.  Looking to the future, SSIS 2008 changed to utilizing VSTA (Visual Studio Tools for Applications).  VSTA provided SSIS with a heightened level of reference to external resources and addition of the development language, C#.</p>
+<blockquote><p>Migrating Scripts to VSTA http://msdn.microsoft.com/en-us/library/bb522527.aspx </p></blockquote>
+<p>So as we can see, understanding the history and changes of a product may assist in decision making from major purchases down to choosing the more efficient task or component while developing under platforms like SSIS.</p>
+<blockquote><p>History of SQL Server Integrated Services – Main product documentation<br />
+SSIS 2005 http://technet.microsoft.com/en-us/library/ms141026(SQL.90).aspx<br />
+SSIS 2008 http://technet.microsoft.com/en-us/library/ms141026.aspx<br />
+SSIS Team Home Pages<br />
+Technet http://technet.microsoft.com/en-us/sqlserver/cc510302.aspx<br />
+MSDN http://msdn.microsoft.com/en-us/sqlserver/cc511477.aspx</p></blockquote>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/history-of-ssis/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>SSIS runs in BIDS but not with SQL Agent</title>
+		<link>/index.php/datamgmt/dbprogramming/ssis-runs-in-bids-but-not-with-sql-agent/</link>
+		<comments>/index.php/datamgmt/dbprogramming/ssis-runs-in-bids-but-not-with-sql-agent/#comments</comments>
+		<pubDate>Wed, 06 Oct 2010 09:54:16 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server agent failure]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/10/ssis-runs-in-bids-but-not-with-sql-agent/</guid>
+		<description><![CDATA[The title of this article is one that is asked on many occasions around the forums and SQL Server community.  SQL Server Integration Services (SSIS) is the Extract, Transform and Load (ETL) platform behind SQL Server.  There aren’t many arguments against SSIS as a great tool, and it has the ability to get the job done as an ETL platform.  With the added complexity of any product, pain is involved while becoming familiar with the intricacies of it.  One pain that comes with any development practice that is performed within one set of environment and system variables and later moved to another set (Transport process): a process can execute successfully in one location and fail in another.]]></description>
+				<content:encoded><![CDATA[<p>The title of this article is one that is asked on many occasions around the forums and SQL Server community.  <strong>SQL Server Integration Services</strong> (SSIS) is the <strong>Extract, Transform and Load</strong> (ETL) platform behind SQL Server.  There aren’t many arguments against SSIS as a great tool, and it has the ability to get the job done as an ETL platform.  With the added complexity of any product, pain is involved while becoming familiar with the intricacies of it.  One pain that comes with any development practice that is performed within one set of environment and system variables and later moved to another set (Transport process): a process can execute successfully in one location and fail in another. </p>
+<p>The one thing that we have working for us when working on transport processing is a working shell of the development area.  This shell contains all the information we need in order to troubleshoot the reasoning for failure on after the transport has been performed.  Taking the case of an <strong>SSIS package</strong> (DTSX) executing successfully in your development area and unsuccessfully in the production area leaves the case in which we go back to listing the settings of the package itself and environment itself to determine the cause.</p>
+<p>In order for us to start digging into troubleshooting the topic at hand of an SSIS package running in <strong>Business Intelligence Development Studio</strong> (BIDS) but not with the SQL Server Agent, we will first come up with a package to work with. BIDS is nothing more than a shell of Visual Studio with additional projects that allow us to develop for SQL Server.  With the installation of client tools, you can obtain the version of BIDS from the installation media version of SQL Server.   Some important facts: BIDS only installs as a 32bit version.  Visual Studio 2010 will not allow for the manipulation or creation of SSIS (or any feature of SQL Server) objects.  The good part to version editing issues in newer full versions of Visual Studio: all versions of BIDS and full installations of Visual Studio run well side-by-side.</p>
+<p>Below will outline a process that will consume a flat file with three columns of string type data.  Those three columns of data will be sent to distinct output areas based on a header name for each column.  The header names will be header1, header2 and header3.  The output will be three distinct tables named the same as the header names.  For header1, the output will flow to table header1 and so on.</p>
+<p>Our execution in BIDS is good at this point and we are successful in the development stage of our process.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis agent fail 1.gif" alt="" title="" width="312" height="199" /></div>
+</p>
+<p>Now we turn to creating a SQL Server Agent job to call an SSIS step. This step connects to the MSDB in which our package has been deployed to.   Upon execution, we are faced with a different result:</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis agent fail 2.gif" alt="" title="" width="529" height="170" /></div>
+</p>
+<p>Now that we have paved the road to troubleshoot this error, we can take a normal approach that most troubleshooting will take.</p>
+<ol>
+<li>Validate Security</li>
+<li>Validate System Settings</li>
+<li>Validate External Resources</li>
+<li>Validate Internal Resources</li>
+<li>Validate the Package Execution Itself</li>
+</ol>
+<p>Notice that validating the actual package is last.  Why is that?  Well, we know the package can run successfully already given the right system variables behind it.  We’ve provided the proof of concept there from execution being successful in BIDS.</p>
+<p>Several of these steps cross over each other.  For instances, security will directly affect determining external results (as we will see later).  Many times during troubleshooting these types of problems, one solution is referred to many times from the other steps.  The important thing to always remember when troubleshooting in a technical setting is to change one thing, document that change and test.  Do not fall into the habit of changing several things at once before validating the change actually is the resolution.  Answers are hidden from us still when the process is done in that manner.</p>
+<p>In our approach listing we can evaluate a new list directly related to SSIS.</p>
+<ol>
+<li>Authentication – Basics</li>
+<li>ProtectionLevel – Internal Package Security</li>
+<li>Variable access and Configuration file access.  Environmental variables, Registry, Configuration files</li>
+<li>Supporting objects</li>
+<li>32-bit vs. 64-bit</li>
+<li>Double HOP &#8211; loss of authentication</li>
+<li>External calls (not configuration file based)</li>
+<li>OS level calls when using DTExec.exe and security</li>
+</ol>
+<p>Now that we have our starting point we can show the failure and common resolutions to each of them.</p>
+<p><strong>Authentication basics</strong> revolve around anything that deals with the credentials that are being used to execute the package itself.  The SQL Server Agent by default runs under a service account.  In many instances this service account is set as a domain account.  That domain account is also commonly created specifically for the task of running the agent.  While running the package in BIDS, the execution is performed under the users’ account that is logged into the machine at that time.  In our packages case that is an account that is set in the local administrators group.  In the package we created, there are two primary points in which the authentication of the account used to execute the package will be required.  The first is a share that was created to hold all the import files that are read during the import process.  That share was created specifically to secure the sensitive files.  While the share was accessed successfully by the means of the local administrators group and the account logged in while working in BIDS, the SQL Server Agent Service Account is now being used to attempt retrieval of the files.</p>
+<ul>
+<li>Fixing the case of the SQL Server Agent Account access has two paths.  </li>
+<li>Alter the share to add the security required so the account will pass through successfully</li>
+</ul>
+<p>Use a proxy on the step that is calling the SSIS package.  The proxy will use a designated account that already has access to the share.  Although bad practice, the account that was used to develop the package can be used for test purposes.  This is considered bad practice because a user account is considered unstable, primarily in the sense that it can change at will.  One volatile variable to use of a user account for a proxy is the saved password while setting the proxy up.  This password may change at will based on the users’ actions while not automating the process of updating the proxy settings.</p>
+<p>Another security point is based on the internal security of the package itself and how passwords for things such as connection managers are saved.  This is done by using the setting, ProtectionLevel.   By default this is set to, “EncryptSensitiveWithUserKey”.  By using this key the user profile that created the package is taken to encrypt anything needed.  The primary failure with this being left as the default and not handling the effects will be shown when moving the package from one machine to another while the user profile that created the package is not the one that opens it for execution.</p>
+<p>To resolve the ProtectionLevel related errors there are several options.  The best practice would be to reevaluate the ProtectionLevel setting itself and determine the proper setting to use.  For troubleshooting purposes, setting this value to, &#8220;DontSaveSensitive&#8221; and executing the package will verify if the ProtectionLevel used is the cause.</p>
+<blockquote><p><span class="MT_red">Note: Using the Protection Level of DontSaveSensitive is not considered a best practice due to this setting bypassing all encryption of sensitive data in the package.</span> </p></blockquote>
+<p>Refer to <a href="http://msdn.microsoft.com/en-us/library/ms141747.aspx">BOL entry</a> for further clarification on the ProtectionLevel setting and options available.</p>
+<p>Following the pattern of security related failures, configurations in SSIS may also be a direct security related cause of a package failing.</p>
+<blockquote><p><span class="MT_red">Note: Before going on; SSIS configurations can and will be bypassed if set but not available for local settings in the package.  Be sure to set internal values while using configurations to allow for the package to fail if the configuration is required for successful processing.</span> </p></blockquote>
+<p>There are several ways SSIS can store configurations to force reusability and the dynamic setting of properties and values to ensure our package processing is done as we intended it to.</p>
+<p><strong>Configuration Types</strong></p>
+<ol>
+<li>XML Configuration Files</li>
+<li>Environment Variables;</li>
+<li>Registry Entry</li>
+<li>Parent Package Variables</li>
+<li>SQL Server Tables</li>
+</ol>
+<p>We have two security paths to troubleshoot with configuration files.  </p>
+<ul>
+<li>Security access to the local system based on the type of configuration saved to the local system.</li>
+<li>Security access to the SQL Server Instance that has been used to store the configurations.</li>
+</ul>
+<p>To resolve these types of problems that cause agent failures deals with the same changes to either heightened rights to the service account or proxy utilization.  Altering the configurations or types of configurations used in the package can be a resolution.  Altering what works may not be the best course if there was a given security reason the type was used.</p>
+<p>Earlier in this article it was mentioned that in order to develop with BIDS and SQL Server project types, SQL Tools is required to be installed.  This includes SSIS objects (as well as the service for interacting with SSIS from wizards and SSMS).  When developing SSIS in one location and deploying to another, supporting objects may be missing.  This is common when using DTEXEC to call your package and not ensuring all support is available for the entire process you have developed.</p>
+<p>Resolution is as with the development machine, to install the required SSIS components.  This problem is rare as deploying to an instance to execute SSIS packages that does not have SSIS installed is not common.</p>
+<p>Windows Server prior to 2008 R2 came in both <strong>32-bit and 64-bit versions</strong>.  These two platforms are very different in internal processing and resource allocations.  With the need for more resources in developer machines, 64 bit Windows versions are almost completely taking over as a normal platform at the desktop level.  This poses another problem to cross platform transports.  The problem arises with the change in platform from 32 bit and 64 bit platform change in transports.</p>
+<p><i>Example: Developer starts to write a package to import a flat file much like the one used earlier in this article.  Once the Data Flow task has been created and the source is set, OLEDB destinations are utilized.</i></p>
+<p>In the situation above, the package will not execute on the developers machine while under the 64 bit platform.  Resolving that is a project setting to set the execution of 64 bit mode to false. (Essentially executing with the 32 bit components) More importantly, when this package is executed successfully in BIDS and then transferred to a Windows Server 64 bit version, the package will again fail by using the agent with default settings.</p>
+<p>To resolve this problem of transport and running in 32 bit mode on a 64 bit Windows Server version: SSIS tools install be default a 32 bit version of DTEXEC which can be used to call a package in 32 bit mode.  This can also be done by using a setting in the agent step itself found in the Execution Options, &#8220;Use 32 bit runtime&#8221;.</p>
+<p><strong>Double Hop</strong> problems exist when windows authentication is used and the process in which passing credentials from a calling mechanism to a second forces another request to a third resource or server.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis agent fail 3.gif" alt="" title="" width="473" height="131" /></div>
+</p>
+<p>In this situation, the resolution is to either change the landscape or resolve with implementing Kerberos Authentication.  </p>
+<p>Errors that may or may not accompany double hop situations are typically involving failed authentication while sending a valid windows account but resulting in the <i>NT AUTHORITY/ANONYMOUS LOGON</i></p>
+<p>More detailed information on <a href="http://technet.microsoft.com/en-us/library/cc780469(WS.10).aspx">Kerberos setup</a></p>
+<p><strong>External (or remote) Resources Calls</strong> and Operating System level calls occur with the same level of problems as a lot of the steps we have covered already; security.  We bring in a new layer of problems with external resources in network related blocking.  A well maintained and secured network will only allow the communication that is documented and known.  Calling resources such as FTP or Web Services that exist outside the internal network may go through different policies from a development machine than a server is allowed to perform.  Local firewall settings also play a large part in this.  Windows Firewall and all other virus and firewall software that is deployed should be a point of interest when returning failures that revolve around failed access of these resources.</p>
+<p>Resolving these problems may or may not be a long process.  Network and server groups must be enlisted to either set the configurations that are known already or determine the access that is being attempted.  Once this is done, if the configuration is a known change, the change itself may be quick.  If it requires additional resources in figuring out how to make the change and retain the stability and security of the server, time may be prolonged even more.</p>
+<p><strong>OS level</strong> calls when using DTExec.exe is a topic that brings us full circle to the SQL Server Agent Service Account again.  Like many objects that are utilized locally from the operating system, DTEXEC is located by default in the SQL Server Binn directory under the DTS folders.  In some cases, the agent service account may have a problem with accessing this directory.</p>
+<p>Resolving this is to provide the rights to the service account.  Although this problem is rare, it is a bullet point to rule out.  Given the interaction with most services that the SQL Server Agent enlists in order to run successfully with other tasks, this problem may be found in an earlier error on other processing.  Start up may even fail and then the problem would be found and resolved at that point.</p>
+<p><strong>Conclusion</strong></p>
+<p>The common problems and resolutions covered will help in stepping through SSIS packages failing to run when scheduled in the SQL Server Agent.  Cases do arise when much more in-depth troubleshooting is required and these resolutions do not apply.  When they are exhausted, stay on track with, one change at a time fundamentals.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/ssis-runs-in-bids-but-not-with-sql-agent/feed/</wfw:commentRss>
+		<slash:comments>10</slash:comments>
+		</item>
+		<item>
+		<title>SQL Saturday Iowa</title>
+		<link>/index.php/datamgmt/datadesign/sqlsaturday50-iowa/</link>
+		<comments>/index.php/datamgmt/datadesign/sqlsaturday50-iowa/#comments</comments>
+		<pubDate>Sat, 11 Sep 2010 14:09:16 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql community]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/09/sqlsaturday50-iowa/</guid>
+		<description><![CDATA[Last year I attended SQL Saturday in Iowa and enjoyed it immensely.  I was glad to see a follow up for this year coming this Friday, September 18th.  This year I’m very happy to announce that I will be attending Iowa’s second SQL Saturday and also contributing as a speaker.  If you have never been to a SQL Saturday event, I highly recommend attending this one or another in your area.  These events are free and organized by people just like you and I.]]></description>
+				<content:encoded><![CDATA[<p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqlsat50.gif" alt="" title="" width="244" height="106" align="left" /></div>
+<p>Last year I attended SQL Saturday in Iowa and enjoyed it immensely.  I was glad to see a follow up for this year coming this Friday, September 18th.  This year I’m very happy to announce that I will be attending <a href="http://www.sqlsaturday.com/eventhome.aspx">Iowa’s second SQL Saturday</a> and also contributing as a speaker.  If you have never been to a SQL Saturday event, I highly recommend attending this one or another in your area.  These events are free and organized by people just like you and I.  That means they know what you want to hear and how to present that information to you.  (Not to mention the awesome prizes that sponsors give out in the raffle)</p>
+<p>These events are 100% free.  One of the other great aspects to the SQL Community, we have a vast amount of truly community orientated vendors that sponsor SQL Saturday events.  When you are attending, take the time out during lunch or between sessions to stop at the vendor booths to thank them and also find out what great new products they have to offer.</p>
+<p>I will be talking about SQL Server Integration Services and coming from the ground up to running packages.</p>
+<p><strong>The abstract for this session:</strong></p>
+<p><i>This session discusses what is needed to install, develop, and execute a basic SSIS 2008 package. An overview of some basic yet powerful tasks available to administrators and developers as well as ways to increase the performance of commonly used tasks and components will be discussed briefly.</i> </p>
+<p><span class="MT_under">We will cover</span> </p>
+<ul>
+<li>Planning and Installation Requirements</li>
+<li>Developing a basic SSIS package </li>
+<li>Importing/Exporting packages </li>
+<li>SSIS issues to watch out for </li>
+<li>Deploying an SSIS package to production </li>
+<li>Differentiating various package storage methods </li>
+<li>Running packages manually or on a schedule</li>
+</ul>
+<p>I will also be giving away a free licensed for <a href="http://www.gerasus.com/">Gerasus&#8217;s SSIS-DTS Package Search 2.0</a>.  Very cool and useful product! </p>
+<p>I look forward to this event and getting into some great conversations with the attendees as well as having the opportunity to sit in on the other great sessions that are scheduled.</p></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sqlsaturday50-iowa/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday &#8211; Give me my cores SSIS 2008!</title>
+		<link>/index.php/datamgmt/dbprogramming/ssis-2008-multiproc-usage/</link>
+		<comments>/index.php/datamgmt/dbprogramming/ssis-2008-multiproc-usage/#respond</comments>
+		<pubDate>Tue, 08 Jun 2010 08:39:46 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql community]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+		<category><![CDATA[ssis 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/ssis-2008-multiproc-usage/</guid>
+		<description><![CDATA[I’m jumping into the T-SQL Tuesday fun this week.  It is a busy week at that with SQL University writing and everything going on in the SQL Community.  The SQL Server 2008 (R2) hottest, most favorite new feature topic had me wanting to throw SSIS out there once more and show off the Data Flow Engine changes.]]></description>
+				<content:encoded><![CDATA[<p><a href="http://sqlchicken.com/2010/06/t-sql-tuesday-007-summertime-in-the-sql/">
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday1.gif" alt="" title="T-SQL Tuesday" width="154" height="154" align="left" /></div>
+<p></a>I’m jumping into the T-SQL Tuesday fun this week.  The very well known, Jorge Segarra (<a href="http://sqlchicken.com/">blog</a> | <a href="http://twitter.com/sqlchicken">twitter</a>) is <a href="http://sqlchicken.com/2010/06/t-sql-tuesday-007-summertime-in-the-sql/">hosting the fun</a> this time around.  It is a busy week at that with SQL University writing and everything going on in the SQL Community.  The SQL Server 2008 (R2) hottest, most favorite new feature topic had me wanting to throw SSIS out there once more and show off the Data Flow Engine changes.  OK, the Data Flow Engine isn&#8217;t a, &#8220;New Feature&#8221; but given the redesign, I&#8217;m throwing it into the mix with the rest.
+</p>
+<p>
+This was a big, big and did I say BIG change in SSIS 2008.  Being a performance freak, the changes to the Data Flow and the effective use of multi-core processors was what had me the most excited.  See, with SSIS 2005, Data Flow was sent off on its merry way running execution trees with only one lonely execution thread.  That meant one thread!  This doesn’t help us much in a core happy world we live in.  So in SSIS 2008 we had a big change to this architecture.  Did I mention this was big?  </p>
+<h3><strong>Off to the races we go with Pipeline Parallelism</strong></h3>
+<p>What SSIS 2008 has given us over SSIS 2005 and the execution tree is the ability to run more than one component from the single tree.  This is really a huge change.  Before this change and automated thread scheduling in SSIS, we had to try making our own with designing methods.  In some cases the changes in designs caused other performance problems themselves.  Now with a thread pool, threads are assigned dynamically (yes, auto-magically) to components.  Thread pooling is not a new concept to the computing world (and .NET framework).   Thread pooling manages where and what work a set of threads will work on.   When work is thrown at the pool, the work is sent off to threads that can work on it.  This means multiple threads working on multiple jobs in parallel execution.  Thread pooling can be done manually but with SSIS and SQL Server, we like the concept of this being controlled without us causing problems.  In SSIS 2008 we were given just that automatic scheduling.</p>
+<p>The question of the hour is, does this help us with performance?  The performance shines from the massive tests that have been done already and can answer the question for us.  If you haven’t heard of the <a href="http://blogs.msdn.com/b/sqlperf/archive/2008/02/27/etl-world-record.aspx">ETL World Record</a>, you need to get over there and check it out.  1 TB in 30 minutes!!  Yes, on SSIS 2008 and the architecture behind it.  </p>
+<p>
+The best way to check this out is to show the differences.  Robert Sheldon also went over this test on the, <a href="http://www.simple-talk.com/sql/ssis/sql-server-2008-ssis-cribsheet/">SSIS 2008 Crib sheet</a>.  Very cool write-up and recommended reading it.</p>
+<h3><strong>The truth is in the pipe by logging it</strong></h3>
+<p>
+Let’s create a package that will run some data through so we can log the execution.</p>
+<blockquote><p><span class="MT_red">Note: the SSIS 2008 Crib sheet shows pretty much the same here.  Robert did an awesome job explaining all of this.  Highly recommend reading it.</span></p></blockquote>
+<p>Steps to the test SSIS in 2005 and 2008 so we can see the execution changes and speed differences
+</p>
+<ol>
+<li>In BIDS 2005, create a new package named Pipes 2005</li>
+<li>Bring over an OLE DB Source and connect this source to AdventureWorks.  </li>
+<li>Bring in the table, Sales.SalesOrderDetail</li>
+<li>Drop a Conditional Split into the Data Flow tab</li>
+<li>Make the condition based on OrderQty being greater than one.  </li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday2.gif" alt="" title="" width="628" height="76" /></div>
+<li>Next, drag and drop two Derived Column’s</li>
+<li>Make one Derived column the Case 1 output by connecting the first Path to it and selecting Case 1 output</li>
+<li>Make the Expression (DT_STR,3,1252)ProductID + &#8221; for &#8221; + (DT_STR,3,1252)OrderQty</li>
+<li>Change the Data Type to DT_STR (non-unicode string)</li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday3.gif" alt="" title="" width="628" height="112" /></div>
+<li>Do this for the next Derived Column by connecting the remaining output path to it.  </li>
+<li>Name the column Under2orders and leave the Expression the same</li>
+<li>Connect both Derived Columns to two unique SQL Server Destinations</li>
+<li>In the SQL Server Destinations, use the same connection of AdventureWorks.  Click, New to create a new table.  Use the following CREATE TABLE statement:
+<pre>CREATE TABLE [Playing_1] (
+OrderOver1Unit varchar(10)
+)</pre>
+</li>
+<li>Use this for the second destination but name the table, [Playing_2]</li>
+<p>Our finished product should appear like below</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday4.gif" alt="" title="" width="444" height="381" /></div>
+<li>Next, click the menu option SSIS and select Logging</li>
+<li>Select package in the Containers and add a new SSIS log provider for Text files.</li>
+<li>Add a path to the new log of C:ExecutionTreeSSIS_Test2005</li>
+<li>Highlight Data Flow Task to move into logging the task.</li>
+<li>Click Details in the right tabs and click the Advanced button </li>
+<li>Scroll down a bit and check PipelineExecutionTree. </li>
+<li>Uncheck everything except MessageText</li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday5.gif" alt="" title="" width="628" height="317" /></div>
+<li>Click OK until out of the editors and save the package. </li>
+<li>Run the package from BIDS </li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday6.gif" alt="" title="" width="474" height="409" /></div>
+<p>And we have our data split and loaded</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday7.gif" alt="" title="" width="380" height="419" /></div>
+<p>Execution time was 936 Milliseconds</p>
+<p>SSIS 2005 PipelineExecutionTrees log</p>
+<blockquote><p>begin execution tree 0<br />
+   output &#8220;OLE DB Source Output&#8221; (11)<br />
+   input &#8220;Conditional Split Input&#8221; (17)<br />
+   output &#8220;Case 1&#8221; (146)<br />
+   input &#8220;Derived Column Input&#8221; (163)<br />
+   output &#8220;Derived Column Output&#8221; (164)<br />
+   input &#8220;SQL Server Destination Input&#8221; (61)<br />
+   output &#8220;Derived Column Error Output&#8221; (165)<br />
+   output &#8220;Conditional Split Default Output&#8221; (18)<br />
+   input &#8220;Derived Column Input&#8221; (169)<br />
+   output &#8220;Derived Column Output&#8221; (170)<br />
+   input &#8220;SQL Server Destination Input&#8221; (78)<br />
+   output &#8220;Derived Column Error Output&#8221; (171)<br />
+   output &#8220;Conditional Split Error Output&#8221; (20)<br />
+end execution tree 0<br />
+begin execution tree 1<br />
+   output &#8220;OLE DB Source Error Output&#8221; (12)<br />
+end execution tree 1</p></blockquote>
+</ol>
+<p>
+We can see all of the work was primarily done in execution tree 0.   936 Milliseconds isn’t the greatest for what we just did either.</p>
+<p>Now upgrade the package to 2008 by creating a new SSIS project.  Right click SSIS Packages in the Solution Explorer and select Add Existing.  Browse to the package we just created in SSIS 2005 (found in your projects folder in My Documents by default).  Double click the package to bring it in.<br />
+You will receive the succeeded upgrade to SSIS 2008 message.  Click OK to close it and load the upgraded 2008 package.</p>
+<p>Click the SSIS option in the menu strip and select lopping.  Change the path to the text file to be C:ExecutionTreeSSIS_Test2008<br />
+Save and run the package</p>
+<p>Package execution time for this was 640 Milliseconds.  Now check the log<br />
+<blockquote>ExecutionTreeSSIS_Test2008</p>
+<p>Begin path plan<br />
+   Begin Path Plan 0<br />
+      Call ProcessInput on component &#8220;Conditional Split&#8221; (16) for input &#8220;Conditional Split Input&#8221; (17)<br />
+      Create new execution item for subpath 0<br />
+      Create new execution item for subpath 1<br />
+      Begin Subpath Plan 0<br />
+         Create new row view for output &#8220;Case 1&#8221; (146)<br />
+         Call ProcessInput on component &#8220;Derived Column&#8221; (162) for input &#8220;Derived Column Input&#8221; (163)<br />
+         Create new row view for output &#8220;Derived Column Output&#8221; (164)<br />
+         Call ProcessInput on component &#8220;SQL Server Destination&#8221; (45) for input &#8220;SQL Server Destination Input&#8221; (61)<br />
+      End Subpath Plan 0<br />
+      Begin Subpath Plan 1<br />
+         Create new row view for output &#8220;Conditional Split Default Output&#8221; (18)<br />
+         Call ProcessInput on component &#8220;Derived Column 1&#8221; (168) for input &#8220;Derived Column Input&#8221; (169)<br />
+         Create new row view for output &#8220;Derived Column Output&#8221; (170)<br />
+         Call ProcessInput on component &#8220;SQL Server Destination 1&#8221; (62) for input &#8220;SQL Server Destination Input&#8221; (78)<br />
+      End Subpath Plan 1<br />
+   End Path Plan 0</p>
+<p>End path plan</p></blockquote>
+<p>Changes we can see in the logging are the Paths and the Subpaths.  This is showing the tasks being executed in the main path in parallel by using Subpaths.  </p>
+<p>And our execution time was increased.  </p>
+<h3><strong>Where’s the beef? Right there, in the Data Flow Engine</strong></h3>
+<p>
+The Data Flow Engine changes are truly an enhancement that pushes SSIS to the Enterprise ETL levels.  Don’t sell yourself short by dismissing the abilities of SSIS as anything less than performing at that level.
+</p>
+<blockquote><p>References and in-depth reading materials<br />
+<a href="http://msdn.microsoft.com/en-us/library/bb522498.aspx">Architecture of Integration Services</a></p>
+<p><a href="http://sqlcat.com/top10lists/archive/2009/02/24/top-10-performance-and-productivity-reasons-to-use-sql-server-2008-for-your-business-intelligence-solutions.aspx">Top 10 Performance and Productivity Reasons to Use SQL Server 2008 for Your Business Intelligence Solutions</a></p>
+<p><a href="http://www.simple-talk.com/sql/ssis/sql-server-2008-ssis-cribsheet/">SSIS 2008 Crib Sheet</a></p></blockquote>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/ssis-2008-multiproc-usage/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Removing old files with SSIS</title>
+		<link>/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/</link>
+		<comments>/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/#comments</comments>
+		<pubDate>Fri, 04 Jun 2010 12:29:42 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[delete files]]></category>
+		<category><![CDATA[sql community]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/removing-old-files-with-ssis-sql-server/</guid>
+		<description><![CDATA[This post will illustrate two methods for removing old files from directories using SSIS.  This task is often used to delete old backup files and other ETL files that are not required any longer.  We’ll step through two methods.  First method uses a script task entirely for the removal and the logging events.  This method will also have some comments in for logging and using the FireInformation method to mimic the normal logging abilities of SSIS.  The FireInformation method didn’t provide much more of a performance boost so it wasn’t used here.  Second method uses a Foreach Loop Container, Script Task for logic and a File System Task for the delete event.  SSIS Logging will be utilized with the OnPreExecute and OnPostExecute events in the second method over the System.IO method of AppendText.]]></description>
+				<content:encoded><![CDATA[<p>
+This post will illustrate two methods for removing old files from directories using SSIS.  This task is often used to delete old backup files and other ETL files that are not required any longer.  We’ll step through two methods.  First method uses a script task entirely for the removal and the logging events.  This method will also have some comments in for logging and using the FireInformation method to mimic the normal logging abilities of SSIS.  The FireInformation method didn’t provide much more of a performance boost so it wasn’t used here.  Second method uses a Foreach Loop Container, Script Task for logic and a File System Task for the delete event.  SSIS Logging will be utilized with the OnPreExecute and OnPostExecute events in the second method over the System.IO method of AppendText.
+</p>
+<p>
+The use of System.IO in a script task performed much better than the use of the File System Task.
+</p>
+<p>
+Both methods were tested on folders containing 300 files with size ranging from 200MB to 1GB.  168 files were placed among the 300 in order to meet the properties that will require a delete event to fire.</p>
+<p>Deletion by System.IO and manually logging to flat files elapsed in 156 Milliseconds. </p>
+<p>Deletion by means of a Foreach Loop Container containing a Script Task to validate the file meets criteria (File System Task is limited in doing that) and then the File System Task to force the delete took a whopping 3.962 seconds!</p>
+<p>Have fun playing with this yourself and hope it comes in handy when you need to perform this type of task.
+</p>
+<p>
+If anyone has other methods or improvements to these, please feel free to comment or start a thread in the LessThanDot SQL Server forums.
+</p>
+<p><h2>Method one: Script Task</h2>
+<ol>
+<li>Bring over a Script Task into the Control Flow </li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_1.gif" alt="" title="" width="437" height="157" /></div>
+<li>Name the task, &#8220;Remove all files based on backdays&#8221;</li>
+<li>Create the following variables</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_2.gif" alt="" title="" width="343" height="137" /></div>
+<li>Double click the script task to open the editor.</li>
+<li>Add the variable to the ReadOnlyVariables area</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_3.gif" alt="" title="" width="585" height="410" /></div>
+<li>Click Edit Script</li>
+<li>Add the following code</li>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.IO</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Data</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Microsoft.SqlServer.Dts.Runtime</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Windows.Forms</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> ST_aaf20a0bd5b94ad394ab80cf5d585c41<span class="sy0">.</span><span class="me1">csproj</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span><span class="kw5">System</span><span class="sy0">.</span><span class="me1">AddIn</span><span class="sy0">.</span><span class="me1">AddIn</span><span class="br0">&#40;</span><span class="st0">&quot;ScriptMain&quot;</span>, Version <span class="sy0">=</span> <span class="st0">&quot;1.0&quot;</span>, Publisher <span class="sy0">=</span> <span class="st0">&quot;&quot;</span>, Description <span class="sy0">=</span> <span class="st0">&quot;&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">partial</span> <span class="kw4">class</span> ScriptMain <span class="sy0">:</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Tasks</span><span class="sy0">.</span><span class="me1">ScriptTask</span><span class="sy0">.</span><span class="me1">VSTARTScriptObjectModelBase</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co2">#region VSTA generated code</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">enum</span> ScriptResults
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Success <span class="sy0">=</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Runtime</span><span class="sy0">.</span><span class="me1">DTSExecResult</span><span class="sy0">.</span><span class="me1">Success</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Failure <span class="sy0">=</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Runtime</span><span class="sy0">.</span><span class="me1">DTSExecResult</span><span class="sy0">.</span><span class="me1">Failure</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co2">#endregion</span>
+&nbsp;
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Main<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> logfile <span class="sy0">=</span> Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::logfile&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; DateTime olderThanDate <span class="sy0">=</span> <span class="br0">&#40;</span>DateTime<span class="br0">&#41;</span>Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::daysback&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> folder <span class="sy0">=</span> Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::folder&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span><span class="sy0">!</span><span class="br0">&#40;</span>File<span class="sy0">.</span><span class="me1">Exists</span><span class="br0">&#40;</span>logfile<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileInfo fi <span class="sy0">=</span> <span class="kw3">new</span> FileInfo<span class="br0">&#40;</span>logfile<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileStream fstr <span class="sy0">=</span> fi<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; fstr<span class="sy0">.</span><span class="me1">Close</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ActionJackson<span class="br0">&#40;</span>folder, logfile, olderThanDate<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">catch</span> <span class="br0">&#40;</span>Exception Ex<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Dts<span class="sy0">.</span><span class="me1">Events</span><span class="sy0">.</span><span class="me1">FireError</span><span class="br0">&#40;</span><span class="nu0">1</span>, <span class="st0">&quot;&quot;</span>, <span class="st0">&quot;BOOM!!! &nbsp;&quot;</span> <span class="sy0">+</span> Ex<span class="sy0">.</span><span class="me1">Message</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="st0">&quot;&quot;</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Dts<span class="sy0">.</span><span class="me1">TaskResult</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw4">int</span><span class="br0">&#41;</span>ScriptResults<span class="sy0">.</span><span class="me1">Success</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">private</span> <span class="kw4">void</span> ActionJackson<span class="br0">&#40;</span><span class="kw4">string</span> folder, <span class="kw4">string</span> path, DateTime olderThanDate<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; DirectoryInfo dirInfo <span class="sy0">=</span> <span class="kw3">new</span> DirectoryInfo<span class="br0">&#40;</span>folder<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; TextWriter tw <span class="sy0">=</span> File<span class="sy0">.</span><span class="me1">AppendText</span><span class="br0">&#40;</span>path<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileInfo<span class="br0">&#91;</span><span class="br0">&#93;</span> files <span class="sy0">=</span> dirInfo<span class="sy0">.</span><span class="me1">GetFiles</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span>FileInfo file <span class="kw1">in</span> files<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>file<span class="sy0">.</span><span class="me1">LastWriteTime</span> <span class="sy0">&lt;</span> olderThanDate<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//or use Dts.Events.FireInformation(0, &quot;&quot;, &quot;File Deleted Succesfully&quot;, &quot;&quot;, 0, True)</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//with a logging file destination setup</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//the two methods did not vary in performance much. &nbsp;FireInformation allows for </span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//the same descriptive logging as OnPreExecute/OnPostExecute descriptions </span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; tw<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;File &quot;</span> <span class="sy0">+</span> file<span class="sy0">.</span><span class="me1">FullName</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">&quot; Deleted on &quot;</span> <span class="sy0">+</span> <span class="kw5">System</span><span class="sy0">.</span><span class="me1">DateTime</span><span class="sy0">.</span><span class="me1">Now</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; file<span class="sy0">.</span><span class="me1">IsReadOnly</span> <span class="sy0">=</span> <span class="kw1">false</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; file<span class="sy0">.</span><span class="me1">Delete</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; tw<span class="sy0">.</span><span class="me1">Close</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System;
+using System.IO;
+using System.Data;
+using Microsoft.SqlServer.Dts.Runtime;
+using System.Windows.Forms;
+
+namespace ST_aaf20a0bd5b94ad394ab80cf5d585c41.csproj
+{
+    [System.AddIn.AddIn("ScriptMain", Version = "1.0", Publisher = "", Description = "")]
+    public partial class ScriptMain : Microsoft.SqlServer.Dts.Tasks.ScriptTask.VSTARTScriptObjectModelBase
+    {
+
+        #region VSTA generated code
+        enum ScriptResults
+        {
+            Success = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Success,
+            Failure = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Failure
+        };
+        #endregion
+
+
+        public void Main()
+        {
+            try
+            {
+                string logfile = Dts.Variables["User::logfile"].Value.ToString();
+                DateTime olderThanDate = (DateTime)Dts.Variables["User::daysback"].Value;
+                string folder = Dts.Variables["User::folder"].Value.ToString();
+
+                    if (!(File.Exists(logfile)))
+                    {
+                        FileInfo fi = new FileInfo(logfile.ToString());
+                        FileStream fstr = fi.Create();
+                        fstr.Close();
+                    }
+                    ActionJackson(folder, logfile, olderThanDate);
+            }
+            catch (Exception Ex)
+            {
+                Dts.Events.FireError(1, "", "BOOM!!!  " + Ex.Message.ToString(), "", 0);
+            }
+
+            Dts.TaskResult = (int)ScriptResults.Success;
+        }
+
+        private void ActionJackson(string folder, string path, DateTime olderThanDate)
+        {
+                DirectoryInfo dirInfo = new DirectoryInfo(folder);
+                TextWriter tw = File.AppendText(path);
+
+                FileInfo[] files = dirInfo.GetFiles();
+                foreach (FileInfo file in files)
+                {
+                    if (file.LastWriteTime &lt; olderThanDate)
+                    {
+                        //or use Dts.Events.FireInformation(0, "", "File Deleted Succesfully", "", 0, True)
+                        //with a logging file destination setup
+                        //the two methods did not vary in performance much.  FireInformation allows for 
+                        //the same descriptive logging as OnPreExecute/OnPostExecute descriptions 
+                        tw.WriteLine("File " + file.FullName.ToString() + " Deleted on " + System.DateTime.Now.ToString());
+                        file.IsReadOnly = false;
+                        file.Delete();
+                    }
+                }
+                tw.Close();
+        }
+    }
+}</pre></div></div>
+
+<li>Close the code editor and click OK to the script task editor.</li>
+<li>Right click an empty space in the Control Flow and select Package Configurations</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_4.gif" alt="" title="" width="211" height="120" /></div>
+<li>Check Enable package configurations</li>
+<li>Click Add and enter C:DelConfig.xml to the specify configuration settings directly textbox</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_5.gif" alt="" title="" width="526" height="341" /></div>
+<li>Click Finish and Close to the configurations editor.  </li>
+<li>You can open the XML file to edit the folder location and the log file location now</li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/ssis_delete2_0.gif" alt="" title="" width="819" height="727" /></div>
+<li>Import the package into SSIS and execute it to run.  </li>
+</ol>
+<h2>Method two: Foreach Loop Container</h2>
+<ol>
+<li>Bring over a Foreach Loop Container in the Control Flow</li>
+<li>Create these variables</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_6.gif" alt="" title="" width="273" height="129" /></div>
+<li>Bring over a Script Task and drop it into the Foreach Loop Container</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_7.gif" alt="" title="" width="301" height="329" /></div>
+<li>Double click the Script Task and add these ReadOnly variables</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_8.gif" alt="" title="" width="628" height="378" /></div>
+<li>Click the Edit Script button and add this code</li>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Data</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.IO</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Microsoft.SqlServer.Dts.Runtime</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Windows.Forms</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> ST_216af79b563f4866bb64f6043b232b4e<span class="sy0">.</span><span class="me1">csproj</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="br0">&#91;</span><span class="kw5">System</span><span class="sy0">.</span><span class="me1">AddIn</span><span class="sy0">.</span><span class="me1">AddIn</span><span class="br0">&#40;</span><span class="st0">&quot;ScriptMain&quot;</span>, Version <span class="sy0">=</span> <span class="st0">&quot;1.0&quot;</span>, Publisher <span class="sy0">=</span> <span class="st0">&quot;&quot;</span>, Description <span class="sy0">=</span> <span class="st0">&quot;&quot;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">partial</span> <span class="kw4">class</span> ScriptMain <span class="sy0">:</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Tasks</span><span class="sy0">.</span><span class="me1">ScriptTask</span><span class="sy0">.</span><span class="me1">VSTARTScriptObjectModelBase</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co2">#region VSTA generated code</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">enum</span> ScriptResults
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Success <span class="sy0">=</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Runtime</span><span class="sy0">.</span><span class="me1">DTSExecResult</span><span class="sy0">.</span><span class="me1">Success</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Failure <span class="sy0">=</span> Microsoft<span class="sy0">.</span><span class="me1">SqlServer</span><span class="sy0">.</span><span class="me1">Dts</span><span class="sy0">.</span><span class="me1">Runtime</span><span class="sy0">.</span><span class="me1">DTSExecResult</span><span class="sy0">.</span><span class="me1">Failure</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co2">#endregion</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Main<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileInfo fi <span class="sy0">=</span> <span class="kw3">new</span> FileInfo<span class="br0">&#40;</span>Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::filefocus&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>fi<span class="sy0">.</span><span class="me1">LastWriteTime</span> <span class="sy0">&lt;</span> <span class="br0">&#40;</span>DateTime<span class="br0">&#41;</span>Dts<span class="sy0">.</span><span class="me1">Variables</span><span class="br0">&#91;</span><span class="st0">&quot;User::daysback&quot;</span><span class="br0">&#93;</span><span class="sy0">.</span><span class="kw1">Value</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Dts<span class="sy0">.</span><span class="me1">TaskResult</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw4">int</span><span class="br0">&#41;</span>ScriptResults<span class="sy0">.</span><span class="me1">Success</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">catch</span> <span class="br0">&#40;</span>Exception Ex<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Dts<span class="sy0">.</span><span class="me1">Events</span><span class="sy0">.</span><span class="me1">FireError</span><span class="br0">&#40;</span><span class="nu0">1</span>, <span class="st0">&quot;&quot;</span>, <span class="st0">&quot;BOOM!!! &nbsp;&quot;</span> <span class="sy0">+</span> Ex<span class="sy0">.</span><span class="me1">Message</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="st0">&quot;&quot;</span>, <span class="nu0">0</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System;
+using System.Data;
+using System.IO;
+using Microsoft.SqlServer.Dts.Runtime;
+using System.Windows.Forms;
+
+namespace ST_216af79b563f4866bb64f6043b232b4e.csproj
+{
+    [System.AddIn.AddIn("ScriptMain", Version = "1.0", Publisher = "", Description = "")]
+    public partial class ScriptMain : Microsoft.SqlServer.Dts.Tasks.ScriptTask.VSTARTScriptObjectModelBase
+    {
+
+        #region VSTA generated code
+        enum ScriptResults
+        {
+            Success = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Success,
+            Failure = Microsoft.SqlServer.Dts.Runtime.DTSExecResult.Failure
+        };
+        #endregion
+
+        public void Main()
+        {
+            try
+            {
+                FileInfo fi = new FileInfo(Dts.Variables["User::filefocus"].Value.ToString());
+
+                if (fi.LastWriteTime &lt; (DateTime)Dts.Variables["User::daysback"].Value)
+                {
+                    Dts.TaskResult = (int)ScriptResults.Success;
+                }
+            }
+            catch (Exception Ex)
+            {
+                Dts.Events.FireError(1, "", "BOOM!!!  " + Ex.Message.ToString(), "", 0);
+            }
+        }
+    }
+}</pre></div></div>
+
+<li>Close the code editor and hit OK to exit and save the script task settings.</li>
+<li>Bring over and drop a File System Task into the Foreach Loop Container</li>
+<li>Connect the Script Task to the File System Task</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_9.gif" alt="" title="" width="284" height="267" /></div>
+<li>Double click the Foreach Loop Container and go to Collection.</li>
+<li>Enter in a default folder</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_10.gif" alt="" title="" width="469" height="348" /></div>
+<li>In Variable Mappings, drop down the Variable and select the User::filefocus variable and leave the index at 0</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_11.gif" alt="" title="" width="533" height="104" /></div>
+<li>Click OK to close the editor</li>
+<li>Double click the File System Task</li>
+<li>Change Operation to Delete</li>
+<li>Change IsSourcePathVariable to True</li>
+<li>SourceVariable to User::filefocus</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_12.gif" alt="" title="" width="449" height="195" /></div>
+<li>Click OK to exit and save</li>
+<li>Add a package configurations file as an XML file</li>
+<li>Right click an empty space in the Control Flow window</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_13.gif" alt="" title="" width="413" height="135" /></div>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_14.gif" alt="" title="" width="469" height="400" /></div>
+<li>Enter FileEnumConfig.xml and click, Next</li>
+<li>Click the variables filefocus and folder</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_15.gif" alt="" title="" width="402" height="205" /></div>
+<li>Name the configuration </li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_16.gif" alt="" title="" width="419" height="372" /></div>
+<li>Click Finish and then Close to exit and save</li>
+<li>Click SSIS in the menu strip and select Logging</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_17.gif" alt="" title="" width="254" height="187" /></div>
+<li>Check container FileEnumTest</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_18.gif" alt="" title="" width="356" height="106" /></div>
+<li>Select SSIS log provider for Text Files</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_19.gif" alt="" title="" width="476" height="106" /></div>
+<li>Drop down configuration and select New Connection</li>
+<li>Select Create File and enter C:DelbyFilEnum.txt</li>
+<div class="image_block"><img src="/wp-content/uploads/users/onpnt/ssis_delete_20.gif" alt="" title="" width="476" height="241" /></div>
+<li>Click OK and then OK to exit and save</li>
+<li>You can open the XML file to edit the folder location and the log file location now</li>
+<li>Import the package into SSIS and execute it to run.  </li>
+</ol>
+<p>Logging from the first method appears in blocks like this</p>
+<blockquote><p>File C:TestDeleteSystemIOFile_20100603121501.trn Deleted on 6/4/2010 7:11:38 AM<br />
+File C:TestDeleteSystemIOFile_20100603123001.trn Deleted on 6/4/2010 7:11:38 AM
+</p></blockquote>
+<p>compared to the SSIS logging method of</p>
+<blockquote><p>Diagnostic,onpnt,onpnt,Delete Old File,{E4830550-A51A-46F3-A374-243888315707},{969D771F-24A9-4A57-B98D-42B025BE2573},6/4/2010 7:31:25 AM,6/4/2010 7:31:25 AM,0,(null),Trying to delete file &#8216;C:TestDeleteFileSystemTaskFile_20100603191001.trn&#8217;.<br />
+Diagnostic,onpnt,onpnt,Delete Old File,{E4830550-A51A-46F3-A374-243888315707},{969D771F-24A9-4A57-B98D-42B025BE2573},6/4/2010 7:31:25 AM,6/4/2010 7:31:25 AM,0,(null),Finished deleting file &#8216;C:TestDeleteFileSystemTaskFile_20100603191001.trn&#8217;.</p></blockquote>
+<h2>Conclusions</h2>
+<p>
+The use of the script task and going to the System.IO namespace to do the work has some benefits over the second method.  The largest was speed.  The second was the administrative and development time needed.  </p>
+<p>Both of these methods are sound and good options.  The File System Task usage removes the need for more extensive programming over the Script Task.   There are also benefits in the logging method used and the amount of information we can easily obtain during the execution progress.  Picking either method will be decided on comfort level with coding in .NET and performance requirements while giving up or gaining functionality.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/removing-old-files-with-ssis-sql-server/feed/</wfw:commentRss>
+		<slash:comments>13</slash:comments>
+		</item>
+		<item>
+		<title>SQL Connections Suburban Chicago May 2010 Meeting (SSIS Basics)</title>
+		<link>/index.php/datamgmt/datadesign/get-some-chicago-ssis/</link>
+		<comments>/index.php/datamgmt/datadesign/get-some-chicago-ssis/#comments</comments>
+		<pubDate>Mon, 03 May 2010 13:55:24 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql community]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/get-some-chicago-ssis/</guid>
+		<description><![CDATA[I will be speaking tomorrow night on SQL Server Integration Services basics for the SQL Connections group in the Chicago suburbs.  Yes, the Wisconsin guy is going to go farther than Hwy 60 once again.  The session, “SSIS 2008 Basics – Get up to Speed in 90 Minutes”, will be going over the fundamentals of SSIS and getting started with your own installation and development of packages.   There is a lot to cover when considering SSIS basics when starting from opening the installation media, to opening BIDS for the first time.  I hope everyone that attends leaves the session excited and ready to jump into SSIS.]]></description>
+				<content:encoded><![CDATA[<p>
+I will be speaking tomorrow night, May 4th, on SQL Server Integration Services basics for the SQL Connections group in the Chicago suburbs.  Yes, the Wisconsin guy is going to go farther than Hwy 60 once again.  The session, &#8220;SSIS 2008 Basics – Get up to Speed in 90 Minutes&#8221;, will be going over the fundamentals of SSIS and getting started with your own installation and development of packages.   There is a lot to cover when considering SSIS basics when starting from opening the installation media, to opening BIDS for the first time.  I hope everyone that attends leaves the session excited and ready to jump into SSIS.
+</p>
+<p>
+The path and goals of the session will cover</p>
+<ol>
+<li>Planning and Installation Requirements</li>
+<li>Developing a basic SSIS package</li>
+<li>Importing/Exporting packages</li>
+<li>SSIS issues to watch out for</li>
+<li>Deploying an SSIS package to production</li>
+<li>Differentiating various package storage methods</li>
+<li>Running packages manually or on a schedule</li>
+</ol>
+<p>If you are new to SSIS or a seasoned SSIS developer/administrator, come out and join us.  Remember, SSIS is as powerful of a feature in SQL Server to developers and it is to database administrators.
+</p>
+<p>
+For more details go to http://sqlconnections.eventbrite.com/<br />
+<br />
+Once the session is completed, I’ll upload the slides and accompanying package (with supporting files) to this post.<br />
+<br />
+See you there!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/get-some-chicago-ssis/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+	</channel>
+</rss>

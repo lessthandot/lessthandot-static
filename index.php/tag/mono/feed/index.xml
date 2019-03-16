@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>mono &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/mono/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>A Simple Parallel.ForEach Implementation in .NET 3.5</title>
+		<link>/index.php/webdev/serverprogramming/a-simple-parallel-foreach-implementation-5/</link>
+		<comments>/index.php/webdev/serverprogramming/a-simple-parallel-foreach-implementation-5/#comments</comments>
+		<pubDate>Thu, 01 Apr 2010 12:25:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[.net]]></category>
+		<category><![CDATA[c#]]></category>
+		<category><![CDATA[concurrency]]></category>
+		<category><![CDATA[mono]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/04/a-simple-parallel-foreach-implementation-5/</guid>
+		<description><![CDATA[In an application I'm working on, I had a need for a method to write a single object to several Lucene indexes in order to support different types of searches.  I ended up with a method that looks like this:
+public static void Accept&#60;T&#62;(T to_be_i&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In an application I&#8217;m working on, I had a need for a method to write a single object to several <a href="http://incubator.apache.org/projects/lucene.net.html">Lucene</a> indexes in order to support different types of searches.  I ended up with a method that looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">void</span> Accept<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span><span class="br0">&#40;</span>T to_be_indexed<span class="br0">&#41;</span> 
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> indexers <span class="sy0">=</span> StructureMap<span class="sy0">.</span><span class="me1">ObjectFactory</span><span class="sy0">.</span><span class="me1">GetAllInstances</span><span class="sy0">&lt;</span>Indexer<span class="sy0">&lt;</span>T<span class="sy0">&gt;&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> x <span class="kw1">in</span> indexers<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; x<span class="sy0">.</span><span class="me1">Index</span><span class="br0">&#40;</span>to_be_indexed<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public static void Accept&lt;T&gt;(T to_be_indexed) 
+{
+	var indexers = StructureMap.ObjectFactory.GetAllInstances&lt;Indexer&lt;T&gt;&gt;();
+	
+	foreach (var x in indexers)
+	{
+		x.Index(to_be_indexed);
+	}
+}</pre></div></div>
+
+<p>Simple enough.  Because of all the disk I/O involved, it seemed like this would be a good candidate for processing concurrently.  I tried a few different options, but found manually creating an array of threads too awkward, and had some trouble getting the ThreadPool to wait properly.  I was talking about this with <a href="/index.php/All/?disp=authdir&amp;author=225">Matt</a> and he showed me a small class that he used for just this type of scenario called Countdown.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">class</span> Countdown <span class="sy0">:</span> IDisposable
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">private</span> <span class="kw1">readonly</span> ManualResetEvent done<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">private</span> <span class="kw1">volatile</span> <span class="kw4">int</span> current<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> Countdown<span class="br0">&#40;</span><span class="kw4">int</span> total<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; current <span class="sy0">=</span> total<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; done <span class="sy0">=</span> <span class="kw3">new</span> ManualResetEvent<span class="br0">&#40;</span><span class="kw1">false</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Signal<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">lock</span> <span class="br0">&#40;</span>done<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>current <span class="sy0">&gt;</span> <span class="nu0">0</span> <span class="sy0">&amp;&amp;</span> <span class="sy0">--</span>current <span class="sy0">==</span> <span class="nu0">0</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; done<span class="sy0">.</span><span class="kw1">Set</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Wait<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; done<span class="sy0">.</span><span class="me1">WaitOne</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> Dispose<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span><span class="br0">&#40;</span>IDisposable<span class="br0">&#41;</span>done<span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Dispose</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class Countdown : IDisposable
+{
+    private readonly ManualResetEvent done;
+    private volatile int current;
+
+    public Countdown(int total)
+    {
+        current = total;
+        done = new ManualResetEvent(false);
+    }
+
+    public void Signal()
+    {
+        lock (done)
+        {
+            if (current &gt; 0 &amp;&amp; --current == 0)
+                done.Set();
+        }
+    }
+
+    public void Wait()
+    {
+        done.WaitOne();
+    }
+
+    public void Dispose()
+    {
+        ((IDisposable)done).Dispose();
+    }
+} </pre></div></div>
+
+<p>I found this class <strong>much</strong> more predictable and easier to work with than a bunch of ManualResetEvents, so we started looking at how it could be used to solve the problem at hand.  It was remarkably easy, and I can only recall one issue that we ran into.  The end result looked like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">void</span> Accept<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span><span class="br0">&#40;</span>T to_be_indexed<span class="br0">&#41;</span> 
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> indexers <span class="sy0">=</span> StructureMap<span class="sy0">.</span><span class="me1">ObjectFactory</span><span class="sy0">.</span><span class="me1">GetAllInstances</span><span class="sy0">&lt;</span>Indexer<span class="sy0">&lt;</span>T<span class="sy0">&gt;&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="kw1">using</span> <span class="br0">&#40;</span><span class="kw1">var</span> cd <span class="sy0">=</span> <span class="kw3">new</span> Countdown<span class="br0">&#40;</span> indexers<span class="sy0">.</span><span class="me1">Count</span> <span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> current <span class="kw1">in</span> indexers<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> captured <span class="sy0">=</span> current<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ThreadPool<span class="sy0">.</span><span class="me1">QueueUserWorkItem</span><span class="br0">&#40;</span>x <span class="sy0">=&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; captured<span class="sy0">.</span><span class="me1">Index</span><span class="br0">&#40;</span>to_be_indexed<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; cd<span class="sy0">.</span><span class="me1">Signal</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; cd<span class="sy0">.</span><span class="me1">Wait</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public static void Accept&lt;T&gt;(T to_be_indexed) 
+{
+	var indexers = StructureMap.ObjectFactory.GetAllInstances&lt;Indexer&lt;T&gt;&gt;();
+	
+	using (var cd = new Countdown( indexers.Count ))
+    {
+        foreach (var current in indexers)
+        {
+            var captured = current;
+            ThreadPool.QueueUserWorkItem(x =&gt;
+                {
+                    captured.Index(to_be_indexed);
+                    cd.Signal();
+                });
+        }
+        cd.Wait();
+    }
+}</pre></div></div>
+
+<p>The problem we ran into was the lambda expression grabbing whatever &#8220;current&#8221; was defined as <strong><em>at execution time</em></strong>, causing the same index to be written to twice (and others not at all) in many cases.  This is what forced us to add the line<br />
+<code class="codespan">var captured = current;</code><br />
+and use captured rather than current within the lambda.  I&#8217;ve gotta say, I <strong>really</strong> like the all the code in that using block for the countdown.  It may be because I set rather low expectations with my hackish early attempts to get this done, but I like things very simple and this definitely fits the bill.  But, as beautiful / simple as the code may be, I still don&#8217;t want to write it multiple times if I can avoid it.  So I took a look at the signature for Parallel.ForEach in .net 4 and threw together a version that would work with my system (running on mono 2.4.2.3, mostly equivalent to .net 3.5).  Here that is:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">void</span> <span class="kw1">ForEach</span><span class="sy0">&lt;</span>T<span class="sy0">&gt;</span><span class="br0">&#40;</span>IEnumerable<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> enumerable, Action<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> action<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">using</span> <span class="br0">&#40;</span><span class="kw1">var</span> cd <span class="sy0">=</span> <span class="kw3">new</span> Countdown<span class="br0">&#40;</span> enumerable<span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> current <span class="kw1">in</span> enumerable<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> captured <span class="sy0">=</span> current<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ThreadPool<span class="sy0">.</span><span class="me1">QueueUserWorkItem</span><span class="br0">&#40;</span>x <span class="sy0">=&gt;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; action<span class="sy0">.</span><span class="me1">Invoke</span><span class="br0">&#40;</span>captured<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; cd<span class="sy0">.</span><span class="me1">Signal</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; cd<span class="sy0">.</span><span class="me1">Wait</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public static void ForEach&lt;T&gt;(IEnumerable&lt;T&gt; enumerable, Action&lt;T&gt; action)
+{
+    using (var cd = new Countdown( enumerable.Count() ))
+    {
+        foreach (var current in enumerable)
+        {
+            var captured = current;
+            ThreadPool.QueueUserWorkItem(x =&gt;
+                {
+                    action.Invoke(captured);
+                    cd.Signal();
+                });
+        }
+        cd.Wait();
+    }
+}</pre></div></div>
+
+<p>The only real changes were to use the Count() method on IEnumerable rather than the Count property on IList, and the change from<br />
+<code class="codespan">captured.Index(to_be_indexed);</code><br />
+to<br />
+<code class="codespan">action.Invoke(captured);</code><br />
+to allow execution of whatever method was passed in.</p>
+<p>Then, the Accept method can be changed to look like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">void</span> Accept<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span><span class="br0">&#40;</span>T to_be_indexed<span class="br0">&#41;</span> 
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> indexers <span class="sy0">=</span> StructureMap<span class="sy0">.</span><span class="me1">ObjectFactory</span><span class="sy0">.</span><span class="me1">GetAllInstances</span><span class="sy0">&lt;</span>Indexer<span class="sy0">&lt;</span>T<span class="sy0">&gt;&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; Parallel<span class="sy0">.</span><span class="kw1">ForEach</span><span class="br0">&#40;</span>indexers, x <span class="sy0">=&gt;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; x<span class="sy0">.</span><span class="me1">Index</span><span class="br0">&#40;</span>to_be_indexed<span class="br0">&#41;</span><span class="sy0">;</span> 
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public static void Accept&lt;T&gt;(T to_be_indexed) 
+{
+	var indexers = StructureMap.ObjectFactory.GetAllInstances&lt;Indexer&lt;T&gt;&gt;();
+	
+	Parallel.ForEach(indexers, x =&gt; {
+		x.Index(to_be_indexed);	
+	});
+}</pre></div></div>
+
+<p>I realize that this is a very naive implementation, and that Parallel.ForEach in .net 4 is probably doing things under the hood that I haven&#8217;t even considered (optimizing for different number of CPU&#8217;s and such) but I think / hope that the ThreadPool takes care of some of that for me.  I&#8217;d love to hear any comments on how to make it better though.  </p>
+<p>For another implementation, check out this Code Project article: <a href="http://www.codeproject.com/KB/dotnet/PoorMansParallelForEach.aspx">Poor Man&#8217;s Parallel ForEach</a>.  We tested this implementation briefly (and far from scientifically), but found that the ThreadPool behaved a bit more consistently, was often a bit faster, and also required much less code to implement.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/a-simple-parallel-foreach-implementation-5/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Mono 2.0 Has Been Released</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/mono-2-0-has-been-released/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/mono-2-0-has-been-released/#respond</comments>
+		<pubDate>Tue, 07 Oct 2008 00:05:10 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[.net]]></category>
+		<category><![CDATA[linux]]></category>
+		<category><![CDATA[mono]]></category>
+		<category><![CDATA[open source]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/10/mono-2-0-has-been-released/</guid>
+		<description><![CDATA[Mono 2.0 Has Been Released Mono 2.0 is a portable and open source implementation of the .NET framework for Unix, Windows, MacOS and other operating systems. Some Details: Microsoft Compatible APIs ADO.NET 2.0 API for accessing databases. ASP.NET 2.0 API for developing Web-based applications. Windows.Forms 2.0 API to create desktop applications. System.XML 2.0: An API [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><strong>Mono 2.0 Has Been Released</strong></p>
+<p>Mono 2.0 is a portable and open source implementation of the .NET framework for Unix, Windows, MacOS and other operating systems.</p>
+<p>Some Details:</p>
+<p><strong>Microsoft Compatible APIs</strong><br />
+ADO.NET 2.0 API for accessing databases.<br />
+ASP.NET 2.0 API for developing Web-based applications.<br />
+Windows.Forms 2.0 API to create desktop applications.<br />
+System.XML 2.0: An API to manipulate XML documents.<br />
+System.Core: Provides support for the Language Integrated Query (LINQ).<br />
+System.Xml.Linq: Provides a LINQ provider for XML.<br />
+System.Drawing 2.0 API: A portable graphics rendering API. </p>
+<p><strong>Mono APIs </strong><br />
+Gtk# 2.12: A binding to the Gtk+ 2.12 and GNOME libraries for creating desktop applications on Linux, Windows and MacOS X.<br />
+Mono.Cecil: A library to manipulate ECMA CLI files (the native format used for executables and libraries).<br />
+Mono.Cairo: A binding to the Cairo Graphics library to produce 2D graphics and render them into a variety of forms (images, windows, postscript and PDF).<br />
+Mono&#8217;s SQLite support: a library to create and consume databases created with SQLite.<br />
+Mono.Posix: a library to access Linux and Unix specific functionality from your managed application. With both a low-level interface as well as higher level interfaces. </p>
+<p>Download Mono 2.0 here: http://www.go-mono.com/mono-downloads/download.html</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/mono-2-0-has-been-released/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

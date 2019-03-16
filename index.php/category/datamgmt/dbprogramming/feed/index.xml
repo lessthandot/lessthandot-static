@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Database Programming &#8211; LessthanDot</title>
+	<atom:link href="/index.php/category/datamgmt/dbprogramming/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Replacing Trace Flags 1204 and 1222 with the Extended Events system_health Session</title>
+		<link>/index.php/datamgmt/dbprogramming/replacing-trace-flags-1204-and-1222-with-the-extended-events-system_health-session/</link>
+		<comments>/index.php/datamgmt/dbprogramming/replacing-trace-flags-1204-and-1222-with-the-extended-events-system_health-session/#respond</comments>
+		<pubDate>Tue, 24 Apr 2018 16:51:47 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=9226</guid>
+		<description><![CDATA[Deadlocks in a SQL Server instance are problematic. They can cause application errors, slow performance, and unhappy users. As a DBA or developer, it’s very helpful to be able to find deadlocks, review what caused them, and fix it permanently, if possible. How do you find deadlocks? Over the years, there have been various methods, [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Deadlocks in a SQL Server instance are problematic. They can cause application errors, slow performance, and unhappy users. As a DBA or developer, it’s very helpful to be able to find deadlocks, review what caused them, and fix it permanently, if possible.</p>
+<p>How do you find deadlocks? Over the years, there have been various methods, depending on what tools were available in SQL Server. Many of us used to run a Profiler or server trace to capture the Deadlock Graph event – useful if we knew when they were occurring (or they occurred all the time). We could also enable trace flags 1204 and/or 1222 to write the information to the event log – better if we knew there were issues, but they weren’t predictable.</p>
+<p>However, I don’t like a messy event log. I like it neat and clean, so I can see errors easily. For example, I enable TF 3226 to suppress “Log was backed up” messages. With SQL Server 2012+, I also prefer to use the Extended Events default system_health session to view deadlock graphs – with no extra work required!</p>
+<p>Let me walk through what a deadlock looks like with TF 1222 and compare that to the XE session.</p>
+<p>In my instance, I have TF 1222 enabled.</p>
+<p><a href="/wp-content/uploads/2018/04/config-mgr.png"><img class="aligncenter size-full wp-image-9227" src="/wp-content/uploads/2018/04/config-mgr.png" alt="config-mgr" width="414" height="496" srcset="/wp-content/uploads/2018/04/config-mgr.png 414w, /wp-content/uploads/2018/04/config-mgr-250x300.png 250w" sizes="(max-width: 414px) 100vw, 414px" /></a></p>
+<p>I have simple code to create a deadlock. You can use this as an example in a test environment to replicate it.</p>
+<pre style="padding-left: 30px">/* Create deadlock - query 1 */
+
+USE tempdb;
+GO
+
+CREATE TABLE tbl1 (id INT NOT NULL PRIMARY KEY CLUSTERED,
+       col INT)
+CREATE TABLE tbl2 (id INT NOT NULL PRIMARY KEY CLUSTERED,
+       col INT REFERENCES tbl1(id))
+
+BEGIN TRANSACTION
+INSERT INTO tbl1 VALUES (2, 999);
+
+/* Now, open a second query and paste this */
+USE tempdb;
+GO
+BEGIN TRAN
+INSERT INTO tbl2 VALUES (111, 2); 
+
+/* Come back here and execute this */
+INSERT INTO tbl2 VALUES (111, 555);
+COMMIT TRAN</pre>
+<p>When I run the last statement, I receive an error that one of the processes was the deadlock victim.</p>
+<p><a href="/wp-content/uploads/2018/04/deadlock-error.png"><img class="aligncenter size-full wp-image-9228" src="/wp-content/uploads/2018/04/deadlock-error.png" alt="deadlock-error" width="609" height="100" srcset="/wp-content/uploads/2018/04/deadlock-error.png 609w, /wp-content/uploads/2018/04/deadlock-error-300x49.png 300w, /wp-content/uploads/2018/04/deadlock-error-600x99.png 600w" sizes="(max-width: 609px) 100vw, 609px" /></a></p>
+<p>If I open the error log, I can see the details of the deadlock. Every bit of information is on a separate line.</p>
+<p><a href="/wp-content/uploads/2018/04/deadlock-error-log.png"><img class="aligncenter size-full wp-image-9229" src="/wp-content/uploads/2018/04/deadlock-error-log.png" alt="deadlock-error-log" width="726" height="636" srcset="/wp-content/uploads/2018/04/deadlock-error-log.png 726w, /wp-content/uploads/2018/04/deadlock-error-log-300x263.png 300w, /wp-content/uploads/2018/04/deadlock-error-log-600x526.png 600w, /wp-content/uploads/2018/04/deadlock-error-log-342x300.png 342w" sizes="(max-width: 726px) 100vw, 726px" /></a></p>
+<p>This one isn’t bad, but imagine a multi-statement deadlock, or a server with several deadlocks in an hour – how do you easily see if there were other errors on the server at the same time?</p>
+<p>With SQL Server 2012+, we have a better tool to see when deadlocks occur – and the deadlock graphs are saved by default, so we don’t have to read the text version to figure it out, or run a separate trace to capture them.</p>
+<p>In SSMS, open Object Explorer and navigate to Extended Events &gt; Sessions &gt; system_health &gt; package0.event_file. Double-click to view the data.</p>
+<p><a href="/wp-content/uploads/2018/04/xe-sessions.png"><img class="aligncenter size-full wp-image-9230" src="/wp-content/uploads/2018/04/xe-sessions.png" alt="xe-sessions" width="239" height="129" /></a></p>
+<p>I go right to Filters to find the xml_deadlock_report events.</p>
+<p><a href="/wp-content/uploads/2018/04/xe-filter.png"><img class="aligncenter size-full wp-image-9231" src="/wp-content/uploads/2018/04/xe-filter.png" alt="xe-filter" width="627" height="236" srcset="/wp-content/uploads/2018/04/xe-filter.png 627w, /wp-content/uploads/2018/04/xe-filter-300x113.png 300w, /wp-content/uploads/2018/04/xe-filter-600x226.png 600w" sizes="(max-width: 627px) 100vw, 627px" /></a></p>
+<p><a href="/wp-content/uploads/2018/04/xe-filter-screen.png"><img class="aligncenter size-full wp-image-9232" src="/wp-content/uploads/2018/04/xe-filter-screen.png" alt="xe-filter-screen" width="637" height="411" srcset="/wp-content/uploads/2018/04/xe-filter-screen.png 637w, /wp-content/uploads/2018/04/xe-filter-screen-300x194.png 300w, /wp-content/uploads/2018/04/xe-filter-screen-600x387.png 600w, /wp-content/uploads/2018/04/xe-filter-screen-465x300.png 465w" sizes="(max-width: 637px) 100vw, 637px" /></a></p>
+<p>Here you’ll see deadlocks that have occurred. The Value field will show the XML values that you also see in the log. You can double-click on the Value field to bring up the XML.</p>
+<p><a href="/wp-content/uploads/2018/04/details.png"><img class="aligncenter size-full wp-image-9233" src="/wp-content/uploads/2018/04/details.png" alt="details" width="515" height="238" srcset="/wp-content/uploads/2018/04/details.png 515w, /wp-content/uploads/2018/04/details-300x139.png 300w" sizes="(max-width: 515px) 100vw, 515px" /></a></p>
+<p>Don’t ignore that sneaky “Deadlock” tab, however – that’s where you’ll find the easier-to-read deadlock graph!</p>
+<p><a href="/wp-content/uploads/2018/04/deadlock.png"><img class="aligncenter size-large wp-image-9234" src="/wp-content/uploads/2018/04/deadlock-1024x433.png" alt="deadlock" width="1024" height="433" srcset="/wp-content/uploads/2018/04/deadlock-1024x433.png 1024w, /wp-content/uploads/2018/04/deadlock-300x127.png 300w, /wp-content/uploads/2018/04/deadlock-768x324.png 768w, /wp-content/uploads/2018/04/deadlock-600x253.png 600w, /wp-content/uploads/2018/04/deadlock-710x300.png 710w, /wp-content/uploads/2018/04/deadlock.png 1044w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p>
+<p>A good description of deadlock graphs, and how to interpret them, can be found at <a href="https://www.sqlshack.com/understanding-graphical-representation-sql-server-deadlock-graph/">https://www.sqlshack.com/understanding-graphical-representation-sql-server-deadlock-graph/</a>.</p>
+<p>As you modernize your data platform, you should update your troubleshooting methods and tools as well. This is an easy example of taking advantage of Extended Events to solve an old problem!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/replacing-trace-flags-1204-and-1222-with-the-extended-events-system_health-session/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL is Hard (still): Reviving a stale application</title>
+		<link>/index.php/datamgmt/dbprogramming/sql-is-hard-still-reviving-a-stale-application/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sql-is-hard-still-reviving-a-stale-application/#comments</comments>
+		<pubDate>Tue, 06 Feb 2018 13:20:09 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[sql]]></category>
+
+		<guid isPermaLink="false">/?p=8853</guid>
+		<description><![CDATA[Several years ago, I launched SQLisHard to help folks learn SQL. Some folks learn well from books or videos, but others learn best by getting in there and running queries. I monitored and tweaked things for about a year, trying to get the first set of exercises smoothed out. Then, like many folks, I was [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Several years ago, I <a href="/index.php/datamgmt/dbprogramming/sql-is-hard/" title="SQL is Hard launch post">launched SQLisHard</a> to help folks learn SQL. Some folks learn well from books or videos, but others learn best by getting in there and running queries. I monitored and tweaked things for about a year, trying to get the first set of exercises smoothed out. Then, like many folks, I was sidetracked by other projects and work responsibilities.</p>
+<p><center></p>
+<div class="wp-caption aligncenter" style="display: inline-block;">
+<a href="http://www.sqlishard.com/" title="Visit SQL is Hard"><img src="http://www.sqlishard.com/Content/Screenshot.png" alt="SQL is Hard screenshot" /></a></p>
+<div class="wp-caption-text">SQL is Hard website: Learning SQL through hands one exercises</div>
+</div>
+<p></center></p>
+<p>For about $10/month, this little site has kept running and helping folks. I expected to see traffic die off, since I wasn&#8217;t adding more content. Instead, there&#8217;s been nearly 7000 folks that have stopped by and successfully completed one or more exercises despite a total lack of marketing.</p>
+<p>The hosting is oversized for what it is, most of the technology is not what I would pick today for options, but it just keeps ticking. So I&#8217;m dusting off the build pipeline, rebuilding some data analytics so I can see what&#8217;s going on, and started fashioning a new set of exercises.</p>
+<p>Here&#8217;s how I went about reviving the application.</p>
+<h2>Delivering Change: The Build Pipeline</h2>
+<p>One of the things that made it easy to tinker with SQLisHard is the build pipeline for delivering updates. Most of the scripts live in the repo, but I hadn&#8217;t bothered to document it. Luckily, I had an old backup of the original build server VM and was able to recreate the build process on a much newer one.</p>
+<p>Why did I bother?</p>
+<p>A build pipeline makes delivering changes consistent. This application has 2 separate databases, runs user-entered queries against a real database, and has to provide accurate feedback every time (or risk hurting someone&#8217;s progression). A pipeline provides both safety and speed. I was experimenting with several different things at the time, so I have rudimentary testing covering all types of situations. By the time the changes roll out to the website and apply changes to 2 separate SQL Server instances, that one button push has run:</p>
+<ul>
+<li>Clean nuget + npm installation to ensure consistency</li>
+<li>MS Build to make sure they work</li>
+<li>Some unit tests to make sure the code is happy</li>
+<li>Applied SQL changes to two beta databases to verify updates work and complete quickly</li>
+<li>Asset minification for faster site loading</li>
+<li>Deployed the site to a beta web server</li>
+<li>Run 13 quick UI tests via Chrome Headless to make sure everything plays together</li>
+</ul>
+<p>It was a little painful to bring back to life, but infinitely safer then applying changes manually. It&#8217;s past time for every company to run a pipeline, and I&#8217;m more than happy to dive into more details or other build services if folks are interested.</p>
+<h2>Visibility into usage</h2>
+<p>The 2013 version of SQL is Hard tracked statistics on how many folks were successful or unsuccessful at each step along the way.</p>
+<blockquote class="twitter-tweet" data-lang="en"><p lang="en" dir="ltr">On the SQLisHard front, it looks like exercises 1.0, 1.2 and 4.0 need refinement, they have the highest error rates <a href="http://t.co/Hv5OfOL10L">pic.twitter.com/Hv5OfOL10L</a></p>
+<p>&mdash; Eli Weinstock-Herman (@Tarwn) <a href="https://twitter.com/Tarwn/status/345526863428472835?ref_src=twsrc%5Etfw">June 14, 2013</a></p></blockquote>
+<p><script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script></p>
+<p>Visibility into the flow from step to step helped me make adjustments and help folks make it all the way through the exercises. This site used a bunch of experimental things, so the data originally lived in a beta Splunk Cloud offering that was discontinued years ago (and replaced by a cloud offering that did not have an API&#8230;). Unfortunately, this activity is not tracked well in the database either.</p>
+<p>Azure Insights has come a long way, so I decided to switch to that and not get distracted by rewriting the database back-end. With a few lines of JavaScript, I now have live events flowing into pretty charts again:</p>
+<div id="attachment_8855" style="width: 810px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/12/SQLisHard_AzureInsights.png" alt="SQL is Hard: Azure Insights" width="800" height="341" class="size-full wp-image-8855" srcset="/wp-content/uploads/2017/12/SQLisHard_AzureInsights.png 800w, /wp-content/uploads/2017/12/SQLisHard_AzureInsights-300x128.png 300w, /wp-content/uploads/2017/12/SQLisHard_AzureInsights-768x327.png 768w" sizes="(max-width: 800px) 100vw, 800px" /><p class="wp-caption-text">SQL is Hard: Azure Insights</p></div>
+<p>Every query someone tries in SQLisHard is executed against a sample database and returned to the front-end. Once the front-end receives the result, I send an event to Insights to report the Exercise Id and Status:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1">dataService.<span class="me1">exercises</span>.<span class="me1">executeQuery</span><span class="br0">&#40;</span>currentQuery.<span class="me1">toStatementDTO</span><span class="br0">&#40;</span>limitResults<span class="br0">&#41;</span><span class="sy0">,</span> <span class="kw1">function</span> <span class="br0">&#40;</span>data<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; 
+&nbsp; &nbsp; <span class="co1">// ... receive query results, extract completion status, and display ...</span>
+&nbsp;
+&nbsp; &nbsp; trackEvent<span class="br0">&#40;</span><span class="st0">'executeQuery'</span><span class="sy0">,</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; exerciseSet<span class="sy0">:</span> exercises<span class="br0">&#40;</span><span class="br0">&#41;</span>.<span class="me1">id</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; exercise<span class="sy0">:</span> exercises<span class="br0">&#40;</span><span class="br0">&#41;</span>.<span class="me1">currentExercise</span><span class="br0">&#40;</span><span class="br0">&#41;</span>.<span class="me1">id</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; completedSuccessfully<span class="sy0">:</span> exerciseCompleted
+&nbsp; &nbsp; <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">dataService.exercises.executeQuery(currentQuery.toStatementDTO(limitResults), function (data) {
+    
+    // ... receive query results, extract completion status, and display ...
+
+    trackEvent('executeQuery', {
+        exerciseSet: exercises().id,
+        exercise: exercises().currentExercise().id,
+        completedSuccessfully: exerciseCompleted
+    });
+});</pre></div></div>
+
+<p>I query the data in Application Insights (https://azure.microsoft.com/en-us/services/application-insights/) to count the number of success/non-success calls have occurred for each exercise:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">customEvents
+| where timestamp &gt; now(-7d) 
+| project exercise = tostring(customDimensions.exercise), success = tostring(customDimensions.completedSuccessfully)
+| where notempty(exercise)
+| summarize attempts=count() by exercise, success
+| order by exercise asc, success desc
+| render columnchart</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">customEvents
+| where timestamp &gt; now(-7d) 
+| project exercise = tostring(customDimensions.exercise), success = tostring(customDimensions.completedSuccessfully)
+| where notempty(exercise)
+| summarize attempts=count() by exercise, success
+| order by exercise asc, success desc
+| render columnchart</pre></div></div>
+
+<p>Where this pays off is when I start making new exercises public. Now I&#8217;ll have immediate visibility into how folks are progressing and I can try to improve the exercise descriptions to help as many folks get through as I can.</p>
+<h2>New Exercises Coming Soon: Aggregation</h2>
+<p>The first exercise set focused on some basic building block SELECT statements. We went through some beginning SELECT * statements, listed columns, and column aliases. We performed WHERE statements with equivalence, LIKE, and BETWEEN. Then we added in JOINs with ON statements.</p>
+<p>One of the great things about a relational database is the ability to mine across those related datasets for new information. Aggregation plays a big part here, so I&#8217;ve started building an exercise set that looks like this:</p>
+<ul>
+<li>COUNT</li>
+<li>SUM</li>
+<li>GROUP BY one field</li>
+<li>GROUP BY multiple fields</li>
+<li>MIN/MAX</li>
+<li>AVG/STDEV</li>
+<li>HAVING</li>
+<li>ORDER BY</li>
+<li>Aggregation data from INNER JOIN</li>
+<li>LEFT JOIN</li>
+<li>Then possibly some tricks, like SUM(IF/ELSE/END) statements</li>
+</ul>
+<p>If this works out, I&#8217;ll have a test link posted on twitter (@sqlishard) and, after a trial period, will roll it out live.</p>
+<p>I can&#8217;t promise this will usher in a great deal of additions, it&#8217;s hard to jump in this code base and not immediately start rewriting all the things plus I have a half-dozen other projects I&#8217;d like to be working on too. We&#8217;ll see what happens.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sql-is-hard-still-reviving-a-stale-application/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Use ostress to load test a SQL database</title>
+		<link>/index.php/datamgmt/dbprogramming/use-ostress-to-load-test-a-sql-database/</link>
+		<comments>/index.php/datamgmt/dbprogramming/use-ostress-to-load-test-a-sql-database/#comments</comments>
+		<pubDate>Thu, 26 Oct 2017 14:49:36 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=8831</guid>
+		<description><![CDATA[Have you ever wondered how you could take one or more .sql files you captured as a workload and run them against a SQL Server or Azure SQL Database to test performance or impact? Microsoft has a free tool to do just that &#8211; ostress. Ostress.exe is part of the RML utilities. The first step [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Have you ever wondered how you could take one or more .sql files you captured as a workload and run them against a SQL Server or Azure SQL Database to test performance or impact? Microsoft has a free tool to do just that &#8211; ostress.</p>
+<p>Ostress.exe is part of the RML utilities. The first step is to download it from <a href="https://www.microsoft.com/en-us/download/details.aspx?id=4511">https://www.microsoft.com/en-us/download/details.aspx?id=4511</a>. Along with the command-line tools, there is also a helpful help document!</p>
+<p>Ostress allows you to specify one file, or a folder that contains multiple files, to run. You can also specify a number of connections to be made to the database, to simulate multiple users or applications running the same query. Each connection can then run the file one or more times.</p>
+<p>The next thing you’ll need is one or more .sql files that the tool will run.</p>
+<p>To run a load test, you’ll open RML cmd prompt and enter your command. A few common parameters, which you’ll be using:</p>
+<p style="padding-left: 30px">-S – server name &#8211; this works for a SQL Server or an Azure SQL Database.<br />
+-E – Windows authentication. The other option is -U and -P for SQL authentication.<br />
+-d – database name.<br />
+-i – Path to batch file(s), such as C:\ostress\ostress_batch_file.sql.<br />
+-n – Number of connections to create.<br />
+-r – Number of iterations through the file each connection will make.<br />
+-q – Quiet mode – no result display.<br />
+-o – Output file directory.</p>
+<p>A sample command which will take one file I created (ostress_batch_file.sql), create 5 connections, and run it twice on each:<br />
+ostress -SJesSb -E -dAdventureWorks2016 -iC:\ostress\ostress_batch_file.sql -n5 -r2 -oC:\ostress</p>
+<p>In the cmd window:</p>
+<p><a href="/wp-content/uploads/2017/10/ostress-cmd.png"><img class="aligncenter size-full wp-image-8832" src="/wp-content/uploads/2017/10/ostress-cmd.png" alt="ostress-cmd" width="793" height="434" srcset="/wp-content/uploads/2017/10/ostress-cmd.png 793w, /wp-content/uploads/2017/10/ostress-cmd-300x164.png 300w, /wp-content/uploads/2017/10/ostress-cmd-768x420.png 768w" sizes="(max-width: 793px) 100vw, 793px" /></a><br />
+The output folder contains one log file, and one output file for each connection.</p>
+<p><a href="/wp-content/uploads/2017/10/ostress-output.png"><img class="aligncenter size-full wp-image-8833" src="/wp-content/uploads/2017/10/ostress-output.png" alt="ostress-output" width="487" height="199" srcset="/wp-content/uploads/2017/10/ostress-output.png 487w, /wp-content/uploads/2017/10/ostress-output-300x123.png 300w" sizes="(max-width: 487px) 100vw, 487px" /></a></p>
+<p>One question I&#8217;ve been asked was how to build delays into the batch. My suggestion is to edit the T-SQL script, using WAITFOR DELAY, to accomplish that.</p>
+<p>Give ostress a try when you want a simple load testing tool for SQL Server!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/use-ostress-to-load-test-a-sql-database/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>I’m talking SQL Server, Azure, and Extended Events at SQLintersection</title>
+		<link>/index.php/uncategorized/im-talking-sql-server-azure-and-extended-events-at-sqlintersection/</link>
+		<comments>/index.php/uncategorized/im-talking-sql-server-azure-and-extended-events-at-sqlintersection/#respond</comments>
+		<pubDate>Thu, 18 Aug 2016 13:59:11 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Professional Development]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4664</guid>
+		<description><![CDATA[I’ll be in Las Vegas October 24-28, 2016 for SQLintersection, part of the DEVintersection conference series! Why attend DEVintersection? It “brings your favorite Microsoft leaders, engineers and industry experts together to educate, network, and share their expertise with you. Just this year, ASP.NET Core, SQL Server 2016, Visual Studio 2015, Windows 10 and SharePoint 2016 [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I’ll be in Las Vegas October 24-28, 2016 for <a href="https://devintersection.com/#!/SQL-Conference">SQLintersection</a>, part of the <a href="https://devintersection.com/#!/">DEVintersection</a> conference series! Why attend DEVintersection? It “brings your favorite Microsoft leaders, engineers and industry experts together to educate, network, and share their expertise with you. Just this year, ASP.NET Core, SQL Server 2016, Visual Studio 2015, Windows 10 and SharePoint 2016 launched. The new release of Windows Server is on the horizon and open source is becoming the norm. The cloud is real and so is cloud scaling. Are you ready?”</p>
+<p>What’s that about SQL Server and Azure? I’m talking about both of them a lot that week! On Monday, October 24, I’m leading a full-day workshop, Get Started With SQL Server In Azure. This is seven hours of discussion about Azure fundamentals, the difference between IaaS (VMs) and PaaS (SQL Database). I talk about when to use each, along with how to create, maintain, and monitor them. If your organization wants to start putting data in Azure (or has already started), you don’t want to miss this!</p>
+<p>But that’s not it! I have three other sessions throughout the week.</p>
+<ul>
+<li>SQL Server in Azure: Essentials for the Database Administrator – In this 75-minute session, I distill the most important information any DBA needs to know about SQL Server VMs and SQL Database. You’re going to learn how to choose the right service, how to perform your essential admin tasks, how to monitor them, and more!</li>
+<li>SQL Server in Azure: Essentials for the Database Developer – This 60-minute session covers what you need to know about writing and tuning T-SQL for SQL Server VMs and SQL Database. There are differences in syntax and tools; join me to learn more!</li>
+<li>Everyday Extended Events – First, go to Erin Stellato’s session, Kicking and Screaming: Replacing Profiler with Extended Events. She covers all the basics – what XE is, how to create sessions, and how to view the data. Then, stick around for my session, where I show you the sessions used most frequently. Tasks like capturing query performance, gathering deadlock information, and integrating XE and SQL Server Agent will be covered.</li>
+</ul>
+<p>There are dozens of other SQL Server workshops and sessions, not to mention the Azure, Visual Studio, and SharePoint sessions running concurrently. On Thursday evening, you won’t want to miss SQL after Dark, hosted by Paul Randal &amp; Kimberly Tripp! Check out <a href="https://devintxcontent.blob.core.windows.net/showcontent/Schedule/DEVintersection_Fall%2016_SQL_Schedule.pdf">the full SQLintersection schedule here</a>! Hurry and <a href="https://devintersection.com/#!/register">register today</a>! Prices increase on September 13, and again on September 28, so don’t delay!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/im-talking-sql-server-azure-and-extended-events-at-sqlintersection/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Learn more about Azure + SQL Server at SQLSaturday Minnesota</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/learn-more-about-azure-sql-server-at-sqlsaturday-minnesota/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/learn-more-about-azure-sql-server-at-sqlsaturday-minnesota/#respond</comments>
+		<pubDate>Mon, 15 Aug 2016 20:48:43 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Professional Development]]></category>
+
+		<guid isPermaLink="false">/?p=4661</guid>
+		<description><![CDATA[I&#8217;m excited to cross the Mississippi River again this autumn to present at SQLSaturday #557 Minnesota 2016. First, I&#8217;ll be giving a full-day pre-conference session, &#8220;Get Started With SQL Server in Azure&#8221;, on Friday, September 30. Tickets are only $110, include lunch, and you&#8217;ll get to hear me talk about What you need to know about [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;m excited to cross the Mississippi River again this autumn to present at <a href="http://www.sqlsaturday.com/557/eventhome.aspx" target="_blank">SQLSaturday #557 Minnesota 2016</a>.</p>
+<p>First, I&#8217;ll be giving a full-day pre-conference session, &#8220;Get Started With SQL Server in Azure&#8221;, on Friday, September 30. Tickets are only $110, include lunch, and you&#8217;ll get to hear me talk about</p>
+<ul>
+<li>What you need to know about Azure networking before creating a single database</li>
+<li>The differences between the IaaS and PaaS offerings, and when to use each</li>
+<li>How to create, manage, and monitor IaaS SQL Server VMs</li>
+<li>How to create, manage, and monitor PaaS SQL Databases</li>
+</ul>
+<p>Every attendee will get a link to my GitHub repository with scripts to accomplish many of the tasks I talk about! <a href="https://sites.google.com/site/sqlsaturday557preconreg/home#CL1" target="_blank">Register today for this great class</a>!</p>
+<p>Second, I&#8217;ll be attending and presenting on Saturday, October 1. My session is &#8220;SQL Server in Azure: Essentials for the Database Administrator&#8221;. I cover what DBAs need to know about SQL Server VMs, SQL Database, networking, security, and monitoring to make Azure fit into their current environments.</p>
+<p>But I&#8217;m giving only <a href="http://www.sqlsaturday.com/557/Sessions/Schedule.aspx" target="_blank">1 of 48 sessions</a>! SQLSaturday has something for everyone &#8211; the DBA, the database developer, the BI practitioner. I hope to see you at SQLSaturday Minnesota!</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/learn-more-about-azure-sql-server-at-sqlsaturday-minnesota/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Announcing SQL Saturday Minnesota #557 Pre-Conference Seminars!</title>
+		<link>/index.php/uncategorized/announcing-sql-saturday-minnesota-557-pre-conference-seminars/</link>
+		<comments>/index.php/uncategorized/announcing-sql-saturday-minnesota-557-pre-conference-seminars/#respond</comments>
+		<pubDate>Thu, 21 Jul 2016 21:15:12 +0000</pubDate>
+		<dc:creator><![CDATA[Paul Timmerman]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Professional Development]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4639</guid>
+		<description><![CDATA[Before we know it, October will be upon us and it will be time for another SQL Saturday Minnesota!  If you have not yet registered for this free day of training on Saturday October 1st, please visit the site and sign up now! Since no SQL Saturday Minnesota would be complete without a full slate of pre-cons, PASSMN and the organizers of SQL [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><span style="color: #272727">Before we know it, October will be upon us and it will be time for another <a href="http://www.sqlsaturday.com/557/eventhome.aspx" target="_blank">SQL Saturday Minnesota</a>!  If you have not yet registered for this free day of training on Saturday October 1st, please visit the <a href="http://www.sqlsaturday.com/557/eventhome.aspx" target="_blank">site </a>and sign up now!</span></p>
+<p>Since no <a href="http://www.sqlsaturday.com/557/eventhome.aspx" target="_blank">SQL Saturday Minnesota</a> would be complete without a full slate of pre-cons, <a href="http://passmn.org/" target="_blank">PASSMN</a> and the organizers of SQL Saturday #557 are proud to announce the addition of <strong>four</strong> day long pre-cons to be held on <span class="aBn"><span class="aQJ">Friday, September 30th</span></span> from <span class="aBn"><span class="aQJ">9AM &#8211; 5PM</span></span>. Sessions will once again be held at Dakota County Technical College in Rosemount, MN.</p>
+<p>For the low price of only <strong>$110</strong> you join Jes Borland and get started with SQL Server in Azure, learn about using R in SQL Server from Pragmatic Works very own Ginger Grant, get a complete primer on infrastructure tuning for your SQL Server from David Klee, or craft a complete strategy for securing your data platform assets with Ed Leighton-Dick.</p>
+<p>Visit the links below to review the complete abstracts for these amazing sessions.</p>
+<p>Any one of these sessions represents an amazing value for your training dollars!</p>
+<blockquote><p><span style="color: black"><strong><a href="https://sites.google.com/site/sqlsaturday557preconreg/home#CL1" target="_blank"><span style="color: #1155cc">Jes Borland</span></a></strong>: </span><span style="color: #272727">Get Started With SQL Server in Azure</span></p>
+<p><span style="color: black"><strong><a href="https://sites.google.com/site/sqlsaturday557preconreg/home#BI1" target="_blank"><span style="color: #1155cc">Ginger Grant</span></a></strong>: R School for SQL Pros</span></p>
+<p><strong><a href="https://sites.google.com/site/sqlsaturday557preconreg/home#DB1" target="_blank"><span style="color: #1155cc">David Klee</span></a></strong><span style="color: black">: </span><span style="color: #272727">The Complete Primer to SQL Server Infrastructure Tuning</span></p>
+<p><span style="color: black"><strong><a href="https://sites.google.com/site/sqlsaturday557preconreg/home#DB2" target="_blank"><span style="color: #1155cc">Ed Leighton-Dick</span></a></strong>: </span><span style="color: #272727">Securing the Data Platform: Crafting a Strategy That Works</span></p></blockquote>
+<p>Upon successful registration, you will receive a confirmation email from the SQLSaturday #557 team within 48 hours.</p>
+<p><span style="color: #272727">You may also access this information by visiting the <a href="http://www.sqlsaturday.com/557/EventHome.aspx" target="_blank"><span style="color: #1155cc">SQL </span><span class="aBn"><span class="aQJ"><span style="color: #1155cc">Saturday</span></span></span><span style="color: #1155cc"> #557 homepage</span></a>.</span></p>
+<p><span style="color: #272727">Please direct any questions regarding the pre-cons to the SQL Saturday #557 team at </span><a href="mailto:sqlsaturday557@sqlsaturday.com" target="_blank"><span style="color: #1155cc"><span style="color: #1155cc">sqlsaturday557@sqlsaturday.</span>com</span></a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/announcing-sql-saturday-minnesota-557-pre-conference-seminars/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Testing SQL Server with an Application</title>
+		<link>/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/</link>
+		<comments>/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/#comments</comments>
+		<pubDate>Tue, 21 Jun 2016 14:12:38 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/?p=4555</guid>
+		<description><![CDATA[I’ve been blogging about SQL Server for years. Most of these blogs are designed for the database administrator or developer, and thus use SQL Server Management Studio exclusively. (Back in the day, I’d show SSRS a lot, too.) But one of the questions that’s always been at the back of my mind is, “What does [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I’ve been blogging about SQL Server for years. Most of these blogs are designed for the database administrator or developer, and thus use SQL Server Management Studio exclusively. (Back in the day, I’d show SSRS a lot, too.)</p>
+<p>But one of the questions that’s always been at the back of my mind is, “What does this look like from an application perspective?” I’ve been asking this question even more lately, as I work with Azure SQL Database and SQL Server 2016 features like Data Masking and Row Level Security. I’m used to having high-level permissions and executing queries in SSMS; what does it look like to a user that doesn’t have those permissions or tools?</p>
+<p>I decided to dust off the programmings skills from that AAS – Programmer/Analyst degree I earned a few years ago. I’ve used Visual Studio to create a web application, connect that to my database, and show what would appear to a user. I don’t know if I did it the easy way, or the best way, and it’s definitely not a way that I would use for any real-world application. But it helps me get a sense of what it takes to implement a feature beyond the database.</p>
+<p>I thought it might be helpful for others to see this process. Especially since you can now get all the tools to do this – within the Microsoft ecosystem – for free!</p>
+<h1>Step 1: SQL Server 2016</h1>
+<p>Download SQL Server 2016 Developer Edition from <a href="https://www.microsoft.com/en-us/server-cloud/products/sql-server-editions/sql-server-developer.aspx">https://www.microsoft.com/en-us/server-cloud/products/sql-server-editions/sql-server-developer.aspx</a>. This version has all of the features of Enterprise Edition, but is free. No, you can’t use it in production. But it’s free!</p>
+<p>After downloading, install and configure it. (Yes, even in my development environments, I configure things like max memory and cost threshold for parallelism and tempdb and trace flags.)</p>
+<p>Now you need a database. AdventureWorks is an old standby, but there is a new test database available, WideWorldImporters! And it’s on GitHub! This is exciting. Download from <a href="https://github.com/Microsoft/sql-server-samples/releases/tag/wide-world-importers-v1.0">https://github.com/Microsoft/sql-server-samples/releases/tag/wide-world-importers-v1.0</a>. Restore the database into your SQL Server 2016 instance.</p>
+<p>Then you need proper security for your database. Don’t run all demos as sa or as your own sysadmin-level account. That isn’t the real world, and not how users will access an application (or, it shouldn&#8217;t be). Add a Windows user if you can; I had to use SQL authentication for mine. I created a login named PurchaseOrdersApp. At the server level, permissions are public. At the database level, I granted db_datareader and db_datawriter.</p>
+
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/login-properties/'><img width="200" height="200" src="/wp-content/uploads/2016/06/Login-Properties-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Username and password" /></a>
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/login-server-roles/'><img width="200" height="200" src="/wp-content/uploads/2016/06/Login-Server-Roles-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Server role" /></a>
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/login-user-mapping/'><img width="200" height="200" src="/wp-content/uploads/2016/06/Login-User-Mapping-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Database role" /></a>
+
+<h1>Step 2: Visual Studio</h1>
+<p>Visual Studio Community 2015 is a free version that can be downloaded from <a href="https://www.visualstudio.com/en-us/products/visual-studio-community-vs.aspx">https://www.visualstudio.com/en-us/products/visual-studio-community-vs.aspx</a>. Install and open, and you’ll see the Start Page.</p>
+<p><a href="/wp-content/uploads/2016/06/Visual-Studio-Start-Page.png"><img class="aligncenter wp-image-4565 size-medium" src="/wp-content/uploads/2016/06/Visual-Studio-Start-Page-300x163.png" alt="Visual Studio Start Page" width="300" height="163" srcset="/wp-content/uploads/2016/06/Visual-Studio-Start-Page-300x163.png 300w, /wp-content/uploads/2016/06/Visual-Studio-Start-Page-1024x557.png 1024w" sizes="(max-width: 300px) 100vw, 300px" /></a></p>
+<p>This hasn’t changed much from my days of using Visual Studio 2005/2008, or has it? I’m about to find out.</p>
+<p>I click on New Project. On the left menu, I choose Templates &gt; Visual Basic &gt; Web. In the middle I choose ASP.NET Web Application. At the bottom I name it and click OK. The Template window should open. Choose Web Forms. If you don’t want to use Azure to host the app, uncheck the “Host in the cloud box”. Click OK. (If you left “Host in the cloud” checked, you’ll be prompted to enter information about your Azure account.)</p>
+<p>When I’m using Visual Studio for app development, I keep the Toolbox pinned on the left side and the Solution Explorer pinned on the left.</p>
+<h1>Step 3: Making a Web App</h1>
+<p>What I want to do is create a new “web page” where a user can enter some information and results will be returned. At the top, I select Project &gt; Add New Item. On the left menu, I choose Visual Basic &gt; Web &gt; Web Form. At the bottom, I enter a name and click Add. (It should open in the middle pane, but if not, find it in the Solution Explorer, right-click, and select Open.)</p>
+<p>I see HTML in the middle pane. I want to view the designer, so at the bottom of the window I choose “Split”. My VS now looks like this.</p>
+<p><a href="/wp-content/uploads/2016/06/VS-view.png"><img class="aligncenter size-medium wp-image-4567" src="/wp-content/uploads/2016/06/VS-view-300x188.png" alt="VS view" width="300" height="188" srcset="/wp-content/uploads/2016/06/VS-view-300x188.png 300w, /wp-content/uploads/2016/06/VS-view-1024x644.png 1024w, /wp-content/uploads/2016/06/VS-view.png 1493w" sizes="(max-width: 300px) 100vw, 300px" /></a></p>
+<p>I want to use a stored procedure to show Purchase Order information. I’m going to add a GridView to the page, and connect it to a data source. In the Toolbox, I expand Data and find GridView. I click and drag it on to the bottom half, the design view.</p>
+
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/vs-toolbox-gridview/'><img width="200" height="200" src="/wp-content/uploads/2016/06/VS-toolbox-gridview-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Choose GridView from the Toolbox" /></a>
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/vs-designer-gridview/'><img width="200" height="200" src="/wp-content/uploads/2016/06/VS-designer-gridview-200x200.png" class="attachment-thumbnail size-thumbnail" alt="How the GridView will appear on the Designer" /></a>
+
+<p>I need to connect it to my data source. Next to Choose Data Source, I click the drop-down arrow and the Data Source Configuration window appears. I choose “Database” and name the data source, then click OK.</p>
+<p>The next step is creating the connection. I click “New Connection” and fill in the server information, click OK, then Next. I give my connection string a name and click Next. Now I have to choose what data I’ll show. I choose the option to “Specify a custom SQL statement or stored procedure” and click Next. I already created a stored procedure, GetPurchaseOrder, which I select. My stored proc has a parameter, StockItemID. I’m going to pass a value in from a text box. However, I haven’t added that to the form yet, so I can’t choose it. I leave Parameter source as None and click Next. I click the Test Query button and enter a parameter value. I get the results I expect. I click Finish.</p>
+
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/ds-wizard-type/'><img width="200" height="200" src="/wp-content/uploads/2016/06/DS-wizard-type-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Choose &quot;Database&quot;" /></a>
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/ds-connection/'><img width="200" height="200" src="/wp-content/uploads/2016/06/DS-connection-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Enter Server name, Authentication, and database name; Test Connection" /></a>
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/ds-conn-string/'><img width="200" height="200" src="/wp-content/uploads/2016/06/ds-conn-string-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Name and save the connection string" /></a>
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/ds-config-select/'><img width="200" height="200" src="/wp-content/uploads/2016/06/ds-config-select-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Choose a custom statement" /></a>
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/ds-custom-statement/'><img width="200" height="200" src="/wp-content/uploads/2016/06/ds-custom-statement-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Choose stored procedure and select one from the list" /></a>
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/ds-parameters/'><img width="200" height="200" src="/wp-content/uploads/2016/06/ds-parameters-200x200.png" class="attachment-thumbnail size-thumbnail" alt="ds parameters" /></a>
+<a href='/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/attachment/ds-test-query/'><img width="200" height="200" src="/wp-content/uploads/2016/06/ds-test-query-200x200.png" class="attachment-thumbnail size-thumbnail" alt="Click Test Query, enter a parameter value, and make sure you get the results you expect" /></a>
+
+<p>I need to add that text box. First I drag a label from the Toolbox to the Designer. I change the (ID) and Text properties. Then I drag a TextBox control to the Designer, and again, change the (ID). Then, I add a Button to perform the search. I drag the Button over and change its (ID) and Text. Now, to tie the text box to the parameter, I click on my GridView so the tasks pop-out appears on the right, then click Configure Data Source. I click Next until I’m on the Define Parameters screen. For my Parameter source I choose Control. For ControlID, I choose txtItemId. I leave DefaultValue blank. I click Next and Finish.</p>
+<div id="attachment_4585" style="width: 310px" class="wp-caption aligncenter"><a href="/wp-content/uploads/2016/06/design-gridview-task.png"><img class="size-medium wp-image-4585" src="/wp-content/uploads/2016/06/design-gridview-task-300x90.png" alt="You can see the label and button in the top left. The GridView Tasks pop-out is to the right." width="300" height="90" srcset="/wp-content/uploads/2016/06/design-gridview-task-300x90.png 300w, /wp-content/uploads/2016/06/design-gridview-task-1024x310.png 1024w, /wp-content/uploads/2016/06/design-gridview-task.png 1238w" sizes="(max-width: 300px) 100vw, 300px" /></a><p class="wp-caption-text">You can see the label and button in the top left. The GridView Tasks pop-out is to the right.</p></div>
+<p>Now, I want to make sure this works. To get the web page to run, I click on Debug &gt; Start Debugging (or F5). If all has gone according to plan, I’ll see my web page.</p>
+<div id="attachment_4584" style="width: 310px" class="wp-caption aligncenter"><a href="/wp-content/uploads/2016/06/web-page.png"><img class="size-medium wp-image-4584" src="/wp-content/uploads/2016/06/web-page-300x64.png" alt="Opened in Edge " width="300" height="64" srcset="/wp-content/uploads/2016/06/web-page-300x64.png 300w, /wp-content/uploads/2016/06/web-page.png 882w" sizes="(max-width: 300px) 100vw, 300px" /></a><p class="wp-caption-text">Opened in Edge</p></div>
+<p>I enter a value and click Find. My results appear.</p>
+<div id="attachment_4586" style="width: 310px" class="wp-caption aligncenter"><a href="/wp-content/uploads/2016/06/web-page-results.png"><img class="size-medium wp-image-4586" src="/wp-content/uploads/2016/06/web-page-results-300x48.png" alt="The expected results appear " width="300" height="48" srcset="/wp-content/uploads/2016/06/web-page-results-300x48.png 300w, /wp-content/uploads/2016/06/web-page-results-1024x164.png 1024w, /wp-content/uploads/2016/06/web-page-results.png 1199w" sizes="(max-width: 300px) 100vw, 300px" /></a><p class="wp-caption-text">The expected results appear</p></div>
+<p>To end, I go back to VS and select Debug &gt; Stop Debugging.</p>
+<h1>A Basic Application</h1>
+<p>This is how I am going to test various database features! This sample is not:</p>
+<ul>
+<li>Written using best practices</li>
+<li>Going to perform well</li>
+<li>Secure</li>
+<li>Production-ready</li>
+</ul>
+<p>It is, however, going to show me how things appear, and need to be configured, outside of SSMS. Exciting!</p>
+<p>&nbsp;</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/testing-sql-server-with-an-application/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Learn about SQL Server in Azure in Madison, WI</title>
+		<link>/index.php/uncategorized/learn-about-sql-server-in-azure-in-madison-wi/</link>
+		<comments>/index.php/uncategorized/learn-about-sql-server-in-azure-in-madison-wi/#respond</comments>
+		<pubDate>Wed, 27 Jan 2016 16:05:21 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Azure]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Professional Development]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4326</guid>
+		<description><![CDATA[You: curious about Azure, wondering if it&#8217;s right for your organization. You run some SQL Server databases, but don&#8217;t know if you would use a VM in Azure, or should jump into an Azure SQL Database. You know there are some differences and complexities, but aren&#8217;t sure how to work with them. Me: ready to [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>You: curious about Azure, wondering if it&#8217;s right for your organization. You run some SQL Server databases, but don&#8217;t know if you would use a VM in Azure, or should jump into an Azure SQL Database. You know there are some differences and complexities, but aren&#8217;t sure how to work with them.</p>
+<p>Me: ready to spend a day teaching you how to get started!</p>
+<p>I&#8217;ll be presenting my full-day class <a href="http://www.eventbrite.com/e/sql-sat-madison-pre-con-get-started-with-sql-server-in-azure-wjes-borland-tickets-20990868252" target="_blank">Get Started With SQL Server in Azure </a>at Globe University in Madison, WI on Friday, April 8, 2016. (Conveniently, the day before the fifth annual SQLSaturday in Madison.) You can get a full day of learning for only $125! Here are the details about the class:</p>
+<p style="padding-left: 30px">Microsoft Azure is a mature, stable ecosystem, but some people and companies are still hesitant to adopt it. In this full day class, I&#8217;ll teach you why building SQL Server environments in Azure is safe, easy, and reliable and how to do it.</p>
+<p style="padding-left: 30px">We&#8217;ll begin with an overview of the Azure ecosystem. SQL Server is one of a large number of services being offered, and many work together. I&#8217;ll walk through the main management tool, the Azure Portal, to show you how to use it. I&#8217;ll cover the security and compliance of features of Azure, which are numerous. You&#8217;ll understand the differences between Azure Infrastructure as a Service (Iaas) and Platform as a Service (PaaS) offerings.</p>
+<p style="padding-left: 30px">You&#8217;ll see how to build IaaS SQL Server VMs. I&#8217;ll talk through licensing, networking, security, and what you&#8217;ll pay for. We&#8217;ll talk about how to move your current data into the VM, how to connect to the databases for management or from the application, and uses for VMs such as DR. The HA/DR options for IaaS will be explained.</p>
+<p style="padding-left: 30px">You&#8217;ll also see how to build PaaS Azure SQL Databases, with the same information networking, security, and what you&#8217;ll pay for. I&#8217;ll show you how to move your current data to the database, and how it differs from the IaaS product. You&#8217;ll learn how to connect to and manage the databases. We&#8217;ll also cover how HA/DR is handled with PaaS databases.</p>
+<p style="padding-left: 30px">I&#8217;ll cover intricacies learned from hands-on experience, such as security and networking settings to be aware of, and how to use Azure&#8217;s ability to scale up and down as necessary. You&#8217;ll come away from this class fully prepared to build your first IaaS or PaaS deployment.</p>
+<h3>Call To Action</h3>
+<p><a href="http://www.eventbrite.com/e/sql-sat-madison-pre-con-get-started-with-sql-server-in-azure-wjes-borland-tickets-20990868252" target="_blank">Register today</a> for this one-day training opportunity. Don&#8217;t forget to register for <a href="http://www.sqlsaturday.com/499/eventhome.aspx" target="_blank">SQLSaturday Madison</a> &#8211; a free, one-day event where you can choose from over 30 SQL Server sessions &#8211; as well!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/learn-about-sql-server-in-azure-in-madison-wi/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Prepare to Set Sail on SQL Cruise Caribbean 2016</title>
+		<link>/index.php/uncategorized/prepare-to-set-sail-on-sql-cruise-caribbean-2016/</link>
+		<comments>/index.php/uncategorized/prepare-to-set-sail-on-sql-cruise-caribbean-2016/#comments</comments>
+		<pubDate>Mon, 23 Nov 2015 14:14:18 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Professional Development]]></category>
+		<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4266</guid>
+		<description><![CDATA[Here in the Frozen Tundra of Wisconsin, winter is setting in &#8211; this weekend, temperatures didn&#8217;t rise above freezing, and snow fell in some parts of the state. I have my cold-weather running gear out &#8211; fleece-lined tights, wind-proof jacket, hats, mittens, and trail shoes &#8211; and my snowshoes are hanging in the garage. For [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Here in the Frozen Tundra of Wisconsin, winter is setting in &#8211; this weekend, temperatures didn&#8217;t rise above freezing, and snow fell in some parts of the state. I have my cold-weather running gear out &#8211; fleece-lined tights, wind-proof jacket, hats, mittens, and trail shoes &#8211; and my snowshoes are hanging in the garage. For now, I&#8217;m looking forward to winter.</p>
+<p>I&#8217;m also still digesting all the great things I learned at <a href="http://sqlpass.org/summit/2015" target="_blank">PASS Summit </a>and MVP Summit a month ago. I attended great sessions on Azure topics, professional development, and learned what&#8217;s coming in SQL Server 2016. I&#8217;m recharged from spending time with old friends and meeting new ones.</p>
+<p>But I know myself, and I know that come mid-January, the cold weather and windy days will have me cursing winter. I know that I&#8217;ll be missing my SQL community, wishing for the first <a href="http://sqlsaturday.com/" target="_blank">SQL Saturday</a> of the year to arrive so I can spend time with friends that also happen to be geeks.</p>
+<p>The good news is that I have a cure for all that will ail me mid-January: <a href="http://sqlcruise.com/" target="_blank">SQL Cruise</a>. The Norwegian Escape sets sail on Saturday, January 30, 2016 and returns on Saturday, February 6. Seven fun-filled days of sailing, snorkeling, shuffleboard, and SQL Server training will happen between.</p>
+<p>That&#8217;s right&#8230;adventure on the high seas! Pirates! Rum! SQL Server!</p>
+<div id="attachment_3238" style="width: 310px" class="wp-caption alignright"><a href="/wp-content/uploads/2015/02/IMAG0532_1.jpg"><img class="size-medium wp-image-3238" src="/wp-content/uploads/2015/02/IMAG0532_1-300x169.jpg" alt="On the beach in Nassau after the best on-shore day ever " width="300" height="169" srcset="/wp-content/uploads/2015/02/IMAG0532_1-300x169.jpg 300w, /wp-content/uploads/2015/02/IMAG0532_1-1024x579.jpg 1024w" sizes="(max-width: 300px) 100vw, 300px" /></a><p class="wp-caption-text">SQL Cruise 2015 &#8211; On the beach in Nassau after the best on-shore day ever</p></div>
+<p>I&#8217;ve <a href="/index.php/uncategorized/sql-cruise-caribbean-2015-more-than-a-cruise-with-classes-much-more/" target="_blank">written about SQL Cruise before</a>, and how it&#8217;s changed my career. It&#8217;s given me new friendships and strengthened old ones. Because of this, I highly, highly recommend anyone looking for a learning event with top-notch instructors and a very low teacher-to-student ratio consider SQL Cruise. The Technical Leads this year are an incredible group: Tim Ford, Grant Fritchey, David Klee, and Jason Hall.</p>
+<p>I&#8217;m beyond delighted that Tim Ford, our fearless captain, has asked me to be a Technical Lead, too! I&#8217;ll be delivering two new sessions this year:</p>
+<p style="padding-left: 30px"><strong>Everyday Extended Events</strong></p>
+<p style="padding-left: 30px">As a DBA or developer, you want to know what is happening inside SQL Server. Extended Events are the modern framework for finding and interpreting SQL Server&#8217;s actions. In this session, you&#8217;ll see practical examples to solve everyday problems, such as capturing queries and their resources, measuring wait statistics, tracking I/O for database files, and capturing index activity. Many useful features will be shown, such as the depth of events, filtering, and multiple target types!</p>
+<p style="padding-left: 30px"><strong>Beyond CXPACKET: Understanding Wait Statistics</strong></p>
+<p style="padding-left: 30px">&#8216;Time and tide wait for no man&#8217;, but SQL Server must wait for resources when executing a query. The lifecycle of a query is full of waiting, and SQL Server records when it&#8217;s waiting, why, and for how long. By learning how each query is executed, and observing how waits can accumulate along the way, you can unlock the secrets to what resources or code changes are needed to improve your query and server performance.</p>
+<p>If you&#8217;ve ever considered attending SQL Cruise, today is the day to <a href="http://sqlcruise.com/registerme/" target="_blank">register</a>! No one has ever regretted setting sail on SQL Cruise.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/prepare-to-set-sail-on-sql-cruise-caribbean-2016/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Announcing SQL Saturday Minnesota #453 Pre-Conference Seminars!</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/announcing-sql-saturday-minnesota-453-pre-conference-seminars/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/announcing-sql-saturday-minnesota-453-pre-conference-seminars/#respond</comments>
+		<pubDate>Mon, 03 Aug 2015 13:00:12 +0000</pubDate>
+		<dc:creator><![CDATA[Paul Timmerman]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Professional Development]]></category>
+		<category><![CDATA[#sqlsat453]]></category>
+		<category><![CDATA[#sqlsatmn]]></category>
+		<category><![CDATA[Minnesota]]></category>
+		<category><![CDATA[pre-cons]]></category>
+		<category><![CDATA[sqlsaturday]]></category>
+
+		<guid isPermaLink="false">/?p=3517</guid>
+		<description><![CDATA[Before we know it, October will be upon us and it will be time for another SQL Saturday Minnesota!  If you have not yet registered for this free day of training on October 10th, please visit the site and sign up now! Since no SQL Saturday Minnesota would be complete without a full slate of pre-cons, [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><span style="color: #272727">Before we know it, October will be upon us and it will be time for another <a href="http://www.sqlsaturday.com/453/eventhome.aspx" target="_blank">SQL Saturday Minnesota</a>!  If you have not yet registered for this free day of training on October 10th, please visit the <a href="http://www.sqlsaturday.com/453/eventhome.aspx" target="_blank">site</a> and sign up now!</span></p>
+<p>Since no <a href="http://www.sqlsaturday.com/453/eventhome.aspx" target="_blank">SQL Saturday Minnesota</a> would be complete without a full slate of pre-cons, <a href="http://passmn.org/" target="_blank">PASSMN</a> and the organizers of SQL Saturday #453 are proud to announce the addition of <strong>four</strong> day long pre-cons to be held on <span class="aBn"><span class="aQJ">Friday, October 9th</span></span> from <span class="aBn"><span class="aQJ">9AM &#8211; 5PM</span></span>. Sessions will once again be held at Dakota County Technical College in Rosemount, MN.</p>
+<p>For the low price of only <strong>$99</strong> you could learn how to build a world class data organization from the team at Pragmatic Works, dive into the world of Hadoop with Hortonwork&#8217;s own Bill Preachuk and his PASS Summit 2015 selected pre-con, become a SQL Server security master with Ed Leighton-Dick, or learn everything there is no know about Power BI with Mark Vaillancourt.</p>
+<p>Visit the links below to review the complete abstracts for these amazing sessions.</p>
+<p>Any one of these sessions represents an amazing value for your training dollars!</p>
+<blockquote><p><strong><span style="color: #1155cc"><a href="https://sites.google.com/site/sqlsaturday453preconreg/home#PD_BI1" target="_blank"><span style="color: #1155cc">Adam Jorgensen, Jason Strate, Steve Hughes, and Anthony Martin</span></a></span></strong><span style="color: black">: </span><span style="color: #272727">Building World Class Data Organizations</span></p>
+<p><strong><span style="color: #1155cc"><a href="https://sites.google.com/site/sqlsaturday453preconreg/home#BD1" target="_blank"><span style="color: #1155cc">Bill Preachuk</span></a></span></strong><span style="color: black">: </span><span style="color: #272727">Hadoop Essentials for the SQL Server Professional</span></p>
+<p><strong><span style="color: #1155cc"><a href="https://sites.google.com/site/sqlsaturday453preconreg/home#DB1" target="_blank"><span style="color: #1155cc">Ed Leighton-Dick</span></a></span></strong><span style="color: black">: </span><span style="color: #272727">SQL Server Security Master Class</span></p>
+<p><strong><span style="color: #1155cc"><a href="https://sites.google.com/site/sqlsaturday453preconreg/home#BI2" target="_blank"><span style="color: #1155cc">Mark Vaillancourt</span></a></span></strong><span style="color: black">: </span><span style="color: #272727">Click, Click, WOW: The Exciting World of Power BI</span></p></blockquote>
+<p>Upon successful registration, you will receive a confirmation email from the SQLSaturday #453 team within 48 hours.</p>
+<p><span style="color: #272727">You may also access this information by visiting the <a href="http://www.sqlsaturday.com/453/eventhome.aspx" target="_blank"><span style="color: #1155cc">SQL </span><span class="aBn"><span class="aQJ"><span style="color: #1155cc">Saturday</span></span></span><span style="color: #1155cc"> #453 homepage</span></a>.</span></p>
+<p><span style="color: #272727">Please direct any questions regarding the pre-cons to the SQL Saturday #453 team at </span><a href="mailto:sqlsaturday453@sqlsaturday.com" target="_blank"><span style="color: #1155cc"><span style="color: #1155cc">sqlsaturday453@sqlsaturday.</span>com</span></a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/announcing-sql-saturday-minnesota-453-pre-conference-seminars/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

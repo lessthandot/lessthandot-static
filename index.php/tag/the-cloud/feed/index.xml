@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>the cloud &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/the-cloud/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>A couple of things to be aware of when working with tables in SQL Azure</title>
+		<link>/index.php/datamgmt/datadesign/a-couple-of-things-to/</link>
+		<comments>/index.php/datamgmt/datadesign/a-couple-of-things-to/#comments</comments>
+		<pubDate>Wed, 02 May 2012 23:25:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[sql azure]]></category>
+		<category><![CDATA[the cloud]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/05/a-couple-of-things-to/</guid>
+		<description><![CDATA[I was messing around with SQL Azure today and noticed a couple of things that are not supported compared to the regular version of SQL Server in regards to tables. I will list these in this post.
+
+All the code has been tested against the following ver&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I was messing around with SQL Azure today and noticed a couple of things that are not supported compared to the regular version of SQL Server in regards to tables. I will list these in this post.</p>
+<p>All the code has been tested against the following version of SQL Azure as returned by @@version</p>
+<p>Microsoft SQL Azure (RTM) &#8211; 11.0.1892.4<br />
+Apr 24 2012 10:21:54 Copyright (c) Microsoft Corporation</p>
+<p>
+<h2>1) Tables have to have a clustered index if you want to insert data into those tables</h2>
+<p>There is actually no problem creating a table without a clustered index (heap)<br />
+If you run this code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test<span class="br0">&#40;</span>bla <span class="kw1">uniqueidentifier</span> <span class="kw1">default</span> newid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test(bla uniqueidentifier default newid())</pre></div></div>
+
+<p>And then refresh and expand the tables folder, you will see the following</p>
+<p><a href="/wp-content/uploads/blogs/DataMgmt/Denis/AzureTable.PNG?mtime=1336007070"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/AzureTable.PNG?mtime=1336007070" width="422" height="356" /></a></p>
+<p>Now run the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> Test <span class="kw1">DEFAULT</span> <span class="kw1">VALUES</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT Test DEFAULT VALUES</pre></div></div>
+
+<p>And here is the error<br />
+<em>Msg 40054, Level 16, State 1, Line 1<br />
+Tables without a clustered index are not supported in this version of SQL Server. Please create a clustered index and try again.</em></p>
+<p>Adding a clustered index and running the insert again fixes this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> ix_Test_bla <span class="kw1">on</span> Test<span class="br0">&#40;</span>bla<span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> Test <span class="kw1">DEFAULT</span> <span class="kw1">VALUES</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX ix_Test_bla on Test(bla)
+GO
+
+INSERT Test DEFAULT VALUES</pre></div></div>
+
+<p>The problem is that until you try to insert data in your tables, you won&#8217;t see this error, at that point it might be too late and your application will fail</p>
+<p>To list all the tables in your database without a clustered index, you can use this code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> t.<span class="me1">name</span> 
+<span class="kw1">FROM</span> sys.<span class="me1">tables</span> t
+<span class="kw1">WHERE</span> <span class="sy0">NOT</span> <span class="sy0">EXISTS</span> <span class="br0">&#40;</span>&nbsp; <span class="kw1">SELECT</span> <span class="nu0">1</span> &nbsp;<span class="kw1">FROM</span> sys.<span class="me1">indexes</span> i
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHERE</span> i.<span class="me1">type_desc</span> <span class="sy0">=</span> <span class="st0">'CLUSTERED'</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> i.<span class="kw2">object_id</span> <span class="sy0">=</span> t.<span class="kw2">object_id</span> <span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT t.name 
+FROM sys.tables t
+WHERE NOT EXISTS (	SELECT 1  FROM sys.indexes i
+					WHERE i.type_desc = 'CLUSTERED' 
+					AND i.object_id = t.object_id )</pre></div></div>
+
+<p>BTW, temporary tables can be created without a  clustered index, this runs without a problem</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #bla<span class="br0">&#40;</span>id <span class="kw1">int</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> #bla <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #bla(id int)
+INSERT #bla VALUES(1)</pre></div></div>
+
+<p>
+<h2>2) Global temporary tables are not supported</h2>
+<p>If you try to create the following global temporary table, you will get an error</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> ##bla<span class="br0">&#40;</span>id <span class="kw1">int</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE ##bla(id int)</pre></div></div>
+
+<p><em>Msg 40516, Level 15, State 1, Line 2<br />
+Global temp objects are not supported in this version of SQL Server.</em></p>
+<p>I admit that I have only used a global temporary table once or twice in the last 10+ years or so, I don&#8217;t think this is a big deal</p>
+<p>
+<h2>3) Select Into is not supported</h2>
+<p>You cannot use select into either in SQL Azure</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">INTO</span> Testb <span class="kw1">from</span> Test</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * INTO Testb from Test</pre></div></div>
+
+<p>Here is the error<br />
+<em>Msg 40510, Level 16, State 1, Line 1<br />
+Statement &#8216;SELECT INTO&#8217; is not supported in this version of SQL Server.</em></p>
+<p>I don&#8217;t think this is a big deal either, sure you will have to list all the columns and create the table first before inserting, this could be a pain in the neck but it is not the end of the world</p>
+<p>
+<h2>4) Newsequentialid() is not supported</h2>
+<p>Remember this table from before</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test2<span class="br0">&#40;</span>bla <span class="kw1">uniqueidentifier</span> <span class="kw1">default</span> newid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test2(bla uniqueidentifier default newid())</pre></div></div>
+
+<p>Try making that default newsequentialid() instead of newid()</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Testb<span class="br0">&#40;</span>bla <span class="kw1">uniqueidentifier</span> <span class="kw1">default</span> newsequentialid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Testb(bla uniqueidentifier default newsequentialid())</pre></div></div>
+
+<p>Here is the error message<br />
+<em>Msg 40511, Level 15, State 1, Line 1<br />
+Built-in function &#8216;newsequentialid&#8217; is not supported in this version of SQL Server.</em></p>
+<p>In this case, you will probably need to go with newid() instead of newsequentialid(), not a big change</p>
+<p>
+<h2>Conclusion</h2>
+<p>Overall I don&#8217;t think that these are major issues and should be fairly easy to either change the design or change the code to get around these limitations in this version of SQL Azure</p>
+<p>What do you think, big pain in the neck or no big deal?</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/a-couple-of-things-to/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+	</channel>
+</rss>

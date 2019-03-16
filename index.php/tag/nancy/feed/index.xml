@@ -1,0 +1,997 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>nancy &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/nancy/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Using Selenium for View testing with knockout and RequireJS</title>
+		<link>/index.php/webdev/using-selenium-for-view-testing-with-knockout-and-requirejs/</link>
+		<comments>/index.php/webdev/using-selenium-for-view-testing-with-knockout-and-requirejs/#respond</comments>
+		<pubDate>Mon, 01 Dec 2014 14:20:41 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Web Developer]]></category>
+		<category><![CDATA[knockout]]></category>
+		<category><![CDATA[nancy]]></category>
+		<category><![CDATA[selenium]]></category>
+		<category><![CDATA[UnitTesting]]></category>
+		<category><![CDATA[webdriver]]></category>
+
+		<guid isPermaLink="false">/?p=3089</guid>
+		<description><![CDATA[I&#8217;ve written about using Selenium/WebDriver for automated testing in a C# environment in the past. Some of these posts may be dated, but I&#8217;ve covered everything from using the Selenium IDE, to using WebDriver and the PageObject pattern, to using SpecFlow to drive Selenium UI testing. But in this age of MVVM/MVC frameworks and libraries, [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;ve written about using Selenium/WebDriver for automated testing in a C# environment in the past. Some of these posts may be dated, but I&#8217;ve covered everything from <a href="/index.php/webdev/uidevelopment/automated-web-testing-with-selenium/" title="Automated testing with Selenium IDE">using the Selenium IDE</a>, to <a href="/index.php/webdev/uidevelopment/automated-web-testing-with-selenium-2/" title="Automated testing with Selenium WebDriver">using WebDriver and the PageObject pattern</a>, to <a href="/index.php/enterprisedev/application-lifecycle-management/using-specflow-to/" title="Using SpecFlow to drive Selenium WebDriver Tests">using SpecFlow to drive Selenium UI testing</a>. But in this age of <a href="/index.php/webdev/uidevelopment/angularjs-vs-knockout-introduction-1/" title="AngularJS vs Knockout - Introduction (1 of 8)">MVVM/MVC frameworks and libraries</a>, do we really need every single test to hit the database?</p>
+<h1>The Integration Testing Tax</h1>
+<p>UI testing is widely accepted as slow and fragile. We can use patterns like the <a href="http://docs.seleniumhq.org/docs/06_test_design_considerations.jsp#page-object-design-pattern" title="Selenium: Page Object Design Pattern">Page Object design pattern</a> to reduce the fragility of how we interact with elements on the page, but that doesn&#8217;t speed things up any. We can merge tests to reduce repetitive actions, but that just adds a bunch of mess to the fragility side of the equation again.</p>
+<p>So what to do?</p>
+<p>Something I have been considering lately is to use Selenium to test just the View bindings, without the overhead of doing full integration testing. If I keep the logic out of the View (one of the reasons I love MVVM), then I can write some very extensive behavioral unit tests very close to the user and have fast, thorough behavior coverage. My main test concern then becomes how I ensure my bindings stay wired together over time, since I know the behavior under them is working properly. Tightening the focus provides a smaller subsurface to test against then trying to test all of the intricacies all of the way down and reduces the performance drags of anything behind the UI (like network, disk, subsystems, etc), so I could potentially test far more things in less time.</p>
+<h1>UI Testing without the Backend</h1>
+<p>To try this out, I needed a sample application. I wrote a simple application using <a href="http://knockoutjs.com/">knockout</a> and <a href="http://requirejs.org/">RequireJS</a>. There is a basic search screen that allows you to &#8220;search&#8221; against a slow WebApi endpoint, get further details about a product from that endpoint, and add items to a local cart. </p>
+<p>Note: The WebApi actions are slow to reflect performance from larger, more complex applications that have to worry about things like authentication, databases, accessing network stores, logging, contention and retry policies, business logic, etc. </p>
+<h2>The Fake Application + Test Cases</h2>
+<p>All of the code for the fake application and tests is on github at <a href="https://github.com/tarwn/Blog_RequireJSandSelenium" title="tarwn/Blog_RequireJSandSelenium on github">tarwn/Blog_RequireJSandSelenium</a>.</p>
+<p>The fake application looks like this:</p>
+<p><a href="/wp-content/uploads/2014/11/SeleniumKnockoutSampleApp.png"><img src="/wp-content/uploads/2014/11/SeleniumKnockoutSampleApp.png" alt="SeleniumKnockoutSampleApp" width="639" height="864" class="aligncenter size-full wp-image-3090" srcset="/wp-content/uploads/2014/11/SeleniumKnockoutSampleApp.png 639w, /wp-content/uploads/2014/11/SeleniumKnockoutSampleApp-221x300.png 221w" sizes="(max-width: 639px) 100vw, 639px" /></a></p>
+<p>The ViewModel behind this view contains all of the properties necessary to display the screen and it&#8217;s actions:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+</pre></td><td class="de1"><pre class="de1">define<span class="br0">&#40;</span><span class="br0">&#91;</span><span class="st0">&quot;knockout&quot;</span><span class="sy0">,</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;lodash&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/services/itemService&quot;</span><span class="sy0">,</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/models/itemSummary&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/models/itemFull&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/models/itemCart&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/models/cart&quot;</span>
+<span class="br0">&#93;</span><span class="sy0">,</span>
+<span class="kw1">function</span> <span class="br0">&#40;</span>ko<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ItemService<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ItemSummary<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ItemFull<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ItemCart<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Cart<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">function</span> IndexViewModel<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> itemService <span class="sy0">=</span> <span class="kw1">new</span> ItemService<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> self <span class="sy0">=</span> <span class="kw1">this</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">searchText</span> <span class="sy0">=</span> ko.<span class="me1">observable</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">isSearching</span> <span class="sy0">=</span> ko.<span class="me1">observable</span><span class="br0">&#40;</span><span class="kw2">false</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">searchResults</span> <span class="sy0">=</span> ko.<span class="me1">observableArray</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">executeSearch</span> <span class="sy0">=</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="coMULTI">/* Search logic with self.itemService.getItems */</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">selectedItem</span> <span class="sy0">=</span> ko.<span class="me1">observable</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">isLoadingSelectedItem</span> <span class="sy0">=</span> ko.<span class="me1">observable</span><span class="br0">&#40;</span><span class="kw2">false</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">selectItem</span> <span class="sy0">=</span> <span class="kw1">function</span> <span class="br0">&#40;</span>item<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="coMULTI">/* Selection logic with self.itemService.getItem(item.id) */</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">cart</span> <span class="sy0">=</span> <span class="kw1">new</span> Cart<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">addToCart</span> <span class="sy0">=</span> <span class="kw1">function</span> <span class="br0">&#40;</span>itemToAdd<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="coMULTI">/* Add item to cart */</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">return</span> IndexViewModel<span class="sy0">;</span>
+&nbsp;
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">define(["knockout", 
+        "lodash",
+        "app/services/itemService", 
+        "app/models/itemSummary",
+        "app/models/itemFull",
+        "app/models/itemCart",
+        "app/models/cart"
+],
+function (ko,
+        _,
+        ItemService,
+        ItemSummary,
+        ItemFull,
+        ItemCart,
+        Cart) {
+   
+    function IndexViewModel() {
+        var itemService = new ItemService();
+        var self = this;
+
+        this.searchText = ko.observable();
+        this.isSearching = ko.observable(false);
+        this.searchResults = ko.observableArray();
+        this.executeSearch = function () {
+                /* Search logic with self.itemService.getItems */
+        };
+        
+        this.selectedItem = ko.observable();
+        this.isLoadingSelectedItem = ko.observable(false);
+        this.selectItem = function (item) {
+                /* Selection logic with self.itemService.getItem(item.id) */
+        };
+
+        this.cart = new Cart();
+        this.addToCart = function (itemToAdd) {
+                /* Add item to cart */
+        };
+    }
+
+    return IndexViewModel;
+
+});</pre></div></div>
+
+<p>All of the code for the site is located here: <a href="https://github.com/tarwn/Blog_RequireJSandSelenium/tree/master/SampleWebSite" title="SampleWebSite on github">github: tarwn/Blog_RequireJSandSelenium &#8211; /SampleWebSite</a></p>
+<div style="background-color: #FFFFBB; padding: 1em; margin: .25em 1em">If you have not used <a href="http://requirejs.org/" title="RequireJS">RequireJS</a>, the top part of the javascript file may look confusing. define() is used to define all the dependencies I need for the script and a method that accepts those dependencies for us in the scope of that script. When someone in turn asks for an IndexViewModel (or more appropriately: /app/indexViewModel), they will get back this constructor, fully wired with all of it&#8217;s dependencies. RequireJS ensures dependencies are loaded in the right order, keeps the global window scope clean, and allows us to mock out those dependencies using tools like <a href="https://github.com/iammerrick/Squire.js/" title="Squire.js on github">Squire.js</a>.</div>
+<p>Let&#8217;s get testing!</p>
+<h2>Testing with Selenium &#8211; times 8!</h2>
+<p>While playing with this, I looked at 4 different methods of testing with Selenium across Chrome and Phantom. </p>
+<p>The 4 methods are:</p>
+<ul>
+<li><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/IndexTests.FullIntegration.cs">IndexTests.FullIntegration</a> &#8211; launch the site locally and run my UI tests against it, with the &#8220;real&#8221; WebAPI service</li>
+<li><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/IndexTests.ClientSideInjection.cs">IndexTests.ClientSideInjection</a> &#8211; Execute a script to stub the itemService.js logic to run locally</li>
+<li><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/IndexTests.NancyServer.cs">IndexTests.NancyServer</a> &#8211; Self-host a Nancy server with fake versions of the server-side API</li>
+<li><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/IndexTests.NancyServerWithScriptInjection.cs">IndexTests.NancyServer</a> &#8211; Self-host a Nancy server that serves a stubbed itemService.js file</li>
+</ul>
+<p>These tests only cover the case where the HTML page is already a static file. If my page had instead been server-side generated from something like ASP.Net MVC or Web Pages, there would be additional work involved.</p>
+<p>My goal was to keep the tests consistent across methods. This is a sample test:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> WhenUserSearchesForItemsAndSelectsOne_ThenDetailsAreDisplayedForTheSelectedProduct<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> indexPage <span class="sy0">=</span> <span class="kw3">new</span> IndexPage<span class="br0">&#40;</span>_webDriver, _url, <span class="st0">&quot;Sample App&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; indexPage<span class="sy0">.</span><span class="me1">SearchButton</span><span class="sy0">.</span><span class="me1">Click</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Utility<span class="sy0">.</span><span class="me1">WaitUpTo</span><span class="br0">&#40;</span><span class="nu0">5000</span>, <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">=&gt;</span> Utility<span class="sy0">.</span><span class="me1">IsElementPresent</span><span class="br0">&#40;</span>indexPage<span class="sy0">.</span><span class="me1">SearchResultsTable</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">&amp;&amp;</span> indexPage<span class="sy0">.</span><span class="me1">SearchResultsTable</span><span class="sy0">.</span><span class="me1">Displayed</span>, <span class="st0">&quot;Search results&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreNotEqual</span><span class="br0">&#40;</span><span class="nu0">0</span>, indexPage<span class="sy0">.</span><span class="me1">GetNumberOfSearchResults</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; indexPage<span class="sy0">.</span><span class="me1">ClickSearchResults</span><span class="br0">&#40;</span><span class="nu0">0</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Utility<span class="sy0">.</span><span class="me1">WaitUpTo</span><span class="br0">&#40;</span><span class="nu0">5000</span>, <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">=&gt;</span> Utility<span class="sy0">.</span><span class="me1">IsElementPresent</span><span class="br0">&#40;</span>indexPage<span class="sy0">.</span><span class="me1">ItemDetails</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">&amp;&amp;</span> indexPage<span class="sy0">.</span><span class="me1">ItemDetails</span><span class="sy0">.</span><span class="me1">Displayed</span>, <span class="st0">&quot;Item Details&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreEqual</span><span class="br0">&#40;</span>indexPage<span class="sy0">.</span><span class="me1">GetSelectedRowItemName</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, indexPage<span class="sy0">.</span><span class="me1">ItemDetailsName</span><span class="sy0">.</span><span class="me1">Text</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void WhenUserSearchesForItemsAndSelectsOne_ThenDetailsAreDisplayedForTheSelectedProduct()
+{
+    var indexPage = new IndexPage(_webDriver, _url, "Sample App");
+
+    indexPage.SearchButton.Click();
+    Utility.WaitUpTo(5000, () =&gt; Utility.IsElementPresent(indexPage.SearchResultsTable) 
+				  &amp;&amp; indexPage.SearchResultsTable.Displayed, "Search results");
+    Assert.AreNotEqual(0, indexPage.GetNumberOfSearchResults());
+
+    indexPage.ClickSearchResults(0);
+    Utility.WaitUpTo(5000, () =&gt; Utility.IsElementPresent(indexPage.ItemDetails) 
+				  &amp;&amp; indexPage.ItemDetails.Displayed, "Item Details");
+
+    Assert.AreEqual(indexPage.GetSelectedRowItemName(), indexPage.ItemDetailsName.Text);
+}</pre></div></div>
+
+<p>Translated into English:</p>
+<ul>
+<li>Open the Index Page</li>
+<li>Click the Search button</li>
+<li>Wait up to 5 seconds for the search results table to be displayed</li>
+<li>Verify there are more than 0 results displayed</li>
+<li>Click the 0th search result (to select it)</li>
+<li>Wait up to 5 seconds for the selected Item to load in the Item Details section</li>
+<li>Verify the name from the selected row matches the name in the details</li>
+</ul>
+<div style="background-color: #FFFFBB; padding: 1em; margin: 1em 1em .25em 1em">
+Note: I used the PageObject pattern very lightly to try and keep the tests readable and easily repeatable for each test method, but did not spend a lot of time following good patterns to create maintainable logic, as this is just experimental code.
+</div>
+<p>Rather than go through all of the cases, I&#8217;ll touch on just the basic FullIntegration case and one of the Nancy cases. The ClientSide injection case felt really hacky and fragile and I don&#8217;t think it&#8217;s a good choice.</p>
+<h3>IndexTests.FullIntegration</h3>
+<p>This method is really slow and you have to have a working web server. The setup is quick and easy though:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>TestFixture<span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>ChromeDriver<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="br0">&#91;</span>TestFixture<span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>PhantomJSDriver<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">class</span> IndexTests_FullIntegration<span class="sy0">&lt;</span>TDriver<span class="sy0">&gt;</span>
+<span class="kw1">where</span> TDriver <span class="sy0">:</span> IWebDriver, <span class="kw3">new</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">private</span> IWebDriver _webDriver<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">private</span> <span class="kw4">string</span> _url <span class="sy0">=</span> <span class="st0">&quot;http://localhost:63431/&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestFixtureSetUp<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> TestFixtureSetup<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webDriver <span class="sy0">=</span> <span class="kw3">new</span> TDriver<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestFixtureTearDown<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> TestFixtureTearDown<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webDriver<span class="sy0">.</span><span class="me1">Quit</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// ... tests here ...</span>
+&nbsp;
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[TestFixture(typeof(ChromeDriver))]
+[TestFixture(typeof(PhantomJSDriver))]
+public class IndexTests_FullIntegration&lt;TDriver&gt;
+where TDriver : IWebDriver, new()
+{
+
+	private IWebDriver _webDriver;
+	private string _url = "http://localhost:63431/";
+
+	[TestFixtureSetUp]
+	public void TestFixtureSetup()
+	{
+	    _webDriver = new TDriver();
+	}
+
+	[TestFixtureTearDown]
+	public void TestFixtureTearDown()
+	{
+	    _webDriver.Quit();
+	}
+
+	// ... tests here ...
+
+}</pre></div></div>
+
+<p>Besides the performance, the other downside of this method is the hosting. In the <a href="/index.php/enterprisedev/application-lifecycle-management/using-specflow-to/" title="Using SpecFlow to drive Selenium WebDriver Tests">Using SpecFlow to drive Selenium UI Testing</a> post, I already had the steps necessary to deploy a staging site to test against, but this equates to more overhead and could drive where in your build process you perform the tests as well as make it harder to run them locally.</p>
+<h3>IndexTests.Nancy</h3>
+<p>In this case, I created a self-hosting Nancy site that copies all of the static content from my Sample site and exposes fake versions of the API. The downsides of the two Nancy methods are the restriction to static content (no MVC pages) and that you&#8217;re reimplementing a fake API for the system. </p>
+<p>This second issue actually bothers me a bit, as it means you are creating a fake set of data that all of your tests are going to rely on. Typically when you have one big shared pool of test data, it makes your systems harder to maintain, as that test data turns into a bog of magic values, some of which have to be set just so for tests to succeed. Allowing the tests to define the values that would be returned when they have specific needs would make this a lot more maintainable and help surface those critical data assumptions in the tests.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>TestFixture<span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>ChromeDriver<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="br0">&#91;</span>TestFixture<span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>PhantomJSDriver<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">class</span> IndexTests_NancyServer<span class="sy0">&lt;</span>TDriver<span class="sy0">&gt;</span>
+<span class="kw1">where</span> TDriver <span class="sy0">:</span> IWebDriver, <span class="kw3">new</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">private</span> <span class="kw4">string</span> _baseUrl <span class="sy0">=</span> <span class="st0">&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">private</span> NancyHost _webServer<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">private</span> IWebDriver _webDriver<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestFixtureSetUp<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> TestFixtureSetup<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webServer <span class="sy0">=</span> SetupServer<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webDriver <span class="sy0">=</span> <span class="kw3">new</span> TDriver<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">private</span> NancyHost SetupServer<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> dnfo <span class="sy0">=</span> <span class="kw3">new</span> DirectoryInfo<span class="br0">&#40;</span><span class="st0">&quot;TestSampleWebSite&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>dnfo<span class="sy0">.</span><span class="me1">Exists</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; dnfo<span class="sy0">.</span><span class="me1">Delete</span><span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> proc <span class="sy0">=</span> <span class="kw3">new</span> Process<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">StartInfo</span><span class="sy0">.</span><span class="me1">UseShellExecute</span> <span class="sy0">=</span> <span class="kw1">true</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">StartInfo</span><span class="sy0">.</span><span class="me1">FileName</span> <span class="sy0">=</span> <span class="st_h">@&quot;C:\WINDOWS\system32\xcopy.exe&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">StartInfo</span><span class="sy0">.</span><span class="me1">Arguments</span> <span class="sy0">=</span> <span class="st0">&quot;<span class="es0">\&quot;</span>../../../SampleWebSite<span class="es0">\&quot;</span> TestSampleWebSite /E /I&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">Start</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">WaitForExit</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> config <span class="sy0">=</span> <span class="kw3">new</span> HostConfiguration<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; UrlReservations <span class="sy0">=</span> <span class="kw3">new</span> UrlReservations<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; User <span class="sy0">=</span> <span class="st0">&quot;Everyone&quot;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; CreateAutomatically <span class="sy0">=</span> <span class="kw1">true</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> host <span class="sy0">=</span> <span class="kw3">new</span> NancyHost<span class="br0">&#40;</span><span class="kw3">new</span> LocalServerBootstrapper<span class="br0">&#40;</span>dnfo<span class="sy0">.</span><span class="me1">FullName</span><span class="br0">&#41;</span>, config, <span class="kw3">new</span> Uri<span class="br0">&#40;</span>_baseUrl<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; host<span class="sy0">.</span><span class="me1">Start</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> host<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestFixtureTearDown<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> TestFixtureTearDown<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webDriver<span class="sy0">.</span><span class="me1">Quit</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webServer<span class="sy0">.</span><span class="me1">Stop</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// ... tests ...</span>
+&nbsp;
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[TestFixture(typeof(ChromeDriver))]
+[TestFixture(typeof(PhantomJSDriver))]
+public class IndexTests_NancyServer&lt;TDriver&gt;
+where TDriver : IWebDriver, new()
+{
+
+	private string _baseUrl = "http://localhost:5000/";
+	private NancyHost _webServer;
+	private IWebDriver _webDriver;
+
+	[TestFixtureSetUp]
+	public void TestFixtureSetup()
+	{
+	    _webServer = SetupServer();
+	    _webDriver = new TDriver();
+	}
+
+	private NancyHost SetupServer()
+	{
+	    var dnfo = new DirectoryInfo("TestSampleWebSite");
+	    if (dnfo.Exists)
+		dnfo.Delete(true);
+
+	    var proc = new Process();
+	    proc.StartInfo.UseShellExecute = true;
+	    proc.StartInfo.FileName = @"C:\WINDOWS\system32\xcopy.exe";
+	    proc.StartInfo.Arguments = "\"../../../SampleWebSite\" TestSampleWebSite /E /I";
+	    proc.Start();
+	    proc.WaitForExit();
+
+	    var config = new HostConfiguration()
+	    {
+		UrlReservations = new UrlReservations()
+		{
+		    User = "Everyone",
+		    CreateAutomatically = true
+		}
+	    };
+
+	    var host = new NancyHost(new LocalServerBootstrapper(dnfo.FullName), config, new Uri(_baseUrl));
+	    host.Start();
+	    return host;
+	}
+
+	[TestFixtureTearDown]
+	public void TestFixtureTearDown()
+	{
+	    _webDriver.Quit();
+	    _webServer.Stop();
+	}
+
+	// ... tests ...
+
+}</pre></div></div>
+
+<p><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/NancyServer/LocalServerBootstrapper.cs" title="/SampleWebSite.UITests/NancyServer/LocalServerBootstrapper.cs on github">LocalServerBootstrapper</a> defines the static content folders (in this case, /styles, /Scripts, and the /index.html file). There is a single Module, <a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/NancyServer/LocalServer.cs" title="/SampleWebSite.UITests/NancyServer/LocalServer.cs on github">LocalServer</a>, that serves up the 2 item API endpoints.</p>
+<p>In a larger test suite, I would move this test code to a single startup method for the whole assembly.</p>
+<h3>The Performance Results</h3>
+<p>Running the same 3 tests for each of the 4 methods across two different browsers helped see the difference between startup and ongoing performance costs.</p>
+<p><a href="/wp-content/uploads/2014/11/SeleniumRequireJsResults.png"><img src="/wp-content/uploads/2014/11/SeleniumRequireJsResults.png" alt="SeleniumRequireJsResults" width="584" height="645" class="aligncenter size-full wp-image-3098" srcset="/wp-content/uploads/2014/11/SeleniumRequireJsResults.png 584w, /wp-content/uploads/2014/11/SeleniumRequireJsResults-271x300.png 271w" sizes="(max-width: 584px) 100vw, 584px" /></a></p>
+<p>We pick up quite a bit of performance when we remove the backend server from the tests. one other thing to note is that the startup time for Phantom is quite a bit faster, but there is a slightly higher ongoing cost.</p>
+<h2>Conclusions</h2>
+<p>This turned out to be a pretty nice little experiment. I wouldn&#8217;t use any of these methods for a production test suite as they are now, but they definitely have promise and I&#8217;ll certainly be trying out some more things with that Nancy setup. </p>
+<p>Switching from a full integration focus to more of a View focus did make things faster, but not to the degree I had hoped. I intend to spend some further thought on how to turn the dial up further without making this really painful to maintain. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/using-selenium-for-view-testing-with-knockout-and-requirejs/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SquishIt and Nancy &#8211; Part Deux</title>
+		<link>/index.php/webdev/serverprogramming/squishit-and-nancy-part-deux/</link>
+		<comments>/index.php/webdev/serverprogramming/squishit-and-nancy-part-deux/#comments</comments>
+		<pubDate>Fri, 21 Feb 2014 02:53:31 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[nancy]]></category>
+		<category><![CDATA[squishit]]></category>
+
+		<guid isPermaLink="false">/?p=2430</guid>
+		<description><![CDATA[About a year ago, I wrote about getting SquishIt up and running with the (awesome) Nancy Web Framework.  You can read all about that here.  Since then, things have changed a bit, as they are wont to do.  I had mostly been ignoring this project, until an issue came up on the SquishIt mailing list [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>About a year ago, I wrote about getting SquishIt up and running with the (awesome) <a href="http://nancyfx.org/">Nancy Web Framework</a>.  You can read all about that <a href="/index.php/webdev/serverprogramming/aspnet/squishit-and-nancy/">here</a>.  Since then, things have changed a bit, as they are wont to do.  I had mostly been ignoring this project, until an issue came up on the SquishIt mailing list that forced me to fire it up again.  The biggest change I found is that Nancy no longer depends on System.Web.  This really messed up the file path resolution in SquishIt, and forced us to introduce a new extensibility point for path translation.  Frankly, this probably should have been done a long time ago, but at least it is getting done now.</p>
+<p>It was a pretty simple change but I&#8217;ll go over it here.  First we needed to introduce a new interface, IPathTranslator.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">Framework</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">interface</span> IPathTranslator
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> ResolveAppRelativePathToFileSystem<span class="br0">&#40;</span><span class="kw4">string</span> file<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">string</span> ResolveFileSystemPathToAppRelative<span class="br0">&#40;</span><span class="kw4">string</span> file<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace SquishIt.Framework
+{
+    public interface IPathTranslator
+    {
+        string ResolveAppRelativePathToFileSystem(string file);
+        string ResolveFileSystemPathToAppRelative(string file);
+    }
+}</pre></div></div>
+
+<p>This takes the place of the old &#8220;FileSystem&#8221; static class, that probably only a few people are aware of.  The implementation isn&#8217;t that important, but it takes some information from HttpRuntime / HttpContext and uses that to convert between file locations on disk and app-relative web paths.  </p>
+<p>Because newer versions of Nancy don&#8217;t reference System.Web, we had to find another way to do this.  It seems like the best way to get it done is using Nancy&#8217;s IRootPathProvider.  The following looks like a reasonable approximation of what was being done with HttpContext / HttpRuntime &#8211; I have not tested it with CSS path rewriting or any of the trickier stuff that SquishIt does, but I think it will work.  If not I&#8217;m sure someone will let me know.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Nancy</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">SquishIt.Framework</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">NancySample</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> NancyPathTranslator <span class="sy0">:</span> IPathTranslator
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">private</span> <span class="kw1">readonly</span> IRootPathProvider _rootPathProvider<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> NancyPathTranslator<span class="br0">&#40;</span>IRootPathProvider rootPathProvider<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _rootPathProvider <span class="sy0">=</span> rootPathProvider<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">string</span> ResolveAppRelativePathToFileSystem<span class="br0">&#40;</span><span class="kw4">string</span> file<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Remove query string</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span>file<span class="sy0">.</span><span class="me1">IndexOf</span><span class="br0">&#40;</span><span class="st0">'?'</span><span class="br0">&#41;</span> <span class="sy0">!=</span> <span class="sy0">-</span><span class="nu0">1</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; file <span class="sy0">=</span> file<span class="sy0">.</span><span class="me1">Substring</span><span class="br0">&#40;</span><span class="nu0">0</span>, file<span class="sy0">.</span><span class="me1">IndexOf</span><span class="br0">&#40;</span><span class="st0">'?'</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> _rootPathProvider<span class="sy0">.</span><span class="me1">GetRootPath</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">&quot;/&quot;</span> <span class="sy0">+</span> file<span class="sy0">.</span><span class="me1">TrimStart</span><span class="br0">&#40;</span><span class="st0">'~'</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">TrimStart</span><span class="br0">&#40;</span><span class="st0">'/'</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">string</span> ResolveFileSystemPathToAppRelative<span class="br0">&#40;</span><span class="kw4">string</span> file<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> root <span class="sy0">=</span> <span class="kw3">new</span> Uri<span class="br0">&#40;</span>_rootPathProvider<span class="sy0">.</span><span class="me1">GetRootPath</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> root<span class="sy0">.</span><span class="me1">MakeRelativeUri</span><span class="br0">&#40;</span><span class="kw3">new</span> Uri<span class="br0">&#40;</span>file, UriKind<span class="sy0">.</span><span class="me1">RelativeOrAbsolute</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System;
+using Nancy;
+using SquishIt.Framework;
+
+namespace SquishIt.NancySample
+{
+    public class NancyPathTranslator : IPathTranslator
+    {
+        private readonly IRootPathProvider _rootPathProvider;
+
+        public NancyPathTranslator(IRootPathProvider rootPathProvider)
+        {
+            _rootPathProvider = rootPathProvider;
+        }
+
+        public string ResolveAppRelativePathToFileSystem(string file)
+        {
+            // Remove query string
+            if(file.IndexOf('?') != -1)
+            {
+                file = file.Substring(0, file.IndexOf('?'));
+            }
+
+            return _rootPathProvider.GetRootPath() + "/" + file.TrimStart('~').TrimStart('/');
+        }
+
+        public string ResolveFileSystemPathToAppRelative(string file)
+        {
+            var root = new Uri(_rootPathProvider.GetRootPath());
+            return root.MakeRelativeUri(new Uri(file, UriKind.RelativeOrAbsolute)).ToString();
+        }
+    }
+}</pre></div></div>
+
+<p>Pretty simple.  We basically had to replace the Server.MapPath / HttpRuntime.AppDomainAppPath type stuff we were using with IRootPathProvider.GetRootPath().  It may very well end up being more complicated than this &#8211; but whats important is it is now in the user&#8217;s control.  In addition to allowing users of newer versions of Nancy to use SquishIt, this will also let users with environmental issues that our code does not account for work around our bad code without needing to dig too deeply into SquishIt&#8217;s internals.</p>
+<p>Once this is coded, we just have to configure SquishIt to use it.  This can be done in a nancy bootstrapper like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">Bundle<span class="sy0">.</span><span class="me1">ConfigureDefaults</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">UsePathTranslator</span><span class="br0">&#40;</span><span class="kw3">new</span> NancyPathTranslator<span class="br0">&#40;</span><span class="kw3">new</span> AspNetRootSourceProvider<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Bundle.ConfigureDefaults()
+    .UsePathTranslator(new NancyPathTranslator(new AspNetRootSourceProvider()));</pre></div></div>
+
+<p>Once this is done, we can run the project successfully again, and go back to not worrying about this until another Nancy user points out the next problem.  For a closer look, the sample project is available at <a href="https://github.com/AlexCuse/SquishIt.NancySample">github</a>.  Big thanks to SquishIt/Nancy user Mike Ward for pointing out on the mailing list that things weren&#8217;t working anymore.  It would be impossible to stay on top of this kind of stuff without the help of people like him.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/squishit-and-nancy-part-deux/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>SquishIt and Nancy</title>
+		<link>/index.php/webdev/serverprogramming/aspnet/squishit-and-nancy/</link>
+		<comments>/index.php/webdev/serverprogramming/aspnet/squishit-and-nancy/#comments</comments>
+		<pubDate>Fri, 11 Jan 2013 13:11:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[nancy]]></category>
+		<category><![CDATA[squishit]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/squishit-and-nancy/</guid>
+		<description><![CDATA[Everybody's favorite LTD blogger / Belgian tweeter Chris asked me last week how he could get SquishIt working with the Nancy web framework.  I had to admit, I had no idea.  But couldn't imagine it would be that much more difficult than making it work wi&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Everybody&#8217;s favorite <a href="/index.php/All/?disp=authdir&amp;author=7">LTD blogger</a> / <a href="http://twitter.com/chrissie1">Belgian tweeter</a> Chris asked me last week how he could get SquishIt working with the <a href="http://nancyfx.org/">Nancy web framework</a>. I had to admit, I had no idea. But couldn&#8217;t imagine it would be that much more difficult than making it work with ASP.net MVC. So I decided to look into it. It turned out to be pretty much the same, with one extra step. I started out by installing the packages I needed from NuGet to an empty asp.net application:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1">&gt; install-package SquishIt
+&gt; install-package Nancy
+&gt; install-package Nancy.Hosting.AspNet
+&gt; install-package Nancy.Viewengines.Razor</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&gt; install-package SquishIt
+&gt; install-package Nancy
+&gt; install-package Nancy.Hosting.AspNet
+&gt; install-package Nancy.Viewengines.Razor</pre></div></div>
+
+<p>Once installed, there is a little bit of setup work we need to do.</p>
+<h3>Configuring Nancy&#8217;s View Engine</h3>
+<p>This was infinitely more complex than using a referenced library in a razor view with MVC. Translation: this was as simple as adding a &#8220;razor&#8221; section to the web.config:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1">&nbsp; <span class="sc3"><span class="re1">&lt;configSections<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;section</span> <span class="re0">name</span>=<span class="st0">&quot;razor&quot;</span> <span class="re0">type</span>=<span class="st0">&quot;Nancy.ViewEngines.Razor.RazorConfigurationSection, Nancy.ViewEngines.Razor&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/configSections<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;razor</span> <span class="re0">disableAutoIncludeModelNamespace</span>=<span class="st0">&quot;false&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;assemblies<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">assembly</span>=<span class="st0">&quot;System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">assembly</span>=<span class="st0">&quot;SquishIt.Framework&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/assemblies<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;namespaces<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;add</span> <span class="re0">namespace</span>=<span class="st0">&quot;SquishIt.Framework&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/namespaces<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/razor<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">  &lt;configSections&gt;
+    &lt;section name="razor" type="Nancy.ViewEngines.Razor.RazorConfigurationSection, Nancy.ViewEngines.Razor" /&gt;
+  &lt;/configSections&gt;
+  &lt;razor disableAutoIncludeModelNamespace="false"&gt;
+    &lt;assemblies&gt;
+      &lt;add assembly="System, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" /&gt;
+      &lt;add assembly="SquishIt.Framework" /&gt;
+    &lt;/assemblies&gt;
+    &lt;namespaces&gt;
+      &lt;add namespace="SquishIt.Framework" /&gt;
+    &lt;/namespaces&gt;
+  &lt;/razor&gt;</pre></div></div>
+
+<p>Its worth noting that when I added SquishIt.Framework to the namespaces section it <strong>worked</strong>, but didn&#8217;t help with intellisense. So I ended up adding the @using directives in my views anyway. So if you want intellisense, don&#8217;t bother with the namespaces if redundancy bothers you.</p>
+<h3>Static Bundles</h3>
+<p>The typical SquishIt use involves writing a new css or javascript file to the server&#8217;s file system. At least I think it does &#8211; this is certainly what I would consider typical. So I looked at that first. First thing I needed to do was figure out how to get Nancy to render a view for me. It wasn&#8217;t terribly difficult, just had to set up a module with the routes involved:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">Nancy</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">NancySample</span><span class="sy0">.</span><span class="me1">Modules</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> HomeModule <span class="sy0">:</span> NancyModule
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> HomeModule<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> View<span class="br0">&#91;</span><span class="st0">&quot;Hello.cshtml&quot;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using Nancy;
+
+namespace SquishIt.NancySample.Modules
+{
+    public class HomeModule : NancyModule
+    {
+        public HomeModule()
+        {
+            Get["/"] = parameters =&gt; View["Hello.cshtml"];
+        }
+    }
+}</pre></div></div>
+
+<p>By convention, Nancy locates the view in Views/Home. I assume it would look in Views/Shared next, but didn&#8217;t bother to confirm. So I added couple javascript files in Content/js, and then added a view with a bundle:</p>
+<pre>@using SquishIt.Framework
+&lt;!DOCTYPE html&gt;
+
+&lt;html lang="en"&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8" /&gt;
+        &lt;title&gt;Hello World Page&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Hello World Page&lt;/h1&gt;
+        &lt;p&gt;Hello World!&lt;/p&gt;
+        &lt;p&gt;This page will include a javascript bundle that is rendered to the file system and served as a static asset.&lt;/p&gt;
+        @Html.Raw(Bundle.JavaScript()
+            .Add("~/Content/js/js1.js")
+            .Add("~/Content/js/js2.js")
+            .Render("~/Content/combined/bundle.js"))
+    &lt;/body&gt;
+&lt;/html&gt;</pre>
+<p>As long as I disabled debugging, a single tag was rendered into my page for bundle.js. That was easy.</p>
+<h3>Cached Bundles</h3>
+<p>SquishIt also has the ability to render bundles to an internal cache instead of the file system. This is useful for shared hosting environments. You can read the initial documentation <a href="https://github.com/jetheredge/SquishIt/wiki/Using-SquishIt-programmatically-without-the-file-system">here</a>. Getting this to work with Nancy was not really that different &#8211; we just needed to create a module to handle serving the assets:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System.IO</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Text</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Nancy</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">SquishIt.Framework</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">NancySample</span><span class="sy0">.</span><span class="me1">Modules</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> AssetsModule <span class="sy0">:</span> NancyModule
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> AssetsModule<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">:</span> <span class="kw1">base</span><span class="br0">&#40;</span><span class="st0">&quot;/assets&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/js/{name}&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> CreateResponse<span class="br0">&#40;</span>Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">RenderCached</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw4">string</span><span class="br0">&#41;</span>parameters<span class="sy0">.</span><span class="me1">name</span><span class="br0">&#41;</span>, Configuration<span class="sy0">.</span><span class="me1">Instance</span><span class="sy0">.</span><span class="me1">JavascriptMimeType</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/css/{name}&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> CreateResponse<span class="br0">&#40;</span>Bundle<span class="sy0">.</span><span class="me1">Css</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">RenderCached</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw4">string</span><span class="br0">&#41;</span>parameters<span class="sy0">.</span><span class="me1">name</span><span class="br0">&#41;</span>, Configuration<span class="sy0">.</span><span class="me1">Instance</span><span class="sy0">.</span><span class="me1">CssMimeType</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; Response CreateResponse<span class="br0">&#40;</span><span class="kw4">string</span> content, <span class="kw4">string</span> contentType<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> Response
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">FromStream</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">=&gt;</span> <span class="kw3">new</span> MemoryStream<span class="br0">&#40;</span>Encoding<span class="sy0">.</span><span class="me1">UTF8</span><span class="sy0">.</span><span class="me1">GetBytes</span><span class="br0">&#40;</span>content<span class="br0">&#41;</span><span class="br0">&#41;</span>, contentType<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">WithHeader</span><span class="br0">&#40;</span><span class="st0">&quot;Cache-Control&quot;</span>, <span class="st0">&quot;max-age=45&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System.IO;
+using System.Text;
+using Nancy;
+using SquishIt.Framework;
+
+namespace SquishIt.NancySample.Modules
+{
+    public class AssetsModule : NancyModule
+    {
+        public AssetsModule()
+            : base("/assets")
+        {
+            Get["/js/{name}"] = parameters =&gt; CreateResponse(Bundle.JavaScript().RenderCached((string)parameters.name), Configuration.Instance.JavascriptMimeType);
+            Get["/css/{name}"] = parameters =&gt; CreateResponse(Bundle.Css().RenderCached((string)parameters.name), Configuration.Instance.CssMimeType);
+        }
+
+        Response CreateResponse(string content, string contentType)
+        {
+            return Response
+                .FromStream(() =&gt; new MemoryStream(Encoding.UTF8.GetBytes(content)), contentType)
+                .WithHeader("Cache-Control", "max-age=45");
+        }
+    }
+}</pre></div></div>
+
+<p>This module renders a cached bundle by name using SquishIt&#8217;s globally configured MIME types to render the content. It also sets a cache-control header on the response, just because I wanted to see how to set headers with Nancy.</p>
+<p>We then need to add a Global.asax and build a bundle:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">protected</span> <span class="kw4">void</span> Application_Start<span class="br0">&#40;</span><span class="kw4">object</span> sender, EventArgs e<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Bundle<span class="sy0">.</span><span class="me1">JavaScript</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;~/Content/js/js1.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;~/Content/js/js2.js&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">AsCached</span><span class="br0">&#40;</span><span class="st0">&quot;hello&quot;</span>, <span class="st0">&quot;~/assets/js/hello&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">protected void Application_Start(object sender, EventArgs e)
+{
+    Bundle.JavaScript()
+        .Add("~/Content/js/js1.js")
+        .Add("~/Content/js/js2.js")
+        .AsCached("hello", "~/assets/js/hello");
+}</pre></div></div>
+
+<p>The second parameter here is called filePath, but actually represents the path to the assets controller, including the &#8220;name&#8221; parameter. This is what gets used in the src attribute of the rendered tag.</p>
+<p>Finally we can add a view. Note that the cached bundle is rendered by name into the page:</p>
+<pre>@using SquishIt.Framework
+&lt;!DOCTYPE html&gt;
+
+&lt;html lang="en"&gt;
+    &lt;head&gt;
+        &lt;meta charset="utf-8" /&gt;
+        &lt;title&gt;Hello World Page&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Hello World Page&lt;/h1&gt;
+        &lt;p&gt;Hello World!&lt;/p&gt;
+        &lt;p&gt;This page will include a javascript bundle that is rendered into memory in Global.asax and served through the Assets Module&lt;/p&gt;
+        @Html.Raw(Bundle.JavaScript()
+            .RenderCachedAssetTag("hello"))
+    &lt;/body&gt;
+&lt;/html&gt;</pre>
+<p>and change our HomeModule to serve the route:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">Nancy</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> SquishIt<span class="sy0">.</span><span class="me1">NancySample</span><span class="sy0">.</span><span class="me1">Modules</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">class</span> HomeModule <span class="sy0">:</span> NancyModule
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> HomeModule<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> View<span class="br0">&#91;</span><span class="st0">&quot;Hello.cshtml&quot;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Get</span><span class="br0">&#91;</span><span class="st0">&quot;/cached&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> parameters <span class="sy0">=&gt;</span> View<span class="br0">&#91;</span><span class="st0">&quot;HelloCached.cshtml&quot;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using Nancy;
+
+namespace SquishIt.NancySample.Modules
+{
+    public class HomeModule : NancyModule
+    {
+        public HomeModule()
+        {
+            Get["/"] = parameters =&gt; View["Hello.cshtml"];
+            Get["/cached"] = parameters =&gt; View["HelloCached.cshtml"];
+        }
+    }
+}</pre></div></div>
+
+<p>Piece of cake.</p>
+<h3>Conclusion</h3>
+<p>This was my first exposure to Nancy, and I came away pretty impressed. Its no-nonsense approach reminds me of other projects I&#8217;ve messed around with in the past like <a href="http://manosdemono.org/">manos</a> and <a href="http://servicestack.net/">ServiceStack</a>. I hope to get a chance to play around with it at least a little bit more.</p>
+<p>I&#8217;ll think about putting together a package to help with integration (similar to <a href="http://nuget.org/packages/SquishIt.Mvc/">SquishIt.Mvc</a> but its so easy to get going that I&#8217;m not sure its needed (that package is only a controller and a few extension methods that return MvcHtmlStrings instead of strings). I guess I will have to see if there is any demand, or if there are any issues preventing Nancy from being used in shared hosting environments to see if it&#8217;d be worth it.</p>
+<p>The sample project can be downloaded in its&#8217; entirety at <a href="https://github.com/AlexCuse/SquishIt.NancySample/tree/blog-20130111">github</a>.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/aspnet/squishit-and-nancy/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

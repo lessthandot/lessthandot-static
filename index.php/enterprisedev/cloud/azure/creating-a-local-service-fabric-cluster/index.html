@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
+		<link rel="shortcut icon" href="http://lessthandot.com/favicon.ico" type="image/vnd.microsoft.icon" />
+	<title>Less Than Dot - Blog -   Creating a local Service Fabric Cluster</title>
+	<meta prefix="og: http://ogp.me/ns#" property="og:title" content="Less Than Dot - Blog -   Creating a local Service Fabric Cluster" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:url" content="/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/" />
+		<meta prefix="og: http://ogp.me/ns#" property="og:image" content="http://lessthandot.com/images/logo_prod.png" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:site_name" content="LessThanDot" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:description" content="Working with Service Fabric and want a local cluster to test and develop against? Here&#8217;s the step-by-step path I took from a set of fresh Windows VMs to a running, secured Service Fabric cluster using self-signed X509 certificates. There are a number of Microsoft docs that cover this subject, this is a single beginning-to-end path [&hellip;]" />
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0" href="/index.php/feed/" />
+	<link rel="alternate" type="application/atom+xml" title="Atom" href="/index.php/feed/atom/" />
+
+	<!-- this page is the canonical URL -->	
+	<link rel="stylesheet" href="/wp-content/themes/lessthandot2009/style.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsite.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsiteprint.css" media="print" type="text/css" />
+
+	<link rel='dns-prefetch' href='//ajax.googleapis.com' />
+<link rel='dns-prefetch' href='//s.w.org' />
+<link rel="alternate" type="application/rss+xml" title="LessthanDot &raquo; Creating a local Service Fabric Cluster Comments Feed" href="/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/feed/" />
+		<script type="text/javascript">
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/svg\/","svgExt":".svg","source":{"concatemoji":"\/wp-includes\/js\/wp-emoji-release.min.js?ver=4.6.1"}};
+			!function(a,b,c){function d(a){var c,d,e,f,g,h=b.createElement("canvas"),i=h.getContext&&h.getContext("2d"),j=String.fromCharCode;if(!i||!i.fillText)return!1;switch(i.textBaseline="top",i.font="600 32px Arial",a){case"flag":return i.fillText(j(55356,56806,55356,56826),0,0),!(h.toDataURL().length<3e3)&&(i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,65039,8205,55356,57096),0,0),c=h.toDataURL(),i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,55356,57096),0,0),d=h.toDataURL(),c!==d);case"diversity":return i.fillText(j(55356,57221),0,0),e=i.getImageData(16,16,1,1).data,f=e[0]+","+e[1]+","+e[2]+","+e[3],i.fillText(j(55356,57221,55356,57343),0,0),e=i.getImageData(16,16,1,1).data,g=e[0]+","+e[1]+","+e[2]+","+e[3],f!==g;case"simple":return i.fillText(j(55357,56835),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode8":return i.fillText(j(55356,57135),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode9":return i.fillText(j(55358,56631),0,0),0!==i.getImageData(16,16,1,1).data[0]}return!1}function e(a){var c=b.createElement("script");c.src=a,c.type="text/javascript",b.getElementsByTagName("head")[0].appendChild(c)}var f,g,h,i;for(i=Array("simple","flag","unicode8","diversity","unicode9"),c.supports={everything:!0,everythingExceptFlag:!0},h=0;h<i.length;h++)c.supports[i[h]]=d(i[h]),c.supports.everything=c.supports.everything&&c.supports[i[h]],"flag"!==i[h]&&(c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&c.supports[i[h]]);c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&!c.supports.flag,c.DOMReady=!1,c.readyCallback=function(){c.DOMReady=!0},c.supports.everything||(g=function(){c.readyCallback()},b.addEventListener?(b.addEventListener("DOMContentLoaded",g,!1),a.addEventListener("load",g,!1)):(a.attachEvent("onload",g),b.attachEvent("onreadystatechange",function(){"complete"===b.readyState&&c.readyCallback()})),f=c.source||{},f.concatemoji?e(f.concatemoji):f.wpemoji&&f.twemoji&&(e(f.twemoji),e(f.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+<link rel='stylesheet' id='bwp-syntax-css'  href='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/css/bwp-syntax-global.css?ver=4.6.1' type='text/css' media='all' />
+<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js?ver=1.12.4'></script>
+<script type='text/javascript' src='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/js/bwp-syntax.js?ver=4.6.1'></script>
+<link rel='https://api.w.org/' href='/wp-json/' />
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="/wp-includes/wlwmanifest.xml" /> 
+<link rel='prev' title='Multiple NuGet Methods for VS2017 + MSBuild 15 in TeamCity' href='/index.php/itprofessionals/softwareandconfigmgmt/multiple-nuget-methods-for-vs2017-msbuild-15-in-teamcity/' />
+<link rel='next' title='Deploying to ServiceFabric from TeamCity' href='/index.php/enterprisedev/cloud/azure/deploying-to-servicefabric-from-teamcity/' />
+<meta name="generator" content="WordPress 4.6.1" />
+<link rel="canonical" href="/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/" />
+<link rel='shortlink' href='/?p=8713' />
+<link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fenterprisedev%2Fcloud%2Fazure%2Fcreating-a-local-service-fabric-cluster%2F" />
+<link rel="alternate" type="text/xml+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fenterprisedev%2Fcloud%2Fazure%2Fcreating-a-local-service-fabric-cluster%2F&#038;format=xml" />
+<style type='text/css'>.rp4wp-related-posts ul{width:100%;padding:0;margin:0;float:left;}
+.rp4wp-related-posts ul>li{list-style:none;padding:0;margin:0;padding-bottom:20px;clear:both;}
+.rp4wp-related-posts ul>li>p{margin:0;padding:0;}
+.rp4wp-related-post-image{width:35%;padding-right:25px;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;float:left;}</style>
+	<script src="http://lessthandot.com/includes/allsite.js" type="text/javascript" ></script>
+</head>
+<body>
+<div id="contain"><div id="subcontain"><div id="ttl"><div id="hdr"><div id="snav"><a href="http://lessthandot.com/login.php?backtrack=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/?">Member Login</a>
+</div><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="logoc"><img src="http://lessthandot.com/images/logo_prod.png" alt="LessThanDot Site Logo" border="0" /></a><h1>LessThanDot</h1><div class="pgsttl">A decade of helpful technical content</div></div><div id="nav">
+<ul>
+<li><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="h" ><span>Launchpad</span></a></li>
+<li class="cur"><a href="/" title="LessThanDot Blogs" id="b" ><span>Blogs</span></a></li>
+<li><a href="http://forum.lessthandot.com/" title="LessThanDot Community Forums" id="f" ><span>Forum</span></a></li>
+<li><a href="http://wiki.lessthandot.com/" title="LessThanDot Wiki Articles" id="w" ><span>Wiki</span></a></li>
+<li><a href="http://sqlcop.lessthandot.com/" title="LessThanDot SQLCop" id="a" ><span>SQLCop</span></a></li>
+<li><a href="http://lessthandot.com/account.php" title="Your Account Settings" id="r"  class="l_ie"><span>My Account</span></a></li></ul></div>
+</div><div id="content">
+<div id="fac"><div id="fa">
+		<p>Less Than Dot is a community of passionate IT professionals and enthusiasts dedicated to sharing technical knowledge, experience, and assistance. Inside you will find reference materials, interesting technical discussions, and expert tips and commentary.</p></div></div><div class="content-sidebar">
+	<div id="social" class="sdsec">
+		<h2>LTD Social Sitings</h2>
+		<div>
+		<a id="social_twitter" href="http://twitter.com/LessThanDot/" title="Follow us on Twitter" ><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Lessthandot twitter"/></a> 
+		<a href="http://www.linkedin.com/groups?home=&amp;gid=113440" title="Join us on LinkedIn" ><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="Lessthandot Linkedin" /></a> 
+		<a href="http://www.facebook.com/group.php?gid=19330511063" title="Join us on Facebook" ><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Lessthandot facebook"/></a> 
+		<a href="http://lessthandot.com/rss.php" title="LessThanDot News Feed" ><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="Lessthandot rss"/></a> 
+		</div>
+		<p><em>Note: Watch for social icons on posts by your favorite authors to follow their postings on these and other social sites.</em></p>
+	</div><div class="content-sidebar-section">
+<h2>Tag cloud</h2>
+	<p class="tag-cloud">
+		<a href='/index.php/tag/net/' class='tag-link-245 tag-link-position-1' title='21 topics' style='font-size: 8.9565217391304pt;'>.net</a> <a href='/index.php/tag/asp-net/' class='tag-link-168 tag-link-position-2' title='21 topics' style='font-size: 8.9565217391304pt;'>asp.net</a> <a href='/index.php/tag/azure-2/' class='tag-link-321 tag-link-position-3' title='29 topics' style='font-size: 10.173913043478pt;'>azure</a> <a href='/index.php/tag/book/' class='tag-link-130 tag-link-position-4' title='26 topics' style='font-size: 9.7391304347826pt;'>book</a> <a href='/index.php/tag/business-intelligence-2/' class='tag-link-256 tag-link-position-5' title='30 topics' style='font-size: 10.260869565217pt;'>business intelligence</a> <a href='/index.php/tag/c/' class='tag-link-138 tag-link-position-6' title='40 topics' style='font-size: 11.304347826087pt;'>c#</a> <a href='/index.php/tag/database/' class='tag-link-134 tag-link-position-7' title='31 topics' style='font-size: 10.434782608696pt;'>database</a> <a href='/index.php/tag/excel/' class='tag-link-155 tag-link-position-8' title='16 topics' style='font-size: 8pt;'>excel</a> <a href='/index.php/tag/gotcha/' class='tag-link-240 tag-link-position-9' title='19 topics' style='font-size: 8.6086956521739pt;'>gotcha</a> <a href='/index.php/tag/how-to/' class='tag-link-272 tag-link-position-10' title='44 topics' style='font-size: 11.652173913043pt;'>how to</a> <a href='/index.php/tag/mongodb/' class='tag-link-765 tag-link-position-11' title='17 topics' style='font-size: 8.2608695652174pt;'>mongodb</a> <a href='/index.php/tag/nosql/' class='tag-link-775 tag-link-position-12' title='18 topics' style='font-size: 8.4347826086957pt;'>nosql</a> <a href='/index.php/tag/performance/' class='tag-link-179 tag-link-position-13' title='26 topics' style='font-size: 9.7391304347826pt;'>performance</a> <a href='/index.php/tag/security-2/' class='tag-link-398 tag-link-position-14' title='25 topics' style='font-size: 9.5652173913043pt;'>security</a> <a href='/index.php/tag/sql/' class='tag-link-132 tag-link-position-15' title='42 topics' style='font-size: 11.478260869565pt;'>sql</a> <a href='/index.php/tag/sql-advent-2012/' class='tag-link-1416 tag-link-position-16' title='18 topics' style='font-size: 8.4347826086957pt;'>sql advent 2012</a> <a href='/index.php/tag/sql-friday/' class='tag-link-377 tag-link-position-17' title='18 topics' style='font-size: 8.4347826086957pt;'>sql friday</a> <a href='/index.php/tag/sql-server/' class='tag-link-154 tag-link-position-18' title='145 topics' style='font-size: 16.086956521739pt;'>sql server</a> <a href='/index.php/tag/sql-server-2000/' class='tag-link-366 tag-link-position-19' title='45 topics' style='font-size: 11.739130434783pt;'>sql server 2000</a> <a href='/index.php/tag/sql-server-2005/' class='tag-link-327 tag-link-position-20' title='118 topics' style='font-size: 15.391304347826pt;'>sql server 2005</a> <a href='/index.php/tag/sql-server-2008/' class='tag-link-152 tag-link-position-21' title='237 topics' style='font-size: 18pt;'>sql server 2008</a> <a href='/index.php/tag/sql-server-2008-r2/' class='tag-link-548 tag-link-position-22' title='38 topics' style='font-size: 11.130434782609pt;'>sql server 2008 r2</a> <a href='/index.php/tag/sql-server-2012/' class='tag-link-1161 tag-link-position-23' title='76 topics' style='font-size: 13.739130434783pt;'>sql server 2012</a> <a href='/index.php/tag/ssis-2/' class='tag-link-501 tag-link-position-24' title='52 topics' style='font-size: 12.260869565217pt;'>ssis</a> <a href='/index.php/tag/ssms/' class='tag-link-640 tag-link-position-25' title='18 topics' style='font-size: 8.4347826086957pt;'>ssms</a> <a href='/index.php/tag/ssrs-2/' class='tag-link-557 tag-link-position-26' title='27 topics' style='font-size: 9.9130434782609pt;'>ssrs</a> <a href='/index.php/tag/syndicated/' class='tag-link-1407 tag-link-position-27' title='67 topics' style='font-size: 13.217391304348pt;'>syndicated</a> <a href='/index.php/tag/t-sql/' class='tag-link-185 tag-link-position-28' title='26 topics' style='font-size: 9.7391304347826pt;'>t-sql</a> <a href='/index.php/tag/tip/' class='tag-link-194 tag-link-position-29' title='46 topics' style='font-size: 11.826086956522pt;'>tip</a> <a href='/index.php/tag/unit-testing/' class='tag-link-162 tag-link-position-30' title='17 topics' style='font-size: 8.2608695652174pt;'>unit testing</a>	</p>
+</div>		<div class="content-sidebar-section">
+		<h2>Authors</h2>
+			<ul class="author-list dimmed">
+				<li><a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis">SQLDenis</a> <a href="/index.php/author/SQLDenis/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (597)</li><li><a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)">Ted Krueger (onpnt)</a> <a href="/index.php/author/onpnt/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (355)</li><li><a href="/index.php/author/grrlgeek/" title="Posts by Jes Borland">Jes Borland</a> <a href="/index.php/author/grrlgeek/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (202)</li><li><a href="/index.php/author/tarwn/" title="Posts by Eli Weinstock-Herman (tarwn)">Eli Weinstock-Herman (tarwn)</a> <a href="/index.php/author/tarwn/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (190)</li><li><a href="/index.php/author/koenverbeeck/" title="Posts by Koen Verbeeck">Koen Verbeeck</a> <a href="/index.php/author/koenverbeeck/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (100)</li><li><a href="/index.php/author/alexcuse/" title="Posts by Alex Ullrich">Alex Ullrich</a> <a href="/index.php/author/alexcuse/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (55)</li><li><a href="/index.php/author/gmmastros/" title="Posts by George Mastros (gmmastros)">George Mastros (gmmastros)</a> <a href="/index.php/author/gmmastros/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (45)</li><li><a href="/index.php/author/axel8s/" title="Posts by Axel Achten (axel8s)">Axel Achten (axel8s)</a> <a href="/index.php/author/axel8s/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (28)</li><li><a href="/index.php/author/naomi/" title="Posts by Naomi Nosonovsky">Naomi Nosonovsky</a> <a href="/index.php/author/naomi/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (27)</li><li><a href="/index.php/author/thirster42/" title="Posts by David Forck (thirster42)">David Forck (thirster42)</a> <a href="/index.php/author/thirster42/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (24)</li><li><a href="/index.php/author/chopstik/" title="Posts by chopstik">chopstik</a> <a href="/index.php/author/chopstik/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (20)</li><li><a href="/index.php/author/kconan/" title="Posts by Kevin Conan">Kevin Conan</a> <a href="/index.php/author/kconan/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (18)</li><li><a href="/index.php/author/robearl/" title="Posts by Rob Earl">Rob Earl</a> <a href="/index.php/author/robearl/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (14)</li><li><a href="/index.php/author/thatrickguy/" title="Posts by ThatRickGuy">ThatRickGuy</a> <a href="/index.php/author/thatrickguy/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (12)</li><li><a href="/index.php/author/sqlarcher/" title="Posts by SQLArcher">SQLArcher</a> <a href="/index.php/author/sqlarcher/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (11)</li>                <li><a href="http://lessthandot.com/Stats/BlogAuthors.php">More...</a></li>
+			</ul>
+		</div>
+				<div class="content-sidebar-section">
+		<h2>Categories</h2>
+			<ul class="categories-list">
+					<li class="cat-item cat-item-10"><a href="/index.php/category/all/" >All Blogs</a>
+</li>
+	<li class="cat-item cat-item-5"><a href="/index.php/category/architect/" >Architecture, Design and Strategy</a>
+</li>
+	<li class="cat-item cat-item-1759"><a href="/index.php/category/artificial-intelligence/" >Artificial Intelligence</a>
+</li>
+	<li class="cat-item cat-item-6"><a href="/index.php/category/datamgmt/" >Data Management</a>
+</li>
+	<li class="cat-item cat-item-7"><a href="/index.php/category/desktopdev/" >Desktop Developer</a>
+</li>
+	<li class="cat-item cat-item-8"><a href="/index.php/category/enterprisedev/" >Enterprise Developer</a>
+</li>
+	<li class="cat-item cat-item-11"><a href="/index.php/category/itprofessionals/" >IT Professionals</a>
+</li>
+	<li class="cat-item cat-item-12"><a href="/index.php/category/itstudents/" >IT Students and Researchers</a>
+</li>
+	<li class="cat-item cat-item-1743"><a href="/index.php/category/management/" >Management</a>
+</li>
+	<li class="cat-item cat-item-9"><a href="/index.php/category/sysadmins/" >System Admins</a>
+</li>
+	<li class="cat-item cat-item-1"><a href="/index.php/category/uncategorized/" >Uncategorized</a>
+</li>
+	<li class="cat-item cat-item-4"><a href="/index.php/category/webdev/" >Web Developer</a>
+</li>
+			</ul>
+		</div>
+		</div><div class="content-main">
+				<div class="post-navigation">
+				<div class="post-navigation-forward"><a href="/index.php/enterprisedev/cloud/azure/deploying-to-servicefabric-from-teamcity/" rel="next">Deploying to ServiceFabric from TeamCity</a> &raquo; </div>
+				<div class="post-navigation-back">&laquo; <a href="/index.php/itprofessionals/softwareandconfigmgmt/multiple-nuget-methods-for-vs2017-msbuild-15-in-teamcity/" rel="prev">Multiple NuGet Methods for VS2017 + MSBuild 15 in TeamCity</a></div>
+			</div>
+			<div class="post-area instapaper_body">
+				<div class="post-title-line">
+										<h1 class="instapaper_ignore"><a href="/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/" class="post-title">Creating a local Service Fabric Cluster</a></h1>
+					<div class="post-byline">by <a href="/index.php/author/tarwn/" title="Posts by Eli Weinstock-Herman (tarwn)" rel="author">Eli Weinstock-Herman (tarwn)</a> on July 26, 2017 in category <a href="/index.php/category/enterprisedev/cloud/azure/" rel="category tag">Azure</a>. Article views: 5,452 </div>
+				</div>
+				<div class="post-tagline"><a href="https://twitter.com/intent/tweet?url=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&text=RT @LessThanDot Blog - Creating a local Service Fabric Cluster by @tarwn" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&title=Creating a local Service Fabric Cluster&source=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&title=Creating a local Service Fabric Cluster" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&quote=Creating a local Service Fabric Cluster" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&title=Creating a local Service Fabric Cluster" class="instapaper_button">Instapaper</a></div>
+
+				<div class="post-content"><p>Working with Service Fabric and want a local cluster to test and develop against? Here&#8217;s the step-by-step path I took from a set of fresh Windows VMs to a running, secured Service Fabric cluster using self-signed X509 certificates. There are a number of Microsoft docs that cover this subject, this is a single beginning-to-end path that also includes fixes for gaps or errors in those docs as I went.</p>
+<p>Here are the technical details:</p>
+<ul>
+<li>3 Hyper-V VMs running Windows 2016 x64, single-core, 2046MB RAM</li>
+<li>ServiceFabric 5.6.220.9494</li>
+</ul>
+<p>My VMs are: </p>
+<ul>
+<li>SFNode0 &#8211; 192.168.1.200</li>
+<li>SFNode1 &#8211; 192.168.1.201</li>
+<li>SFNode2 &#8211; 192.168.1.202</li>
+</ul>
+<p>Here we go!</p>
+<h2>Step 1: Download the Service Fabric Standalone Package</h2>
+<p>Starting on SFNode0, I <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-cluster-creation-for-windows-server#downloadpackage">download the package</a>. There is a brief struggle through the overly strict IE security settings (did you know docs.microsoft.com uses google-analytics?).</p>
+<p>Unpack the downloaded archive and make a copy of the ClusterConfig.X509.MultiMachine.json so we can modify a copy without changing the original. I&#8217;ve named this &#8220;ClusterConfig.LaunchReady.LocalCluster.json&#8221; for my cluster.</p>
+<h2>Step 2: Cluster Configuration File</h2>
+<p>The configuration (or &#8220;manifest&#8221;) is explained in detail in <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-cluster-manifest">Microsoft Docs</a>. I&#8217;ll call out the specifics of what I&#8217;m changing as I go.</p>
+<div id="attachment_8718" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/SFNode0ConfigScreen.png" alt="Initial Cluster Configuration" width="1024" height="768" class="size-full wp-image-8718" srcset="/wp-content/uploads/2017/07/SFNode0ConfigScreen.png 1024w, /wp-content/uploads/2017/07/SFNode0ConfigScreen-300x225.png 300w, /wp-content/uploads/2017/07/SFNode0ConfigScreen-768x576.png 768w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">Initial Cluster Configuration</p></div>
+<p>The first update is the name of the cluster:</p>
+<pre>"name": "LaunchReady.LocalCluster",
+"clusterConfigurationVersion": "1.0.0",
+"apiVersion": "04-2017",</pre>
+<p>The clusterConfigurationVersion and apiVersion can stay unchanged. Later when we make changes to the cluster, we&#8217;ll increment the clusterConfigurationVersion (and commit it to our git repository).</p>
+<h3>Configuring Nodes</h3>
+<p>The next section is the node definitions. I&#8217;ve updated these to reflect the names of my VMs, a common fault domain to indicate the shared server they are running on, and a common update domain (it woul dbe better to make these different, I wasn&#8217;t thinking when I first created this).</p>
+<pre>{
+	"nodeName": "SFNode0",
+	"iPAddress": "SFNode0",
+	"nodeTypeRef": "NodeType0",
+	"faultDomain": "fd:/hyperv0",
+	"upgradeDomain": "UD0"
+},
+{
+	"nodeName": "SFNode1",
+	"iPAddress": "SFNode1",
+	"nodeTypeRef": "NodeType0",
+	"faultDomain": "fd:/hyperv0",
+	"upgradeDomain": "UD0"
+},
+{
+	"nodeName": "SFNode2",
+	"iPAddress": "SFNode2",
+	"nodeTypeRef": "NodeType0",
+	"faultDomain": "fd:/hyperv0",
+	"upgradeDomain": "UD0"
+}</pre>
+<p>Here&#8217;s a break down of the properties:</p>
+<ul>
+<li>nodeName: is the name that we will see in logs and the management console.</li>
+<li>iPAddress: is a discoverable name or IPAddress for the node</li>
+<li>nodeTypeRef: NodeTypes are defined later in the configuration and represent port and reliability settings for the node <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-cluster-manifest#nodetypes">See MSDN</a></li>
+<li>faultDomain: An indicator of (potentially) shared physical resources that the node relies on (if this goes down, all nodes with this indicator will as well)</li>
+<li>upgradeDomain: Identifier to group (or not) which nodes will be upgraded simultaneously during an upgrade</li>
+</ul>
+<p>I am going to skip over the diagnosticsStore section for now, as the defaults will be good enough until I have the cluster running, which requires the configs above and the X509 configs coming up next.</p>
+<h3>Configuring X509 certificates</h3>
+<p>More background detail: <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-windows-cluster-x509-security">Secure a standalone cluster on Windows using X.509 certificates</a></p>
+<p>I am going to secure this as if it is a production cluster, to ensure any work I do in my local lab won&#8217;t suddenly blow up when I switch to an Azure cluster, but I&#8217;ll use self-signed certificates since it is a local lab. I&#8217;ll use a single certificate for node-to-node and server-to-client (<code>ClusterCertificate</code>, <code>ServerCertificate</code>) because I don&#8217;t plan on performing certificate rollovers. I&#8217;ll have a second certificate for clients to authenticate with when connecting (<code>ClientCertificateThumbprints</code>).</p>
+<div style="background-color: #FFCCCC; padding: 1em; margin: 1em;">
+<b>Warning:</b> The <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-windows-cluster-x509-security#optional-create-a-self-signed-certificate">Self-Signed Certificate instructions</a> are generally ok, but make some assumptions about the Service Fabric SDK, copy and paste for Certificate Thumbprints, file permissions, etc. The instructions below borrow from this document, but correct some of those deficiencies and assumptions to work in the context of following the Service Fabric setup instructions.
+</div>
+<p>First, switch to a system that has the ServiceFabric SDK installed. It won&#8217;t be present on your nodes at this point. </p>
+<p>Next copy the CertSetup.ps1 file to your desktop or another location that will allow you to edit the file (we don&#8217;t want to replace one the SDK relies on and Windows security will prevent you from saving over it in the current location).</p>
+<p>Next, follow the instructions to generate a cluster/server certificate and a client certificate (I named mine &#8220;LaunchReadyLocalClusterCert&#8221; and &#8220;LaunchReadyLocalClientCert&#8221;). This requires editing the names in CertSetup.ps1 on line 22 (Cleanup-Cert function), line 96, and line 163.</p>
+<p>Launch PowerShell as an Administrator, then run the altered script <code>.\CertSetup.ps1 -Install</code>. When it completes, edit the script to enter the second certificate subject name and run it a second time.</p>
+<p>Opening &#8220;Manage computer certificates&#8221; from the Start menu, I can see my two certificates listed in Personal/Certificates:</p>
+<div id="attachment_8719" style="width: 769px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/Certificates.png" alt="Certificates Successfully Generated" width="759" height="155" class="size-full wp-image-8719" srcset="/wp-content/uploads/2017/07/Certificates.png 759w, /wp-content/uploads/2017/07/Certificates-300x61.png 300w" sizes="(max-width: 759px) 100vw, 759px" /><p class="wp-caption-text">Certificates Successfully Generated</p></div>
+<p>To export these to pfx files, I copied the thumbprint from the details for each certificate and ran it like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$pswd</span> <span class="sy0">=</span> <span class="kw1">ConvertTo-SecureString</span> <span class="kw5">-String</span> <span class="st0">&quot;NotMyRealPassword!&quot;</span> <span class="kw5">-Force</span> –AsPlainText
+&nbsp;
+<span class="co1">#Client cert</span>
+<span class="kw1">Get-ChildItem</span> <span class="kw5">-Path</span> <span class="st0">&quot;cert:\localMachine\my\ae 01 64 c8 27 56 71 59 e8 3b c9 37 c4 47 b8 75 7d 1c f3 7e&quot;</span> <span class="sy0">|</span> Export<span class="sy0">-</span>PfxCertificate <span class="kw5">-FilePath</span> C:\LaunchReadyLocalClientCert.pfx <span class="sy0">-</span>Password <span class="re0">$pswd</span>
+<span class="co1">#Server cert</span>
+<span class="kw1">Get-ChildItem</span> <span class="kw5">-Path</span> <span class="st0">&quot;cert:\localMachine\my\e7 98 12 6c 5c 04 46 55 ef ad f7 e3 99 88 0a 82 e7 87 c8 6f&quot;</span> <span class="sy0">|</span> Export<span class="sy0">-</span>PfxCertificate <span class="kw5">-FilePath</span> C:\LaunchReadyLocalClusterCert.pfx <span class="sy0">-</span>Password $pswd</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$pswd = ConvertTo-SecureString -String "NotMyRealPassword!" -Force –AsPlainText
+
+#Client cert
+Get-ChildItem -Path "cert:\localMachine\my\ae 01 64 c8 27 56 71 59 e8 3b c9 37 c4 47 b8 75 7d 1c f3 7e" | Export-PfxCertificate -FilePath C:\LaunchReadyLocalClientCert.pfx -Password $pswd
+#Server cert
+Get-ChildItem -Path "cert:\localMachine\my\e7 98 12 6c 5c 04 46 55 ef ad f7 e3 99 88 0a 82 e7 87 c8 6f" | Export-PfxCertificate -FilePath C:\LaunchReadyLocalClusterCert.pfx -Password $pswd</pre></div></div>
+
+<div style="background-color: #FFFFCC; padding: 1em; margin: 1em;">
+Potential Error: If you receive a null object error, you may have an invisible character at the beginning of the thumbprint. I put my cursor at the beginning of the thumbprint and pressed backspace once and was able to run the script no the next try.
+</div>
+<p>With the PFX files produced, now we have to get them onto the nodes. </p>
+<p>The quickest solution, since I&#8217;m on the same network, is to open up a shared folder from my desktop temporarily and download to each of the 3 nodes. From the <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-windows-cluster-x509-security#install-the-certificates">Install the Certificates</a> instructions, I create a script to install the certs and copy their second script to set permissions and drop those in the fileshare also.</p>
+<p><b>Install my certs:</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$pswd</span> <span class="sy0">=</span> <span class="kw1">ConvertTo-SecureString</span> <span class="kw5">-String</span> <span class="st0">&quot;NotMyRealPassword!&quot;</span> <span class="kw5">-Force</span> –AsPlainText
+&nbsp;
+<span class="co1">## Client Cert</span>
+Import<span class="sy0">-</span>PfxCertificate <span class="sy0">-</span>Exportable <span class="sy0">-</span>CertStoreLocation Cert:\LocalMachine\My <span class="kw5">-FilePath</span> <span class="st0">&quot;C:\LaunchReadyLocalClientCert.pfx&quot;</span> <span class="sy0">-</span>Password <span class="br0">&#40;</span><span class="kw1">ConvertTo-SecureString</span> <span class="kw5">-String</span> <span class="re0">$pswd</span> <span class="kw5">-AsPlainText</span> <span class="kw5">-Force</span><span class="br0">&#41;</span>
+<span class="co1">## Server Cert</span>
+Import<span class="sy0">-</span>PfxCertificate <span class="sy0">-</span>Exportable <span class="sy0">-</span>CertStoreLocation Cert:\LocalMachine\My <span class="kw5">-FilePath</span> <span class="st0">&quot;C:\LaunchReadyLocalClusterCert.pfx&quot;</span> <span class="sy0">-</span>Password <span class="br0">&#40;</span><span class="kw1">ConvertTo-SecureString</span> <span class="kw5">-String</span> <span class="re0">$pswd</span> <span class="kw5">-AsPlainText</span> <span class="kw5">-Force</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$pswd = ConvertTo-SecureString -String "NotMyRealPassword!" -Force –AsPlainText
+
+## Client Cert
+Import-PfxCertificate -Exportable -CertStoreLocation Cert:\LocalMachine\My -FilePath "C:\LaunchReadyLocalClientCert.pfx" -Password (ConvertTo-SecureString -String $pswd -AsPlainText -Force)
+## Server Cert
+Import-PfxCertificate -Exportable -CertStoreLocation Cert:\LocalMachine\My -FilePath "C:\LaunchReadyLocalClusterCert.pfx" -Password (ConvertTo-SecureString -String $pswd -AsPlainText -Force)</pre></div></div>
+
+<p>On each node, I copy the 4 files, run the Install script, then run the Permissions script once for each Thumbprint:</p>
+<div id="attachment_8720" style="width: 869px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/InstallCertificates.png" alt="Install Certificates and Grant Access" width="859" height="586" class="size-full wp-image-8720" srcset="/wp-content/uploads/2017/07/InstallCertificates.png 859w, /wp-content/uploads/2017/07/InstallCertificates-300x205.png 300w, /wp-content/uploads/2017/07/InstallCertificates-768x524.png 768w" sizes="(max-width: 859px) 100vw, 859px" /><p class="wp-caption-text">Install Certificates and Grant Access</p></div>
+<p>Finally, I return to SFNode0 and enter the thumbprints in the &#8220;Security&#8221; section of my cluster configuration, removing the ThumbprintSecondary properties, the ClientCertificateCommonNames property, and the ReverseProxyCertificate property that I don&#8217;t intend to use.</p>
+<h2>Step 3: Test the Configuration</h3>
+<p>Note: Make sure you look at the paths in the fabricSettings section and move these to a non-OS drive if available. These are not changeable once the cluster is created. I chose to keep the defaults for this local cluster.</p>
+<p>Before testing, there are some notable prerequisites buried in the <a href="https://docs.microsoft.com/en-us/azure/service-fabric/service-fabric-cluster-standalone-deployment-preparation#step-7-environment-setup">Environment Setup</a>:</p>
+<ul>
+<li>#9: Add firewall entry to allow ports 135, 137, 138, 139, and 445</li>
+</ul>
+<p>To test the configuration, I opened a powershell console on SFNode0 and run <code>.\TestConfiguration.ps1 -ClusterConfigFilePath .\ClusterConfig.LaunchReady.LocalCluster.json</code></p>
+<div style="background-color: #FFFFCC; padding: 1em; margin: 1em;">
+Tip: open a powershell console to the current folder in Windows Explorer by typing &#8220;powershell&#8221; in the address bar!
+</div>
+<p>Here are the errors as I work through them:</p>
+<h3>Name Resolution Failure</h3>
+<p><b>Error:</b> &#8220;Machine &#8216;SFNode2&#8217; is not reachable on port 445. Check connectivity/open ports. Error: No such host is known&#8221;</p>
+<p><b>Fix:</b> Name resolution failed to find the host on my local network, so I switched my <code>iPAddress</code> properties to actual IP Addresses.</p>
+<h3>Missing Firewall Rule</h3>
+<p><b>Error:</b> &#8220;Machine &#8216;SFNode2&#8217; is not reachable on port 445. Check connectivity/open ports. Error: A connection attempt failed because the conncted party did not properly respond…&#8221; (classic timeout error)</p>
+<p><b>Fix:</b> Add the Firewall rule I mentioned above to allow traffic on 135, 137, 138, 139, and 445.</p>
+<h3>SMB? Reboot all the things</h3>
+<p><b>Error: </b> &#8220;Machine &#8216;SFNode2&#8217; is not reachable on port 445. Check connectivity/open ports. Error: The connection was actively refused&#8221;</p>
+<p><b>Fix:</b><br />
+1. Open the Network Adapter properties and make sure &#8220;File and Printer Sharing for Microsoft Networks&#8221; is enabled (or netstat -ao and make sure you&#8217;re listening on 445)<br />
+2. Reboot <- it's like windows nt all over again! (i don't know why this fixed it, but it did)
+
+<img src="/wp-content/uploads/2017/07/SuccessfulConfigTest.png" alt="Successful Configuration Test" width="517" height="258" class="size-full wp-image-8721" srcset="/wp-content/uploads/2017/07/SuccessfulConfigTest.png 517w, /wp-content/uploads/2017/07/SuccessfulConfigTest-300x150.png 300w" sizes="(max-width: 517px) 100vw, 517px" /></p>
+<p>Much Success!</p>
+<h2>Step 4: Deploy the cluster</h3>
+<p>Time to try deploying the cluster, using the provided <code>CreateServiceFabricCluster</code> script.</p>
+<p>(cue ominous organ music)</p>
+<p><code>.\CreateServiceFabricCluster.ps1 -ClusterConfigFilePath .\ClusterConfig.LaunchReady.LocalCluster.json -AcceptEULA</code></p>
+<p>Here&#8217;s a summary of what the script is running (so you know it hasn&#8217;t gone off the rails):</p>
+<ul>
+<li>Check and create if necessary: Runtime directory</li>
+<li>Check and create if necessary: Trace folder</li>
+<li>Download Runtime package (small delay for download time)</li>
+<li>Creating Service fabric Cluster…</li>
+<li>Details per machine: Configuring, Configured, Started FabricInstallerSvc, …(HDD clicky clicky)…, Started FabricHostSvc, (short delay)</li>
+<li>Your cluster is successful created! …</li>
+</ul>
+<p>This took a few minutes to run for me, but of course YMMV depending on internet speed, CPU resources, etc.</p>
+<h2>Step 5: Connect to the cluster</h2>
+<p>Connecting via web browser is easy, but the documentation assumes you are using an insecure setup. <code>http://localhost:19080/Explorer/index.html</code> will time out.</p>
+<p>Use https instead and use something like Chrome instead of IE. Chrome will popup an option for you to select the Client Certificate we produced earlier, and then connect successfully:</p>
+<div id="attachment_8722" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/ServiceFabricDashboard-1024x593.png" alt="Service Fabric Dashboard" width="1024" height="593" class="size-large wp-image-8722" srcset="/wp-content/uploads/2017/07/ServiceFabricDashboard-1024x593.png 1024w, /wp-content/uploads/2017/07/ServiceFabricDashboard-300x174.png 300w, /wp-content/uploads/2017/07/ServiceFabricDashboard-768x444.png 768w, /wp-content/uploads/2017/07/ServiceFabricDashboard.png 1360w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">Service Fabric Dashboard</p></div>
+<p>Because the certificate is self-generated, it will be treated as insecure by the browser and may require you to also go through a &#8220;no, really, I trust this certificate&#8221; routine.</p>
+<h2>Step 6: Publish a ServiceFabric Project from VisualStudio</h2>
+<p>Switching to Visual Studio, your ServiceFabric project should have a folder named &#8220;PublishProfiles&#8221;. Make a copy of the default &#8220;Cloud.xml&#8221; profile and rename it to &#8220;LocalCluster.xml&#8221;. </p>
+<p>There is an example for connecting via X509 certificates in a comment in the xml file, so replace the current content with that example and edit appropriately. Use the Thumbprint from the Server certificate above (also can be found in the cluster manifest screen at https://(ip address):19080/Explorer/index.html#/tab/manifest).</p>
+<p>My file now looks like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;?xml</span> <span class="re0">version</span>=<span class="st0">&quot;1.0&quot;</span> <span class="re0">encoding</span>=<span class="st0">&quot;utf-8&quot;</span><span class="re2">?&gt;</span></span>
+<span class="sc3"><span class="re1">&lt;PublishProfile</span> <span class="re0">xmlns</span>=<span class="st0">&quot;http://schemas.microsoft.com/2015/05/fabrictools&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="sc3"><span class="re1">&lt;ClusterConnectionParameters</span> <span class="re0">ConnectionEndpoint</span>=<span class="st0">&quot;192.168.173.200:19000&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">X509Credential</span>=<span class="st0">&quot;true&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">ServerCertThumbprint</span>=<span class="st0">&quot;E798126C5C044655EFADF7E399880A82E787C86F&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">FindType</span>=<span class="st0">&quot;FindByThumbprint&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">FindValue</span>=<span class="st0">&quot;E798126C5C044655EFADF7E399880A82E787C86F&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">StoreLocation</span>=<span class="st0">&quot;CurrentUser&quot;</span></span>
+<span class="sc3"> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="re0">StoreName</span>=<span class="st0">&quot;My&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp;
+&nbsp; <span class="sc3"><span class="re1">&lt;ApplicationParameterFile</span> <span class="re0">Path</span>=<span class="st0">&quot;..\ApplicationParameters\LocalCluster.xml&quot;</span> <span class="re2">/&gt;</span></span>
+<span class="sc3"><span class="re1">&lt;/PublishProfile<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;PublishProfile xmlns="http://schemas.microsoft.com/2015/05/fabrictools"&gt;
+       &lt;ClusterConnectionParameters ConnectionEndpoint="192.168.173.200:19000"
+                                    X509Credential="true"
+                                    ServerCertThumbprint="E798126C5C044655EFADF7E399880A82E787C86F"
+                                    FindType="FindByThumbprint"
+                                    FindValue="E798126C5C044655EFADF7E399880A82E787C86F"
+                                    StoreLocation="CurrentUser"
+                                    StoreName="My" /&gt;
+
+  &lt;ApplicationParameterFile Path="..\ApplicationParameters\LocalCluster.xml" /&gt;
+&lt;/PublishProfile&gt;</pre></div></div>
+
+<p>Add the new profile file to the project in Visual Studio.</p>
+<p>Right click the project and select &#8220;Publish&#8221;. In the Publish dialog, select your new Profile file from the first dropdown. The dialog will verify it can connect to the Cluster:</p>
+<div id="attachment_8723" style="width: 648px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/PublishPackage.png" alt="VS 2017 - Publish Package for Service Fabric" width="638" height="434" class="size-full wp-image-8723" srcset="/wp-content/uploads/2017/07/PublishPackage.png 638w, /wp-content/uploads/2017/07/PublishPackage-300x204.png 300w" sizes="(max-width: 638px) 100vw, 638px" /><p class="wp-caption-text">VS 2017 &#8211; Publish Package for Service Fabric</p></div>
+<p>(Yes, I&#8217;m using a hotmail address, it amuses me 🙂 )</p>
+<p>Click Publish and Visual Studio will build the project and publish it to the cluster. Visual Studio will provide feedback as it publishes the application and we can see the results in the dashboard:</p>
+<div id="attachment_8724" style="width: 1034px" class="wp-caption aligncenter"><img src="/wp-content/uploads/2017/07/UnhealthyDeployedPackage-1024x879.png" alt="Unhealthy, But Deployed Dashboard View" width="1024" height="879" class="size-large wp-image-8724" srcset="/wp-content/uploads/2017/07/UnhealthyDeployedPackage-1024x879.png 1024w, /wp-content/uploads/2017/07/UnhealthyDeployedPackage-300x258.png 300w, /wp-content/uploads/2017/07/UnhealthyDeployedPackage-768x660.png 768w, /wp-content/uploads/2017/07/UnhealthyDeployedPackage.png 1345w" sizes="(max-width: 1024px) 100vw, 1024px" /><p class="wp-caption-text">Unhealthy, But Deployed Dashboard View</p></div>
+<p>Successful deployment! Except my application is unhealthy in this case, which I will now go start to debug 🙂</p>
+<div class='rp4wp-related-posts'>
+<h3>Related Posts</h3>
+<ul>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/uncategorized/setup-iaas-in-azure-for-sql-server/'>Setup IaaS in Azure for SQL Server</a><p>Prior to full support for availability group listeners in Azure, we were forced to use&hellip;</p></div>
+</li>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/dbprogramming/windows-and-sql-server-2012/'>Windows and SQL Server 2012 Test Setup</a><p>SQL Server 2012 Test Setup I’m often asked what I would recommend for a development&hellip;</p></div>
+</li>
+</ul>
+</div>
+</div>
+				<div class="post-author">
+					<div class="userInfo"><h2>About the Author</h2><img class="bioPic" src="http://www.tiernok.com/images/RedShirt_80.jpg" alt="User bio image"/>My roles have included accidental DBA, lone developer, systems architect, team lead, VP of Engineering, and general troublemaker. On the technical front I work in web development, distributed systems, test automation, and devop-sy areas like delivery pipelines and integration of all the auditable things. <br style="clear: left" /><div class="bioSoc"><span class="bioSocTitle">Social Sitings</span><a href="http://twitter.com/tarwn" title="tarwn at Twitter" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Twitter" /></a><a href="http://www.linkedin.com/in/eliweinstockherman" title="tarwn at LinkedIn" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="LinkedIn" /></a><a href="http://tiernok.com/" title="tarwn at HomePage" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_homepage.png" alt="HomePage" /></a><a href="https://plus.google.com/114520820167873768473" title="tarwn at Google Plus" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_gplus.png" alt="Google Plus" /></a><a href="/index.php/author/tarwn/feed/" title="Blog RSS feed for tarwn" class="bioSocLink"><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="LTD RSS Feed" /></a></div></div>				</div>
+				<div class="post-foot instapaper_ignore">
+					<div class="post-tagline">
+						<div class="post-foot-views"><label>Article views:</label> 5,452 </div>
+						<div class="post-foot-more-posts">
+                            <a href="/index.php/author/tarwn/">Read More Posts by Eli Weinstock-Herman (tarwn)</a>
+						</div>
+					</div>
+					<div>
+						<label>Tags:</label> <a href="/index.php/tag/azure-2/" rel="tag">azure</a>, <a href="/index.php/tag/powershell/" rel="tag">powershell</a>, <a href="/index.php/tag/service-fabric/" rel="tag">Service Fabric</a> 
+					</div>
+					<div class="post-tagline" style="height: auto">
+						<span class="social-button-label">Share:</span><a href="https://twitter.com/intent/tweet?url=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&text=RT @LessThanDot Blog - Creating a local Service Fabric Cluster by @tarwn" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&title=Creating a local Service Fabric Cluster&source=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&title=Creating a local Service Fabric Cluster" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&quote=Creating a local Service Fabric Cluster" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/&title=Creating a local Service Fabric Cluster" class="instapaper_button">Instapaper</a>					</div>			
+				</div>
+				<div class="comments-area instapaper_ignore">
+	<h4 class="comments-title">
+		No comments posted so far	</h4>
+					<div id="respond" class="comment-respond">
+			<h3 id="reply-title" class="comment-reply-title">Leave a Reply <small><a rel="nofollow" id="cancel-comment-reply-link" href="/index.php/enterprisedev/cloud/azure/creating-a-local-service-fabric-cluster/#respond" style="display:none;">Cancel reply</a></small></h3>				<form action="/wp-comments-post.php" method="post" id="commentform" class="comment-form">
+					<p class="comment-notes"><span id="email-notes">Your email address will not be published.</span> Required fields are marked <span class="required">*</span></p><p class="comment-form-comment"><label for="comment">Comment</label> <textarea id="comment" name="comment" cols="45" rows="8" maxlength="65525" aria-required="true" required="required"></textarea></p><p class="comment-form-author"><label for="author">Name <span class="required">*</span></label> <input id="author" name="author" type="text" value="" size="30" maxlength="245" aria-required='true' required='required' /></p>
+<p class="comment-form-email"><label for="email">Email <span class="required">*</span></label> <input id="email" name="email" type="text" value="" size="30" maxlength="100" aria-describedby="email-notes" aria-required='true' required='required' /></p>
+<p class="comment-form-url"><label for="url">Website</label> <input id="url" name="url" type="text" value="" size="30" maxlength="200" /></p>
+<p class="form-submit"><input name="submit" type="submit" id="submit" class="submit" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='8713' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='0' />
+</p><input type="hidden" id="killer_value" name="killer_value" value="df877f3865752637daa540ea9cbc474f"/><noscript>Sorry, but you are required to use a javascript enabled brower to comment here.</noscript>				</form>
+					</div><!-- #respond -->
+		</div>			</div>
+				<br style="clear: both;" />
+</div>
+		</div>
+		<div id="page-footer">
+			<div id="botnav"><a href="http://lessthandot.com/" title="LessThanDot Launchpad">Launchpad</a> | <a href="http://lessthandot.com/account.php" title="Your Account Settings">My Account</a> | <a href="http://lessthandot.com/statistics.php" title="Statistics">Statistics</a> | <a href="http://lessthandot.com/donate.php" title="Donate">Donate</a> | <a href="http://lessthandot.com/contactus.php" title="Contact Us">Contact Us</a> | <a href="http://lessthandot.com/aboutus.php" title="About the LessThanDot Team">&copy;2008 - 2019 LessThanDot, LLC</a></div>
+
+		<script type='text/javascript'>
+		var _gaq = _gaq || [];
+		_gaq.push(['_setAccount', 'UA-4471405-1']);
+		_gaq.push(['_trackPageview']);
+		_gaq.push(['_setCustomVar', 1, 'Environment', 'lessthandot.com', 3]);
+
+		(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		})();
+	  </script>			<div class="validator"><a href="http://validator.w3.org/check?uri=referer">Valid XHTML</a> | <a href="http://jigsaw.w3.org/css-validator/check/referer" title="Validate the CSS for this page at the W3C website">Valid CSS</a> | 2018-11-11 15:52</div>
+		</div>
+	</div>
+</div>
+<!-- <script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script> -->
+<script type='text/javascript' src='/wp-includes/js/wp-embed.min.js?ver=4.6.1'></script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var spam_destroyer = {"key":"159ff9dcc225580310c2de238cdd1f1a","lifetime":"3600","limit":"1552765477"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='/wp-content/plugins/spam-destroyer/kill.js?ver=1.2'></script>
+</body>
+</html>

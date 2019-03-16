@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>structuremap &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/structuremap/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Twisting My Arm &#8211; How I was Persuaded to Change StructureMap Versions</title>
+		<link>/index.php/webdev/serverprogramming/my-compelling-reason-for-upgrading-struc/</link>
+		<comments>/index.php/webdev/serverprogramming/my-compelling-reason-for-upgrading-struc/#respond</comments>
+		<pubDate>Wed, 02 Jun 2010 10:00:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[structuremap]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/my-compelling-reason-for-upgrading-struc/</guid>
+		<description><![CDATA[I&#8217;ve been using StructureMap 2.5x for some time, and I have been quite pleased with it. I&#8217;d read a bit about 2.6x, and the improvements to the registry DSL seemed cool but not quite cool enough to give me the motivation I needed to make upgrading the version used in my project a priority. A [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;ve been using StructureMap 2.5x for some time, and I have been quite pleased with it.  I&#8217;d read a bit about 2.6x, and the improvements to the registry DSL seemed cool but not quite cool enough to give me the motivation I needed to make upgrading the version used in my project a priority.</p>
+<p>A week or two ago, I found what proved to be my compelling reason.  It&#8217;s a method called</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">ObjectFactory<span class="sy0">.</span><span class="me1">ReleaseAndDisposeAllHttpScopedObjects</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ObjectFactory.ReleaseAndDisposeAllHttpScopedObjects();</pre></div></div>
+
+<p>And it does just what it says it does.  This could really help in one particular situation encountered in my application (using StructureMap for NHibernate session management in a web context).  I need to cache the session factory as a singleton, but the sessions themselves should be unique <em>per request</em>.  Before coming across this method I was using a filter to clean up sessions at the end of the request:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">class</span> SessionPerRequest <span class="sy0">:</span> ActionFilterAttribute
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> OnActionExecuted <span class="br0">&#40;</span>ActionExecutedContext filterContext<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// for when session doesn't need to remain open for view rendering</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">//StructureMap.ObjectFactory.GetInstance&lt;NHibernate.ISession&gt;().Dispose();</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> OnResultExecuted <span class="br0">&#40;</span>ResultExecutedContext filterContext<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; StructureMap<span class="sy0">.</span><span class="me1">ObjectFactory</span><span class="sy0">.</span><span class="me1">GetInstance</span><span class="sy0">&lt;</span>NHibernate<span class="sy0">.</span><span class="me1">ISession</span><span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Dispose</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class SessionPerRequest : ActionFilterAttribute
+{
+	public override void OnActionExecuted (ActionExecutedContext filterContext)
+	{
+		// for when session doesn't need to remain open for view rendering
+		//StructureMap.ObjectFactory.GetInstance&lt;NHibernate.ISession&gt;().Dispose();
+	}
+
+	public override void OnResultExecuted (ResultExecutedContext filterContext)
+	{
+		StructureMap.ObjectFactory.GetInstance&lt;NHibernate.ISession&gt;().Dispose();
+	}
+}</pre></div></div>
+
+<p>This was working fine, but I did need to decorate every controller method where I wanted to apply it. In addition to not really being my idea of a good time, this leaves the door open for me to forget to decorate a method somwhere, causing the app to leak sessions all over the place.  Also, if I put it someplace it&#8217;s not needed, a session will be created only to be disposed of!</p>
+<p>So today, I finally got around to upgrading.  I made the slight improvements to Registry code that were now possible, but I was most excited to get rid of the filter above, and replace it with this method (in Global.asax.cs):</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">protected</span> <span class="kw4">void</span> Application_EndRequest<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; ObjectFactory<span class="sy0">.</span><span class="me1">ReleaseAndDisposeAllHttpScopedObjects</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">protected void Application_EndRequest()
+{
+    ObjectFactory.ReleaseAndDisposeAllHttpScopedObjects();
+}</pre></div></div>
+
+<p>While there was certainly some pain involved in removing the filter I had used previously, this approach will make my life much easier in the long run.  I already trust StructureMap to cache these different instances for me correctly, why not trust it to clean up afterwards as well?  It&#8217;s also nice to know that if I end up needing any other objects to be unique per http context, I won&#8217;t need to write any more code to clean up after myself.  This is a great feature added to the library, and I wish I&#8217;d read about it sooner!</p>
+<p><strong>EDIT:</strong> I saw a thread today mentioning another method called
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">HttpContextBuildPolicy<span class="sy0">.</span><span class="me1">DisposeAndClearAll</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">HttpContextBuildPolicy.DisposeAndClearAll();</pre></div></div>
+
+<p> that&#8217;s been available since StructureMap 2.3.5 that seems to do the exact same thing.  So I didn&#8217;t really need to upgrade after all, but I guess its nice to stay current.  I don&#8217;t want to make excuses for my ignorance, but I&#8217;ve gotta say accessing it through the ObjectFactory makes a bit more sense to me.  In a way I&#8217;m more impressed that it showed up there, because its&#8217; often a harder decision to relocate code when refactoring than to add it in the first place!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/my-compelling-reason-for-upgrading-struc/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Dependency Injection Tool StructureMap 2.5 Has Been Released</title>
+		<link>/index.php/desktopdev/mstech/structuremap-2-5-has-been-released/</link>
+		<comments>/index.php/desktopdev/mstech/structuremap-2-5-has-been-released/#comments</comments>
+		<pubDate>Mon, 27 Oct 2008 11:08:47 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[.net]]></category>
+		<category><![CDATA[c#]]></category>
+		<category><![CDATA[dependency injection]]></category>
+		<category><![CDATA[structuremap]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/10/structuremap-2-5-has-been-released/</guid>
+		<description><![CDATA[StructureMap is a Dependency Injection tool written in C# for .NET development. StructureMap is also a generic &#8220;Plugin&#8221; mechanism for flexible and extensible .NET applications. The new functionality in StructureMap 2.5: Completely revamped Assembly scanning options Cleaner, more predictable way to initialize a Container.&#160; StructureMapConfiguration is now deprecated, please use ObjectFactory.Initialize(). Optional setter injection All [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>StructureMap is a Dependency Injection tool written in C# for .NET development. StructureMap is also a generic &#8220;Plugin&#8221; mechanism for flexible and extensible .NET applications.</p>
+<p><strong>The new functionality in StructureMap 2.5:</strong> </p>
+<ul>
+<li>Completely revamped Assembly scanning options </li>
+<li>Cleaner, more predictable way to initialize a Container.&#160; StructureMapConfiguration is now deprecated, please use ObjectFactory.Initialize().</li>
+<li>Optional setter injection </li>
+<li>All new abilities to query the configuration of a Container </li>
+<li>The ability to use StructureMap with ZERO Xml or attributes by default </li>
+<li>The ability to add services at runtime. You can now programmatically add an entire Assembly at runtime for modular applications that might not want all services to be loaded at startup. </li>
+<li>An auto mocking container based on Rhino Mocks 3.5. I was a doubter on the validity of AMC, but I&#39;m sold now that I&#39;ve used it </li>
+<li>Contextual object construction </li>
+<li>More sophisticated auto wiring rules </li>
+<li>Supporting NameValueCollection and IDictionary types </li>
+<li>Far more extensibility </li>
+<li>Interception and post processing hooks for you AOP enthusiasts. StructureMap will NOT include its own AOP engine, but will allow you to use the runtime AOP technique of your choice. </li>
+<li>More configuration options in both Xml and the Fluent Interface. Completely revamped the Registry DSL. </li>
+<li>More options for modular configuration (mix and match Xml configuration or Registry&#39;s at will) &#8212; which basically had to trigger: </li>
+<li>Completely revamped diagnostics, including the Environment Testing support </li>
+<li>Transparent creation of concrete types that are not explicitly registered </li>
+<li>Create objects with explicit arguments passed to the container </li>
+<li>Use the underlying Container independently of ObjectFactory </li>
+<li>Pluggable auto registration with your own custom Type scanning policies </li>
+<li>StructureMap is now strong named (thanks to Steve Harman) </li>
+<li>Pull configuration from the App.config (thanks to Josh Flanagan) </li>
+<li>Generics fixes (thanks to Derrick Rapp) </li>
+</ul>
+<p><strong>Download it here: http://sourceforge.net/projects/structuremap</strong></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/structuremap-2-5-has-been-released/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

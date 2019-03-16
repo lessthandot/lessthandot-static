@@ -1,0 +1,708 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>indexes &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/indexes/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Indexes in MongoDB: A quick overview</title>
+		<link>/index.php/datamgmt/dbprogramming/indexes-in-mongodb/</link>
+		<comments>/index.php/datamgmt/dbprogramming/indexes-in-mongodb/#comments</comments>
+		<pubDate>Sat, 19 Jan 2013 12:23:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[bigdata]]></category>
+		<category><![CDATA[indexes]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[mongodb]]></category>
+		<category><![CDATA[nosql]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/indexes-in-mongodb/</guid>
+		<description><![CDATA[This is my Fourth MongoDB post, in the first post we looked at how we can install MongoDB as a Windows Service, In the second post we looked at how we could do UPSERTs with MongoDB, In the third post we looked at how to sort results in MongoDB
+This pos&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This is my fourth MongoDB post, in the first post we looked at how we can <a href="/index.php/DataMgmt/DBProgramming/creating-mongodb-as-a-service">install MongoDB as a Windows Service</a>, In the second post we looked at how we could do <a href="/index.php/DataMgmt/DBProgramming/doing-upserts-in-mongodb">UPSERTs with MongoDB</a>, In the third post we looked at <a href="/index.php/DataMgmt/DBProgramming/mongodb-how-to-sort-results">how to sort results in MongoDB</a>. This post is about indexing in MongoDB, we are going to take a look at how to create indexes and how to see if the indexes are being used by MongoDB.<br />
+Every index that you create in MongoDB is a secondary index, this is because MongoDB creates the default _id index for all collections. The _id index is a unique index on the _id field, you cannot delete the index on _id.<br />
+MongoDB indexes use a B-tree data structure</p>
+<p>Besides a regular one field index, you can also create the following indexes in MongoDB</p>
+<ul>
+<li>Indexes on Embedded Fields</li>
+<li>Compound Indexes</li>
+<li>Multikey Indexes</li>
+<li>Unique Indexes</li>
+<li>Sparse Indexes</li>
+</ul>
+<p>Before you go crazy and start adding indexes on every possible field in your collection, keep in mind that just like in regular databases, the more indexes you have the slower you write operations will be. Every update and insert will be a little slower because the indexes will have to be maintained.</p>
+<p>Some limitations:<br />
+A collection can&#8217;t have more than 64 indexes.<br />
+Index keys can&#8217;t be larger than 1024 bytes. This includes the field value or values, the field name or names, and the namespace.</p>
+<p>Let&#8217;s go take a look at some of these indexes</p>
+<p>
+<h2>Creating A Simple Index in MongoDB</h2>
+<p>Let&#8217;s insert some data before we create the index</p>
+<pre>db.Indexing.insert( { name : "Denis", age : 20 } )
+db.Indexing.insert( { name : "Abe", age : 30 } )
+db.Indexing.insert( { name : "John", age : 40 } )
+db.Indexing.insert( { name : "Xavier", age : 10 } )
+db.Indexing.insert( { name : "Zen", age : 50 } )</pre>
+<p>Now let&#8217;s run a simple query that will return all rows where the name is Denis and we want to see what the engine is doing. You can use explain to return the plan</p>
+<pre>db.Indexing.find({name: "Denis"}).explain()</pre>
+<p>Here is what you get back</p>
+<pre>{
+        "cursor" : "BasicCursor",
+        "isMultiKey" : false,
+        "n" : 0,
+        "nscannedObjects" : 0,
+        "nscanned" : 0,
+        "nscannedObjectsAllPlans" : 0,
+        "nscannedAllPlans" : 0,
+        "scanAndOrder" : false,
+        "indexOnly" : false,
+        "nYields" : 0,
+        "nChunkSkips" : 0,
+        "millis" : 0,
+        "indexBounds" : {
+
+        },
+        "server" : "Denis:27017"
+}</pre>
+<p>Let&#8217;s add an index</p>
+<pre>db.Indexing.ensureIndex({name: 1});</pre>
+<p>What we did was, we created an index on name and it is sorted ascending, if you want descending, you would use -1 instead of 1</p>
+<p>Now if we add run the same command from before with explain</p>
+<pre>db.Indexing.find({name: "Denis"}).explain()</pre>
+<p>Here are the results</p>
+<pre>{
+        "cursor" : "BtreeCursor name_1",
+        "isMultiKey" : false,
+        "n" : 1,
+        "nscannedObjects" : 1,
+        "nscanned" : 1,
+        "nscannedObjectsAllPlans" : 1,
+        "nscannedAllPlans" : 1,
+        "scanAndOrder" : false,
+        "indexOnly" : false,
+        "nYields" : 0,
+        "nChunkSkips" : 0,
+        "millis" : 1,
+        "indexBounds" : {
+                "name" : [
+                        [
+                                "Denis",
+                                "Denis"
+                        ]
+                ]
+        },
+        "server" : "Denis:27017"
+}</pre>
+<p>As you can see several things are different. Instead of a BasicCursor, we now use a BtreeCursor</p>
+<p>Also instead of</p>
+<pre>"indexBounds" : {
+        
+}</pre>
+<p>we now see</p>
+<pre>"indexBounds" : {
+      "name" : [
+                 [
+                      "Denis",
+                      "Denis"
+                 ]
+               ]
+    },</pre>
+<p>
+<h2>Dropping an Index in MongoDB</h2>
+<p>You can drop an index by specifying a field in a collection</p>
+<pre>db.Indexing.dropIndex({name: 1});</pre>
+<p>Here is the output</p>
+<pre>{ "nIndexesWas" : 2, "ok" : 1 }</pre>
+<p>You can also drop all indexes for a collection in one shot</p>
+<pre>db.Indexing.dropIndexes()</pre>
+<p>Here is the output</p>
+<pre>{
+        "nIndexesWas" : 1,
+        "msg" : "non-_id indexes dropped for collection",
+        "ok" : 1
+}</pre>
+<p>As we mentioned before all _id fields have an index by default and those don&#8217;t get dropped</p>
+<p>
+<h2>Creating A Unique Index in MongoDB</h2>
+<p>Let&#8217;s now create an index on name again but this time we will make it unique., The syntax is the same as with the index we created before with the addition <em>unique: true</em><br />
+If you didn&#8217;t drop the index we created before, drop it first and then execute the following</p>
+<pre>db.Indexing.ensureIndex({name: 1}, {unique: true});</pre>
+<p>Now if we try to insert the same name again, you will see that we get an error</p>
+<pre>db.Indexing.insert( { name : "Denis", age : 20 } )</pre>
+<p>Here is the output<br />
+<em>E11000 duplicate key error index: Indexing.Indexing.$name_1  dup key: { : &#8220;Denis&#8221; }</em></p>
+<p>As you can see it is pretty easy to create a unique index</p>
+<p>
+<h2>Creating A Compound Index in MongoDB</h2>
+<p>Creating an compound index is pretty straightforward as well, you just add the other fields. So if we want to create an compound index on name and age then you would do it like this</p>
+<pre>db.Indexing.ensureIndex({name: 1, age : 1});</pre>
+<p>Just like in a regular index, you use 1 for ascending and -1 for descending</p>
+<p>To create an compound unique index, you would just add <em>unique: true</em></p>
+<pre>db.Indexing.ensureIndex({name: 1, age : 1}, {unique: true})</pre>
+<p>The same rules like in a regular RDBMS when an compound index is used apply. If you supply the first field ot the first field and subsequent fields, then the index will be used, otherwise the index will not be used. You can easily test this.</p>
+<p>Search for name which is the first field in the compound index</p>
+<pre>db.Indexing.find({name: "Denis"}).explain()</pre>
+<p>Here is the output, as you can see the index is used</p>
+<pre>{
+        "cursor" : "BtreeCursor name_1_age_1",
+        "isMultiKey" : false,
+        "n" : 1,
+        "nscannedObjects" : 1,
+        "nscanned" : 1,
+        "nscannedObjectsAllPlans" : 1,
+        "nscannedAllPlans" : 1,
+        "scanAndOrder" : false,
+        "indexOnly" : false,
+        "nYields" : 0,
+        "nChunkSkips" : 0,
+        "millis" : 0,
+        "indexBounds" : {
+                "name" : [
+                        [
+                                "Denis",
+                                "Denis"
+                        ]
+                ],
+                "age" : [
+                        [
+                                {
+                                        "$minElement" : 1
+                                },
+                                {
+                                        "$maxElement" : 1
+                                }
+                        ]
+                ]
+        },
+        "server" : "Denis:27017"
+}</pre>
+<p>Now search for name which is the second field in the index</p>
+<pre>db.Indexing.find({age: "20"}).explain()</pre>
+<p>Here is the output for that</p>
+<pre>{
+        "cursor" : "BasicCursor",
+        "isMultiKey" : false,
+        "n" : 0,
+        "nscannedObjects" : 5,
+        "nscanned" : 5,
+        "nscannedObjectsAllPlans" : 5,
+        "nscannedAllPlans" : 5,
+        "scanAndOrder" : false,
+        "indexOnly" : false,
+        "nYields" : 0,
+        "nChunkSkips" : 0,
+        "millis" : 0,
+        "indexBounds" : {
+
+        },
+        "server" : "Denis:27017"
+}</pre>
+<p>As you can see, no index was used</p>
+<p>
+<hr />
+<p>If you want to dive deeper into Indexing in MongoDB I would suggest you take a look at the documentation on the MongoDB site, they have an excellent section on Indexing with many more examples than I have given here. I didn&#8217;t cover Sparse Indexes, Indexes on Embedded Fields, Multikey Indexes, TTL Indexes, Geospatial Indexes or Geohaystack Indexes. You can find the documentation here: http://docs.mongodb.org/manual/core/indexes/</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/indexes-in-mongodb/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Use INDEXKEY_PROPERTY in SQL Server to determine if columns in indexes are sorted ascending or descending</title>
+		<link>/index.php/datamgmt/datadesign/use-indexkey_property-in-sql-server-to-d/</link>
+		<comments>/index.php/datamgmt/datadesign/use-indexkey_property-in-sql-server-to-d/#comments</comments>
+		<pubDate>Wed, 23 Sep 2009 18:20:23 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[functions]]></category>
+		<category><![CDATA[indexes]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/09/use-indexkey_property-in-sql-server-to-d/</guid>
+		<description><![CDATA[How can you find out if the columns that are part of the index are sorted descending or ascending in that index? For example when you create the following index T-SQL1 CREATE CLUSTERED &#160;INDEX ix_test_clust ON test &#40;id ASC, col1 DESC&#41; CREATE CLUSTERED INDEX ix_test_clust ON test (id ASC, col1 DESC) How would you find [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>How can you find out if the columns that are part of the index are sorted descending or ascending in that index? For example when you create the following index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> &nbsp;<span class="kw1">INDEX</span> ix_test_clust <span class="kw1">ON</span> test <span class="br0">&#40;</span>id <span class="kw1">ASC</span>, col1 <span class="kw1">DESC</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED  INDEX ix_test_clust ON test (id ASC, col1 DESC)</pre></div></div>
+
+<p>How would you find out without scripting the index if the columns are in descending or ascending order? SQL Server has a function for that, the name of this function is INDEXKEY_PROPERTY<br />
+Before starting I need to warn you that this will only run on SQL Server 2005 and above, I have not tested this on SQL Server 2000 but if you need it to run on SQL Server 2000 remove sys. in front of the tables&#8230;so instead of sys.sysindexes use sysindexes that should do the trick.</p>
+<p>Let&#8217;s see how that works. first create this table in the tempdb</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> tempdb
+go
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test <span class="br0">&#40;</span>id <span class="kw1">INT</span>, col1 <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">40</span><span class="br0">&#41;</span>, col2 <span class="kw1">INT</span>, col3 <span class="kw1">INT</span><span class="br0">&#41;</span>
+go</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE tempdb
+go
+ 
+CREATE TABLE Test (id INT, col1 VARCHAR(40), col2 INT, col3 INT)
+go</pre></div></div>
+
+<p>Now create 2 indexes, one clustered with 2 columns and one non clustered with 4 columns</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> &nbsp;<span class="kw1">INDEX</span> ix_test <span class="kw1">ON</span> test <span class="br0">&#40;</span>id <span class="kw1">ASC</span>, col1 <span class="kw1">DESC</span>,col2 <span class="kw1">DESC</span>, col3 <span class="kw1">ASC</span><span class="br0">&#41;</span>
+go
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> &nbsp;<span class="kw1">INDEX</span> ix_test_clust <span class="kw1">ON</span> test <span class="br0">&#40;</span>id <span class="kw1">ASC</span>, col1 <span class="kw1">DESC</span><span class="br0">&#41;</span>
+go</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED  INDEX ix_test ON test (id ASC, col1 DESC,col2 DESC, col3 ASC)
+go
+ 
+ 
+CREATE CLUSTERED  INDEX ix_test_clust ON test (id ASC, col1 DESC)
+go</pre></div></div>
+
+<p>First we need to see what the arguments are for the INDEXKEY_PROPERTY function; here is what you can find in Books On Line<br />
+<strong>INDEXKEY_PROPERTY ( object_ID ,index_ID ,key_ID ,property )</strong></p>
+<p><strong>Arguments</strong></p>
+<table border="1" cellpadding="10">
+<tr>
+<td><strong>object_ID</strong></td>
+<td>Is the object identification number of the table or indexed view. object_ID is int.</td>
+</tr>
+<tr>
+<td><strong>index_ID</strong></td>
+<td>Is the index identification number. index_ID is int.</td>
+</tr>
+<tr>
+<td><strong>key_ID</strong></td>
+<td>Is the index key column position. key_ID is int.</td>
+</tr>
+<tr>
+<td valign="top"><strong>property</strong></td>
+<td>Is the name of the property for which information will be returned. property is a character string and can be one of the following values.</p>
+<table border="1">
+<tr>
+<td><strong>Value</strong></td>
+<td><strong>Description</strong></td>
+</tr>
+<tr>
+<td>ColumnId</td>
+<td>  Column ID at the key_ID position of the index.</td>
+</tr>
+<tr>
+<td>IsDescending</td>
+<td>Order in which the index column is stored.</td>
+</tr>
+<tr>
+<td colspan="2" align="right">1 = Descending 0 = Ascending</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+<p>So to use it we need to know a couple of things, we need the table name, the index id and the index key column position.<br />
+Run the following query which will give you all that info for the table Test, change the table name if you are interested in other tables.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>k.<span class="me1">id</span><span class="br0">&#41;</span> <span class="kw1">as</span> TableName,i.<span class="me1">name</span> <span class="kw1">as</span> IndexName,c.<span class="me1">name</span> <span class="kw1">as</span> ColumnName,k.<span class="me1">keyno</span>,k.<span class="me1">indid</span> <span class="kw1">as</span> IndexID 
+<span class="kw1">from</span> sys.<span class="me1">sysindexes</span> i
+join sys.<span class="me1">sysindexkeys</span> k <span class="kw1">on</span> i.<span class="me1">id</span> <span class="sy0">=</span> k.<span class="me1">id</span>
+and k.<span class="me1">indid</span> <span class="sy0">=</span> i.<span class="me1">indid</span>
+join sys.<span class="me1">syscolumns</span> c <span class="kw1">on</span> k.<span class="me1">id</span> <span class="sy0">=</span> c.<span class="me1">id</span>
+and k.<span class="me1">colid</span> <span class="sy0">=</span> c.<span class="me1">colid</span>
+<span class="kw1">where</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>k.<span class="me1">id</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'Test'</span>
+<span class="kw1">order</span> <span class="kw1">by</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>k.<span class="me1">id</span><span class="br0">&#41;</span>,i.<span class="me1">name</span>,k.<span class="me1">keyno</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select OBJECT_NAME(k.id) as TableName,i.name as IndexName,c.name as ColumnName,k.keyno,k.indid as IndexID 
+from sys.sysindexes i
+join sys.sysindexkeys k on i.id = k.id
+and k.indid = i.indid
+join sys.syscolumns c on k.id = c.id
+and k.colid = c.colid
+where OBJECT_NAME(k.id) = 'Test'
+order by OBJECT_NAME(k.id),i.name,k.keyno</pre></div></div>
+
+<p>Here is the output</p>
+<table border="1">
+<tr>
+<td>TableName</td>
+<td> IndexName</td>
+<td> ColumnName</td>
+<td>keyno</td>
+<td> IndexID</td>
+</tr>
+<tr>
+<td>Test</td>
+<td>	ix_test</td>
+<td>id</td>
+<td>1</td>
+<td>	2</td>
+</tr>
+<tr>
+<td>Test</td>
+<td>	ix_test</td>
+<td>col1</td>
+<td>2</td>
+<td>	2</td>
+</tr>
+<tr>
+<td>Test</td>
+<td>	ix_test</td>
+<td>col2</td>
+<td>3</td>
+<td>	2</td>
+</tr>
+<tr>
+<td>Test</td>
+<td>	ix_test</td>
+<td>col3</td>
+<td>4</td>
+<td>	2</td>
+</tr>
+<tr>
+<td>Test</td>
+<td>	ix_test_clust</td>
+<td>id</td>
+<td>1</td>
+<td>	1</td>
+</tr>
+<tr>
+<td>Test</td>
+<td>	ix_test_clust</td>
+<td>col1</td>
+<td>2</td>
+<td>	1</td>
+</tr>
+</table>
+<p>Now with the output from above can easily call the INDEXKEY_PROPERTY  function, we use the IsDescending property to find out the sort order, below are the function calls for the two indexes we created.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="co1">--index ix_test </span>
+<span class="kw1">SELECT</span> <span class="kw2">INDEXKEY_PROPERTY</span> <span class="br0">&#40;</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'Test'</span><span class="br0">&#41;</span> , <span class="nu0">2</span> , <span class="nu0">1</span> , <span class="st0">'isdescending'</span> <span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="kw2">INDEXKEY_PROPERTY</span> <span class="br0">&#40;</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'Test'</span><span class="br0">&#41;</span> , <span class="nu0">2</span> , <span class="nu0">2</span> , <span class="st0">'isdescending'</span> <span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="kw2">INDEXKEY_PROPERTY</span> <span class="br0">&#40;</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'Test'</span><span class="br0">&#41;</span> , <span class="nu0">2</span> , <span class="nu0">3</span> , <span class="st0">'isdescending'</span> <span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="kw2">INDEXKEY_PROPERTY</span> <span class="br0">&#40;</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'Test'</span><span class="br0">&#41;</span> , <span class="nu0">2</span> , <span class="nu0">4</span> , <span class="st0">'isdescending'</span> <span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">--index ix_test 
+SELECT INDEXKEY_PROPERTY ( OBJECT_ID('Test') , 2 , 1 , 'isdescending' )
+SELECT INDEXKEY_PROPERTY ( OBJECT_ID('Test') , 2 , 2 , 'isdescending' )
+SELECT INDEXKEY_PROPERTY ( OBJECT_ID('Test') , 2 , 3 , 'isdescending' )
+SELECT INDEXKEY_PROPERTY ( OBJECT_ID('Test') , 2 , 4 , 'isdescending' )</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="co1">-- index ix_test_clust</span>
+<span class="kw1">SELECT</span> <span class="kw2">INDEXKEY_PROPERTY</span> <span class="br0">&#40;</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'Test'</span><span class="br0">&#41;</span> , <span class="nu0">1</span> , <span class="nu0">1</span> , <span class="st0">'isdescending'</span> <span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="kw2">INDEXKEY_PROPERTY</span> <span class="br0">&#40;</span> <span class="kw2">OBJECT_ID</span><span class="br0">&#40;</span><span class="st0">'Test'</span><span class="br0">&#41;</span> , <span class="nu0">1</span> , <span class="nu0">2</span> , <span class="st0">'isdescending'</span> <span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">-- index ix_test_clust
+SELECT INDEXKEY_PROPERTY ( OBJECT_ID('Test') , 1 , 1 , 'isdescending' )
+SELECT INDEXKEY_PROPERTY ( OBJECT_ID('Test') , 1 , 2 , 'isdescending' )</pre></div></div>
+
+<p>Of course we are not amateurs and nobody wants to type all that stuff, we will just take the query from before and put the following in the select statement <em>INDEXKEY_PROPERTY (k.id,k.indid ,c.colid,&#8217;isdescending&#8217;) as IsDescending</em><br />
+Run the code below to see how that works.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="kw2">INDEXKEY_PROPERTY</span> <span class="br0">&#40;</span>k.<span class="me1">id</span>,k.<span class="me1">indid</span> ,k.<span class="me1">keyno</span>,<span class="st0">'isdescending'</span><span class="br0">&#41;</span> <span class="kw1">as</span> IsDescending,<span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>k.<span class="me1">id</span><span class="br0">&#41;</span> <span class="kw1">as</span> TableName,i.<span class="me1">name</span> <span class="kw1">as</span> IndexName,c.<span class="me1">name</span> <span class="kw1">as</span> ColumnName,c.<span class="me1">colid</span>,k.<span class="me1">indid</span> <span class="kw1">as</span> IndexID 
+<span class="kw1">from</span> sys.<span class="me1">sysindexes</span> i
+join sys.<span class="me1">sysindexkeys</span> k <span class="kw1">on</span> i.<span class="me1">id</span> <span class="sy0">=</span> k.<span class="me1">id</span>
+and k.<span class="me1">indid</span> <span class="sy0">=</span> i.<span class="me1">indid</span>
+join sys.<span class="me1">syscolumns</span> c <span class="kw1">on</span> k.<span class="me1">id</span> <span class="sy0">=</span> c.<span class="me1">id</span>
+and k.<span class="me1">colid</span> <span class="sy0">=</span> c.<span class="me1">colid</span>
+<span class="kw1">where</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>k.<span class="me1">id</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'Test'</span>
+<span class="kw1">order</span> <span class="kw1">by</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>k.<span class="me1">id</span><span class="br0">&#41;</span>,i.<span class="me1">name</span>,k.<span class="me1">keyno</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select INDEXKEY_PROPERTY (k.id,k.indid ,k.keyno,'isdescending') as IsDescending,OBJECT_NAME(k.id) as TableName,i.name as IndexName,c.name as ColumnName,c.colid,k.indid as IndexID 
+from sys.sysindexes i
+join sys.sysindexkeys k on i.id = k.id
+and k.indid = i.indid
+join sys.syscolumns c on k.id = c.id
+and k.colid = c.colid
+where OBJECT_NAME(k.id) = 'Test'
+order by OBJECT_NAME(k.id),i.name,k.keyno</pre></div></div>
+
+<p>Here is the output</p>
+<table border="1">
+<tr>
+<td>IsDescending</td>
+<td>TableName</td>
+<td> IndexName</td>
+<td> ColumnName</td>
+<td>keyno</td>
+<td> IndexID</td>
+</tr>
+<tr>
+<td>0</td>
+<td>Test</td>
+<td>	ix_test</td>
+<td>id</td>
+<td>1</td>
+<td>	2</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Test</td>
+<td>	ix_test</td>
+<td>col1</td>
+<td>2</td>
+<td>	2</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Test</td>
+<td>	ix_test</td>
+<td>col2</td>
+<td>3</td>
+<td>	2</td>
+</tr>
+<tr>
+<td>0</td>
+<td>Test</td>
+<td>	ix_test</td>
+<td>col3</td>
+<td>4</td>
+<td>	2</td>
+</tr>
+<tr>
+<td>0</td>
+<td>Test</td>
+<td>	ix_test_clust</td>
+<td>id</td>
+<td>1</td>
+<td>	1</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Test</td>
+<td>	ix_test_clust</td>
+<td>col1</td>
+<td>2</td>
+<td>	1</td>
+</tr>
+</table>
+<p>Of course if you can do that you can also very simply write a query that returns all the columns that are sorted descending in any index by making the WHERE clause the following: where INDEXKEY_PROPERTY (k.id,k.indid ,k.keyno,&#8217;isdescending&#8217;) = 1. Run the query below to see how that works</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="kw2">INDEXKEY_PROPERTY</span> <span class="br0">&#40;</span>k.<span class="me1">id</span>,k.<span class="me1">indid</span> ,k.<span class="me1">keyno</span>,<span class="st0">'isdescending'</span><span class="br0">&#41;</span> <span class="kw1">as</span> IsDescending,<span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span>k.<span class="me1">id</span><span class="br0">&#41;</span> <span class="kw1">as</span> TableName,i.<span class="me1">name</span> <span class="kw1">as</span> IndexName,c.<span class="me1">name</span> <span class="kw1">as</span> ColumnName,k.<span class="me1">keyno</span>,k.<span class="me1">indid</span> <span class="kw1">as</span> IndexID 
+<span class="kw1">from</span> sys.<span class="me1">sysindexes</span> i
+join sys.<span class="me1">sysindexkeys</span> k <span class="kw1">on</span> i.<span class="me1">id</span> <span class="sy0">=</span> k.<span class="me1">id</span>
+and k.<span class="me1">indid</span> <span class="sy0">=</span> i.<span class="me1">indid</span>
+join sys.<span class="me1">syscolumns</span> c <span class="kw1">on</span> k.<span class="me1">id</span> <span class="sy0">=</span> c.<span class="me1">id</span>
+and k.<span class="me1">colid</span> <span class="sy0">=</span> c.<span class="me1">colid</span>
+<span class="kw1">where</span> <span class="kw2">INDEXKEY_PROPERTY</span> <span class="br0">&#40;</span>k.<span class="me1">id</span>,k.<span class="me1">indid</span> ,k.<span class="me1">keyno</span>,<span class="st0">'isdescending'</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="nu0">1</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select INDEXKEY_PROPERTY (k.id,k.indid ,k.keyno,'isdescending') as IsDescending,OBJECT_NAME(k.id) as TableName,i.name as IndexName,c.name as ColumnName,k.keyno,k.indid as IndexID 
+from sys.sysindexes i
+join sys.sysindexkeys k on i.id = k.id
+and k.indid = i.indid
+join sys.syscolumns c on k.id = c.id
+and k.colid = c.colid
+where INDEXKEY_PROPERTY (k.id,k.indid ,k.keyno,'isdescending') = 1</pre></div></div>
+
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/use-indexkey_property-in-sql-server-to-d/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>How to get the selectivity of an index</title>
+		<link>/index.php/datamgmt/datadesign/how-to-get-the-selectivity-of-an-index/</link>
+		<comments>/index.php/datamgmt/datadesign/how-to-get-the-selectivity-of-an-index/#respond</comments>
+		<pubDate>Tue, 20 May 2008 13:32:33 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[database]]></category>
+		<category><![CDATA[indexes]]></category>
+		<category><![CDATA[optimizing]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[sqlserver]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/05/how-to-get-the-selectivity-of-an-index/</guid>
+		<description><![CDATA[The selectivity of an index is extremely important. If your index is not selective enough then the optimizer will simply have to do a scan. This is also a reason why creating an index on a gender column does not make a lot of sense. First create this table T-SQL1 2 3 4 5 6 [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>The selectivity of an index is extremely important. If your index is not selective enough then the optimizer will simply have to do a scan. This is also a reason why creating an index on a gender column does not make a lot of sense.</p>
+<p>First create this table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> tempdb
+go
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestCompositeIndex <span class="br0">&#40;</span><span class="kw1">State</span> <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">2</span><span class="br0">&#41;</span>,Zip <span class="kw1">Char</span><span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestCompositeIndex <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'NJ'</span>,<span class="st0">'08540'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestCompositeIndex <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'NJ'</span>,<span class="st0">'08540'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestCompositeIndex <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'NY'</span>,<span class="st0">'10028'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestCompositeIndex <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'NY'</span>,<span class="st0">'10021'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestCompositeIndex <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'NY'</span>,<span class="st0">'10021'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestCompositeIndex <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'NY'</span>,<span class="st0">'10021'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestCompositeIndex <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'NY'</span>,<span class="st0">'10001'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestCompositeIndex <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'NJ'</span>,<span class="st0">'08536'</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> TestCompositeIndex <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="st0">'NJ'</span>,<span class="st0">'08540'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE tempdb
+go
+
+CREATE TABLE TestCompositeIndex (State char(2),Zip Char(5))
+INSERT TestCompositeIndex VALUES('NJ','08540')
+INSERT TestCompositeIndex VALUES('NJ','08540')
+INSERT TestCompositeIndex VALUES('NY','10028')
+INSERT TestCompositeIndex VALUES('NY','10021')
+INSERT TestCompositeIndex VALUES('NY','10021')
+INSERT TestCompositeIndex VALUES('NY','10021')
+INSERT TestCompositeIndex VALUES('NY','10001')
+INSERT TestCompositeIndex VALUES('NJ','08536')
+INSERT TestCompositeIndex VALUES('NJ','08540')</pre></div></div>
+
+<p>If you have a composite index (composite means the index contains more than one column) you need to run this code.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @<span class="kw2">Count</span> <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span> <span class="kw1">State</span>, Zip
+<span class="kw1">FROM</span> TestCompositeIndex;
+&nbsp;
+<span class="kw1">SET</span> @<span class="kw2">Count</span> <span class="sy0">=</span> <span class="kw2">@@ROWCOUNT</span>;
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="br0">&#40;</span>@<span class="kw2">Count</span><span class="sy0">*</span><span class="nu0">1.0</span><span class="br0">&#41;</span> <span class="sy0">/</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">AS</span> IndexSelectivity, 
+<span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span><span class="kw1">AS</span> TotalCount,
+@<span class="kw2">Count</span> <span class="kw1">AS</span> DistinctCount
+<span class="kw1">FROM</span> TestCompositeIndex;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @Count int
+
+SELECT DISTINCT State, Zip
+FROM TestCompositeIndex;
+
+SET @Count = @@ROWCOUNT;
+
+ 
+
+SELECT (@Count*1.0) / COUNT(*) AS IndexSelectivity, 
+COUNT(*)AS TotalCount,
+@Count AS DistinctCount
+FROM TestCompositeIndex;</pre></div></div>
+
+<p>Result<br />
+&#8212;&#8212;&#8211;<br />
+IndexSelectivity	TotalCount	DistinctCount<br />
+.555555555555	9	5</p>
+<p>If you have a one column index you can use this code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="br0">&#40;</span><span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="kw1">DISTINCT</span> <span class="kw1">State</span><span class="br0">&#41;</span><span class="sy0">*</span> <span class="nu0">1.0</span><span class="br0">&#41;</span> <span class="sy0">/</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">AS</span> IndexSelectivity,
+<span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">AS</span> TotalCount,
+<span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="kw1">DISTINCT</span> <span class="kw1">State</span><span class="br0">&#41;</span> <span class="kw1">AS</span> DistinctCount
+<span class="kw1">FROM</span> TestCompositeIndex;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT (COUNT(DISTINCT State)* 1.0) / COUNT(*) AS IndexSelectivity,
+COUNT(*) AS TotalCount,
+COUNT(DISTINCT State) AS DistinctCount
+FROM TestCompositeIndex;</pre></div></div>
+
+<p>Result<br />
+&#8212;&#8212;&#8211;<br />
+IndexSelectivity	TotalCount	DistinctCount<br />
+.222222222222	9	2</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/how-to-get-the-selectivity-of-an-index/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

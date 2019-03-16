@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>databases &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/databases/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Listing all your SQL Server databases ordered by size</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/listing-all-your-sql-server/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/listing-all-your-sql-server/#respond</comments>
+		<pubDate>Fri, 08 Feb 2013 11:51:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[databases]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[sqlcop]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/listing-all-your-sql-server/</guid>
+		<description><![CDATA[To see all the databases with their size on an instance, you can use sp_helpdb. That works but returns the results in some random order. In my case I see master, model and
+msdb followed by a couple of user database, then tempdb and then again some user&#8230;]]></description>
+				<content:encoded><![CDATA[<p>To see all the databases with their size on an instance, you can use sp_helpdb. That works but returns the results in some random order. In my case I see master, model and<br />
+msdb followed by a couple of user database, then tempdb and then again some user databases. What if I want to get the list returned order by size descending? This is pretty easy if you dump the results into a table and then do the sorting when doing the SELECT query against this table. The one thing you have to do is taking out MB from the db_size column and converting it to something numeric.</p>
+<p>Here is what the query looks like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #test <span class="br0">&#40;</span>name <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, db_size <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,owner <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,<span class="kw2">db_id</span> <span class="kw1">int</span>,created <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>,status <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">1000</span><span class="br0">&#41;</span>,compatibility_level <span class="kw1">int</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">INSERT</span> #test 
+<span class="kw1">EXEC</span> <span class="kw3">sp_helpdb</span>
+&nbsp;
+<span class="kw1">SELECT</span> name,db_size,owner,<span class="kw2">db_id</span>,created,compatibility_level 
+<span class="kw1">FROM</span> #test
+<span class="kw1">ORDER</span> <span class="kw1">BY</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">float</span>,<span class="kw2">REPLACE</span><span class="br0">&#40;</span>db_size,<span class="st0">' MB'</span>,<span class="st0">''</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">DESC</span>
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> #test </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #test (name varchar(100), db_size varchar(100),owner varchar(100),db_id int,created varchar(100),status varchar(1000),compatibility_level int)
+ 
+INSERT #test 
+EXEC sp_helpdb
+ 
+SELECT name,db_size,owner,db_id,created,compatibility_level 
+FROM #test
+ORDER BY CONVERT(float,REPLACE(db_size,' MB','')) DESC
+
+DROP TABLE #test </pre></div></div>
+
+<p>And here is what you would see</p>
+<pre>name		     db_size	owner		db_id	created	    compatibility_level
+TestBigger	    988.31 MB	DenisDenis	8	Nov 26 2012	110
+TestSmaller	    710.31 MB	DenisDenis	9	Nov 26 2012	110
+msdb		     38.00 MB	sa		4	Feb 10 2012	110
+master		     18.63 MB	sa		1	Apr  8 2003	110
+ReportServer	     12.94 MB	DenisDenis	5	Aug 16 2012	110</pre>
+<p>This &#8220;check&#8221; will be part of the informational section of SQLCop</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/listing-all-your-sql-server/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>MongoDB: How to drop databases and collections</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/mongodb-how-to-drop-databases/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/mongodb-how-to-drop-databases/#respond</comments>
+		<pubDate>Tue, 05 Feb 2013 08:47:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[bigdata]]></category>
+		<category><![CDATA[collections]]></category>
+		<category><![CDATA[databases]]></category>
+		<category><![CDATA[mongodb]]></category>
+		<category><![CDATA[nosql]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/mongodb-how-to-drop-databases/</guid>
+		<description><![CDATA[In this post we are going to look at how to drop database and collections. We already covered backup and restores, now that you know how to do that, it is safe to cover dropping collections and databases
+
+Execute the following command, it will create&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In this post we are going to look at how to drop database and collections. We already covered backup and restores, now that you know how to do that, it is safe to cover dropping collections and databases</p>
+<p>Execute the following command, it will create the MultiCollection database if it doesn&#8217;t exist already</p>
+<pre>use MultiCollection</pre>
+<p>Now create these two collections</p>
+<pre>db.Blog.insert( { name : "Denis",  age : 20 } )
+db.Blog.insert( { name : "Abe",    age : 30 } )
+db.Blog.insert( { name : "John",   age : 40 } )
+db.Blog.insert( { name : "Xavier", age : 10 } )
+db.Blog.insert( { name : "Zen",    age : 50 } )
+
+
+db.People.insert( { name : "AADenis",  age : 0020 } )
+db.People.insert( { name : "AAAbe",    age : 0030 } )
+db.People.insert( { name : "AAJohn",   age : 0040 } )
+db.People.insert( { name : "AAXavier", age : 0010 } )
+db.People.insert( { name : "AAZen",    age : 0050 } )</pre>
+<p>Now it is time to drop a collection. The syntax is pretty simple it is <code>db.CollectionName.drop()</code>. So if we wanted to drop the Blog collection it would be <code>db.Blog.drop()</code></p>
+<p>Time to try it out, run the following</p>
+<pre>db.Blog.drop()</pre>
+<p>The output you get back is <code>true</code></p>
+<p>Now if you do a find on the collection, you won&#8217;t get anything back</p>
+<pre>db.Blog.find()</pre>
+<p>That was pretty simple. Now let&#8217;s see how to drop a database. This is pretty easy as well, it is just <code>db.dropDatabase()</code>. I wished you had to specify the name of the database because you could be in the wrong database when executing the command</p>
+<p>Execute this</p>
+<pre>db.dropDatabase()</pre>
+<p>Here is the output</p>
+<pre>{ "dropped" : "MultiCollection", "ok" : 1 }</pre>
+<p>Just be aware that you are still in the MultiCollection database, you can verify this by executing the following command</p>
+<pre>db.getName()</pre>
+<p>And here is the output</p>
+<pre>MultiCollection</pre>
+<p>If you now try to do a find for either collection that existed before you won&#8217;t get anything back</p>
+<pre>db.People.find()
+db.Blog.find()</pre>
+<p>Doing a stats command on the database will tell you how many collections you have as well</p>
+<pre>db.stats()</pre>
+<p>Here is the output</p>
+<pre>{
+        "db" : "MultiCollection",
+        "collections" : 0,
+        "objects" : 0,
+        "avgObjSize" : 0,
+        "dataSize" : 0,
+        "storageSize" : 0,
+        "numExtents" : 0,
+        "indexes" : 0,
+        "indexSize" : 0,
+        "fileSize" : 0,
+        "nsSizeMB" : 0,
+        "ok" : 1
+}</pre>
+<p>As you can see everything is pretty much 0</p>
+<p>
+That is all for this post, if you are interested in my other MongoDB posts, you can find them here:<br />
+<a href="/index.php/DataMgmt/DBProgramming/creating-mongodb-as-a-service">Install MongoDB as a Windows Service</a><br />
+<a href="/index.php/DataMgmt/DBProgramming/doing-upserts-in-mongodb">UPSERTs with MongoDB</a><br />
+<a href="/index.php/DataMgmt/DBProgramming/mongodb-how-to-sort-results">How to sort results in MongoDB</a><br />
+<a href="/index.php/DataMgmt/DBProgramming/indexes-in-mongodb">Indexes in MongoDB: A quick overview</a><br />
+<a href="/index.php/DataMgmt/DBProgramming/multidocument-updates-with-mongodb">Multidocument updates with MongoDB</a><br />
+<a href="/index.php/DataMgmt/DBProgramming/mongodb-how-to-include-and">MongoDB: How to include and exclude the fields you want in results</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/mongodb-how-to-limit-results">MongoDB: How to limit results and how to page through results</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/mongodb-backup-and-restore-databases">MongoDB: How to backup and restore databases</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/mongodb-how-to-restore-collections">MongoDB: How to restore collections</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/mongodb-how-to-backup-all">MongoDB: How to backup all the databases with one command</a><br />
+<a href="/index.php/DataMgmt/DBProgramming/mongodb-exporting-data-into-files">MongoDB: Exporting data into files</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/mongodb-how-to-drop-databases/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Review of Inside Microsoft SQL Server 2005 Query Tuning and Optimization</title>
+		<link>/index.php/datamgmt/datadesign/review-of-inside-microsoft-sql-server-20/</link>
+		<comments>/index.php/datamgmt/datadesign/review-of-inside-microsoft-sql-server-20/#respond</comments>
+		<pubDate>Fri, 08 Feb 2008 02:04:36 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[book]]></category>
+		<category><![CDATA[databases]]></category>
+		<category><![CDATA[programming]]></category>
+		<category><![CDATA[review]]></category>
+		<category><![CDATA[sql]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/02/review-of-inside-microsoft-sql-server-20/</guid>
+		<description><![CDATA[SQL performance tuning is probably one of those things you can do to really make a HUGE difference in performance. Let’s put this in perspective: take a typical application, if you can improve the performance by 100% then you really made a huge improvement. You can improve a SQL query by 1000% with 2 lines [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>SQL performance tuning is probably one of those things you can do to really make a HUGE difference in performance. Let’s put this in perspective: take a typical application, if you can improve the performance by 100% then you really made a huge improvement. You can improve a SQL query by 1000% with 2 lines of code (sometimes all you have to do is take away a % sign). If you can make a query sargable so that the optimizer can do an index seek instead of an index scan your query might go from 12 seconds to 200 milliseconds. Now try doing that in an application, even if you change all the string concatenation to use a stringbuilder instead of creating new strings all the time you will not get such a drastic performance improvement. I am sure you get the point by now, let’s talk about the book. </p>
+<p><a href="http://www.amazon.com/gp/product/0735621969/102-5735017-0910517?ie=UTF8&amp;tag=sql08-20&amp;linkCode=xm2&amp;camp=1789&amp;creativeASIN=0735621969">Inside Microsoft SQL Server 2005: Query Tuning and Optimization</a> is part 4 of the Inside Microsoft SQL Server 2005 series, it is written by Kalen Delaney and five other authors. There are 6 chapters in this book</p>
+<p></p>
+<p>1 A Performance Troubleshooting Methodology<br />
+This chapter explains some typical things that affect performance and also gives a troubleshooting overview</p>
+<p>2 Tracing and Profiling<br />
+This chapter explains how to use the profiler and how to analyze traces. SQL Server’s built-in traces are also covered</p>
+<p>3 Query Execution<br />
+This chapter gives a query processing and execution overview. It explains how to read plans and goes into a lot of detail about analyzing plans</p>
+<p>4 Troubleshooting Query Performance<br />
+This chapter explains how to detect problems in plans, how to improve queries and some best practices</p>
+<p>5 Plan Caching and Recompilation<br />
+This chapter goes into detail about plan caching and recompilation and how to troubleshoot plan cache issues</p>
+<p>6 Concurrency Problems<br />
+The final chapter deals with concurrency (locking, blocking and deadlocking)</p>
+<p>This is an excellent book for an intermediate/advanced developer. There is so much new stuff in SQL Server 2005 compared to 2000 to help you with tuning queries that you probably want to read each chapter several times. The Dynamic Management Views are a big help and this book shows you how to use them. Some other cool stuff in this book is the discussion of internal tables, undocumented DBCC commands and undocumented trace flags to discover information which could help you determine much faster what the cause of a performance problem might be. Some pages are packed with so much information that you need to pause for a second and process all that info (I have read some pages two to three times in a row). You will also find out that there are more joins besides left, full and outer. Page 137 for example has a nice table with the three Physical Join Operators: Nested Loop Join, Hash Join and Merge Join. This table lists the characteristics for each of these joins.</p>
+<p></p>
+<p>If you are an intermediate to advanced developer then I highly recommend this book. </p>
+<p></p>
+<p>I have interviewed Kalen a while back about this book and you can find that interview here:  <a href="http://sqlservercode.blogspot.com/2007/10/interview-with-kalen-delaney-about.html">Interview With Kalen Delaney About Inside Microsoft SQL Server 2005 Query Tuning and Optimization</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/review-of-inside-microsoft-sql-server-20/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

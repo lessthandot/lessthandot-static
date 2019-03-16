@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>tdd &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/tdd/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Auto-Verifying Moqs</title>
+		<link>/index.php/enterprisedev/unittest/auto-verifying-moqs/</link>
+		<comments>/index.php/enterprisedev/unittest/auto-verifying-moqs/#respond</comments>
+		<pubDate>Thu, 20 Dec 2012 14:06:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[Unit Testing]]></category>
+		<category><![CDATA[c#]]></category>
+		<category><![CDATA[moq]]></category>
+		<category><![CDATA[tdd]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/auto-verifying-moqs/</guid>
+		<description><![CDATA[After years of only being familiar with Rhino mocks, I have been using Moq for the last 10 months or so.  For the most part, I like it better.  The syntax seems easier to get people up to speed on, and there are situations where it really cuts down on t&#8230;]]></description>
+				<content:encoded><![CDATA[<p>After years of only being familiar with Rhino mocks, I have been using Moq for the last 10 months or so.  For the most part, I like it better.  The syntax seems easier to get people up to speed on, and there are situations where it really cuts down on the amount of test code you have to write.  This is about one of the situations where it doesn&#8217;t.</p>
+<p>One of the things I always liked about Rhino Mocks was the idea of the mock repository, and the fact that when disposing of a mock repository all of your setups get verified automagically.  I have a lot of trouble remembering to add calls to VerifyAll when I&#8217;m adding functionality to existing tests because I got so used to this behavior in the past.  When I noticed some tests where I had unnecessary mocks setup today I decided to do something about it.  Its not really anything special but figued I&#8217;d share since I haven&#8217;t posted for a while.</p>
+<p>Basically I added a base test fixture to the project that provides a means to create tracked mocks (similar to the MockRepository concept in Rhino).  It provides a method for mock creation, and adds all created mocks to a list that is then verified in the teardown method.  Pretty simple stuff but I found it handy.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System.Collections.Generic</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Moq</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">NUnit.Framework</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> Project<span class="sy0">.</span><span class="me1">Tests</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">abstract</span> <span class="kw4">class</span> MockVerifyingTest
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">readonly</span> List<span class="sy0">&lt;</span>Mock<span class="sy0">&gt;</span> _trackedMocks <span class="sy0">=</span> <span class="kw3">new</span> List<span class="sy0">&lt;</span>Mock<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">protected</span> Mock<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> GenerateTrackedMock<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span><span class="br0">&#40;</span>MockBehavior mockBehavior <span class="sy0">=</span> MockBehavior<span class="sy0">.</span><span class="kw1">Default</span><span class="br0">&#41;</span> <span class="kw1">where</span> T <span class="sy0">:</span> <span class="kw4">class</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> mock <span class="sy0">=</span> <span class="kw3">new</span> Mock<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span><span class="br0">&#40;</span>mockBehavior<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _trackedMocks<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span>mock<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> mock<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>TearDown<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">virtual</span> <span class="kw4">void</span> TearDown<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> mock <span class="kw1">in</span> _trackedMocks<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; mock<span class="sy0">.</span><span class="me1">VerifyAll</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">finally</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _trackedMocks<span class="sy0">.</span><span class="me1">Clear</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System.Collections.Generic;
+using Moq;
+using NUnit.Framework;
+
+namespace Project.Tests
+{
+    public abstract class MockVerifyingTest
+    {
+        readonly List&lt;Mock&gt; _trackedMocks = new List&lt;Mock&gt;();
+
+        protected Mock&lt;T&gt; GenerateTrackedMock&lt;T&gt;(MockBehavior mockBehavior = MockBehavior.Default) where T : class
+        {
+            var mock = new Mock&lt;T&gt;(mockBehavior);
+            _trackedMocks.Add(mock);
+            return mock;
+        }
+
+        [TearDown]
+        public virtual void TearDown()
+        {
+            try
+            {
+                foreach (var mock in _trackedMocks)
+                {
+                    mock.VerifyAll();
+                }
+            }
+            finally
+            {
+                _trackedMocks.Clear();
+            }
+        }
+    }
+}</pre></div></div>
+
+<p>So now instead of something like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> ATest<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> foo <span class="sy0">=</span> <span class="kw3">new</span> Mock<span class="sy0">&lt;</span>IFoo<span class="sy0">&gt;</span><span class="br0">&#40;</span>MockBehavior<span class="sy0">.</span><span class="me1">Strict</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; foo<span class="sy0">.</span><span class="me1">Setup</span><span class="br0">&#40;</span>f <span class="sy0">=&gt;</span> f<span class="sy0">.</span><span class="me1">GetSomething</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Returns</span><span class="br0">&#40;</span><span class="kw3">new</span> Something<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> bar <span class="sy0">=</span> <span class="kw3">new</span> Bar<span class="br0">&#40;</span>foo<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; bar<span class="sy0">.</span><span class="me1">CodeUnderTest</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; foo<span class="sy0">.</span><span class="me1">VerifyAll</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void ATest() 
+{
+    var foo = new Mock&lt;IFoo&gt;(MockBehavior.Strict);
+
+    foo.Setup(f =&gt; f.GetSomething()).Returns(new Something());
+
+    var bar = new Bar(foo);
+
+    bar.CodeUnderTest();
+
+    foo.VerifyAll();
+}</pre></div></div>
+
+<p>I can have my fixture inherit from MockVerifyingTest and write it like this:</p>
+<p><
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> ATest<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> foo <span class="sy0">=</span> GenerateTrackedMock<span class="sy0">&lt;</span>IFoo<span class="sy0">&gt;</span><span class="br0">&#40;</span>MockBehavior<span class="sy0">.</span><span class="me1">Strict</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; foo<span class="sy0">.</span><span class="me1">Setup</span><span class="br0">&#40;</span>f <span class="sy0">=&gt;</span> f<span class="sy0">.</span><span class="me1">GetSomething</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Returns</span><span class="br0">&#40;</span><span class="kw3">new</span> Something<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> bar <span class="sy0">=</span> <span class="kw3">new</span> Bar<span class="br0">&#40;</span>foo<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; bar<span class="sy0">.</span><span class="me1">CodeUnderTest</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void ATest() 
+{
+    var foo = GenerateTrackedMock&lt;IFoo&gt;(MockBehavior.Strict);
+
+    foo.Setup(f =&gt; f.GetSomething()).Returns(new Something());
+
+    var bar = new Bar(foo);
+
+    bar.CodeUnderTest();
+}</pre></div></div>
+
+<p>It only saves one line of test code in this example, but it can add up when dealing with tests that have several mocks.  I realize having this many mocks in play for a test is just asking for trouble, but I am dealing with a legacy system without any test coverage, so working in test coverage without any sweeping refactorings is imperative at this point.  We can make those changes later once we&#8217;ve gotten through a release or two with the code that is now under test <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/unittest/auto-verifying-moqs/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Reducing Code-Build-Test Friction with NCrunch</title>
+		<link>/index.php/enterprisedev/unittest/reducing-code-build-test-friction/</link>
+		<comments>/index.php/enterprisedev/unittest/reducing-code-build-test-friction/#respond</comments>
+		<pubDate>Mon, 23 Jul 2012 10:13:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Unit Testing]]></category>
+		<category><![CDATA[.net]]></category>
+		<category><![CDATA[ncrunch]]></category>
+		<category><![CDATA[tdd]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/07/reducing-code-build-test-friction/</guid>
+		<description><![CDATA[As I've moved from project to project, environment to environment, I've had opportunities to write unit tests after coding, do test first development, and once use unit tests as a living spec for an external developer (code none unit testing?). On&#8230;]]></description>
+				<content:encoded><![CDATA[<p>As I&#8217;ve moved from project to project, environment to environment, I&#8217;ve had opportunities to write unit tests after coding, do test first development, and once use unit tests as a living spec for an external developer (code none unit testing?). One of the biggest friction points, once you settle on a framework, is the constant cycle back and forth between coding, building, running tests, and flipping back. Whether you are using MS Test and the built-in test result viewer, the external NUnit GUI, or a 3rd party test runner, that constant switching is actually stealing precious moments of concentration and time. </p>
+<div style="text-align:center; color: #666666; font-size: 90%">
+   <img src="http://tiernok.com/LTDBlog/AddressTDD/CodeBuildTest.png" alt="The Code, Build, Test Cycle" /><br />
+   The Code, Build, Test Cycle
+</div>
+<p>Imagine for a moment that you have finished writing a piece of code. Maybe it&#8217;s the test, maybe it&#8217;s the code you intend to test. Instead of kicking off a build and switching mental mode to run the tests, the results simply start appearing. Your test lights up red, then green as you switch to building the logic that satisfies it, never once breaking stride to wait for the test suite to run. Your uncovered code is clearly marked as uncovered before you even finish writing it to press save. It&#8217;s magic.</p>
+<p>And so very, very addictive.</p>
+<h2>Hey Kids, Try Some of This</h2>
+<p>Instead of screenshotting our way through another post, let&#8217;s do this together. First download and install <a href="http://www.ncrunch.net/" title="Visit the NCrunch website" target="_blank">NCrunch</a>. Then either download or clone the git repository sample I have set up here: https://github.com/tarwn/TDDAddress</p>
+<p>Let&#8217;s get started.</p>
+<h2>What are we doing?</h2>
+<p><img src="http://tiernok.com/LTDBlog/AddressTDD/Letter.png" alt="Letter" style="float: left; margin-top: 8px;" /> </p>
+<p>The goal of this exercise is to build an Address class that is the business and formatting logic behind entry of a mailing address. The Address class will expose properties to tell an interface what address fields are available, what they should be labelled, whether the address has all the required values, and a displayable formatted address. In return, it will expect that interface to populate input properties for all the address input values. </p>
+<p>This is both as easy and quite a bit harder than what it sounds like. Easier in that we won&#8217;t be writing a game or similarly large construct, but harder because the rules for mailing addresses are not as well defined or as simple as you may think. In fact, most websites on the internet do it wrong, and not just for addresses outside the US. </p>
+<p>Luckily there are some people that have tried to pull together all of the rules from the USPS and other sources and we can use the results of their hard work to serve as a spec for our Address logic. The rules we are using were sourced from http://www.columbia.edu/~fdc/postal/#general, but I&#8217;ve only included a subset of them in this project.</p>
+<h2>Project Setup</h2>
+<p>There are two projects in the solution, one to hold the Address class (Main) and one for the tests (Main.Tests). </p>
+<div style="text-align:center; color: #666666; font-size: 90%">
+   <img src="http://tiernok.com/LTDBlog/AddressTDD/SolutionExplorer.png" alt="Solution Explorer - Projects" /><br />
+   Just a pair of small projects, nothing scary here
+</div>
+<p>The Address class already has the basic properties it needs, but everything else is up to you.</p>
+<h2>Let&#8217;s Go</h2>
+<p>Open the solution and enable NCrunch (it finished installing, right?) by selecting it from the top menu and selecting &#8220;Enable&#8221;. For the most part you can select the defaults when it is enabling. Either select the option to enable all of your tests by default while it is going through the dialogs, or open the Tests window, make ignored tests visible (grey icon on far right) and enable tests for the two projects manually.</p>
+<p>Ready? Ok, moving on.</p>
+<p>Open up the AddressTests file in Main.Tests and the Specs.md file from the root of the solution. Add the first test to the AddressTests like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; <span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> ToFormattedAddress_AddressLine1IsProvided_ItAppearsInOutput<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> sampleValue <span class="sy0">=</span> <span class="st0">&quot;Address Line 1&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> a <span class="sy0">=</span> <span class="kw3">new</span> Address<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; a<span class="sy0">.</span><span class="me1">AddressLine1</span> <span class="sy0">=</span> sampleValue<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> result <span class="sy0">=</span> a<span class="sy0">.</span><span class="me1">ToFormattedAddress</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">IsTrue</span><span class="br0">&#40;</span>result<span class="sy0">.</span><span class="me1">Contains</span><span class="br0">&#40;</span>sampleValue<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">	[Test]
+	public void ToFormattedAddress_AddressLine1IsProvided_ItAppearsInOutput() {
+		var sampleValue = "Address Line 1";
+		var a = new Address();
+
+		a.AddressLine1 = sampleValue;
+		var result = a.ToFormattedAddress();
+
+		Assert.IsTrue(result.Contains(sampleValue));
+	}</pre></div></div>
+
+<p>This test is the second rule in the included Specs.md file. After you add the test code, red dots will show up next to executable lines in the test that are on the path to a failed assertion. </p>
+<div style="text-align:center; color: #666666; font-size: 90%">
+   <img src="http://tiernok.com/LTDBlog/AddressTDD/TestsAreRed.png" alt="Tests Are Red" /><br />
+   Tests are automatically red/failing
+</div>
+<p>NCrunch is building and running the tests behind the scenes as you add more code, automagically. Switching over to the Address class, we&#8217;ll notice that it also has dots to indicate portions of the class that are referenced by failing tests. Right-clicking on any of these dots provides more details, options to run tests in debug mode, and so on.</p>
+<p>Now add some code to satisfy that test. As you make addition, NCrunch continues to build and test in the background, displaying the updated dots as you work. </p>
+<div style="text-align:center; color: #666666; font-size: 90%">
+   <img src="http://tiernok.com/LTDBlog/AddressTDD/TestsAreGreen.png" alt="Tests Are Green" /><br />
+   Tests and code turn Green automatically
+</div>
+<p>When you get to all green dots, you&#8217;re done. No need to stop, just move right on to the next test.</p>
+[video:youtube:E0PztmQQlOQ]
+<p>Enjoy the flow.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/unittest/reducing-code-build-test-friction/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Unit Testing Costs Too Much</title>
+		<link>/index.php/desktopdev/generalpurposelanguages/unit-testing-costs-too-much/</link>
+		<comments>/index.php/desktopdev/generalpurposelanguages/unit-testing-costs-too-much/#comments</comments>
+		<pubDate>Wed, 03 Nov 2010 09:56:08 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[General Purpose Languages]]></category>
+		<category><![CDATA[tdd]]></category>
+		<category><![CDATA[unit testing]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/11/unit-testing-costs-too-much/</guid>
+		<description><![CDATA[There is a long list of reasons not to use Unit Testing in your current projects. In fact I was able to make such a long list of reasons not to use automated Unit Testing that I wasn't able to use them all in my presentation for the Raleigh Code Camp this coming weekend.]]></description>
+				<content:encoded><![CDATA[<p>There is a long list of reasons not to use Unit Testing in your current projects. In fact I was able to make such a long list of reasons not to use automated Unit Testing that I wasn&#8217;t able to use them all in my presentation for the <a href="http://codecamp.org/" title="Visit the codecamp website">Raleigh Code Camp</a> this coming weekend. </p>
+<p>While my presentation aims to dispel a number of these and show that unit testing can return a lot of value for low cost, I thought I would share the highlights from the &#8220;Why Not To Do It&#8221; list. </p>
+<p>Warning: I know, it seems a little lighter-hearted than my usual posts, maybe a little more sarcastic. I blame it on all the time staring at powerpoint this weekend.</p>
+<div style="color: #666666; text-align: center; float: left; margin: .5em; font-size: .8em;">
+<img src="http://tiernok.com/LTDBlog/iStock_000005447184Smaller.jpg" alt="It's a Picture!" /><br />
+Stock from <a href="http://www.istockphoto.com/" title="Visit iStockPhoto.com">iStockPhoto.com</a>
+</div>
+<h2>It&#8217;s Twice as Much Code!</h2>
+<p>First you have to write all the &#8220;real&#8221; code, then you have to write all the test code, and before you know it you&#8217;ve spent twice as long writing the same amount of code. Who&#8217;s going to pay for all that keyboard wear? </p>
+<p><em>(Check out the follow-up link below for a lot more on this one)</em></p>
+<h2>I Don&#8217;t Want To TDD/BDD/ADHD/OMGWTFBBQ!?!?</h2>
+<p>It seems like I have to learn 5 new things and start a blog just to do unit testing. Why do I have to care about 100% code coverage just to do some tests? Why am I doing it wrong to test the code after I write? And I have to be Agile to unit test? This seems like a much bigger investment of my time then I thought&#8230;</p>
+<h2>I&#8217;m A Developer, Not QA!</h2>
+<p>I mean, we hired all these people to test our application and now you want me to do all the testing?  are we duplicating effort or are we doing different types of testing? And is there really value in having two groups test? Wait a minute, these QA people have it all figured out, they&#8217;re going to stop testing as soon as I take it over&#8230;.how do I transfer?</p>
+<h2>I&#8217;m Paid To Code, My Boss Told Me So</h2>
+<p>My boss measures my work based on how long I am pounding on the keyboard and churning out real code. How do I communicate the value and get buy in on writing code that isn&#8217;t directly linked to a feature the customer can see? Is this going to be like that time I tried to explain fencepost errors, because that didn&#8217;t go over so well&#8230;</p>
+<h2>I&#8217;ll Never Catch Them All&#8230;</h2>
+<p>I&#8217;m going to be preemptive about this. Unit testing won&#8217;t catch all the bugs in my application, so I don&#8217;t see the point in even taking the time to do it. I&#8217;d be better off getting another feature or three done and just fixing the bugs when we find them.</p>
+<h2>And So On&#8230;</h2>
+<p>This wasn&#8217;t the end of the list, but one or two of you may show up on Saturday and I don&#8217;t want to give the whole show away. For those that are interested, I&#8217;ll release the full presentation notes and slides afterward on my personal site and do a follow-up post with links.</p>
+<p>Feel free to keep adding to my list in the comments below, lets see who can think of something I didn&#8217;t already have.</p>
+<p>Follow-ups:</p>
+<ul>
+<li>Initial &#8220;Unit Testing Costs Too Much&#8221; post: <a href="/index.php/DesktopDev/GeneralPurposeLanguages/unit-testing-costs-too-much" title="Check out the first post">Unit Testing Costs Too Much</a></li>
+<li>Code camp review and links for slides: <a href="/index.php/All/?p=999" title="Code Camp review">Raleigh Code Camp Followup</a></li>
+<li>2x Code Followup: <a href="/index.php/DesktopDev/GeneralPurposeLanguages/unit-testing-costs-too-much-twice-the-co" title="Read more on the 2x Code topic">Unit Testing Costs Too Much &#8211; Twice The Code = Value?</a></li>
+<li>Too Many Things to Learn: <a href="/index.php/WebDev/ServerProgramming/unit-testing-costs-too-much-too-many-thi" title="Read more on the Unit Test Cost topic">Unit Testing Costs Too Much &#8211; Too Many Things to Learn</a></li>
+</ul>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/generalpurposelanguages/unit-testing-costs-too-much/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+	</channel>
+</rss>

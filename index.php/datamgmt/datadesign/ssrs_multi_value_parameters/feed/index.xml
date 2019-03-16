@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	>
+<channel>
+	<title>Comments on: Multi-Value Parameters in SSRS</title>
+	<atom:link href="/index.php/datamgmt/datadesign/ssrs_multi_value_parameters/feed/" rel="self" type="application/rss+xml" />
+	<link>/index.php/datamgmt/datadesign/ssrs_multi_value_parameters/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Tue, 26 Feb 2019 12:40:14 +0000</lastBuildDate>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>By: Erik</title>
+		<link>/index.php/datamgmt/datadesign/ssrs_multi_value_parameters/#comment-1368</link>
+		<dc:creator><![CDATA[Erik]]></dc:creator>
+		<pubDate>Wed, 30 Jan 2013 17:07:45 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/05/ssrs_multi_value_parameters/#comment-1368</guid>
+		<description><![CDATA[&lt;p&gt;Keith,&lt;/p&gt;
+&lt;p&gt;When I wrote this blog article I was actually unaware of one of the features of SSRS: it tries to do multi-value parameters in queries for you! The way that works is to create a multi-value parameter, then in your query text do something like this:&lt;/p&gt;
+&lt;pre&gt;SELECT *
+FROM dbo.YourView
+WHERE ColumnA IN (@YourMultiValueParameter);&lt;/pre&gt;
+&lt;p&gt;This gets auto-magically turned into a comma-separated list of distinct items. Of course, it requires that you use this format, and it can be fragile--it doesn&#039;t always figure out correctly what you want to do. And it sounds like that&#039;s what you&#039;re running up against--SSRS is trying to solve the multi-value parameter problem itself, and fouling up your different method of attacking the problem.&lt;/p&gt;
+&lt;p&gt;To work around this, you have a couple of choices.&lt;/p&gt;
+&lt;p&gt;1. Concatenate the string yourself. Write a small piece of VB code in the Code section of the report, that, when passed in a parameter, returns a comma-delimited (and comma-escaped!) list. Then use this function&#039;s return value as your SP&#039;s parameter.&lt;/p&gt;
+&lt;p&gt;2. Bow to the way SSRS wants you to do multi-value parameters and put into your script an IN() clause somehow. This could work well if your possible parameters are coming from a short table that defines them. Let&#039;s say it&#039;s a list of document names (as in my example for this blog post). You could use a Table-valued parameter in SQL Server 2008 and up:&lt;/p&gt;
+&lt;pre&gt;/* create the table type, do this only once */
+CREATE TYPE Varchar200Type AS TABLE (
+   Value varchar(200)
+);
+
+/* Modify your SP to use a table-valued parameter (TVP) instead*/
+CREATE PROCEDURE dbo.MySP
+   @DocumentNames Varchar200Type READONLY
+AS
+... join to @DocumentNames in your SP
+
+/* Call the SP */
+DECLARE @DocumentNameList AS Varchar200Type;
+
+INSERT @DocumentNameList
+SELECT Name
+FROM dbo.DocumentNames
+WHERE Name IN (@DocumentNames);
+
+EXEC dbo.MySP @DocumentNameList;&lt;/pre&gt;
+&lt;p&gt;The @DocumentNames SQL parameter would be the one you bind your SSRS parameter to.&lt;/p&gt;
+&lt;p&gt;I hope this helps!&lt;/p&gt;]]></description>
+		<content:encoded><![CDATA[<p>Keith,</p>
+<p>When I wrote this blog article I was actually unaware of one of the features of SSRS: it tries to do multi-value parameters in queries for you! The way that works is to create a multi-value parameter, then in your query text do something like this:</p>
+<pre>SELECT *
+FROM dbo.YourView
+WHERE ColumnA IN (@YourMultiValueParameter);</pre>
+<p>This gets auto-magically turned into a comma-separated list of distinct items. Of course, it requires that you use this format, and it can be fragile&#8211;it doesn&#8217;t always figure out correctly what you want to do. And it sounds like that&#8217;s what you&#8217;re running up against&#8211;SSRS is trying to solve the multi-value parameter problem itself, and fouling up your different method of attacking the problem.</p>
+<p>To work around this, you have a couple of choices.</p>
+<p>1. Concatenate the string yourself. Write a small piece of VB code in the Code section of the report, that, when passed in a parameter, returns a comma-delimited (and comma-escaped!) list. Then use this function&#8217;s return value as your SP&#8217;s parameter.</p>
+<p>2. Bow to the way SSRS wants you to do multi-value parameters and put into your script an IN() clause somehow. This could work well if your possible parameters are coming from a short table that defines them. Let&#8217;s say it&#8217;s a list of document names (as in my example for this blog post). You could use a Table-valued parameter in SQL Server 2008 and up:</p>
+<pre>/* create the table type, do this only once */
+CREATE TYPE Varchar200Type AS TABLE (
+   Value varchar(200)
+);
+
+/* Modify your SP to use a table-valued parameter (TVP) instead*/
+CREATE PROCEDURE dbo.MySP
+   @DocumentNames Varchar200Type READONLY
+AS
+... join to @DocumentNames in your SP
+
+/* Call the SP */
+DECLARE @DocumentNameList AS Varchar200Type;
+
+INSERT @DocumentNameList
+SELECT Name
+FROM dbo.DocumentNames
+WHERE Name IN (@DocumentNames);
+
+EXEC dbo.MySP @DocumentNameList;</pre>
+<p>The @DocumentNames SQL parameter would be the one you bind your SSRS parameter to.</p>
+<p>I hope this helps!</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Keith DeJarnet</title>
+		<link>/index.php/datamgmt/datadesign/ssrs_multi_value_parameters/#comment-1367</link>
+		<dc:creator><![CDATA[Keith DeJarnet]]></dc:creator>
+		<pubDate>Wed, 30 Jan 2013 13:45:10 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/05/ssrs_multi_value_parameters/#comment-1367</guid>
+		<description><![CDATA[This is great information. Unfortunately I keep getting an error that too many arguments were specified when I try using it in SSRS since the multi-value string being passed isn&#039;t enclosed in single quotes so the coma delimited string is seen as different arguments being submitted to the SP when it only accepts one. &lt;br /&gt;
+&lt;br /&gt;
+Any suggestions?&lt;br /&gt;
+&lt;br /&gt;
+Thanks,&lt;br /&gt;
+&lt;br /&gt;
+Keith]]></description>
+		<content:encoded><![CDATA[<p>This is great information. Unfortunately I keep getting an error that too many arguments were specified when I try using it in SSRS since the multi-value string being passed isn&#8217;t enclosed in single quotes so the coma delimited string is seen as different arguments being submitted to the SP when it only accepts one. </p>
+<p>Any suggestions?</p>
+<p>Thanks,</p>
+<p>Keith</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: David Forck (thirster42)</title>
+		<link>/index.php/datamgmt/datadesign/ssrs_multi_value_parameters/#comment-1366</link>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+		<pubDate>Fri, 23 Mar 2012 18:09:36 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/05/ssrs_multi_value_parameters/#comment-1366</guid>
+		<description><![CDATA[The easiest way to never have to worry about excaping your values is if you only use numeric values.  Say, an identity.&lt;br /&gt;
+&lt;br /&gt;
+My multi-valued parameters always return a delimited list of pk keys that i then filter the select on.]]></description>
+		<content:encoded><![CDATA[<p>The easiest way to never have to worry about excaping your values is if you only use numeric values.  Say, an identity.</p>
+<p>My multi-valued parameters always return a delimited list of pk keys that i then filter the select on.</p>
+]]></content:encoded>
+	</item>
+</channel>
+</rss>

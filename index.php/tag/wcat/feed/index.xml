@@ -1,0 +1,526 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>wcat &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/wcat/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Continuous Delivery &#8211; Adding the Load Testing Stage</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-adding-the-load/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-adding-the-load/#comments</comments>
+		<pubDate>Fri, 17 Feb 2012 10:48:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[continuous delivery]]></category>
+		<category><![CDATA[jenkins]]></category>
+		<category><![CDATA[load testing]]></category>
+		<category><![CDATA[mvc music store]]></category>
+		<category><![CDATA[wcat]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/02/continuous-delivery-adding-the-load/</guid>
+		<description><![CDATA[Adding load testing to my continuous build process provides several benefits for a fairly cheap entry fee. As the development process progresses, I'll have a baseline and know if I add something to the application that impacts the performance. I'll also be able to accurately discuss it's performance when asked, instead of guessing.]]></description>
+				<content:encoded><![CDATA[<p>Adding load testing to my continuous build process provides several benefits for a fairly cheap entry fee. As the development process progresses, I&#8217;ll have a baseline and know if I add something to the application that impacts the performance. I&#8217;ll also be able to accurately discuss it&#8217;s performance when asked, instead of guessing. And if I want to increase the performance, that same baseline will serve as a guide on my progress. </p>
+<p>Not every application needs to process 100,000 transactions/second, but the cost of guessing how well our application will perform tends to catch up with us.</p>
+<p>In the <a href="/index.php/EnterpriseDev/application-lifecycle-management/implementing-wcat-for-load-testing" title="Using WCAT to Load Test">previous post</a>, I walked through using WCAT to  define and execute a load test scenario against the site from my <a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Continuous Delivery Wiki page">continuous delivery project</a>. In this post, I&#8217;ll take those WCAT scripts and incorporate them into Jenkins as a new build step in my delivery pipeline, not only running the load test but capturing the results so I can show them over time.</p>
+<h2>Prep the Server</h2>
+<p>Before I can start configuring my new build step, I need to prep the server. Following the steps in my prior post, I&#8217;ll download the WCAT msi to the build server and install it, then register the build server as a WCAT client:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">cscript //H:cscript
+wcat.wsf –terminate –update –clients localhost</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">cscript //H:cscript
+wcat.wsf –terminate –update –clients localhost</pre></div></div>
+
+<p>And, of course, wait for the obligatory reboot to go through.</p>
+<h2>Creating the Build Job</h2>
+<p>Initially I want a build job that I can run manually, to let me tweak the test execution, results capture, and plotting. The overall plan for the job will be to:</p>
+<ul>
+<li>Get the load test scripts from a dedicated source repository</li>
+<li>Pull in the compiled artifacts from the first step (continuous integration)</li>
+<li>Deploy the artifacts to a remote IIS web application folder</li>
+<li>Smoke test the deployment</li>
+<li>Run the Load Test against the delpoyed application</li>
+<li>Capture the results of the Smoke Test and Load Test</li>
+</ul>
+<p><i>While I originally expected the load test portion to be the trickiest, the reality was that plotting the results ended up being the hardest part of the whole adventure.</i></p>
+<p>First up is defining the parameter for the CI build number:</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config1.png" title="Load Test Job - Build Parameter" /><br />
+	Load Test Job &#8211; Build Parameter
+</div>
+<p>Then I need to add in the code repository that I&#8217;m hosting the Load Test scripts from the last post in:</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config2.png" title="Load Test Job - Load Test Scripts" /><br />
+	Load Test Job &#8211; Load Test Scripts
+</div>
+<p>I&#8217;ve also added the <a href="https://wiki.jenkins-ci.org/display/JENKINS/Envfile+Plugin" title="Jenkins EnvFile Plugin">EnvFile plugin</a> to allow me to store critical information, like server names and passwords, in an external settings file:</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config3.png" title="Load Test Job - External Settings" /><br />
+	Load Test Job &#8211; External Settings
+</div>
+<p>Then using the <a href="https://wiki.jenkins-ci.org/display/JENKINS/Copy+Artifact+Plugin" title="Jenkins Copy Artifact Plugin">Copy Artifact</a> plugin, I&#8217;ll add a build step to retrieve the zipped deployable website from the CI build step:</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config4.png" title="Load Test Job - Copy Artifacts" /><br />
+	Load Test Job &#8211; Copy Artifacts
+</div>
+<p>With those retrieved, I can now deploy them to my remote server using MS Deploy and execute the VBScript file I created to smoke test the deployed site, each as windows batch command steps:</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config4c.png" title="Load Test Job - Deploy + Smoke Test" /><br />
+	Load Test Job &#8211; Deploy + Smoke Test
+</div>
+<p><i>Note: These commands and scripts are available in the <a href="/index.php/EnterpriseDev/application-lifecycle-management/continuous-delivery-project-deploy-and" title="Continuous Delivery - Deploy and Smoke Test">Deploy and Smoke Test post</a></i></p>
+<p>The actual command to execute the load test is nicely wrapped in a the Run.cmd file, so I can add a batch command to execute that:</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config4b.png" title="Load Test Job - Run Load Test" /><br />
+	I only included this screenshot to be consistent with the rest of the steps <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" />
+</div>
+<p>The last steps archive the log.xml file that WCAT produces, </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config5.png" title="Load Test Job - Archive Log File" /><br />
+	Load Test Job &#8211; Archive Log File
+</div>
+<p>capture the results of the smoke test, </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config6.png" title="Load Test Job - Capture Smoke Test Results" /><br />
+	Load Test Job &#8211; Capture Smoke Test Results
+</div>
+<p>and clutter up my twitter feed. </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config7.png" title="Load Test Job - Twitter Checkbox" /><br />
+	Twitter Checkbox
+</div>
+<p>With that I have a fully functional build job that deploys a website on demand and load tests it. </p>
+<p>And now the really hard part. Doing something with the load test results (you think I&#8217;m being sarcastic, but just wait).</p>
+<h2>Displaying the Results</h2>
+<p>This was an interesting project and, oddly enough, went like so many IT projects do. We get 90% of the way done and then find out we have another 180% to do.</p>
+<p>There is really only one plugin in Jenkins that I could find to handle plotting for free form data. I did look into trying to misuse the JMeter plugin (like I repurpose the JUnit one to capture my smoke test results), but at a glance it looked like JMeter provide the detailed data without the summaries, while WCAT is just giving me the summaries. </p>
+<h3>The Plot Plugin (Duh Duh Duuuuh)</h3>
+<p>The <a href="https://wiki.jenkins-ci.org/display/JENKINS/Plot+Plugin" title="Jenkins Plot Plugin">Plot Plugin</a> is finicky, poorly documented, and has some hinkiness in the Jenkins display that I haven&#8217;t seen from other plugins. It annoyed me enough that I actually started reading through the source code in <a href="https://github.com/jenkinsci/plot-plugin" title="Jenkins Plot Plugin on GitHub">github</a> to get help figuring out some of it&#8217;s behavior (and then after seeing it, briefly considered trying to relearn java long enough to add some much needed fixes). </p>
+<p>Among it&#8217;s other weaknesses, the plot plugin doesn&#8217;t allow you to set data labels, it automatically uses the tag names of the XML. Which doesn&#8217;t work so well when your XML nodes all have the same name. </p>
+<p>Like the WCAT results.</p>
+<p>Argh.</p>
+<p>So after much wrestling, I decided to map the WCAT data to a new XML file purely for the purposes of feeding the plot plugin (and to also reconfigure it so I could enter all the points for a plot from one XPath query, don&#8217;t get me started on forcing me to re-enter the filename for each XPath statement for the same plot).</p>
+<p><b>Transform.xsl</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;?xml</span> <span class="re0">version</span>=<span class="st0">&quot;1.0&quot;</span><span class="re2">?&gt;</span></span>
+&nbsp;
+<span class="sc3"><span class="re1">&lt;xsl:stylesheet</span> <span class="re0">xmlns:xsl</span>=<span class="st0">&quot;http://www.w3.org/1999/XSL/Transform&quot;</span> <span class="re0">version</span>=<span class="st0">&quot;1.0&quot;</span><span class="re2">&gt;</span></span>
+&nbsp;
+<span class="sc3"><span class="re1">&lt;xsl:template</span> <span class="re0">match</span>=<span class="st0">&quot;/&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;result<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;persecond<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;TransactionsPerSecond<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;summary&quot;]/table[@name=&quot;summarydata&quot;]/item/data[@name=&quot;tps&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/TransactionsPerSecond<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;RequestsPerSecond<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;summary&quot;]/table[@name=&quot;summarydata&quot;]/item/data[@name=&quot;rps&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/RequestsPerSecond<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/persecond<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;total<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Transactions<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;details&quot;]/table[@name=&quot;requeststats&quot;]/item[1]/data[@name=&quot;transactions&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/Transactions<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Requests<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;details&quot;]/table[@name=&quot;requeststats&quot;]/item[1]/data[@name=&quot;requests&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/Requests<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Errors<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;summary&quot;]/table[@name=&quot;summarydata&quot;]/item/data[@name=&quot;terrors&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/Errors<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/total<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;responsetime<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Average<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;details&quot;]/table[@name=&quot;histogram&quot;]/item[2]/data[@name=&quot;response_time_avg&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/Average<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Minimum<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;details&quot;]/table[@name=&quot;histogram&quot;]/item[2]/data[@name=&quot;response_time_min&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/Minimum<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;NinetyFivePercent<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;details&quot;]/table[@name=&quot;histogram&quot;]/item[2]/data[@name=&quot;response_time_95&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/NinetyFivePercent<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;NinetyNinePercent<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;details&quot;]/table[@name=&quot;histogram&quot;]/item[2]/data[@name=&quot;response_time_99&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/NinetyNinePercent<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Maximum<span class="re2">&gt;</span></span><span class="re1">&lt;xsl:value-of</span> <span class="re0">select</span>=<span class="st0">'//section[@name=&quot;details&quot;]/table[@name=&quot;histogram&quot;]/item[2]/data[@name=&quot;response_time_max&quot;]'</span> <span class="re2">/&gt;</span><span class="re1">&lt;/Maximum<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/responsetime<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/result<span class="re2">&gt;</span></span></span>
+<span class="sc3"><span class="re1">&lt;/xsl:template<span class="re2">&gt;</span></span></span>
+&nbsp;
+<span class="sc3"><span class="re1">&lt;/xsl:stylesheet<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;?xml version="1.0"?&gt;
+
+&lt;xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"&gt;
+
+&lt;xsl:template match="/"&gt;
+	&lt;result&gt;
+		&lt;persecond&gt;
+			&lt;TransactionsPerSecond&gt;&lt;xsl:value-of select='//section[@name="summary"]/table[@name="summarydata"]/item/data[@name="tps"]' /&gt;&lt;/TransactionsPerSecond&gt;
+			&lt;RequestsPerSecond&gt;&lt;xsl:value-of select='//section[@name="summary"]/table[@name="summarydata"]/item/data[@name="rps"]' /&gt;&lt;/RequestsPerSecond&gt;
+		&lt;/persecond&gt;
+		&lt;total&gt;
+			&lt;Transactions&gt;&lt;xsl:value-of select='//section[@name="details"]/table[@name="requeststats"]/item[1]/data[@name="transactions"]' /&gt;&lt;/Transactions&gt;
+			&lt;Requests&gt;&lt;xsl:value-of select='//section[@name="details"]/table[@name="requeststats"]/item[1]/data[@name="requests"]' /&gt;&lt;/Requests&gt;
+			&lt;Errors&gt;&lt;xsl:value-of select='//section[@name="summary"]/table[@name="summarydata"]/item/data[@name="terrors"]' /&gt;&lt;/Errors&gt;
+		&lt;/total&gt;
+		&lt;responsetime&gt;
+			&lt;Average&gt;&lt;xsl:value-of select='//section[@name="details"]/table[@name="histogram"]/item[2]/data[@name="response_time_avg"]' /&gt;&lt;/Average&gt;
+			&lt;Minimum&gt;&lt;xsl:value-of select='//section[@name="details"]/table[@name="histogram"]/item[2]/data[@name="response_time_min"]' /&gt;&lt;/Minimum&gt;
+			&lt;NinetyFivePercent&gt;&lt;xsl:value-of select='//section[@name="details"]/table[@name="histogram"]/item[2]/data[@name="response_time_95"]' /&gt;&lt;/NinetyFivePercent&gt;
+			&lt;NinetyNinePercent&gt;&lt;xsl:value-of select='//section[@name="details"]/table[@name="histogram"]/item[2]/data[@name="response_time_99"]' /&gt;&lt;/NinetyNinePercent&gt;
+			&lt;Maximum&gt;&lt;xsl:value-of select='//section[@name="details"]/table[@name="histogram"]/item[2]/data[@name="response_time_max"]' /&gt;&lt;/Maximum&gt;
+		&lt;/responsetime&gt;
+	&lt;/result&gt;
+&lt;/xsl:template&gt;
+
+&lt;/xsl:stylesheet&gt;</pre></div></div>
+
+<p>And then I can use a quick VBScript file to execute the XSL against the WCAT log.xml file:</p>
+<p><b>Transform.vbs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="vbscript"><thead><tr><td colspan="2"  class="head">VBScript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw4">Dim</span> xml, xsl
+<span class="kw4">set</span> xml = <span class="kw2">CreateObject</span>(<span class="st0">&quot;Microsoft.XMLDOM&quot;</span>)
+xml.async = <span class="kw5">false</span>
+xml.load(<span class="st0">&quot;log.xml&quot;</span>)
+&nbsp;
+<span class="co1">'Load the XSL</span>
+<span class="kw4">set</span> xsl = <span class="kw2">CreateObject</span>(<span class="st0">&quot;Microsoft.XMLDOM&quot;</span>)
+xsl.async = <span class="kw5">false</span>
+xsl.load(<span class="st0">&quot;transform.xsl&quot;</span>)
+&nbsp;
+<span class="kw4">Dim</span> fso, fs
+<span class="kw4">Set</span> fso = <span class="kw2">CreateObject</span>(<span class="st0">&quot;Scripting.FileSystemObject&quot;</span>)
+<span class="kw4">Set</span> fs = fso.CreateTextFile(<span class="st0">&quot;result.xml&quot;</span>,<span class="kw5">true</span>)
+fs.Write(Replace(xml.transformNode(xsl),<span class="st0">&quot;&lt;?xml version=&quot;</span><span class="st0">&quot;1.0&quot;</span><span class="st0">&quot; encoding=&quot;</span><span class="st0">&quot;UTF-16&quot;</span><span class="st0">&quot;?&gt;&quot;</span>,<span class="st0">&quot;&quot;</span>))
+fs.<span class="kw3">Close</span>
+<span class="kw4">Set</span> fs = <span class="kw5">Nothing</span>
+<span class="kw4">Set</span> fso = <span class="kw5">Nothing</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Dim xml, xsl
+set xml = CreateObject("Microsoft.XMLDOM")
+xml.async = false
+xml.load("log.xml")
+
+'Load the XSL
+set xsl = CreateObject("Microsoft.XMLDOM")
+xsl.async = false
+xsl.load("transform.xsl")
+
+Dim fso, fs
+Set fso = CreateObject("Scripting.FileSystemObject")
+Set fs = fso.CreateTextFile("result.xml",true)
+fs.Write(Replace(xml.transformNode(xsl),"&lt;?xml version=""1.0"" encoding=""UTF-16""?&gt;",""))
+fs.Close
+Set fs = Nothing
+Set fso = Nothing</pre></div></div>
+
+<p>Which nets me a results file, like so:</p>
+<p><b>result.xml</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;result<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;persecond<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;TransactionsPerSecond<span class="re2">&gt;</span></span></span>1.80<span class="sc3"><span class="re1">&lt;/TransactionsPerSecond<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;RequestsPerSecond<span class="re2">&gt;</span></span></span>29.56<span class="sc3"><span class="re1">&lt;/RequestsPerSecond<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/persecond<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;total<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Transactions<span class="re2">&gt;</span></span></span>216<span class="sc3"><span class="re1">&lt;/Transactions<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Requests<span class="re2">&gt;</span></span></span>3547<span class="sc3"><span class="re1">&lt;/Requests<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Errors<span class="re2">&gt;</span></span></span>3<span class="sc3"><span class="re1">&lt;/Errors<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/total<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;responsetime<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Average<span class="re2">&gt;</span></span></span>270<span class="sc3"><span class="re1">&lt;/Average<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Minimum<span class="re2">&gt;</span></span></span>0<span class="sc3"><span class="re1">&lt;/Minimum<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;NinetyFivePercent<span class="re2">&gt;</span></span></span>912<span class="sc3"><span class="re1">&lt;/NinetyFivePercent<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;NinetyNinePercent<span class="re2">&gt;</span></span></span>1536<span class="sc3"><span class="re1">&lt;/NinetyNinePercent<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Maximum<span class="re2">&gt;</span></span></span>2563<span class="sc3"><span class="re1">&lt;/Maximum<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/responsetime<span class="re2">&gt;</span></span></span>
+<span class="sc3"><span class="re1">&lt;/result<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;result&gt;
+	&lt;persecond&gt;
+		&lt;TransactionsPerSecond&gt;1.80&lt;/TransactionsPerSecond&gt;
+		&lt;RequestsPerSecond&gt;29.56&lt;/RequestsPerSecond&gt;
+	&lt;/persecond&gt;
+	&lt;total&gt;
+		&lt;Transactions&gt;216&lt;/Transactions&gt;
+		&lt;Requests&gt;3547&lt;/Requests&gt;
+		&lt;Errors&gt;3&lt;/Errors&gt;
+	&lt;/total&gt;
+	&lt;responsetime&gt;
+		&lt;Average&gt;270&lt;/Average&gt;
+		&lt;Minimum&gt;0&lt;/Minimum&gt;
+		&lt;NinetyFivePercent&gt;912&lt;/NinetyFivePercent&gt;
+		&lt;NinetyNinePercent&gt;1536&lt;/NinetyNinePercent&gt;
+		&lt;Maximum&gt;2563&lt;/Maximum&gt;
+	&lt;/responsetime&gt;
+&lt;/result&gt;</pre></div></div>
+
+<p>The last piece of the equation is to configure the Plot in the load test job. Here is an example of one graph configuration (the full set is pretty long):</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/LoadTest_Config8.png" title="Load Test Job - Plot Settings" /><br />
+	Load Test Job &#8211; Plot Settings
+</div>
+<p>Each plot has an XPath statement that corresponds to one of the sections of the result XML file, that way I have unique names for the values when it stores the data and I have labels on the plots. Running the job a few times to build up data and my  graph looks like this:</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/load_diagram.png" title="Load Test Job - Response Time Diagram" /><br />
+	Load Test Job &#8211; Response Time Diagram
+</div>
+<p><i>Note: I suspect the fact that I got bored and was watching Netflix for the last few tests had some effect on the values</i></p>
+<p>And there we go, I now have a job that I can run on demand that will load test my site.</p>
+<h2>Incorporate into Build Pipeline</h2>
+<p>The last step of this whole load test adventure is incorporating the load test job I&#8217;ve created into my build pipeline. </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_load.png" title="Continuous Delivery Pipeline with Load Test Step" /><br />
+	Continuous Delivery Pipeline with Load Test Step
+</div>
+<p>The only changes necessary to insert the Load Test job into the pipeline is to modify my &#8220;ASPNet MVC Music Store Interface Tests&#8221; build job to trigger a parametrized build of this new load test and in the load test, check the &#8220;Build Pipeline Plugin -> Manually Execute Downstream Project&#8221; option and specify the &#8220;Deploy to QA&#8221; build step as the target. </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/pipeline_wload.png" title="Continuous Delivery Pipeline w/ Load Testing Step" /><br />
+	Continuous Delivery Pipeline w/ Load Testing Step
+</div>
+<p>With the steps rewired, the pipeline now incorporates the Load Testing job.</p>
+<h2>Next Steps</h2>
+<p>While the plotting portion of this project took longer than I expected, I still managed to do the whole thing in under 8 hours, and that includes writing part of the first blog and the fact that I was working on it in pieces, in between sleeping, feeding the baby, and so on. </p>
+<p>Not every project needs to be the fastest, most responsive application on the planet, but given how cheaply you can add some basic numbers into your process, the net gain of knowing exactly how your application is performing and the heads up when you do something that really breaks performance are both valuable and fairly inexpensive to implement.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/continuous-delivery-adding-the-load/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Implementing WCAT to Load Test a Website</title>
+		<link>/index.php/enterprisedev/application-lifecycle-management/implementing-wcat-for-load-testing/</link>
+		<comments>/index.php/enterprisedev/application-lifecycle-management/implementing-wcat-for-load-testing/#comments</comments>
+		<pubDate>Thu, 16 Feb 2012 13:10:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Application Lifecycle Management]]></category>
+		<category><![CDATA[load testing]]></category>
+		<category><![CDATA[wcat]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/02/implementing-wcat-for-load-testing/</guid>
+		<description><![CDATA[Adding a Load Testing stage to my Continuous Delivery project has been on the todo list since I started the project. The addition will allow me to baseline the applications performance while adding some experience with load testing, a topic I haven't been able to spend as much time on as I would like.]]></description>
+				<content:encoded><![CDATA[<p>Adding a Load Testing stage to my <a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Continuous Delivery project on the LessThanDot wiki">Continuous Delivery project</a> has been on the todo list since I started the project. The addition will allow me to baseline the applications performance while adding some experience with load testing, a topic I haven&#8217;t been able to spend as much time on as I would like. Given I am doing this on my own systems and time, minimizing cost and complexity are also a priority.</p>
+<p>While I have  used a few load testing tools in the past, it&#8217;s primarily been for one off projects and widely spread over the last five to ten years. Load testing is not something we, as developers, are often called upon to do. In fact, load testing is generally considered to be costly, complex, and of limited value to any application that is smaller than [insert application 100x larger than the one you are proposing to test here].</p>
+<p>In this post I&#8217;ll put together a basic load test to measure the actual performance of my application and serve as a baseline going forward. The next post will tie this into my continuous delivery pipeline so I can monitor changes in performance over time and detect problems before they make it into the wild. All in the space of a couple evenings.</p>
+<h2>Selecting a Tool</h2>
+<p>The load testing I do at this point will be integrated with a build server in the next post, so I know I need something that can run in a lightweight fashion and produce a log of it&#8217;s results. This led me to one of the free options I had tried in the past, Web Capacity Analysis Tool (WCAT) from Microsoft.</p>
+<p>WCAT can be a little intimidating at first. It runs entirely command-line driven by settings files. The documentation goes quickly from a picture of one computer to a network with multiple switches, test clients, and so on. But behind that seemingly steep learning curve is the distilled, bare essence of a web load testing tool, with just the pieces we need to get the job done.</p>
+<h2>Installing WCAT</h2>
+<p>First up is installing WCAT and getting it ready to run on my system.</p>
+<ul>
+<li>x86 Download: <a href="http://www.iis.net/community/default.aspx?tabid=34&amp;g=6&amp;i=1466" title="Download from iis.net">http://www.iis.net/community/default.aspx?tabid=34&amp;g=6&amp;i=1466</a></li>
+<li>64-bit Download: <a href="http://www.iis.net/community/default.aspx?tabid=34&amp;g=6&amp;i=1467" title="Download from iis.net">http://www.iis.net/community/default.aspx?tabid=34&amp;g=6&amp;i=1467</a></li>
+</ul>
+<p>The download is an msi, so I can next, next, next my way to victory. This results in a Program Files folder that contains the tools, the documentation for the tool, sample files, and some C libraries for customization. </p>
+<p>Next we need to set our default command-line scripting engine to cscript.exe so script output will go to the console, instead of show up in popups. In a console run:</p>
+<p><code class="codespan">cscript //H:cscript</code></p>
+<p><i>Note: this actually failed on my main system with an error indicating it wasn&#8217;t able to change my default script engine. I fixed this by opening up the registry and setting [HKEY_CLASSES_ROOTWSFFileShell] to &#8220;Open2&#8221;. The command above did work on my build VM, so YMMV</i></p>
+<p>WCAT is designed to run with one or more clients sending the requests to the target site. This architecture means we have a controller that orchestrates the test run and clients that actually execute it. In order to prepare systems for their future role as a WCAT client, we need to run the following (which will result in a reboot):</p>
+<p><code class="codespan">wcat.wsf –terminate –update –clients {server list}</code></p>
+<p>This sets a couple registry keys on the client, among other things. More information is available in the documentation.</p>
+<p>In my case, since I will be using the local system as both the controller and my solitary test client: </p>
+<p><code class="codespan">wcat.wsf –terminate –update –clients localhost</code></p>
+<h2>Create Settings and Scenario Files</h2>
+<p>WCAT requires a settings file and a scenario file. The settings file is primarily for the controller and includes the server that will be put under test, the number of clients that will be generating load, the number of virtual clients that will be used on each actual client, and performance counters to monitor. The scenario file is used mostly by the client and includes the details on what requests will be called, headers to use, etc.</p>
+<p>In my case, creating the settings file was easy. I referred to my server by IP simply because my VMs are on a domain that doesn&#8217;t share DNS with the rest of my home machines and I didn&#8217;t bother adding any performance counters to watch.</p>
+<p><b>settings.ubr</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">settings
+{
+&nbsp; &nbsp; server&nbsp; &nbsp; &nbsp; = &quot;192.168.173.57&quot;;
+&nbsp; &nbsp; virtualclients&nbsp; = 8;
+&nbsp; &nbsp; clients &nbsp; &nbsp; = 1;
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">settings
+{
+	server		= "192.168.173.57";
+	virtualclients	= 8;
+	clients		= 1;
+}</pre></div></div>
+
+<p><i>I used 8 virtual clients to match the number of cores on my desktop, but beyond knowing that that represents the number of threads that will be used, I&#8217;m not really sure how to size that value appropriately.</i></p>
+<p>The scenario file is outlined in the documentation and a sample is included, but rather than hand-building it I found out that <a href="http://fiddler2.com/fiddler2/" title="Fiddler, a Web Debugging Proxy">Fiddler</a> can generate a WCAT scenario file from the HTTP session traffic it captures.</p>
+<p>Sign me up.</p>
+<p>To get started I opened Fiddler, opened Chrome, then opened one of the sub-sites on my beta VM. This generated a bunch of traffic (especially with Firefox in the background throwing our requests to Delicious and Facebook). </p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/wcat_fiddler_1.png" title="Fiddler Screenshot" /><br />
+	Fiddler Screenshot
+</div>
+<p>So I cleared the cache in Chrome and deleted all these entries (select them all, press delete). Clean slate.</p>
+<p>My load test is going to be a worst case. Every &#8220;end user&#8221; will visit with a cold cache and buy just a single item. This will give me a good combination of reads, writes, cart processing logic, and authentication. Generating the session information is as easy as following the path I want to test with Fiddler capturing the individual GET and POST requests in the background.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/wcat_fiddler_2.png" title="Fiddler Screenshot" /><br />
+	Fiddler Screenshot
+</div>
+<p>After deleting all the irrelevant traffic, like the Tweetdeck calls to twitter, I have a list of GET/POST requests that ended in 200 and 302 statuses. Form the file menu I&#8217;ll select &#8220;Export Sessions&#8221;, &#8220;All Sessions&#8221;. The dialog offers several options for export, but the one I want is the WCAT option as the bottom.</p>
+<p>The exported file is a WCAT scenario file I can run locally against my beta server. It still has the name of the randomly selected sub-folder I used in Chrome (my smoketest URL), but I&#8217;ll change that later after I have a chance to set up a new URL on my beta VM.</p>
+<p><i>I would show you the file at this point, but it&#8217;s loooooooong. One downside to the export from fiddler is that each request has all of the headers defined separately. Later I&#8217;ll move the common ones to the default section of the transaction and clean it up some.</i></p>
+<h3>Running WCAT</h3>
+<p>With a settings file and a scenario file, I have everything I need to manually run WCAT. To simplify things, I&#8217;ve created a cmd file. This means I won&#8217;t have to type the command out each time and I can add it to a source code repository and re-use it later from Jenkins.</p>
+<p><b>run.cmd</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">&quot;C:Program Fileswcatwcat.wsf&quot; -terminate -run -clients localhost -t FiddlerExport.wcat -f settings.ubr -singleip -x</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">"C:Program Fileswcatwcat.wsf" -terminate -run -clients localhost -t FiddlerExport.wcat -f settings.ubr -singleip -x</pre></div></div>
+
+<p>FiddlerExport.wcat is my scenario file, settings.ubr is my settings file, the -singleip option tells WCAT only to use the first ip address that resolves for the server (not really necessary in this case), and the -x option tells it to collect additional information from the test server.</p>
+<p>Running this command, the controller opens in one console window, then a second opens as my single client. The default options from the fiddler export are a 30 second warmup period, followed by a 120s test run, and then a 10s cooldown. In other words, just enough time to go top off the coffee cup.</p>
+<div style="text-align: center; font-size: .9em; color: #666666;">
+	<img src="http://tiernok.com/LTDBlog/ContinuousDelivery/wcat_controller.png" title="WCAT Controller Screenshot" /><br />
+	WCAT Controller Screenshot
+</div>
+<p>The controller stays open with the numbers from the last run and a log.xml file is produced with the results in the current directory. As you can see from the screenshot above, my little single-core, 1GB of RAM VM is managing to serve up ~30 requests/second and it&#8217;s erroring on just under 1% of the requests. The log file is more accurate, listing decimal places for values that are shown only as rounded ints on the console (that 1 transaction/second is actually 1.9, for instance).</p>
+<p><i>Note: this run was from after cleaning up the log file below</i></p>
+<h2>Cleaning up the Scenario File</h2>
+<p>There are several issues with the initial scenario file that I need to clean up. </p>
+<ul>
+<li>It&#8217;s wordy, most headers are repeated for all the requests</li>
+<li>Several pages report as errors because they return status 302&#8217;s</li>
+<li>There is a session cookie hard-coded in from my original fiddler capture</li>
+</ul>
+<p><b>Cookies:</b> First I deleted all the cookie headers for session ID. WCAT manages cookies for individual virtual client, so this will allow it to manage the individual sessions instead of writing in one that probably doesn&#8217;t exist.</p>
+<p><b>Repetitious Parts:</b> Next I moved all the common headers to the default{} section at the top of the file. This was basically everything except the cookie header I removed above and the referrer header, which I left in the individual requests. My individual request sections have gone from 50 lines to about 8.</p>
+<p><b>Status 302:</b> WCAT considers a request to be in error if it receives an unexpected status. By default it expects 200, but for the couple posts that are doing redirects the last step is to add in the correct status code, like so:</p>
+<p><b>FiddlerExport.wcat</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; ...
+&nbsp;
+&nbsp; &nbsp; request
+&nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; verb = POST;
+&nbsp; &nbsp; &nbsp; postdata = &quot;UserName=DefaultUser&amp;Password=AlsoDefaultUser&amp;RememberMe=false&quot;; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; url &nbsp; &nbsp; = &quot;/MvcMusicStore_SmokeTest/Account/LogOn?ReturnUrl=%2fMvcMusicStore_SmokeTest%2fCheckout%2fAddressAndPayment&quot;; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; statuscode = 302;
+&nbsp;
+&nbsp; &nbsp; &nbsp; setheader
+&nbsp; &nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; name=&quot;Referer&quot;;
+&nbsp; &nbsp; &nbsp; &nbsp; value=&quot;http://192.168.173.57/MvcMusicStore_SmokeTest/Account/LogOn?ReturnUrl=%2fMvcMusicStore_SmokeTest%2fCheckout%2fAddressAndPayment&quot;;
+&nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; }
+&nbsp;
+&nbsp; &nbsp; ...</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">    ...
+
+    request
+    {
+      verb = POST;
+      postdata = "UserName=DefaultUser&amp;Password=AlsoDefaultUser&amp;RememberMe=false";      
+      url     = "/MvcMusicStore_SmokeTest/Account/LogOn?ReturnUrl=%2fMvcMusicStore_SmokeTest%2fCheckout%2fAddressAndPayment";      
+      statuscode = 302;
+
+      setheader
+      {
+        name="Referer";
+        value="http://192.168.173.57/MvcMusicStore_SmokeTest/Account/LogOn?ReturnUrl=%2fMvcMusicStore_SmokeTest%2fCheckout%2fAddressAndPayment";
+      }
+    }
+
+    ...</pre></div></div>
+
+<p>At this point I can run my cmd file again and everything runs successfully with about the same number of requests/second.</p>
+<h2>Using Load Testing Results</h2>
+<p>For the purpose of this post, I decided to load test an end-to-end sale and found that my poor little VM running against two Compact SQL files could handle 1.9 sales/second. Granted, I&#8217;m not actually doing payment processing, inventory awareness, shipping, and so on, but the important part is that I have a baseline. As quickly as I was able to put that together, I could see also testing a couple other scenarios specifically on key pages. </p>
+<p>The measurements I gather from these scenarios serve three purposes:</p>
+<p><b>Tripwire:</b> Just like automated tests, a good selection of load test measurements running regularly can be used as a tripwire to let me know if a change I made degraded the performance of the site accidentally. </p>
+<p><b>Performance Enhancement:</b> With a baseline, if I decide that the application needs better performance, I have a guide that will tell me if my attempt to improve performance actually works as well as something to stress test the application while I&#8217;m using profiling or logging tools to find performance bottlenecks.</p>
+<p><b>Now We Know:</b> It&#8217;s not uncommon for us to guess or assume how well our application performs without actually testing it, I&#8217;ve even seen this in situations where capacity and response time was contractually guaranteed. Guessing at an applications performance works really well, right up until it doesn&#8217;t. </p>
+<p>Were this an actual production application, I would try to test it under more consistent circumstances and, if I could, similar hardware (although there are ways to create reasonable production estimations based on scaled back load test environments). Even with the disparity in environments, a baseline is still useful to show me changes.</p>
+<h2>Next Steps</h2>
+<p>My next challenge is to incorporate this test run and its results into my build pipeline. This will allow me to capture the information automatically on a regular basis. In the next post I&#8217;ll pick up from here and cover executing the load test from Jenkins and capturing the results so we can see them change over time.</p>
+<p>The Past posts in my Continuous Delivery series or resulting build pipeline are listed on the <a href="http://wiki.lessthandot.com/index.php/Eli%27s_Continuous_Delivery_Project" title="Continuous Delivery project on the LessThanDot wiki">Continuous Delivery wiki page</a>.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/application-lifecycle-management/implementing-wcat-for-load-testing/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,561 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>paas &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/paas/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>The Cloud as a Make-It-Finish-Sooner Dial</title>
+		<link>/index.php/desktopdev/mstech/the-cloud-as-a-make/</link>
+		<comments>/index.php/desktopdev/mstech/the-cloud-as-a-make/#respond</comments>
+		<pubDate>Wed, 23 May 2012 10:10:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[cloud]]></category>
+		<category><![CDATA[cloud computing]]></category>
+		<category><![CDATA[paas]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/05/the-cloud-as-a-make/</guid>
+		<description><![CDATA[There's been a lot of buzz about the cloud over the past years, with a lot of that attention going to IaaS and SaaS platforms, but there's a revolution (or re-revolution) that is of even more importance, and that's PaaS. What PaaS brings us is the ability to scale horizontally and treat CPU, memory, and storage as pools of resources that are as deep as our checkbooks allow.]]></description>
+				<content:encoded><![CDATA[<p>There&#8217;s been a lot of buzz about the cloud over the past years, with a lot of that attention going to IaaS and SaaS platforms, but there&#8217;s a revolution (or re-revolution) that is of even more importance, and that&#8217;s PaaS. What PaaS brings us is the ability to scale horizontally and treat CPU, memory, and storage as pools of resources that are as deep as our checkbooks allow. </p>
+<p>Forget about virtual servers. Remember that 60 hour job with a 24 hour deadline? Built on a PaaS platform and equipped with a couple hundred dollars, you won&#8217;t even be staying late today.</p>
+<p>Today&#8217;s post is going to share highlights from a basic file processing application. Something you would find (hopefully better written) in any random enterprise IT shop or SaaS company. It offers a web page that lets you upload files, a button to process files, a basic and poorly written list of the processed and unprocessed files, and an unattended worker. The trick is that this application was written on top of Windows Azure, so I can play tricks with time just by twisting the dial from one file processor to twenty.</p>
+<h2>The Basic File Processor</h2>
+<p>The file processing in the sample application is intended to be a sample workload. It consists of reading files completely into memory and passing them around, spinning through them one character at a time, replacing each character in the line with it&#8217;s upper case variant. Very critical stuff, very performant.</p>
+<p>In addition to running the process via the website, I also need an unattended application that will can run the same processing function. If I owned the server, this would be a scheduled task or service. As an Azure Worker the code will be remarkably similar.</p>
+<div style="text-align: center; color: #666666; font-size: 90%">
+   <img src="http://tiernok.com/LTDBlog/CloudFileProcessor.png" alt="Cloud Processor Architecture" style="margin-bottom: 5px" /><br />
+   Architecture of the Processor
+</div>
+<p>The two front-ends access common logic in the Core library, which is responsible for both the processing logic and interacting with storage resources. This being sample code, it is certified as working on my machine and is definitely not production ready. That being said, I did write this in a few evenings, so writing a production-ready service doesn&#8217;t have to take that long in normal workdays.</p>
+<h3>The Web Site</h3>
+<p>The website has a single MVC controller with 3 actions:</p>
+<ul>
+<li>~/Home/Index: Displays the list of processed and unprocessed items and buttons for upload and processing</li>
+<li>~/Home/AddFile: The post address for file uploads</li>
+<li>~/Home/ProcessNextItem: An action to process the next queued file</li>
+</ul>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">class</span> HomeController <span class="sy0">:</span> Controller <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; IStorageLocator _storageLocator<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> HomeController<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _storageLocator <span class="sy0">=</span> <span class="kw3">new</span> StorageManager<span class="br0">&#40;</span><span class="st0">&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> ActionResult Index<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> store <span class="sy0">=</span> <span class="kw3">new</span> ItemStore<span class="br0">&#40;</span>_storageLocator<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> model <span class="sy0">=</span> <span class="kw3">new</span> StatusViewModel<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ProcessedItems <span class="sy0">=</span> store<span class="sy0">.</span><span class="me1">GetProcessedList</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; UnprocessedItems <span class="sy0">=</span> store<span class="sy0">.</span><span class="me1">GetUnprocessedList</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; ViewData<span class="br0">&#91;</span><span class="st0">&quot;file&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> TempData<span class="br0">&#91;</span><span class="st0">&quot;file&quot;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> View<span class="br0">&#40;</span>model<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>HttpPost<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> ActionResult AddFile<span class="br0">&#40;</span>HttpPostedFileBase file<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>file <span class="sy0">!=</span> <span class="kw1">null</span> <span class="sy0">&amp;&amp;</span> file<span class="sy0">.</span><span class="me1">ContentLength</span> <span class="sy0">&gt;</span> <span class="nu0">0</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> item <span class="sy0">=</span> <span class="kw3">new</span> FullItem<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ResourceId <span class="sy0">=</span> Guid<span class="sy0">.</span><span class="me1">NewGuid</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Received <span class="sy0">=</span> DateTime<span class="sy0">.</span><span class="me1">Now</span><span class="sy0">.</span><span class="me1">ToUniversalTime</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; IsProcessed <span class="sy0">=</span> <span class="kw1">false</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; FileName <span class="sy0">=</span> file<span class="sy0">.</span><span class="me1">FileName</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; item<span class="sy0">.</span><span class="me1">ReadFileFromStream</span><span class="br0">&#40;</span>file<span class="sy0">.</span><span class="me1">InputStream</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">new</span> ItemStore<span class="br0">&#40;</span>_storageLocator<span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">AddNewItem</span><span class="br0">&#40;</span>item<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; TempData<span class="br0">&#91;</span><span class="st0">&quot;file&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> file<span class="sy0">.</span><span class="me1">FileName</span> <span class="sy0">+</span> <span class="st0">&quot; uploaded and queued for processing.&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">else</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; TempData<span class="br0">&#91;</span><span class="st0">&quot;file&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> <span class="st0">&quot;Processor ignores empty files, sorry.&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> RedirectToAction<span class="br0">&#40;</span><span class="st0">&quot;Index&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>HttpGet<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> ActionResult ProcessNextItem<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> store <span class="sy0">=</span> <span class="kw3">new</span> ItemStore<span class="br0">&#40;</span>_storageLocator<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">new</span> ItemProcessor<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ProcessNextItem</span><span class="br0">&#40;</span>store<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> RedirectToAction<span class="br0">&#40;</span><span class="st0">&quot;Index&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class HomeController : Controller {
+
+	IStorageLocator _storageLocator;
+
+	public HomeController() {
+		_storageLocator = new StorageManager("Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString");
+	}
+
+	public ActionResult Index() {
+		var store = new ItemStore(_storageLocator);
+		var model = new StatusViewModel() {
+			ProcessedItems = store.GetProcessedList(),
+			UnprocessedItems = store.GetUnprocessedList()
+		};
+
+		ViewData["file"] = TempData["file"];
+
+		return View(model);
+	}
+
+	[HttpPost]
+	public ActionResult AddFile(HttpPostedFileBase file) {
+		if (file != null &amp;&amp; file.ContentLength &gt; 0) {
+			var item = new FullItem() {
+				ResourceId = Guid.NewGuid(),
+				Received = DateTime.Now.ToUniversalTime(),
+				IsProcessed = false,
+				FileName = file.FileName
+			};
+			item.ReadFileFromStream(file.InputStream);
+
+			new ItemStore(_storageLocator).AddNewItem(item);
+			TempData["file"] = file.FileName + " uploaded and queued for processing.";
+		}
+		else {
+			TempData["file"] = "Processor ignores empty files, sorry.";
+		}
+
+		return RedirectToAction("Index");
+	}
+
+	[HttpGet]
+	public ActionResult ProcessNextItem() {
+		var store = new ItemStore(_storageLocator);
+		new ItemProcessor().ProcessNextItem(store);
+
+		return RedirectToAction("Index");
+	}
+}</pre></div></div>
+
+<p>The key to all of these methods is the ItemStore and ItemProcessor class, all of the rest of the logic is basic presentation layer logic.</p>
+<h3>The Worker Role</h3>
+<p>The worker role consists of a roughly 6 line while(true) statement that asks the ItemStore to process the next item in the queue, then sleeps for 1 second.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> Run<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">while</span> <span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> storageLocator <span class="sy0">=</span> <span class="kw3">new</span> StorageManager<span class="br0">&#40;</span><span class="st0">&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> store <span class="sy0">=</span> <span class="kw3">new</span> ItemStore<span class="br0">&#40;</span>storageLocator<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">new</span> ItemProcessor<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ProcessNextItem</span><span class="br0">&#40;</span>store<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">Sleep</span><span class="br0">&#40;</span><span class="nu0">1000</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;Working&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public override void Run() {
+	while (true) {
+		var storageLocator = new StorageManager("Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString");
+		var store = new ItemStore(storageLocator);
+		new ItemProcessor().ProcessNextItem(store);
+		Thread.Sleep(1000);
+		Trace.WriteLine("Working", "Information");
+	}
+}</pre></div></div>
+
+<p>Once again, the magic happens in the ItemStore and ItemProcessor instances.</p>
+<h3>The ItemStore</h3>
+<p>The ItemStore class exposes the basic methods we need execute our process:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">void</span> AddNewItem<span class="br0">&#40;</span>FullItem item<span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> FullItem RetrieveForProcessing<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw4">void</span> StoreFinishedItem<span class="br0">&#40;</span>FullItem item<span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public void AddNewItem(FullItem item) { /* More Code */ }
+
+public FullItem RetrieveForProcessing() { /* More Code */ }
+
+public void StoreFinishedItem(FullItem item) { /* More Code */ }</pre></div></div>
+
+<p>And a pair of methods for visibility:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> IEnumerable<span class="sy0">&lt;</span>ItemBase<span class="sy0">&gt;</span> GetUnprocessedList<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> IEnumerable<span class="sy0">&lt;</span>ItemBase<span class="sy0">&gt;</span> GetProcessedList<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span> <span class="coMULTI">/* More Code */</span> <span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public IEnumerable&lt;ItemBase&gt; GetUnprocessedList() { /* More Code */ }
+
+public IEnumerable&lt;ItemBase&gt; GetProcessedList() { /* More Code */ }</pre></div></div>
+
+<p>Windows Azure offers a number of storage options, each with their own benefits and constraints. For this process I decided to use <a href="http://www.windowsazure.com/en-us/develop/net/how-to-guides/table-services/" title="Table storage on WindowsAzure.com">table storage</a> to track the summary level information about each file processing job, <a href="http://www.windowsazure.com/en-us/develop/net/how-to-guides/blob-storage/" title="Blob storage on WindowsAzure.com">blob storage</a> to store the actual file, and the <a href="http://www.windowsazure.com/en-us/develop/net/how-to-guides/queue-service/" title="Queue service on WindowsAzure.com">queue service</a> for managing task execution. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">class</span> ItemStore <span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> RAW_BLOB_NAME <span class="sy0">=</span> <span class="st0">&quot;RawItems&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> FINISHED_BLOB_NAME <span class="sy0">=</span> <span class="st0">&quot;FinishedItems&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> QUEUE_NAME <span class="sy0">=</span> <span class="st0">&quot;ToBeProcessed&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> TABLE_NAME <span class="sy0">=</span> <span class="st0">&quot;Items&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; ITableStore _table<span class="sy0">;</span>
+&nbsp; &nbsp; IBlobStore _rawBlob, _finishedBlob<span class="sy0">;</span>
+&nbsp; &nbsp; IQueueStore _queue<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> ItemStore<span class="br0">&#40;</span>IStorageLocator storageLocator<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _table <span class="sy0">=</span> storageLocator<span class="sy0">.</span><span class="me1">GetTable</span><span class="br0">&#40;</span>TABLE_NAME<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _rawBlob <span class="sy0">=</span> storageLocator<span class="sy0">.</span><span class="me1">GetBlob</span><span class="br0">&#40;</span>RAW_BLOB_NAME<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _finishedBlob <span class="sy0">=</span> storageLocator<span class="sy0">.</span><span class="me1">GetBlob</span><span class="br0">&#40;</span>FINISHED_BLOB_NAME<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _queue <span class="sy0">=</span> storageLocator<span class="sy0">.</span><span class="me1">GetQueue</span><span class="br0">&#40;</span>QUEUE_NAME<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> AddNewItem<span class="br0">&#40;</span>FullItem item<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _rawBlob<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">ResourceId</span>, item<span class="sy0">.</span><span class="me1">File</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _queue<span class="sy0">.</span><span class="me1">Enqueue</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">AsSummary</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _table<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">AsSummary</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> IEnumerable<span class="sy0">&lt;</span>ItemBase<span class="sy0">&gt;</span> GetUnprocessedList<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> _table<span class="sy0">.</span><span class="me1">GetUnprocessedItems</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToList</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> IEnumerable<span class="sy0">&lt;</span>ItemBase<span class="sy0">&gt;</span> GetProcessedList<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ?</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> _table<span class="sy0">.</span><span class="me1">GetProcessedItems</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">ToList</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> FullItem RetrieveForProcessing<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; FullItem rawItem <span class="sy0">=</span> <span class="kw1">null</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> item <span class="sy0">=</span> _queue<span class="sy0">.</span><span class="me1">Dequeue</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>item <span class="sy0">!=</span> <span class="kw1">null</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; rawItem <span class="sy0">=</span> <span class="kw3">new</span> FullItem<span class="br0">&#40;</span>item<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; rawItem<span class="sy0">.</span><span class="me1">File</span> <span class="sy0">=</span> _rawBlob<span class="sy0">.</span><span class="me1">Retrieve</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">ResourceId</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> rawItem<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> StoreFinishedItem<span class="br0">&#40;</span>FullItem item<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _finishedBlob<span class="sy0">.</span><span class="me1">Create</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">ResourceId</span>, item<span class="sy0">.</span><span class="me1">File</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _rawBlob<span class="sy0">.</span><span class="me1">Delete</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">ResourceId</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _table<span class="sy0">.</span><span class="me1">Update</span><span class="br0">&#40;</span>item<span class="sy0">.</span><span class="me1">AsSummary</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class ItemStore {
+
+	public static string RAW_BLOB_NAME = "RawItems";
+	public static string FINISHED_BLOB_NAME = "FinishedItems";
+	public static string QUEUE_NAME = "ToBeProcessed";
+	public static string TABLE_NAME = "Items";
+
+	ITableStore _table;
+	IBlobStore _rawBlob, _finishedBlob;
+	IQueueStore _queue;
+
+	public ItemStore(IStorageLocator storageLocator) {
+		_table = storageLocator.GetTable(TABLE_NAME);
+		_rawBlob = storageLocator.GetBlob(RAW_BLOB_NAME);
+		_finishedBlob = storageLocator.GetBlob(FINISHED_BLOB_NAME);
+		_queue = storageLocator.GetQueue(QUEUE_NAME);
+	}
+
+	public void AddNewItem(FullItem item) {
+		_rawBlob.Create(item.ResourceId, item.File);
+		_queue.Enqueue(item.AsSummary());
+		_table.Create(item.AsSummary());
+	}
+
+	public IEnumerable&lt;ItemBase&gt; GetUnprocessedList() {
+		return _table.GetUnprocessedItems().ToList();
+	}
+
+	public IEnumerable&lt;ItemBase&gt; GetProcessedList() {
+		// ?
+		return _table.GetProcessedItems().ToList();
+	}
+
+	public FullItem RetrieveForProcessing() {
+		FullItem rawItem = null;
+
+		var item = _queue.Dequeue();
+		if (item != null) {
+			rawItem = new FullItem(item);
+			rawItem.File = _rawBlob.Retrieve(item.ResourceId);
+		}
+		return rawItem;
+	}
+
+	public void StoreFinishedItem(FullItem item) {
+		_finishedBlob.Create(item.ResourceId, item.File);
+		_rawBlob.Delete(item.ResourceId);
+		_table.Update(item.AsSummary());
+	}
+}</pre></div></div>
+
+<p>The ItemStore class is built to interact with interfaces for each of these resources, using a single IStorageLocator interface to get instances of those resource interfaces. The class (and application) was driven by the small set of unit tests that helped me define how i wanted the process to work and interact with the resources above.</p>
+<h3>Configurations</h3>
+<p>With all of the pieces defined, we use a pair of configurations to tell Azure how we want to deploy everything. </p>
+<p>The first configuration defines the services we intend to package and deploy as well as the instance size and any endpoints:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;ServiceDefinition</span> <span class="re0">name</span>=<span class="st0">&quot;CloudFileProcessorService&quot;</span> <span class="re0">xmlns</span>=<span class="st0">&quot;http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;WebRole</span> <span class="re0">name</span>=<span class="st0">&quot;Processor_WebRole&quot;</span> <span class="re0">vmsize</span>=<span class="st0">&quot;Small&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Sites<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Site</span> <span class="re0">name</span>=<span class="st0">&quot;Web&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Bindings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Binding</span> <span class="re0">name</span>=<span class="st0">&quot;Endpoint1&quot;</span> <span class="re0">endpointName</span>=<span class="st0">&quot;Endpoint1&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Bindings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Site<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Sites<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Endpoints<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;InputEndpoint</span> <span class="re0">name</span>=<span class="st0">&quot;Endpoint1&quot;</span> <span class="re0">protocol</span>=<span class="st0">&quot;http&quot;</span> <span class="re0">port</span>=<span class="st0">&quot;80&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Endpoints<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Imports<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Import</span> <span class="re0">moduleName</span>=<span class="st0">&quot;Diagnostics&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Imports<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/WebRole<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;WorkerRole</span> <span class="re0">name</span>=<span class="st0">&quot;Processor_WorkerRole&quot;</span> <span class="re0">vmsize</span>=<span class="st0">&quot;Small&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Imports<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Import</span> <span class="re0">moduleName</span>=<span class="st0">&quot;Diagnostics&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/Imports<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/WorkerRole<span class="re2">&gt;</span></span></span>
+<span class="sc3"><span class="re1">&lt;/ServiceDefinition<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;ServiceDefinition name="CloudFileProcessorService" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceDefinition"&gt;
+  &lt;WebRole name="Processor_WebRole" vmsize="Small"&gt;
+    &lt;Sites&gt;
+      &lt;Site name="Web"&gt;
+        &lt;Bindings&gt;
+          &lt;Binding name="Endpoint1" endpointName="Endpoint1" /&gt;
+        &lt;/Bindings&gt;
+      &lt;/Site&gt;
+    &lt;/Sites&gt;
+    &lt;Endpoints&gt;
+      &lt;InputEndpoint name="Endpoint1" protocol="http" port="80" /&gt;
+    &lt;/Endpoints&gt;
+    &lt;Imports&gt;
+      &lt;Import moduleName="Diagnostics" /&gt;
+    &lt;/Imports&gt;
+  &lt;/WebRole&gt;
+  &lt;WorkerRole name="Processor_WorkerRole" vmsize="Small"&gt;
+    &lt;Imports&gt;
+      &lt;Import moduleName="Diagnostics" /&gt;
+    &lt;/Imports&gt;
+  &lt;/WorkerRole&gt;
+&lt;/ServiceDefinition&gt;</pre></div></div>
+
+<p>The second configuration is applied when we deploy the instances above and tells Azure that I want to deploy 1 Processor_WebRole instance and 2 Processor_WorkerRole instances:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="xml"><thead><tr><td colspan="2"  class="head">XML</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="sc3"><span class="re1">&lt;ServiceConfiguration</span> <span class="re0">serviceName</span>=<span class="st0">&quot;CloudFileProcessorService&quot;</span> <span class="re0">xmlns</span>=<span class="st0">&quot;http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceConfiguration&quot;</span> <span class="re0">osFamily</span>=<span class="st0">&quot;1&quot;</span> <span class="re0">osVersion</span>=<span class="st0">&quot;*&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;Role</span> <span class="re0">name</span>=<span class="st0">&quot;Processor_WebRole&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Instances</span> <span class="re0">count</span>=<span class="st0">&quot;1&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;ConfigurationSettings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Setting</span> <span class="re0">name</span>=<span class="st0">&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot;</span> <span class="re0">value</span>=<span class="st0">&quot;UseDevelopmentStorage=true&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/ConfigurationSettings<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/Role<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;Role</span> <span class="re0">name</span>=<span class="st0">&quot;Processor_WorkerRole&quot;</span><span class="re2">&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Instances</span> <span class="re0">count</span>=<span class="st0">&quot;2&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;ConfigurationSettings<span class="re2">&gt;</span></span></span>
+&nbsp; &nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;Setting</span> <span class="re0">name</span>=<span class="st0">&quot;Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString&quot;</span> <span class="re0">value</span>=<span class="st0">&quot;UseDevelopmentStorage=true&quot;</span> <span class="re2">/&gt;</span></span>
+&nbsp; &nbsp; <span class="sc3"><span class="re1">&lt;/ConfigurationSettings<span class="re2">&gt;</span></span></span>
+&nbsp; <span class="sc3"><span class="re1">&lt;/Role<span class="re2">&gt;</span></span></span>
+<span class="sc3"><span class="re1">&lt;/ServiceConfiguration<span class="re2">&gt;</span></span></span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;ServiceConfiguration serviceName="CloudFileProcessorService" xmlns="http://schemas.microsoft.com/ServiceHosting/2008/10/ServiceConfiguration" osFamily="1" osVersion="*"&gt;
+  &lt;Role name="Processor_WebRole"&gt;
+    &lt;Instances count="1" /&gt;
+    &lt;ConfigurationSettings&gt;
+      &lt;Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="UseDevelopmentStorage=true" /&gt;
+    &lt;/ConfigurationSettings&gt;
+  &lt;/Role&gt;
+  &lt;Role name="Processor_WorkerRole"&gt;
+    &lt;Instances count="2" /&gt;
+    &lt;ConfigurationSettings&gt;
+      &lt;Setting name="Microsoft.WindowsAzure.Plugins.Diagnostics.ConnectionString" value="UseDevelopmentStorage=true" /&gt;
+    &lt;/ConfigurationSettings&gt;
+  &lt;/Role&gt;
+&lt;/ServiceConfiguration&gt;</pre></div></div>
+
+<p>Note that I&#8217;m telling it to use the local development storage, which is supported by a local storage emulator. In a production configuration I would enter the service location and a generated token.</p>
+<h2>So Where&#8217;s the Magic?</h2>
+<p>So where&#8217;s the magic that makes this a distribute application instead of 3 days of overtime? It&#8217;s sprinkled throughout the system.</p>
+<p>The architecture of this system would work just as well outside of Azure, provided I offered it stand-ins for the 3 storage resources and deployed the instances and any necessary settings accordingly. Instead of worrying about how to manage deployments and what to use for centralized queueing and storage, I can focus on building an application that simply assumes those resources are available. Is there headroom for performance improvements? Sure, but I can also choose to throw another $15/month server at it, push data to CDNs and blob storage, add caching, or even a SQL Azure instance. </p>
+<p>This application may be fairly basic, but nothing stops us from following this same pattern for much larger applications. PaaS has removed some of the constraints we take for granted. Even applications that have to run in-house in order to standardize against a database can now consider uploading a subset of that lookup data to a table store, performing most of the heavy lifting in the cloud, then produce a few files to import back into the on-premise system. The total execution time would be longer, but being able to scale part of the job across numerous parallel instances means the actual elapsed time can actually be much shorter.</p>
+<p>And it means when we have a 60 hour task that&#8217;s due in 24, it&#8217;s no longer an impossible situation.</p>
+<p><i>The source code is available <a href="https://github.com/tarwn/AzureFileProcessorSample" title="AzureFileProcessorSample on github">on github</a> along with requirements and links for setting up the emulators locally.</i></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/the-cloud-as-a-make/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

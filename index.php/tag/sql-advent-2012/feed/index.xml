@@ -1,0 +1,1298 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>sql advent 2012 &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/sql-advent-2012/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Listing tables that are truly partitioned in SQL Server</title>
+		<link>/index.php/datamgmt/dbprogramming/listing-tables-that-are-truly/</link>
+		<comments>/index.php/datamgmt/dbprogramming/listing-tables-that-are-truly/#comments</comments>
+		<pubDate>Sat, 23 Feb 2013 08:59:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[features]]></category>
+		<category><![CDATA[partitioning]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/listing-tables-that-are-truly/</guid>
+		<description><![CDATA[To list all the tables that are partitioned you can use the sys.partitions view. However be aware that all tables and indexes in SQL Server contain at least one partition, whether or not they are explicitly partitioned.
+
+If you were to do the followin&#8230;]]></description>
+				<content:encoded><![CDATA[<p>To list all the tables that are partitioned you can use the sys.partitions view. However be aware that all tables and indexes in SQL Server contain at least one partition, whether or not they are explicitly partitioned.</p>
+<p>If you were to do the following, you would get back every table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> partition_number,<span class="kw1">rows</span>,<span class="kw2">object_name</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT partition_number,rows,object_name(object_id)
+FROM sys.partitions</pre></div></div>
+
+<p>So what can you do? Let&#8217;s take a look. First we are going to create a partitioned table in case you don&#8217;t have one so that you can get the same output as me.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> SalesPartitioned<span class="br0">&#40;</span>YearCol <span class="kw1">SMALLINT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,OrderID <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, SomeData <span class="kw1">UNIQUEIDENTIFIER</span> <span class="kw1">DEFAULT</span> newsequentialid<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE SalesPartitioned(YearCol SMALLINT NOT NULL,OrderID INT NOT NULL, SomeData UNIQUEIDENTIFIER DEFAULT newsequentialid())
+GO</pre></div></div>
+
+<p>We are going to insert some data into the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> SalesPartitioned <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="nu0">2007</span>,number
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="nu0">2008</span>,number <span class="sy0">+</span> <span class="nu0">2048</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span>
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="nu0">2009</span>,number <span class="sy0">+</span> <span class="nu0">4096</span>
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT SalesPartitioned (YearCol,OrderID)
+SELECT 2007,number
+FROM master..spt_values
+WHERE type = 'P'
+UNION ALL
+SELECT 2008,number + 2048
+FROM master..spt_values
+WHERE type = 'P'
+UNION ALL
+SELECT 2009,number + 4096
+FROM master..spt_values
+WHERE type = 'P'</pre></div></div>
+
+<p>We will now add a primary key</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">SalesPartitioned</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Sales <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">NONCLUSTERED</span> <span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.SalesPartitioned ADD CONSTRAINT
+	PK_Sales PRIMARY KEY NONCLUSTERED (YearCol,OrderID)</pre></div></div>
+
+<p>Now it is time to create our partition function. Here is how we will do it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> PARTITION <span class="kw1">FUNCTION</span> pfFiscalYear<span class="br0">&#40;</span><span class="kw1">SMALLINT</span><span class="br0">&#41;</span>
+<span class="kw1">AS</span> RANGE <span class="kw1">RIGHT</span> <span class="kw1">FOR</span> <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">2007</span>,<span class="nu0">2008</span>,<span class="nu0">2009</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PARTITION FUNCTION pfFiscalYear(SMALLINT)
+AS RANGE RIGHT FOR VALUES(2007,2008,2009)</pre></div></div>
+
+<p>What that does is actually create 4 partitions, one for 2007, one for 2008, one for everything after 2008, and one for everything before 2006.<br />
+<=2006
+= 2007
+= 2008
+>= 2009</p>
+<p>You can verify this by using the function $partition</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="nu0">1</span> <span class="kw1">AS</span> val,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">AS</span> partition &nbsp; &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2006</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2006</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2007</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2007</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2008</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2008</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2009</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2009</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">2010</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">2010</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">UNION</span> all
+<span class="kw1">select</span> <span class="nu0">3000</span>,$partition.<span class="me1">pfFiscalYear</span><span class="br0">&#40;</span><span class="nu0">3000</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select 1 AS val,$partition.pfFiscalYear(1) AS partition	    UNION all
+select 2006,$partition.pfFiscalYear(2006)	UNION all
+select 2007,$partition.pfFiscalYear(2007)	UNION all
+select 2008,$partition.pfFiscalYear(2008)	UNION all
+select 2009,$partition.pfFiscalYear(2009)	UNION all
+select 2010,$partition.pfFiscalYear(2010)	UNION all
+select 3000,$partition.pfFiscalYear(3000)</pre></div></div>
+
+<p>And here is the output</p>
+<pre>val         partition
+----------- -----------
+1           1
+2006        1
+2007        2
+2008        3
+2009        4
+2010        4
+3000        4</pre>
+<p>Now that we have the partition function, we need a partition scheme. A partition scheme is used to map boundary values in partition functions to filegroups. You can have one filegroup for each year placed on a different spindle, this way you don&#8217;t have to wait for the disk if all partitions are on the same spindle. For the sake of simplicity we only have one filegroup. Here is how to create the partition scheme</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> PARTITION SCHEME psFiscalYear
+<span class="kw1">AS</span> PARTITION pfFiscalYear <span class="sy0">ALL</span> <span class="kw1">TO</span> <span class="br0">&#40;</span><span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PARTITION SCHEME psFiscalYear
+AS PARTITION pfFiscalYear ALL TO ([PRIMARY])</pre></div></div>
+
+<p><em>Partition scheme &#8216;psFiscalYear&#8217; has been created successfully. &#8216;PRIMARY&#8217; is marked as the next used filegroup in partition scheme &#8216;psFiscalYear&#8217;.</em></p>
+<p>Now we will add a clustered index and partition this on the YearCol column, the syntax looks like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_Sales <span class="kw1">ON</span> SalesPartitioned<span class="br0">&#40;</span>YearCol,OrderID<span class="br0">&#41;</span>
+<span class="kw1">ON</span> psFiscalYear<span class="br0">&#40;</span>YearCol<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX IX_Sales ON SalesPartitioned(YearCol,OrderID)
+ON psFiscalYear(YearCol)</pre></div></div>
+
+<p>Now it is time to list all the tables that are partitioned. Here is how you do it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> partition_number,<span class="kw1">rows</span>,<span class="kw2">object_name</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> sys.<span class="me1">partitions</span> s
+<span class="kw1">WHERE</span> <span class="sy0">EXISTS</span><span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="sy0">NULL</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> sys.<span class="me1">partitions</span> s2 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">WHERE</span> s.<span class="kw2">object_id</span> <span class="sy0">=</span> s2.<span class="kw2">object_id</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> partition_number <span class="sy0">&gt;</span> <span class="nu0">1</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">AND</span> s.<span class="me1">index_id</span> <span class="sy0">=</span> s2.<span class="me1">index_id</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT partition_number,rows,object_name(object_id)
+FROM sys.partitions s
+WHERE EXISTS(SELECT NULL 
+				FROM sys.partitions s2 
+				WHERE s.object_id = s2.object_id 
+				AND partition_number &gt; 1
+				AND s.index_id = s2.index_id)</pre></div></div>
+
+<p>Here is the output</p>
+<pre>partition_number	rows	TableName
+1	                0	SalesPartitioned
+2	                2048	SalesPartitioned
+3	                2048	SalesPartitioned
+4	                2048	SalesPartitioned</pre>
+<p>As you can see we used WHERE EXISTS, we checked that the object had a partition_number higher than two and we also matched on index_id since a table can have more than one index</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/listing-tables-that-are-truly/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Suppressing xp_cmdshell output</title>
+		<link>/index.php/datamgmt/dbprogramming/supressing-xp_cmdshell-output/</link>
+		<comments>/index.php/datamgmt/dbprogramming/supressing-xp_cmdshell-output/#comments</comments>
+		<pubDate>Thu, 21 Feb 2013 09:13:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[features]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+		<category><![CDATA[xp_cmdshell]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/supressing-xp_cmdshell-output/</guid>
+		<description><![CDATA[Starting with SQL Server 2005 xp_cmdshell is turned off by default as a security measure. You have to explicitly enable xp_cmdshell it. If you have to move files around on a SQL Server box there are probably better ways than using xp_cmdshell, you can use SSIS,&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Starting with SQL Server 2005 xp_cmdshell is turned off by default as a security measure. You have to explicitly <a href="/index.php/DataMgmt/DataDesign/how-to-enable-xp_cmdshell-on-sql-server-2005">enable xp_cmdshell</a> it. If you have to move files around on a SQL Server box there are probably better ways than using xp_cmdshell, you can use SSIS, powershell, plain old DOS.  But old habits are difficult to break and maybe you have ton of legacy code. Someone asked how to supress output from xp_cmdshell when moving a file</p>
+<p>I you move a file with xp_cmdshell, you will get the following output<br />
+output<br />
+1 file(s) moved.<br />
+NULL</p>
+<p>If I want to move a file from c:temp to c:tempold, I would execute the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">xp_cmdshell <span class="st0">'move c:tempbla.txtc:tempoldbla.txt'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">xp_cmdshell 'move c:tempbla.txtc:tempoldbla.txt'</pre></div></div>
+
+<p>Here is what it looks like in SSMS</p>
+<p><a href="/wp-content/uploads/blogs/DataMgmt/Denis/xp_cmdshellMove.PNG?mtime=1361444713"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/xp_cmdshellMove.PNG?mtime=1361444713" width="432" height="224" /></a></p>
+<p>As you can see you get a resultset, in order to surpress that, you can add  no_output to the xp_cmdshell  call, no_output is an optional parameter, specifying that no output should be returned to the client.</p>
+<p>Here is what the command looks like</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">xp_cmdshell <span class="st0">'move c:tempbla.txt c:tempoldbla.txt'</span>,no_output</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">xp_cmdshell 'move c:tempbla.txt c:tempoldbla.txt',no_output</pre></div></div>
+
+<p>Executing the command like that will not return a resultset anymore</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/supressing-xp_cmdshell-output/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+		<item>
+		<title>Ten things added after SQL Server 2000 that I like the most</title>
+		<link>/index.php/datamgmt/dbprogramming/ten-things-added-after-sql/</link>
+		<comments>/index.php/datamgmt/dbprogramming/ten-things-added-after-sql/#comments</comments>
+		<pubDate>Mon, 18 Feb 2013 13:10:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/ten-things-added-after-sql/</guid>
+		<description><![CDATA[It is almost 8 years since SQL Server 2005 has been released, we have gotten 3 major versions since SQL Server 2000: SQL Server 2005, SQL Server 2008 and SQL Server 2012. I decided to take a look to see what I find the most useful that has been added af&#8230;]]></description>
+				<content:encoded><![CDATA[<p>It is almost 8 years since SQL Server 2005 has been released, we have gotten 3 major versions since SQL Server 2000: SQL Server 2005, SQL Server 2008 and SQL Server 2012. I decided to take a look to see what I find the most useful that has been added after SQL Server 2000. Since I already wrote blog posts about most of the things I listed I decided to just give a small description why I like the feature followed by a link to the blog post I already created earlier.</p>
+<p>Here are the ten things I like the most</p>
+<p>	* Date and time data types<br />
+	* Compression<br />
+	* Windowing functions<br />
+	* Partitioning<br />
+	* Schemas<br />
+	* Sequences<br />
+	* DDL Triggers<br />
+	* Try catch<br />
+	* Varchar max<br />
+	* DMVs</p>
+<p>Let&#8217;s take a look into some more detail why I like these features.</p>
+<p><strong>Date and time data types</strong><br />
+I was very glad when this was added to SQL Server 2008. I deal with a lot of data and the ability to use date which is 3 bytes compared to datetime which is 8 bytes saves me a lot of space. When you have a billion rows you save 5 GB right there. Now that you can store time separately you get better performing queries that result in seeks instead of scans. More about date and time can be found in this post:  <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-1">Date and time</a></p>
+<p><strong>Compression</strong><br />
+Data compression was added in SQL Server 2008 as well. I use data compression mostly for  archive tables and tables that are read from more than they are written to. The space savings can be dramatic, this is especially true if the compound clustered index is sorted in such a way that the values are the same for most of the columns. I once saved about 140 GB by compressing 8 or 9 tables over the weekend</p>
+<p><strong>Windowing functions</strong><br />
+The windowing functions row_number, rank and dense_rank are being used all over the place now. This was added in SQL Server 2005 and at least now I don&#8217;t have to look up the syntax every time I want to use them. This simplified a lot for me, no more running counts and using temp tables with identity columns to provide a row number. More about windowing functions can be found here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-6">Windowing Functions</a></p>
+<p><strong>Partitioning</strong><br />
+I have done partitioning even on SQL Server 2000 with partitioned views, native partitioning makes this much easier from a maintenance perspective. More about partitioning can be found here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-3">Partitioning</a></p>
+<p><strong>Schemas</strong><br />
+Schemas were introduced in SQL Server 2005. I like to use schemas to organize objects in a way that makes sense and is intuitive. Schemas also give you the ability to give users access to a set of object without having to specify each object separately. More about schemas can be found here: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-4">Schemas</a></p>
+<p><strong>Sequences</strong><br />
+This has been on the SQL Server wish list (remember the email address before they had connect?) forever. Instead of the ghetto one identity table for the whole database method, you can now have sequences that are more flexible than previous methods. More about sequences can be found here: <a href="/index.php/DataMgmt/DataDesign/a-first-look-at-sequences-in-sql-server">A first look at sequences in SQL Server Denali</a></p>
+<p><strong>DDL Triggers</strong><br />
+When you have developers telling you that columns disappear or that columns have changed, throw a DDL trigger for ALTER TABLE on your DB and find out exactly what is going on. Once I did that and told the developer that I created a DDL trigger all his problems mysteriously never happened again. More about DDL trigger can be found here <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/sql-advent-2011-day-13">DDL Triggers</a> and here <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/use-ddl-triggers-to-track">Use DDL Triggers To Track Table Changes</a></p>
+<p><strong>Try catch</strong><br />
+Error handling was very primitive until SQL Server 2005. You had to deal with error codes and there was no intuitive way of getting an error message back. More can be found here: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/try-catch-sql-advent-2011">TRY CATCH</a></p>
+<p><strong>Varchar max</strong><br />
+If you ever worked with text and ntext you know what a pain in the neck those data types are. A whole bunch of functions don&#8217;t work and there are tons of other restrictions as well. The (max) datatypes makes this much more manageable and easier than before. More can be found here: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-17">varchar(max)</a></p>
+<p><strong>DMVs</strong><br />
+I am a big fan of the dynamic management views, there is no need to run all kinds of DBCC commands, stored procedures, traces etc etc to get some information that you are interested in. The dynamic management views make this easier than ever and in every release we get more and more of them. More can be found here: <a href="/index.php/DataMgmt/DataDesign/dynamic-management-views">Dynamic Management Views</a></p>
+<hr /></p>
+<h2>Ten other additions I also like</h2>
+<p>Some of these should be in the top ten list but since I can only fit ten items they got pushed into this list. Pivot, mirroring and backup compression are things that I use daily and very grateful for</p>
+<p>        * Mirroring<br />
+	* Pivot and unpivot<br />
+	* Columnstore indexes<br />
+	* Table valued parameters<br />
+	* Common table expressions<br />
+	* IIF<br />
+	* Backup compression<br />
+	* OFFSET N ROWS FETCH NEXT N ROWS ONLY<br />
+	* Object_definition<br />
+	* Compound Operators</p>
+<p>        <strong>Mirroring </strong><br />
+Mirroring was added to SQl Server 2005 Service Pack 1, it was also in the RTM version but you had to use a trace flag to enable it. We used to do a lot of replication but have replaced almost all of it with mirroring. We also take snapshots on the mirrored server so that reporting can still be run off that server instead of it being a dead weight</p>
+<p>	<strong>Pivot and unpivot</strong><br />
+Pivot is a nice addition but if you don&#8217;t know the columns beforehand you will need to use dynamic SQL. I still have to lookup pivot and unpivot every time I use them since the syntax is a little complex. More can be found here <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-7">Crosstab with PIVOT</a>  and <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-8">UNPIVOT</a></p>
+<p>	<strong>Columnstore indexes</strong><br />
+Having being exposed to the concept of a columnar database with Sybase IQ, I knew what this was before it came out. It is a nice feature but there are still a tons of restrictions in the current release, it is read only and some data types are not supported</p>
+<p>	<strong>Table Value Constructor</strong><br />
+Table Value Constructors enable you to pass in a bunch of values in a single DML statement instead of a bunch of union statements. More about Table Value Constructors can be found here: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-12">Table Value Constructor</a></p>
+<p>	<strong>Common table expressions</strong><br />
+Common Table Expressions (you will see them called CTE also) were introduced in SQL Server 2005 and you can think of them as a derived table in another form of a table expression. Using CTEs makes for less cluttered code and CTEs can be manipulated as regular tables as well. More about Common Table Expressions can be found here <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-5">Common Table Expressions</a> and here <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/use-common-table-expressions-to-simplify-your-updates-in-sql-server">Use common table expressions to simplify your updates in SQL Server</a></p>
+<p>	<strong>IIF</strong><br />
+IIF is just syntactic sugar for a case statement but if you come from other languages like vb or Excel this might feel more natural to you. More can be found here: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/a-quick-look-at-the">IIF</a></p>
+<p>	<strong>Backup compression</strong><br />
+I have databases in the TB+ size, taking a backup which is a fourth of the size makes it more manageable and save time and money in terms of storage and moving the backup around. You can find more info here: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/testing-backup-compression-in-sql-server-2008">Testing backup compression in SQL Server 2008</a></p>
+<p>	<strong>OFFSET N ROWS FETCH NEXT N ROWS ONLY</strong><br />
+This is a welcome addition to simplify paging code. Read more here: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/using-offset-n-rows-fetch-next-n-rows-on">Using OFFSET N ROWS FETCH NEXT N ROWS ONLY In SQL Server for easy paging</a></p>
+<p>	<strong>Object_definition</strong><br />
+I use the object_definition function all the time. If I need to see in how many stored procedures a table is used I can use the object_definition function to find that out very easy. More info here: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/object_definition-sql-advent-2011-day">OBJECT_DEFINITION</a></p>
+<p>	<strong> Compound Operators</strong><br />
+Compound Operators make it possible to declare and assign a value at the same time, for example<code> declare @i int =5;</code>  This makes for compact code and you don&#8217;t have to search where the variable is initialized. More information can be found here: <a href="/index.php/DataMgmt/DataDesign/compound-operators-or-how-t-sql-is-morph">Compound Operators Or How T-SQL Is Morphing Into VB Or C#</a></p>
+<p>
+<hr />
+
+<div class="image_block"><a href="/wp-content/uploads/users/SQLDenis/BillyMase.PNG?mtime=1361730496"><img alt="" src="/wp-content/uploads/users/SQLDenis/BillyMase.PNG?mtime=1361730496" width="397" height="396" /></a></div>
+<p></p>
+<p>I could go on and on about even more stuff I like, I am just going to list 15 or so more things infomercial style&#8230;.. </p>
+<p>SSMS<br />
+SSIS<br />
+Fast recovery<br />
+Page restores<br />
+Online Index Rebuild<br />
+Except and Intersect<br />
+Filtered Indexes<br />
+Indexes with included columns<br />
+CROSS APPLY<br />
+Dynamic TOP<br />
+MERGE statement<br />
+OUTPUT clause<br />
+Optimize for ad hoc workloads<br />
+Snapshot Isolation</p>
+<p>Now let&#8217;s hear it from you, what do you like the most that they have added since SQL Server 2005? I wonder how difficult it would be to pick out the DBAs from the developers based on the items people list  <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/ten-things-added-after-sql/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>A couple of ways to convert an integer to an coordinate with SQL Server</title>
+		<link>/index.php/datamgmt/dbprogramming/a-couple-of-ways-to/</link>
+		<comments>/index.php/datamgmt/dbprogramming/a-couple-of-ways-to/#respond</comments>
+		<pubDate>Sun, 03 Feb 2013 14:33:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[conversion]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/a-couple-of-ways-to/</guid>
+		<description><![CDATA[I answered this question from a person who had to convert coordinates stored as an integer to a float
+
+
+I'm receiving data on coordinates as 115949833 and I need it to output as 115.949833 because I need to be able to calculate the mileage between th&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I answered this question from a person who had to convert coordinates stored as an integer to a float</p>
+<blockquote><p>I&#8217;m receiving data on coordinates as 115949833 and I need it to output as 115.949833 because I need to be able to calculate the mileage between the latitude and longitude coordinates. Both the longitude and latitude values are saved as integers with no decimal places</p></blockquote>
+<p>There are several things you can do to accomplish this:<br />
+SUBSTRING<br />
+STUFF<br />
+LEFT and RIGHT<br />
+Arithmetic</p>
+<p>Let&#8217;s take a look at how each of them work</p>
+<p><strong>Arithmetic multiplication </strong><br />
+This is pretty simple, just multiply the integer value by 0.000001</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @pos <span class="kw1">int</span> <span class="sy0">=</span> <span class="nu0">115949833</span> 
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">decimal</span><span class="br0">&#40;</span><span class="nu0">10</span>,<span class="nu0">6</span><span class="br0">&#41;</span>,@pos <span class="sy0">*</span> <span class="nu0">0.000001</span><span class="br0">&#41;</span> <span class="co1">--115.949833</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @pos int = 115949833 
+
+SELECT CONVERT(decimal(10,6),@pos * 0.000001) --115.949833</pre></div></div>
+
+<p><strong>Arithmetic division</strong><br />
+This is pretty simple as well, instead of multiplying the integer value by 0.000001, we are going to divide the value by 1000000.0</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @pos <span class="kw1">int</span> <span class="sy0">=</span> <span class="nu0">115949833</span> 
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">decimal</span><span class="br0">&#40;</span><span class="nu0">10</span>,<span class="nu0">6</span><span class="br0">&#41;</span>,@pos <span class="sy0">/</span><span class="nu0">1000000.0</span><span class="br0">&#41;</span> <span class="co1">--115.949833</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @pos int = 115949833 
+
+SELECT CONVERT(decimal(10,6),@pos /1000000.0) --115.949833</pre></div></div>
+
+<p><strong>STUFF</strong><br />
+The STUFF function is not a widely used function in the SQL Server world. Basically you can use it to inject a character (or series of characters) into a range of characters. If you are using 0 then you are inserting and expanding the string, if you use a value greater than 0 then you will replace some characters</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @s <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'1111122222'</span>
+<span class="kw1">SELECT</span> <span class="kw2">STUFF</span><span class="br0">&#40;</span>@S,<span class="nu0">6</span>,<span class="nu0">0</span>,<span class="st0">'.'</span><span class="br0">&#41;</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @s varchar(100) = '1111122222'
+SELECT STUFF(@S,6,0,'.') </pre></div></div>
+
+<p>11111.22222</p>
+<p>As you can see, when you use 0, the dot gets inserted and everything else gets shifted to the right from position 6</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @s <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'1111122222'</span>
+<span class="kw1">SELECT</span> <span class="kw2">STUFF</span><span class="br0">&#40;</span>@S,<span class="nu0">6</span>,<span class="nu0">0</span>,<span class="st0">'.....'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @s varchar(100) = '1111122222'
+SELECT STUFF(@S,6,0,'.....')</pre></div></div>
+
+<p>11111&#8230;..22222</p>
+<p>One or more characters doesn&#8217;t make a difference, the rest still gets shifted to the right</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @s <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'1111122222'</span>
+<span class="kw1">SELECT</span> <span class="kw2">STUFF</span><span class="br0">&#40;</span>@S,<span class="nu0">6</span>,<span class="nu0">5</span>,<span class="st0">'.....'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @s varchar(100) = '1111122222'
+SELECT STUFF(@S,6,5,'.....')</pre></div></div>
+
+<p>11111&#8230;..</p>
+<p>Since we used 5, the 5 left most characters after position 6 get replaced by our dots</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @s <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'1111122222'</span>
+<span class="kw1">SELECT</span> <span class="kw2">STUFF</span><span class="br0">&#40;</span>@S,<span class="nu0">6</span>,<span class="nu0">2</span>,<span class="st0">'.....'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @s varchar(100) = '1111122222'
+SELECT STUFF(@S,6,2,'.....')</pre></div></div>
+
+<p>11111&#8230;..222</p>
+<p>Now we used 2 instead of 5, as you can see 3 (5-2) are still there from the original value</p>
+<p>Here is then how you would use the STUFF function to inject a dot into the value</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @pos <span class="kw1">int</span> <span class="sy0">=</span> <span class="nu0">115949833</span> 
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">decimal</span><span class="br0">&#40;</span><span class="nu0">10</span>,<span class="nu0">6</span><span class="br0">&#41;</span>,<span class="br0">&#40;</span><span class="kw2">STUFF</span><span class="br0">&#40;</span>@pos,<span class="nu0">4</span>,<span class="nu0">0</span>,<span class="st0">'.'</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="co1">--115.949833</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @pos int = 115949833 
+
+SELECT CONVERT(decimal(10,6),(STUFF(@pos,4,0,'.'))) --115.949833</pre></div></div>
+
+<p><strong>LEFT + RIGHT</strong><br />
+This is pretty easy, you grab the first 3 characters with left, add a dot and grab the last 6 characters with right</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @pos <span class="kw1">int</span> <span class="sy0">=</span> <span class="nu0">115949833</span> 
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>@pos,<span class="nu0">3</span><span class="br0">&#41;</span> <span class="sy0">+</span><span class="st0">'.'</span> <span class="sy0">+</span> <span class="kw1">RIGHT</span><span class="br0">&#40;</span>@pos,<span class="nu0">6</span><span class="br0">&#41;</span><span class="co1">--115.949833</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @pos int = 115949833 
+
+SELECT LEFT(@pos,3) +'.' + RIGHT(@pos,6)--115.949833</pre></div></div>
+
+<p><strong>SUBSTRING</strong><br />
+Substring is similar to using left and right but you need to give it a start position and end position. You need first to convert to char or vachar because substring can&#8217;t be used on an integer data type directly</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @pos <span class="kw1">int</span> <span class="sy0">=</span> <span class="nu0">115949833</span> 
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw2">SUBSTRING</span><span class="br0">&#40;</span><span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">9</span><span class="br0">&#41;</span>,@pos<span class="br0">&#41;</span>,<span class="nu0">1</span>,<span class="nu0">3</span><span class="br0">&#41;</span> <span class="sy0">+</span><span class="st0">'.'</span> <span class="sy0">+</span> <span class="kw2">SUBSTRING</span><span class="br0">&#40;</span><span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">9</span><span class="br0">&#41;</span>,@pos<span class="br0">&#41;</span>,<span class="nu0">4</span>,<span class="nu0">6</span><span class="br0">&#41;</span> <span class="co1">--115.949833</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @pos int = 115949833 
+
+SELECT SUBSTRING(CONVERT(CHAR(9),@pos),1,3) +'.' + SUBSTRING(CONVERT(CHAR(9),@pos),4,6) --115.949833</pre></div></div>
+
+<p>That is all for this post, any other way you would have used?</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/a-couple-of-ways-to/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012: Recap</title>
+		<link>/index.php/datamgmt/dbprogramming/sql-advent-2012-recap/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sql-advent-2012-recap/#respond</comments>
+		<pubDate>Tue, 25 Dec 2012 09:28:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[ddl]]></category>
+		<category><![CDATA[designers]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[ssms]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/sql-advent-2012-recap/</guid>
+		<description><![CDATA[A recap of all the SQL Advent 2012 posts]]></description>
+				<content:encoded><![CDATA[<p>Another year, another SQL Advent calendar has come to an end. This year there was not much SQL code after day 10, I still hope you found it interesting and useful. Here is a list off all the posts with a little blurb about them.</p>
+<p>SQL Advent 2012 Day 24: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/getting-help">Getting help</a><br />
+In this post I showed you where to get help and how to use twitter to get some help</p>
+<p>SQL Advent 2012 Day 23: <a href="/index.php/DataMgmt/business-intelligence-1/get-the-tools-you-need">Get the tools you need to be more productive</a><br />
+In this post I tried to show you that tools will pay for themselves</p>
+<p>SQL Advent 2012 Day 22: <a href="/index.php/DataMgmt/business-intelligence-1/testing-your-backup-and-failover">Testing your backup and failover strategy</a><br />
+This post was all about the importance of testing your backup and failover strategy</p>
+<p>SQL Advent 2012 Day 21: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/with-vldbs-it-matters-what">With VLDBs it matters what you do and how you do it</a><br />
+With little databases you can get away with doing stupid stuff, with large databases not so much</p>
+<p>SQL Advent 2012 Day 20: <a href="/index.php/DataMgmt/business-intelligence-1/use-the-new-features">Use the new features</a><br />
+This post detailed why it was important to use the features and functionality</p>
+<p>SQL Advent 2012 Day 19: <a href="/index.php/DataMgmt/DBProgramming/how-to-improve-your-tech">How to improve your tech skills</a><br />
+The post showed you a couple of ways to improve your tech skills</p>
+<p>SQL Advent 2012 Day 18: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/stay-relevant-and-marketable">Stay relevant and marketable</a><br />
+If you don&#8217;t keep up, you will lose</p>
+<p>SQL Advent 2012 Day 17: <a href="/index.php/DataMgmt/business-intelligence-1/no-matter-how-long-you">No matter how long you are on the wrong path, go back</a><br />
+Sometimes it is better to start from scratch than continue down the wrong path</p>
+<p>SQL Advent 2012 Day 16: <a href="/index.php/DataMgmt/DataDesign/lack-of-database-design-and">Lack of database design and normalization</a><br />
+We don&#8217;t need no stinking keys</p>
+<p>SQL Advent 2012 Day 15: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/benefits-of-indexes">Benefits of Indexes</a><br />
+Why do we need indexes and what purpose do they serve?</p>
+<p>SQL Advent 2012 Day 14: <a href="/index.php/DataMgmt/business-intelligence-1/when-to-say-no">When to say no</a><br />
+Sometines you have to say no&#8230;.even to your boss</p>
+<p>SQL Advent 2012 Day 13: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/features-enabled-that-are-not">Features enabled that are not used</a><br />
+Disable and shutdown services and feature that are not used</p>
+<p>SQL Advent 2012 Day 12: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/proactive-notifications">Proactive notifications</a><br />
+Get notified before the client or your boss about errors</p>
+<p>SQL Advent 2012 Day 11: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/cursors-and-loops">Cursors and loops</a><br />
+Cursors are almost always evil</p>
+<p>SQL Advent 2012 Day 10: <a href="/index.php/DataMgmt/business-intelligence-1/sql-server-maintenance">SQL Server Maintenance</a><br />
+Maintenance is unfortunately required, machines and software are not completely autotuned yet</p>
+<p>SQL Advent 2012 Day 9: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2012-day-10">Reinventing the wheel</a><br />
+Why write something if it already exist</p>
+<p>SQL Advent 2012 Day 8: <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/foreign-keys">Foreign Keys</a><br />
+A small post showing that you don&#8217;t always need a primary key for a foreign key</p>
+<p>SQL Advent 2012 Day 7: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/lack-of-constraints">Lack of constraints</a><br />
+Constraints in a database guarantee data integrity</p>
+<p>SQL Advent 2012 Day 6: <a href="/index.php/DataMgmt/DBProgramming/standardized-naming-and-other-conventions">Standardized Naming And Other Conventions</a><br />
+If you have a standard, everything will be easier</p>
+<p>SQL Advent 2012 Day 5: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/do-not-trust-the-ssms">Do not trust the SSMS designers</a><br />
+SOmetimes a simple click can cause a lot of data to be moved behind the scenes</p>
+<p>SQL Advent 2012 Day 4: <a href="/index.php/DataMgmt/DBProgramming/triggers-what-to-do-what">Triggers, what to do, what not to do</a><br />
+Some best practices around triggers</p>
+<p>SQL Advent 2012 Day 3: <a href="/index.php/DataMgmt/DBProgramming/sargable-queries">Sargable Queries</a><br />
+How to write queries that will take advantage of indexes</p>
+<p>SQL Advent 2012 Day 2: <a href="/index.php/DataMgmt/DBProgramming/data-typeshttp:///index.php/DataMgmt/DBProgramming/data-types">Data types storage differences</a><br />
+Make sure you know the difference between the different data types and how they are stored</p>
+<p>SQL Advent 2012 Day 1: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/sizing-database-files">Sizing database files</a><br />
+You have to presize your databases if you want optimal performance</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sql-advent-2012-recap/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 24: Getting help</title>
+		<link>/index.php/datamgmt/dbprogramming/getting-help/</link>
+		<comments>/index.php/datamgmt/dbprogramming/getting-help/#respond</comments>
+		<pubDate>Mon, 24 Dec 2012 12:59:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[forums]]></category>
+		<category><![CDATA[help]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[twitter]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/getting-help/</guid>
+		<description><![CDATA[This is day twenty-four of the SQL Advent 2012 series of blog posts. Today we are going to look at how to get help]]></description>
+				<content:encoded><![CDATA[<p>This is day twenty-four of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at how to get help.</p>
+<p><a href="http://www.flickr.com/photos/vicky-/7089908693/" title="Help! by Vicky! &lt;3, on Flickr"><img src="http://farm8.staticflickr.com/7068/7089908693_f5cb6d839a_m.jpg" width="240" height="125" alt="Help!" style="float:left;margin:0 5px 0 0;" /></a>Imagine if you were stuck with some problem in 1995, you didn&#8217;t have that many choices, you could ask the resident <em>know it all</em> at your job, you could lookup stuff in a book or you could go on the newsgroups and try to get help that way. These days there are many more ways to get help. There are many more books than in 1995, there are also a lot more whitepapers available these days. Twitter is a great way to get help as well if you use a special hashtag. Attend one of the many <a href="http://www.sqlsaturday.com/">SQL Saturday</a> events, there are always experts available who are willing to help you out with your problems. These events are held all over the world and there is a good chance one will be held near your town as well.</p>
+<p><strong>Forums/QA sites</strong><br />
+Join a QA site like <a href="http://stackoverflow.com/questions">stackoverflow</a>, head on to a specialized site on stackexchange, here is a list of all of them http://stackexchange.com/sites You can hit some of the <a href="http://forum.lessthandot.com/">forums</a> on this site. For SQL server, you can also try <a href="http://www.sqlservercentral.com/Forums/">SQLServerCentral</a></p>
+<p><strong>Twitter</strong><br />
+Don&#8217;t be scared to ask for help on twitter, if you don&#8217;t know any of the SQL Server tweeple, use the #sqlhelp hash tag and ask for help, here is an example of what it looks like <a href="https://twitter.com/search/realtime?q=%23sqlhelp&amp;src=typd">#sqlhelp</a><br />
+Here is an image of the replies on twitter after I asked a question with the #sqlhelp tag</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/sqlhelp.PNG?mtime=1355070897"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/sqlhelp.PNG?mtime=1355070897" width="516" height="438" /></a></div>
+<p>Here is a small list of people with their speciality on twitter</p>
+<p><strong>Replication</strong><br />
+<a href="https://twitter.com/hilarycotter">Hilary Cotter</a><br />
+<a href="https://twitter.com/onpnt">Ted Krueger</a></p>
+<p><strong>Mirroring</strong><br />
+<a href="https://twitter.com/SQLSoldier">Robert Davis</a><br />
+<a href="https://twitter.com/onpnt">Ted Krueger</a></p>
+<p><strong>Extended Events</strong><br />
+<a href="https://twitter.com/SQLPoolBoy">Jonathan Kehayias</a></p>
+<p><strong>SQL Internals, checkdb</strong><br />
+<a href="https://twitter.com/PaulRandal">Paul Randal</a></p>
+<p><strong>Indexing</strong><br />
+<a href="https://twitter.com/KimberlyLTripp">Kimberly Tripp</a></p>
+<p><strong>Storage</strong><br />
+<a href="https://twitter.com/mrdenny">Denny Cherry</a><br />
+<a href="https://twitter.com/BrentO">Brent Ozar</a></p>
+<p><strong>Optimizer</strong><br />
+<a href="https://twitter.com/SQL_Kiwiv">Paul White</a></p>
+<p><strong>Powershell</strong><br />
+<a href="http://twitter.com/SQLvariant">Aaron Nelson</a></p>
+<p><strong>SSIS</strong><br />
+<a href="https://twitter.com/andyleonard">Andy Leonard</a><br />
+<a href="https://twitter.com/jamiet">Jamie Thompson</a></p>
+<p><strong>Hardware </strong><br />
+<a href="https://twitter.com/GlennAlanBerry">Glenn Berry</a></p>
+<p><strong>SSRS</strong><br />
+<a href="https://twitter.com/grrl_geek">Jes Schultz Borland</a></p>
+<p><strong>SSAS</strong><br />
+<a href="https://twitter.com/AJbigdata">Adam Jorgensen</a></p>
+<p><strong>T-SQL</strong><br />
+<a href="https://twitter.com/AaronBertrand">Aaron Bertrand</a><br />
+<a href="https://twitter.com/Hugo_Kornelis">Hugo Kornelis</a><br />
+<a href="https://twitter.com/ItzikBenGan">Itzik Ben-Gan</a><br />
+<a href="https://twitter.com/rob_farley">Rob Farley</a></p>
+<p>Start following these people and if you have questions don&#8217;t hesitate to ask them.</p>
+<p>That is all for day twenty-four of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/getting-help/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 22: Testing your backup and failover strategy</title>
+		<link>/index.php/webdev/business-intelligence/testing-your-backup-and-failover/</link>
+		<comments>/index.php/webdev/business-intelligence/testing-your-backup-and-failover/#respond</comments>
+		<pubDate>Sat, 22 Dec 2012 21:31:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[backup]]></category>
+		<category><![CDATA[restore]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[testing]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/testing-your-backup-and-failover/</guid>
+		<description><![CDATA[This is day twenty-two of the SQL Advent 2012 series of blog posts. Today we are going to look at how to test your backup and failover strategy]]></description>
+				<content:encoded><![CDATA[<p>This is day twenty-two of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at how to test your backup and failover strategy</p>
+<p>Let&#8217;s say your CEO comes to you and asks if your backups are good, you say yes, the CEO proceeds to tell you that the board will be arriving in 5 minutes and he will do a hard unplug of your main server. Have the backup restored within 1 hour. How comfortable are you now? Do you actually even test your backups, how do you know that they are not corrupt? What about failover to the other data center, has this been tested, do you know that it will work? </p>
+<p>With Hurricane Sandy causing havoc a couple of weeks ago where whole data centers ran out of fuel and generators didn&#8217;t start up, there are a whole bunch of companies rethinking their HA/DR strategy. Is it really wise having your data center not enough geographically dispersed. I mean if your main data center is in New York City and your backup data center is in Jersey City or Secaucus then you will be in trouble when a storm like Sandy comes along.</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/Storm.PNG?mtime=1356218425"><img alt="" title="Hi I am Sandy...I am here to destroy your backups" src="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/Storm.PNG?mtime=1356218425" width="560" height="328" /></a></div>
+<p>One way I test backups is that I keep a hot backup server for some of the databases that are not changing as frequently as others. I basically have SQL jobs that backup the databases from one server straight to the other server, then a restore is done, permissions are fixed and checkdb is run. Another way I test the backups  with some bigger databases is that I do restores to our staging server once a week or so, these restores take about 6 hours or so.</p>
+<p>You need to test restoring full backups, you also need to test applying differential and transaction log backups. Ideally you want this automated.</p>
+<p>Where do you store your backups? Next to the server in a bin are all the tapes? Bad idea. You need to store the backups offsite or be doing backups to the other datacenter. Your backups cannot be <em>only </em>in the same location as the server that you are backing up from.</p>
+<p>See also this post by Ted Krueger for some more backup information: <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/backups-are-for-sissies">Backups are for sissies!!!</a></p>
+<p>We have a 200 page or so document that explains in detail what needs to happen if we switch data centers or if we have to rebuild a whole data center in the case of a catastrophe. How long would it take you to rebuild a server, install SQL server, installing all the apps and making sure that all the permissions are correct&#8230;&#8230;.oh what&#8230;oh you didn&#8217;t think you needed to backup master and tempdb. Hopefully you have all your jobs and SSIS packages scripted out or backed up. What about the permissions and accounts, do you know all the accounts that you need to create in case you don&#8217;t have a master backup?</p>
+<p>When you boss asks next time what you do all day, make sure to tell him or her that you are making sure that in the case of a catastrophe the company is back in business in an instant, it is part of your job and your duty to yourself and the company</p>
+<p>That is all for day twenty-two of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/business-intelligence/testing-your-backup-and-failover/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 21: With VLDBs it matters what you do and how you do it</title>
+		<link>/index.php/datamgmt/dbprogramming/with-vldbs-it-matters-what/</link>
+		<comments>/index.php/datamgmt/dbprogramming/with-vldbs-it-matters-what/#respond</comments>
+		<pubDate>Sat, 22 Dec 2012 00:12:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[query]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[very large databases]]></category>
+		<category><![CDATA[vldb]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/with-vldbs-it-matters-what/</guid>
+		<description><![CDATA[This is day twenty-one of the SQL Advent 2012 series of blog posts. Today we are going to look at Very Large Databases]]></description>
+				<content:encoded><![CDATA[<p>This is day twenty-one of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at why it matters how you do things when working with a VLDB </p>
+<p><strong>VLD what?</strong><br />
+VLDB stands for Very Large Database, Not too long ago the definition of VLDB was a database that occupies more than 1 terabyte or contains several billion rows. This of course will change over time, there are quite a few companies with Petabyte size databases. Servers with many CPUs and lots of RAM are required when your databases are big</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/SQLServerCPUandRAM.jpg?mtime=1356141722"><img alt="I like big databases and I cannot lie" title ="I like big databases and I cannot lie" src="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/SQLServerCPUandRAM.jpg?mtime=1356141722" width="582" height="395" /></a></div>
+<p><strong>What is the big deal with VLDB anyway, it is just bigger right?</strong><br />
+The problem with a VLDB is that you have to change your mindset and you have to change your ways how you do certain things. Think of it like driving 20 miles per hours compared to driving 160 miles per hour, when you drive very fast you can&#8217;t get away with doing stupid stuff on the road, you will crash. The same is true when working with big databases. You can&#8217;t just delete 100 million rows, you might fill up the log file, you have to do it in batches if you can&#8217;t use a truncate statement.</p>
+<p><strong>Storage</strong><br />
+While you can get away with having just one drive when dealing with smaller database, this doesn&#8217;t hold true for Very Large Databases. With Very Large Databases, ideally you want separate drives for tempdb, log file and data files. You can also put the non clustered indexes on a different spindle, separate from the heaps and clustered indexes. Also make sure that you <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/sizing-database-files">size your database files</a> correctly to improve performance.<br />
+If you have 64 GB of RAM and your database is 50 GB, it is very likely that the whole database will be in RAM at some point. When your database is 2 TB and you have only 512 GB of RAM, you cannot even have a quarter of the DB in RAM. This is where you need to have fast hard drives. A fast SAN or some Solid State Drives are worth looking into.</p>
+<p><strong>Partitioning</strong><br />
+Partitioning can help with maintenance and returning data faster, take a look at my <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-3">partitioning</a> post for more info</p>
+<p><strong>Indexes</strong><br />
+Make the indexes narrow, you want your lookups to be as efficient as possible.<br />
+If using partitions you can now rebuild just one partition of the index, this will make index maintenance easier and faster.</p>
+<p><strong>Deletes</strong><br />
+When you have a small database, you can delete all the rows from a table without a problem generally. Every now and then you will have someone do this, they will of course do this just one because after that you will have <em>THE TALK</em> with them about this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DELETE</span> HugeTable</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DELETE HugeTable</pre></div></div>
+
+<p>Instead of doing that, use truncate or do deletes in batches of 50000 for example</p>
+<p><strong>Select * from HugeTable</strong><br />
+Every now and then you will have someone execute something like the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> 
+<span class="kw1">FROM</span> HugeTable
+<span class="kw1">ORDER</span> <span class="kw1">By</span> SomeColumn</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * 
+FROM HugeTable
+ORDER By SomeColumn</pre></div></div>
+
+<p>When doing something like that SQL Server will create a worktable in tempdb, if the table is big and your tempdb is placed on a drive that doesn&#8217;t have a lot of space, you will run out of space, take a look at <a href="/index.php/DataMgmt/DataDesign/could-not-allocate-new-page-for-database">Dealing with the could not allocate new page for database &#8216;TEMPDB&#8217;. There are no more pages available in filegroup DEFAULT error message</a> how to resolve this</p>
+<p><strong>Compression</strong><br />
+Compression is great, I use it, it makes the backups smaller, it makes the restore faster. I use database compression as well as data compression, when using data compression, SQL Server will be able to store more data per page and thus you will be able to have more data in RAM</p>
+<p><strong>Testbed size</strong><br />
+When coding against Very Large Databases, you need to test with a QA or testbox that has about the same data, you will get into trouble if you don&#8217;t. Take a look at <a href="/index.php/DataMgmt/DataDesign/your-testbed-has-to-have-the-same-volume">Your testbed has to have the same volume of data as on production in order to simulate normal usage</a> to see what can happen.</p>
+<p><strong>Crappy queries</strong><br />
+Ah yes, how to bring the database to its knees, have some n00bs write some queries against your database. While you can get away with writing non-<a href="/index.php/DataMgmt/DBProgramming/sargable-queries">SARGable queries</a>, queries where the index is not used, you will suffer immensely if you do this on Very Large Databases</p>
+<p>I only touched upon a couple of key points, just keep in mind that if you do the thing I mentioned here even with smaller databases, you won&#8217;t suffer when your database starts to grow. And no, while premature optimization might be the root of all evil, I would call this best practices instead</p>
+<p>That is all for day twenty-one of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/with-vldbs-it-matters-what/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 16: Lack of database design and normalization</title>
+		<link>/index.php/datamgmt/datadesign/lack-of-database-design-and/</link>
+		<comments>/index.php/datamgmt/datadesign/lack-of-database-design-and/#respond</comments>
+		<pubDate>Sun, 16 Dec 2012 12:55:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[foreign keys]]></category>
+		<category><![CDATA[normal form]]></category>
+		<category><![CDATA[normalization]]></category>
+		<category><![CDATA[referential integrity]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/lack-of-database-design-and/</guid>
+		<description><![CDATA[This is day sixteen of the SQL Advent 2012 series of blog posts. Today we are going to look at the lack of database design and normalization.
+
+Normalize untill it hurts, denormalize until it works]]></description>
+				<content:encoded><![CDATA[<p>This is day sixteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at the lack of database design and normalization. Normalization and database design is a big enough topic that there are 500 page plus books written about it. This post will barely scratch the surface, if you want to know more about this topic pick up a book about it. <a href="http://www.amazon.com/gp/product/143020866X/002-3562882-4309664?ie=UTF8&amp;tag=sql08-20&amp;linkCode=xm2&amp;camp=1789&amp;creativeASIN=143020866X">Pro SQL Server 2008 Relational Database Design and Implementation</a> is one that I recommend. I did an interview with the author here: <a href="/index.php/DataMgmt/DataDesign/interview-with-louis-davidson-author-of-">Interview With Louis Davidson Author of Pro SQL Server 2008 Relational Database Design and Implementation</a></p>
+<h1>Normalize until it hurts, denormalize until it works</h1>
+<p>So what is normalization? Normalization is the process of organizing the columns and tables of a relational database to minimize redundancy and dependency. Normalization usually involves dividing large tables into smaller (and less redundant) tables and defining relationships between them. The objective is to isolate data so that additions, deletions, and modifications of a field can be made in just one table and then propagated through the rest of the database via the defined relationships.</p>
+<p>Let&#8217;s take a look at a simple example. Let&#8217;s say we have a book store and we want to capture the book title, the date the book was published as well as the author. We are keeping this very simple so no ISBN or publisher or any additional information.</p>
+<p>You might come up with a table like this right?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Books <span class="br0">&#40;</span>BookdId <span class="kw1">int</span>, Title <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, PublishDate <span class="kw1">datetime</span>, Author <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Books (BookdId int, Title varchar(100), PublishDate datetime, Author varchar(100))
+GO</pre></div></div>
+
+<p>One of the problems is that if an author wrote more than one book, the author will be stored in that table more than once. What it the authot is a woman and she gets married and decided to change her name, how will you know this is the same person?</p>
+<p>Let&#8217;s drop that table since we are going to recreate it</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">TABLE</span> Books
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP TABLE Books
+GO</pre></div></div>
+
+<p>Now, let&#8217;s create two tables, we are going to create an Author table and a Books table. The Author table will hold the AuthotID, the last name as well as the first name. Now we can use the AuthorID and store that in the Books table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Create</span> <span class="kw1">Table</span> Authors <span class="br0">&#40;</span>AuthorID <span class="kw1">int</span>, FirstName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, LastName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Books <span class="br0">&#40;</span>BookdId <span class="kw1">int</span>, Title <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, PublishDate <span class="kw1">datetime</span>, AuthorID <span class="kw1">int</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Create Table Authors (AuthorID int, FirstName varchar(100), LastName varchar(100))
+GO
+
+CREATE TABLE Books (BookdId int, Title varchar(100), PublishDate datetime, AuthorID int)
+GO</pre></div></div>
+
+<p>So what is the problem with this so called design? Ever heard of a book that had more than one author? Of course you have there are many of those, this is especially true with technical books.</p>
+<p>Let&#8217;s drop those tables since we are going to recreate it.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">TABLE</span> Books, Authors
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP TABLE Books, Authors
+GO</pre></div></div>
+
+<p>Now what we have to add is a third table, this table will have just two columns, the BookID and the AuthorID, now you can handle many authors per book without a problem. The AuthorID column will now be eliminated from the Books table as well.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">Create</span> <span class="kw1">Table</span> Authors <span class="br0">&#40;</span>AuthorID <span class="kw1">int</span>, FirstName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, LastName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Books <span class="br0">&#40;</span>BookdId <span class="kw1">int</span>, Title <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, PublishDate <span class="kw1">datetime</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> BookAuthors<span class="br0">&#40;</span>BookdId <span class="kw1">int</span>,AuthorID <span class="kw1">int</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Create Table Authors (AuthorID int, FirstName varchar(100), LastName varchar(100))
+GO
+
+CREATE TABLE Books (BookdId int, Title varchar(100), PublishDate datetime)
+GO
+
+CREATE TABLE BookAuthors(BookdId int,AuthorID int)
+GO</pre></div></div>
+
+<p>What else are we missing? How about some primary keys and foreign keys. We are going to make BookID and AuthorID a primary key. Those two columns will also be a foreign key in the BookAuthors tables. Since an author can&#8217;t write the same book twice, we will also make the combination of BookID and AuthorID a primary key in the BookAuthors table</p>
+<p>Here is what you will end up with</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/SimpleDB.PNG?mtime=1355567856"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/SimpleDB.PNG?mtime=1355567856" width="499" height="304" /></a></div>
+<p>Now, here is the code to add the primary keys and foreign keys to the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Books</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Books <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> 
+&nbsp; &nbsp; <span class="br0">&#40;</span>BookdID<span class="br0">&#41;</span> <span class="kw1">ON</span> <span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span>
+&nbsp;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.Books ADD CONSTRAINT
+	PK_Books PRIMARY KEY CLUSTERED 
+	(BookdID) ON [PRIMARY]
+
+GO</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">BookAuthors</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_BookAuthors <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> 
+&nbsp; &nbsp; <span class="br0">&#40;</span>BookdID,AuthorID<span class="br0">&#41;</span> &nbsp;<span class="kw1">ON</span> <span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span>
+&nbsp;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.BookAuthors ADD CONSTRAINT
+	PK_BookAuthors PRIMARY KEY CLUSTERED 
+	(BookdID,AuthorID)  ON [PRIMARY]
+
+GO</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Authors</span> <span class="kw1">ADD</span> <span class="kw1">CONSTRAINT</span>
+&nbsp; &nbsp; PK_Authors <span class="kw1">PRIMARY</span> <span class="kw1">KEY</span> <span class="kw1">CLUSTERED</span> 
+&nbsp; &nbsp; <span class="br0">&#40;</span>AuthorID<span class="br0">&#41;</span> <span class="kw1">ON</span> <span class="br0">&#91;</span><span class="kw1">PRIMARY</span><span class="br0">&#93;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.Authors ADD CONSTRAINT
+	PK_Authors PRIMARY KEY CLUSTERED 
+	(AuthorID) ON [PRIMARY]</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>BookAuthors<span class="br0">&#93;</span> &nbsp;<span class="kw1">WITH</span> <span class="kw1">CHECK</span> <span class="kw1">ADD</span> &nbsp;<span class="kw1">CONSTRAINT</span> <span class="br0">&#91;</span>FK_BookAuthors_Authors<span class="br0">&#93;</span> <span class="kw1">FOREIGN</span> <span class="kw1">KEY</span><span class="br0">&#40;</span><span class="br0">&#91;</span>AuthorID<span class="br0">&#93;</span><span class="br0">&#41;</span>
+<span class="kw1">REFERENCES</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Authors<span class="br0">&#93;</span> <span class="br0">&#40;</span><span class="br0">&#91;</span>AuthorID<span class="br0">&#93;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>BookAuthors<span class="br0">&#93;</span> <span class="kw1">CHECK</span> <span class="kw1">CONSTRAINT</span> <span class="br0">&#91;</span>FK_BookAuthors_Authors<span class="br0">&#93;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE [dbo].[BookAuthors]  WITH CHECK ADD  CONSTRAINT [FK_BookAuthors_Authors] FOREIGN KEY([AuthorID])
+REFERENCES [dbo].[Authors] ([AuthorID])
+GO
+
+ALTER TABLE [dbo].[BookAuthors] CHECK CONSTRAINT [FK_BookAuthors_Authors]
+GO</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>BookAuthors<span class="br0">&#93;</span> &nbsp;<span class="kw1">WITH</span> <span class="kw1">CHECK</span> <span class="kw1">ADD</span> &nbsp;<span class="kw1">CONSTRAINT</span> <span class="br0">&#91;</span>FK_BookAuthors_Books<span class="br0">&#93;</span> <span class="kw1">FOREIGN</span> <span class="kw1">KEY</span><span class="br0">&#40;</span><span class="br0">&#91;</span>BookdID<span class="br0">&#93;</span><span class="br0">&#41;</span>
+<span class="kw1">REFERENCES</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Books<span class="br0">&#93;</span> <span class="br0">&#40;</span><span class="br0">&#91;</span>BookdID<span class="br0">&#93;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">ALTER</span> <span class="kw1">TABLE</span> <span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>BookAuthors<span class="br0">&#93;</span> <span class="kw1">CHECK</span> <span class="kw1">CONSTRAINT</span> <span class="br0">&#91;</span>FK_BookAuthors_Books<span class="br0">&#93;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE [dbo].[BookAuthors]  WITH CHECK ADD  CONSTRAINT [FK_BookAuthors_Books] FOREIGN KEY([BookdID])
+REFERENCES [dbo].[Books] ([BookdID])
+GO
+
+ALTER TABLE [dbo].[BookAuthors] CHECK CONSTRAINT [FK_BookAuthors_Books]
+GO</pre></div></div>
+
+<p>That is a lot of code, this is where modeling tools come in handy. You can use the diagramming tool in SQL Server Management Studio but it is not full feature like the ones below.</p>
+<p>CA <a href="http://erwin.com/products/data-modeler/standard-edition">ERwin Data Modeler</a><br />
+SAP (Sybase) <a href="http://www.sybase.com/products/modelingdevelopment/powerdesigner">PowerDesigner</a><br />
+Embarcadero <a href="http://www.embarcadero.com/products/er-studio">ER/Studio</a><br />
+IBM <a href="http://www-01.ibm.com/software/awdtools/systemarchitect/">Rational Systems Architect</a><br />
+Dell Quest <a href="http://www.quest.com/toad/http://www.quest.com/toad/">TOAD</a></p>
+<p>I have used ERwin  and Visio in the past but use PowerDesigner these days.</p>
+<p>Now how would you handle the name change for the author? You can introduce another table where you would have first and last name together with start and end dates, this now enables you to still have the author being one author for reporting purposes but you can now still represent the name correctly for a specific point in time. Another example of this would be the stock market, companies will change the ticker, Sun Microsystem change the ticker from SUNW to JAVA, sometimes they change the name as well, Apple dropped Computers from the name. You still want this to be the same company so you won&#8217;t just add another row otherwise how would you do historical charting?</p>
+<p>This is also why I like keys that don&#8217;t have meaning, these are called surrogate keys, now when you change everything in the row it doesn&#8217;t matter. I once worked with a system where&#8230;are you ready for this&#8230;&#8230;the primary key was the social security number, this key was then also used as a foreign key in another ten tables. Of course  some people would be reluctant to give their real social security number, they made up a number. Now the person with the real number signed up and couldn&#8217;t he would call customer support, they would track down the person with the fake number and now the SSN had to be changed in over 10 tables, since we didn&#8217;t have cascade update turned on, this had to be handled manually (and of course make sure to highlight the WHERE clause otherwise you are toast)</p>
+<p>Remember how we had that BookAuthors junction/lookup table? Sometimes you will actually see a comma delimited list of IDs in a varchar column. This is not the way to store more than one author for a book. This looks easier from an application point of view (however I disagree even here) but now you have to write some kind of row to column user defined function if you want to show all authors. Performance is also going to be a dud, an index can&#8217;t be used since your WHERE clause is not <a href="/index.php/DataMgmt/DBProgramming/sargable-queries">sargable</a>.</p>
+<p><strong>Unnormalized database</strong><br />
+This is a database which was never normalized to begin with </p>
+<p><strong>Denormalized database</strong><br />
+A denormalized database is a database that was normalized but some parts have been denormalized for performance or maintenance reasons</p>
+<p><strong>For you to research/lookup</strong></p>
+<p><strong>Keys</strong><br />
+There are many types of keys, some of them are just synonyms, here are some of them:  Candidate Key, Surrogate Key, Superkey, Natural Key, Alternate Key, Compound Key</p>
+<p><strong>Normal form</strong><br />
+Like I said at the beginning of the post there many more things to this topic than covered here. I did not talk about normal form at all, make sure that you research what all of these mean</p>
+<p>1NF	First normal form<br />
+2NF	Second normal form<br />
+3NF	Third normal form<br />
+EKNF	Elementary Key Normal Form<br />
+BCNF	Boyce–Codd normal form<br />
+4NF	Fourth normal form<br />
+5NF	Fifth normal form<br />
+DKNF	Domain/key normal form<br />
+6NF	Sixth normal form</p>
+<p>That is all for day sixteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/lack-of-database-design-and/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 15: Benefits of Indexes</title>
+		<link>/index.php/datamgmt/dbprogramming/benefits-of-indexes/</link>
+		<comments>/index.php/datamgmt/dbprogramming/benefits-of-indexes/#respond</comments>
+		<pubDate>Sat, 15 Dec 2012 07:30:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[query]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/benefits-of-indexes/</guid>
+		<description><![CDATA[This is day fifteen of the SQL Advent 2012 series of blog posts. Today we are going to look at indexes]]></description>
+				<content:encoded><![CDATA[<p>This is day fifteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at the benefit of indexes</p>
+<h2>So how does an index work?</h2>
+<p>How does an index work, how does it help SQL Server finding stuff faster? Here is an simple non technology explanation. If I told you to grab a cookbook and give me all the recipes in that book for cod, what would you do? There are two things yuo can do, you can read through the whole book page by page until you get to the last page looking for any cod recipes. Or&#8230;&#8230;&#8230;..take a look at the picture below</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/IMG01005-20121214-1059.jpg?mtime=1355500346"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/ADvent/IMG01005-20121214-1059.jpg?mtime=1355500346" width="640" height="480" /></a></div>
+<p>See that, in one second I know exactly where to find cod recipes, it is on page 305 and 61. Which do you think is faster, looking it up in an index or scanning through the book?  </p>
+<p>SQL Server pretty much uses the same technique. There are two types of <em>basic</em> indexes in SQL Server, these are clustered and non clustered indexes.  A clustered index will contain all the data from the table as well, a non clustered index will have a pointer to the table row if there is no clustered index on that table or to the clustered index position is there is a clustered index on the table.</p>
+<p>A table with a clustered index is also called a clustered table. A table without a  clustered index is also called a heap.</p>
+<p>SQL Server also has XML, spatial, columnstore, filtered, full text indexes but we are just focusing on the basic indexes in this post.</p>
+<p>Here is what books on line has to say about the <a href="http://msdn.microsoft.com/en-us/library/ms177443(v=SQL.105).aspxhttp://msdn.microsoft.com/en-us/library/ms177443(v=SQL.105).aspx">storage of a clustered index</a></p>
+<blockquote><p><em>In SQL Server, indexes are organized as B-trees. Each page in an index B-tree is called an index node. The top node of the B-tree is called the root node. The bottom level of nodes in the index is called the leaf nodes. Any index levels between the root and the leaf nodes are collectively known as intermediate levels. In a clustered index, the leaf nodes contain the data pages of the underlying table. The root and intermediate level nodes contain index pages holding index rows. Each index row contains a key value and a pointer to either an intermediate level page in the B-tree, or a data row in the leaf level of the index. The pages in each level of the index are linked in a doubly-linked list.</em></p></blockquote>
+<p>A non clustered index is a little different since it doesn&#8217;t store the whole data pages, here is what books on line has to say about <a href="http://msdn.microsoft.com/en-us/library/ms177484(v=sql.105).aspx">the storage of a nonclustered index</a></p>
+<blockquote><p><em>Nonclustered indexes have the same B-tree structure as clustered indexes, except for the following significant differences:</p>
+<ul>
+<li>The data rows of the underlying table are not sorted and stored in order based on their nonclustered keys.</li>
+<li>The leaf layer of a nonclustered index is made up of index pages instead of data pages.</li>
+</ul>
+<p>Nonclustered indexes can be defined on a table or view with a clustered index or a heap. Each index row in the nonclustered index contains the nonclustered key value and a row locator. This locator points to the data row in the clustered index or heap having the key value.<br />
+The row locators in nonclustered index rows are either a pointer to a row or are a clustered index key for a row, as described in the following:</p>
+<ul>
+<li>If the table is a heap, which means it does not have a clustered index, the row locator is a pointer to the row. The pointer is built from the file identifier (ID), page number, and number of the row on the page. The whole pointer is known as a Row ID (RID).</li>
+<li>If the table has a clustered index, or the index is on an indexed view, the row locator is the clustered index key for the row. If the clustered index is not a unique index, SQL Server makes any duplicate keys unique by adding an internally generated value called a uniqueifier. This four-byte value is not visible to users. It is only added when required to make the clustered key unique for use in nonclustered indexes. SQL Server retrieves the data row by searching the clustered index using the clustered index key stored in the leaf row of the nonclustered index.</li>
+</ul>
+<p></em>
+</p></blockquote>
+<p>Cool, I will now just add indexes on every column. Not so fast, there are some things to consider here, for every update, insert and delete statement indexes have to be maintained. If you have a busy OLTP database, you have to find the right balance between your read and write IO. Not enough indexes and your retrieval queries will suffer, too many indexes and your inserts will be slower. Also keep in mind that indexes take up storage, the more you have the bigger your database will be.</p>
+<h2>Keep your clustered indexes narrow</h2>
+<p>Try to keep your clustered indexes as narrow as possible, if you can use something like an integer, this is only 4 bytes. The reason to keep your clustered indexes narrow is that when you have non clustered indexes, the row locator is the clustered index key for the row. In this case your non clustered index will become bigger as well and now you won&#8217;t be able to store as much data on a page. To illustrate that let&#8217;s take a look at some simple code</p>
+<p>First let&#8217;s create this table and populate it with 2048 rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test1<span class="br0">&#40;</span>id <span class="kw1">int</span>, somecol <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">36</span><span class="br0">&#41;</span>, somecol2 <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">36</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> Test1 
+<span class="kw1">SELECT</span> number,newid<span class="br0">&#40;</span><span class="br0">&#41;</span>,newid<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test1(id int, somecol char(36), somecol2 char(36))
+GO
+
+INSERT Test1 
+SELECT number,newid(),newid() 
+FROM master..spt_values
+WHERE type = 'P'</pre></div></div>
+
+<p>Add a clustered index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> cx <span class="kw1">on</span> Test1<span class="br0">&#40;</span>id<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX cx on Test1(id)</pre></div></div>
+
+<p>Add these two non clustered indexes</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> ix1 <span class="kw1">on</span> Test1<span class="br0">&#40;</span>somecol<span class="br0">&#41;</span>
+<span class="kw1">CREATE</span> <span class="kw1">NONCLUSTERED</span> <span class="kw1">INDEX</span> ix2 <span class="kw1">on</span> Test1<span class="br0">&#40;</span>somecol2<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE NONCLUSTERED INDEX ix1 on Test1(somecol)
+CREATE NONCLUSTERED INDEX ix2 on Test1(somecol2)</pre></div></div>
+
+<p>Let&#8217;s check how much storage is required for the non clustered indexes</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span>
+<span class="kw2">DB_NAME</span><span class="br0">&#40;</span>DATABASE_ID<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>DatabaseName<span class="br0">&#93;</span>,
+<span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="kw1">AS</span> TableName,
+SI.<span class="me1">NAME</span> <span class="kw1">AS</span> IndexName,
+<span class="sy0">IN</span>DEX_TYPE_DESC <span class="kw1">AS</span> IndexType,
+PAGE_COUNT <span class="kw1">AS</span> PageCounts
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> DPS
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span> sysindexes SI
+<span class="kw1">ON</span> DPS.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> SI.<span class="me1">ID</span> <span class="sy0">AND</span> DPS.<span class="me1">INDEX_ID</span> <span class="sy0">=</span> SI.<span class="me1">INDID</span>
+<span class="sy0">AND</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'Test1'</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT
+DB_NAME(DATABASE_ID) AS [DatabaseName],
+OBJECT_NAME(OBJECT_ID) AS TableName,
+SI.NAME AS IndexName,
+INDEX_TYPE_DESC AS IndexType,
+PAGE_COUNT AS PageCounts
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') DPS
+INNER JOIN sysindexes SI
+ON DPS.OBJECT_ID = SI.ID AND DPS.INDEX_ID = SI.INDID
+AND OBJECT_NAME(OBJECT_ID) = 'Test1'
+GO</pre></div></div>
+
+<p>Here is the output, as you can see the non clustered indexes take up 12 pages</p>
+<pre>DatabaseName	TableName	IndexName	IndexType	PageCounts
+tempdb	        Test1	        cx	      CLUSTERED INDEX	22
+tempdb	        Test1	        ix1	   NONCLUSTERED INDEX	12
+tempdb	        Test1	        ix2	   NONCLUSTERED INDEX	12</pre>
+<p>If we check the table size</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_spaceused</span> <span class="st0">'Test1'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_spaceused 'Test1'</pre></div></div>
+
+<pre>name	rows	reserved	data	index_size	unused
+Test1	2048    472 KB	       176 KB	240 KB	        56 KB</pre>
+<p>We see that it is using 240 KB for the indexes</p>
+<p>Let&#8217;s recreate the clustered index with all 3 columns now.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> cx <span class="kw1">on</span> Test1<span class="br0">&#40;</span>id,somecol,somecol2<span class="br0">&#41;</span>
+<span class="kw1">WITH</span> DROP_EXIST<span class="sy0">IN</span>G</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX cx on Test1(id,somecol,somecol2)
+WITH DROP_EXISTING</pre></div></div>
+
+<p>Recreating the clustered index also recreated the non clustered indexes. Let&#8217;s check now how many pages a non clustered index is</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span>
+<span class="kw2">DB_NAME</span><span class="br0">&#40;</span>DATABASE_ID<span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>DatabaseName<span class="br0">&#93;</span>,
+<span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="kw1">AS</span> TableName,
+SI.<span class="me1">NAME</span> <span class="kw1">AS</span> IndexName,
+<span class="sy0">IN</span>DEX_TYPE_DESC <span class="kw1">AS</span> IndexType,
+PAGE_COUNT <span class="kw1">AS</span> PageCounts
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> DPS
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span> sysindexes SI
+<span class="kw1">ON</span> DPS.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> SI.<span class="me1">ID</span> <span class="sy0">AND</span> DPS.<span class="me1">INDEX_ID</span> <span class="sy0">=</span> SI.<span class="me1">INDID</span>
+<span class="sy0">AND</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'Test1'</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT
+DB_NAME(DATABASE_ID) AS [DatabaseName],
+OBJECT_NAME(OBJECT_ID) AS TableName,
+SI.NAME AS IndexName,
+INDEX_TYPE_DESC AS IndexType,
+PAGE_COUNT AS PageCounts
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') DPS
+INNER JOIN sysindexes SI
+ON DPS.OBJECT_ID = SI.ID AND DPS.INDEX_ID = SI.INDID
+AND OBJECT_NAME(OBJECT_ID) = 'Test1'
+GO</pre></div></div>
+
+<p>Here are the results</p>
+<pre>DatabaseName	TableName	IndexName	IndexType	PageCounts
+tempdb          Test1	        cx	        CLUSTERED INDEX	22
+tempdb          Test1	        ix1	     NONCLUSTERED INDEX	21
+tempdb  	Test1	        ix2	     NONCLUSTERED INDEX	21</pre>
+<p>As you can see the non clustered indexes went from 12 to 21 pages</p>
+<p>The index size changed, if you run this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_spaceused</span> <span class="st0">'Test1'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_spaceused 'Test1'</pre></div></div>
+
+<p>Here is the result</p>
+<pre>name	rows	reserved data	index_size	unused
+Test1	2048    600 KB	 176 KB	384 KB	        40 KB</pre>
+<p>So we went from 240 KB to 384 KB for the index storage.</p>
+<p>So why does this matter you ask? SQL Server will use indexes for all kind of things, if you run a COUNT(*) it will use an index, if you do a JOIN it will use an index, it will use indexes in GROUP By queries and many more things.</p>
+<p>Let&#8217;s look at a simple example, when you do a COUNT(*), the optimizer will pick a non clustered index if there is one since it usually has less columns than the clustered index </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">ON</span>
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw2">count</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> Test1
+GO
+&nbsp;
+<span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET SHOWPLAN_TEXT ON
+GO
+
+SELECT count(*) FROM Test1
+GO
+
+SET SHOWPLAN_TEXT OFF
+GO</pre></div></div>
+
+<p>Here is the plan</p>
+<blockquote><p>  |&#8211;Compute Scalar(DEFINE:([Expr1004]=CONVERT_IMPLICIT(int,[Expr1005],0)))<br />
+       |&#8211;Stream Aggregate(DEFINE:([Expr1005]=Count(*)))<br />
+            |&#8211;Index Scan(OBJECT:([ReportServer].[dbo].[Test1].[ix2]))</p></blockquote>
+<p>Basically it had to scan through all the index pages to get the count, if your index was now still 12 pages instead of 21, SQL Server would take less time to accomplish this.</p>
+<p>I barely scratched the surface on indexing, it is a big topic and I recommend you start by navigating to the topic in Books On Line: http://msdn.microsoft.com/en-us/library/ms175049.aspx</p>
+<p>You can also take a look at the following posts written about indexing right here on this site</p>
+<p><a href="/index.php/DataMgmt/DataDesign/index-rebuild-and-reorganize-sql">Index REBUILD and REORGANIZE</a><br />
+<a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-20">Indexes with Included Columns</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/sql-advent-2011-day-19">Filtered Indexes</a><br />
+<a href="/index.php/DataMgmt/DataDesign/is-an-index-scan-always-better-or-faster">Is an index seek always better or faster than an index scan?</a><br />
+<a href="/index.php/DataMgmt/DataDesign/finding-fragmentation-of-an-index-and-fihttp:///index.php/DataMgmt/DataDesign/finding-fragmentation-of-an-index-and-fi">Finding Fragmentation Of An Index And Fixing It</a><br />
+<a href="/index.php/DataMgmt/DataDesign/how-to-get-the-selectivity-of-an-indexhttp:///index.php/DataMgmt/DataDesign/how-to-get-the-selectivity-of-an-index">How to get the selectivity of an index</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/adding-nonclustered-index-on-primary">Adding nonclustered index on primary keys</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/index-seek-on-lob-columns">Index Seek on LOB Columns</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/performance-impact-of-row-overflow">Row Overflow Pages &#8211; Index Tuning</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/columnstore-index-basics">Columnstore Index Basics</a><br />
+<a href="/index.php/DataMgmt/DBAdmin/columnstore-index-index-statistics">Columnstore Index – Index Statistics</a></p>
+<p>That is all for day fifteen of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/benefits-of-indexes/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

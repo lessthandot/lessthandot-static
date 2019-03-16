@@ -1,0 +1,435 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>unpivot &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/unpivot/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>How To Unpivot (and pivot) Like a Boss</title>
+		<link>/index.php/datamgmt/dbprogramming/how-to-unpivot-and-pivot/</link>
+		<comments>/index.php/datamgmt/dbprogramming/how-to-unpivot-and-pivot/#comments</comments>
+		<pubDate>Tue, 08 Feb 2011 12:25:00 +0000</pubDate>
+		<dc:creator><![CDATA[David Forck (thirster42)]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[mssql]]></category>
+		<category><![CDATA[pivot]]></category>
+		<category><![CDATA[t-sql]]></category>
+		<category><![CDATA[unpivot]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/02/how-to-unpivot-and-pivot/</guid>
+		<description><![CDATA[Pivoting and Unpivoting data has been one of the parts of tsql that has been eluding my grasp for a while now.  I’ve seen plenty of examples for both of these, but none of those examples really helped me in understanding exactly what’s going on.]]></description>
+				<content:encoded><![CDATA[<p>
+Pivoting and Unpivoting data has been one of the parts of tsql that has been eluding my grasp for a while now.  I’ve seen plenty of examples for both of these, but none of those examples really helped me in understanding exactly what’s going on.  We have a wiki article for each here on LTD, <a href="http://wiki.lessthandot.com/index.php/Row_To_Column_(PIVOT)">Pivot</a> and <a href="http://wiki.lessthandot.com/index.php/Column_To_Row_(UNPIVOT)">Unpivot</a>,<br />
+but again these don’t tell me a whole lot about what’s going on, just the before and after pictures.  Well, I was messing around with the unpivot code the other day, and how it worked finally dawned on me.  So, I would like to share what I learned.
+</p>
+<p>
+At my part time job, we were working on a Workforce Availability study.  As part of the study, we hired out to a phone survey company.  We created a survey script for their callers and gave it to them.  The company made a lot of phone calls and when all was said and done they provided us with a spreadsheet of the answers.  Needless to say this spreadsheet was in no way normalized for data import.  It looked a something like this:
+</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @survey <span class="kw1">table</span> <span class="br0">&#40;</span>Respondent <span class="kw1">int</span> <span class="kw1">identity</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span>, Q1 <span class="kw1">int</span>, Q2 <span class="kw1">int</span>, Q3 <span class="kw1">int</span>, Q4 <span class="kw1">int</span>, Q5 <span class="kw1">int</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">3</span>,<span class="nu0">1</span>,<span class="nu0">5</span>,<span class="nu0">8</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">2</span>,<span class="nu0">4</span>,<span class="nu0">1</span>,<span class="nu0">6</span>,<span class="nu0">8</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">4</span>,<span class="nu0">1</span>,<span class="nu0">7</span>,<span class="nu0">9</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">2</span>,<span class="nu0">3</span>,<span class="nu0">2</span>,<span class="nu0">6</span>,<span class="nu0">9</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">3</span>,<span class="nu0">1</span>,<span class="nu0">5</span>,<span class="nu0">10</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> @survey</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @survey table (Respondent int identity(1,1), Q1 int, Q2 int, Q3 int, Q4 int, Q5 int)
+
+insert into @survey values (1,3,1,5,8)
+insert into @survey values (2,4,1,6,8)
+insert into @survey values (1,4,1,7,9)
+insert into @survey values (2,3,2,6,9)
+insert into @survey values (1,3,1,5,10)
+
+select * from @survey</pre></div></div>
+
+<p><img src="/wp-content/uploads/blogs/DataMgmt/thirster42/bosspivot/pivot1.jpg" alt="Pivot 1" /></p>
+<p>
+Well, right now that’s a decent sized mess to clean up using union alls.  However, we don’t have to make that big mess thanks to unpivot.  Here’s what the unpivot code looks like.
+</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> 
+&nbsp; &nbsp; Respondent,
+&nbsp; &nbsp; Q, 
+&nbsp; &nbsp; A 
+<span class="kw1">from</span> @survey
+unpivot
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; A <span class="kw1">for</span> Q in <span class="br0">&#40;</span>Q1, Q2, Q3, Q4, Q5<span class="br0">&#41;</span>
+<span class="br0">&#41;</span> <span class="kw1">as</span> u</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select 
+	Respondent,
+	Q, 
+	A 
+from @survey
+unpivot
+(
+	A for Q in (Q1, Q2, Q3, Q4, Q5)
+) as u</pre></div></div>
+
+<p>
+The way this works is in the unpivot statement, the A for Q statement breaks apart each column you list in the in statement.  So for columns Q1, Q2, Q3, Q4, and Q5, the unpivot function breaks it apart, putting the column name in Q, and putting the actual value into A.
+</p>
+<p>
+Now that the data’s normalized we can join to it rather easily.
+</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @survey <span class="kw1">table</span> <span class="br0">&#40;</span>Respondent <span class="kw1">int</span> <span class="kw1">identity</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span>, Q1 <span class="kw1">int</span>, Q2 <span class="kw1">int</span>, Q3 <span class="kw1">int</span>, Q4 <span class="kw1">int</span>, Q5 <span class="kw1">int</span><span class="br0">&#41;</span>
+<span class="kw1">declare</span> @questions <span class="kw1">table</span> <span class="br0">&#40;</span>PK_quID <span class="kw1">int</span> <span class="kw1">identity</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span>, quName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">declare</span> @answers <span class="kw1">table</span> <span class="br0">&#40;</span>PK_anID <span class="kw1">int</span> <span class="kw1">identity</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span>, anName <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">255</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">insert</span> <span class="kw1">into</span> @questions <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'Do you have a drivers license?'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @questions <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'What best describes your current employment conditions?'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @questions <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'Do you have hair?'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @questions <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'What kind of vehicle do you drive?'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @questions <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'What state are you from?'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'yes'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'no'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'working'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'not working'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'car'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'truck'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'suv'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'MO'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'IL'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @answers <span class="kw1">values</span> <span class="br0">&#40;</span><span class="st0">'TN'</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">3</span>,<span class="nu0">1</span>,<span class="nu0">5</span>,<span class="nu0">8</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">2</span>,<span class="nu0">4</span>,<span class="nu0">1</span>,<span class="nu0">6</span>,<span class="nu0">8</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">4</span>,<span class="nu0">1</span>,<span class="nu0">7</span>,<span class="nu0">9</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">2</span>,<span class="nu0">3</span>,<span class="nu0">2</span>,<span class="nu0">6</span>,<span class="nu0">9</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @survey <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">3</span>,<span class="nu0">1</span>,<span class="nu0">5</span>,<span class="nu0">10</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">select</span>
+&nbsp; &nbsp; s.<span class="sy0">*</span>,
+&nbsp; &nbsp; qu.<span class="sy0">*</span>,
+&nbsp; &nbsp; an.<span class="sy0">*</span>
+<span class="kw1">from</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">select</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; Respondent,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">right</span><span class="br0">&#40;</span>Q,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">as</span> Q, 
+&nbsp; &nbsp; &nbsp; &nbsp; A 
+&nbsp; &nbsp; <span class="kw1">from</span> @survey
+&nbsp; &nbsp; unpivot
+&nbsp; &nbsp; <span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; A <span class="kw1">for</span> Q in <span class="br0">&#40;</span>Q1, Q2, Q3, Q4, Q5<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#41;</span> <span class="kw1">as</span> u
+<span class="br0">&#41;</span> s
+&nbsp; &nbsp; <span class="kw1">left</span> outer join @questions qu
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> s.<span class="me1">Q</span><span class="sy0">=</span>qu.<span class="me1">PK_quID</span>
+&nbsp; &nbsp; <span class="kw1">left</span> outer join @answers an
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> s.<span class="me1">a</span> <span class="sy0">=</span> an.<span class="me1">PK_anID</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @survey table (Respondent int identity(1,1), Q1 int, Q2 int, Q3 int, Q4 int, Q5 int)
+declare @questions table (PK_quID int identity(1,1), quName varchar(255))
+declare @answers table (PK_anID int identity(1,1), anName varchar(255))
+
+insert into @questions values ('Do you have a drivers license?')
+insert into @questions values ('What best describes your current employment conditions?')
+insert into @questions values ('Do you have hair?')
+insert into @questions values ('What kind of vehicle do you drive?')
+insert into @questions values ('What state are you from?')
+insert into @answers values ('yes')
+insert into @answers values ('no')
+insert into @answers values ('working')
+insert into @answers values ('not working')
+insert into @answers values ('car')
+insert into @answers values ('truck')
+insert into @answers values ('suv')
+insert into @answers values ('MO')
+insert into @answers values ('IL')
+insert into @answers values ('TN')
+insert into @survey values (1,3,1,5,8)
+insert into @survey values (2,4,1,6,8)
+insert into @survey values (1,4,1,7,9)
+insert into @survey values (2,3,2,6,9)
+insert into @survey values (1,3,1,5,10)
+
+
+
+select
+	s.*,
+	qu.*,
+	an.*
+from
+(
+	select 
+		Respondent,
+		right(Q,1) as Q, 
+		A 
+	from @survey
+	unpivot
+	(
+		A for Q in (Q1, Q2, Q3, Q4, Q5)
+	) as u
+) s
+	left outer join @questions qu
+		on s.Q=qu.PK_quID
+	left outer join @answers an
+		on s.a = an.PK_anID</pre></div></div>
+
+<p>
+Well, seeing as my data is now normalized I can put it into my responses table.
+</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @responses <span class="kw1">table</span> <span class="br0">&#40;</span>Respondent <span class="kw1">int</span>, FK_quID <span class="kw1">int</span>, FK_anID <span class="kw1">int</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">insert</span> <span class="kw1">into</span> @responses
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; Respondent,
+&nbsp; &nbsp; FK_quID,
+&nbsp; &nbsp; FK_anID
+<span class="br0">&#41;</span>
+<span class="kw1">select</span> 
+&nbsp; &nbsp; Respondent,
+&nbsp; &nbsp; <span class="kw1">right</span><span class="br0">&#40;</span>Q,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="kw1">as</span> Q, 
+&nbsp; &nbsp; A 
+<span class="kw1">from</span> @survey
+unpivot
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; A <span class="kw1">for</span> Q in <span class="br0">&#40;</span>Q1, Q2, Q3, Q4, Q5<span class="br0">&#41;</span>
+<span class="br0">&#41;</span> <span class="kw1">as</span> u</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @responses table (Respondent int, FK_quID int, FK_anID int)
+
+insert into @responses
+(
+	Respondent,
+	FK_quID,
+	FK_anID
+)
+select 
+	Respondent,
+	right(Q,1) as Q, 
+	A 
+from @survey
+unpivot
+(
+	A for Q in (Q1, Q2, Q3, Q4, Q5)
+) as u</pre></div></div>
+
+<p>
+Alright, now I’ve got my survey data stored and I want to run some analytics.  One of the ways to analyze the data is to run a crosstab off of the data.  Here’s a crosstab using pivot:
+</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span>
+<span class="sy0">*</span>
+<span class="kw1">from</span>
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw1">select</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Respondent,
+&nbsp; &nbsp; &nbsp; &nbsp; quName,
+&nbsp; &nbsp; &nbsp; &nbsp; anName
+&nbsp; &nbsp; <span class="kw1">from</span> @responses r
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">inner</span> join @questions q
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> r.<span class="me1">FK_quID</span><span class="sy0">=</span>q.<span class="me1">PK_quID</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">inner</span> join @answers a
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">on</span> r.<span class="me1">FK_anID</span><span class="sy0">=</span>a.<span class="me1">PK_anID</span>
+<span class="br0">&#41;</span> a
+pivot
+<span class="br0">&#40;</span>
+&nbsp; &nbsp; <span class="kw2">count</span><span class="br0">&#40;</span>a.<span class="me1">Respondent</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">for</span> anName in 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>yes<span class="br0">&#93;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span><span class="kw1">no</span><span class="br0">&#93;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>working<span class="br0">&#93;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>not working<span class="br0">&#93;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>car<span class="br0">&#93;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>truck<span class="br0">&#93;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>suv<span class="br0">&#93;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>MO<span class="br0">&#93;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>IL<span class="br0">&#93;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>TN<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#41;</span>
+<span class="br0">&#41;</span> <span class="kw1">as</span> pvt</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select
+*
+from
+(
+	select
+		Respondent,
+		quName,
+		anName
+	from @responses r
+		inner join @questions q
+			on r.FK_quID=q.PK_quID
+		inner join @answers a
+			on r.FK_anID=a.PK_anID
+) a
+pivot
+(
+	count(a.Respondent)
+	for anName in 
+		(
+			[yes],
+			[no],
+			[working],
+			[not working],
+			[car],
+			[truck],
+			[suv],
+			[MO],
+			[IL],
+			[TN]
+		)
+) as pvt</pre></div></div>
+
+<p>
+In this I’m joining my response table to my questions and answers table in a subquery.  I then pivot all of that data using the pivot function.  The pivot function takes an aggregate and applies that across the columns and rows.  In this example, I specify count(a.Respondent) as my aggregate, and then I specify that I want that across anName (and I provide a list of values that I want it applied to) on the X axis.  Unpivot then takes the last column and applies that to the Y column, and then applies the aggregate data to any pieces of that that match up on the X and Y axis.
+</p>
+<p><img src="/wp-content/uploads/blogs/DataMgmt/thirster42/bosspivot/pivot2.jpg" alt="Pivot 2" /></p>
+<p>
+So, in the entire survey, three respondents answered yes to having a driver’s license, while two answered no, four answered as having hair while one answered no.
+</p>
+<p>
+ If you remove quName from the subquery, pivot doesn’t have a third data point to aggregate the data to, so it’ll just aggregate to the X axis.
+</p>
+<p><img src="/wp-content/uploads/blogs/DataMgmt/thirster42/bosspivot/pivot3.jpg" alt="Pivot 3" /></p>
+<p>
+You can play with the aggregate in the query a little bit.  If you change it to avg, it’ll average all the respondent ids.  If you change it to min, it’ll show you which respondent provided each answer for each question first.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/how-to-unpivot-and-pivot/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+	</channel>
+</rss>

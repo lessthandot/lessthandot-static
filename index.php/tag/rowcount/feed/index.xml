@@ -1,0 +1,553 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>@@rowcount &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/rowcount/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Triggers affect on SQL System Variables</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/triggers-affect-on-sql-system/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/triggers-affect-on-sql-system/#comments</comments>
+		<pubDate>Tue, 12 Mar 2013 19:35:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[@@rowcount]]></category>
+		<category><![CDATA[identity]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[trigger]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/triggers-affect-on-sql-system/</guid>
+		<description><![CDATA[A while back I ran into an issue where a user was complaining about @@IDENTITY not always returning the value they expected.]]></description>
+				<content:encoded><![CDATA[<p>A while back I ran into an issue where a user was complaining about @@IDENTITY not always returning the value they expected.  </p>
+<p>This was happening on a table that was setup using 3rd party cross database platform replication software.  The software used triggers to capture the changes to the table to send them over to an Oracle table and a DB2 table.  The issue was caused by the trigger inserting records into another table that also had an identity column and that was being returned instead of the one from the original insert.</p>
+<p>I used to also have a debate with a fellow DBA about @@ROWCOUNT.  I use it all the time and haven’t had any issues.  But I also wanted to know if triggers could affect it.<br />
+Here is some sample code that illustrates how triggers affect @@IDENTITY, @@ROWCOUNT and also demonstrates SCOPE_IDENTITY().</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> tblTest <span class="br0">&#40;</span>col1 <span class="kw1">INT</span> <span class="kw1">IDENTITY</span> <span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>, col2 <span class="kw1">INT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>;
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TRIGGER</span> tr_ins_tblTest
+&nbsp; &nbsp; <span class="kw1">ON</span> tblTest
+&nbsp;<span class="kw1">AFTER</span> <span class="kw1">INSERT</span>
+<span class="kw1">AS</span> 
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; <span class="kw1">DECLARE</span> @<span class="kw1">int</span> <span class="kw1">AS</span> <span class="kw1">INT</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @<span class="kw1">int</span> <span class="sy0">=</span> col1
+&nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> inserted;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="kw1">INTO</span> tblTest <span class="br0">&#40;</span>col2<span class="br0">&#41;</span> 
+&nbsp; &nbsp; <span class="kw1">SELECT</span> @<span class="kw1">int</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">SELECT</span>&nbsp; &nbsp;<span class="st0">'Inside Trigger 1'</span> <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Where</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">@@ROWCOUNT</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>RowCount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,@@<span class="kw1">IDENTITY</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Identity</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Scope</span> <span class="kw1">Identity</span><span class="br0">&#93;</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="co1">--really try to mess with @@ROWCOUNT</span>
+&nbsp; &nbsp; <span class="kw1">INSERT</span> <span class="kw1">INTO</span> tblTest <span class="br0">&#40;</span>col2<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> <span class="nu0">10</span>
+&nbsp; &nbsp; <span class="kw1">WHERE</span> <span class="nu0">1</span> <span class="sy0">=</span> <span class="nu0">2</span>;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">SELECT</span>&nbsp; &nbsp;<span class="st0">'Inside Trigger 2'</span> <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Where</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">@@ROWCOUNT</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>RowCount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,@@<span class="kw1">IDENTITY</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Identity</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Scope</span> <span class="kw1">Identity</span><span class="br0">&#93;</span>;
+&nbsp; &nbsp; 
+<span class="kw1">END</span>;
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> tblTest <span class="br0">&#40;</span>col2<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="st0">'10'</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">SELECT</span>&nbsp; &nbsp;<span class="st0">'Outside Trigger'</span>&nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Where</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">@@ROWCOUNT</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span>RowCount<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,@@<span class="kw1">IDENTITY</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Identity</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ,<span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> &nbsp; <span class="kw1">AS</span> <span class="br0">&#91;</span><span class="kw1">Scope</span> <span class="kw1">Identity</span><span class="br0">&#93;</span>;
+&nbsp;
+GO
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> tblTest;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE tblTest (col1 INT IDENTITY (1,1) NOT NULL, col2 INT NULL);
+
+GO
+
+CREATE TRIGGER tr_ins_tblTest
+    ON tblTest
+ AFTER INSERT
+AS 
+BEGIN
+	DECLARE @int AS INT;
+
+	SELECT @int	= col1
+	  FROM inserted;
+
+	INSERT INTO tblTest (col2) 
+	SELECT @int;
+
+	SELECT	 'Inside Trigger 1'	AS [Where]
+			,@@ROWCOUNT			AS [RowCount]
+			,@@IDENTITY			AS [Identity]
+			,SCOPE_IDENTITY()	AS [Scope Identity];
+
+	--really try to mess with @@ROWCOUNT
+	INSERT INTO tblTest (col2)
+	SELECT 10
+	WHERE 1 = 2;
+
+	SELECT	 'Inside Trigger 2'	AS [Where]
+			,@@ROWCOUNT			AS [RowCount]
+			,@@IDENTITY			AS [Identity]
+			,SCOPE_IDENTITY()	AS [Scope Identity];
+	
+END;
+
+GO
+
+INSERT INTO tblTest (col2) VALUES ('10');
+
+SELECT	 'Outside Trigger'	AS [Where]
+		,@@ROWCOUNT			AS [RowCount]
+		,@@IDENTITY			AS [Identity]
+		,SCOPE_IDENTITY()	AS [Scope Identity];
+
+GO
+
+DROP TABLE tblTest;</pre></div></div>
+
+<p>Here is the output from the above code:</p>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/reccount.JPG?mtime=1363124071"><img alt="" src="/wp-content/uploads/users/kconan/reccount.JPG?mtime=1363124071" width="327" height="144" /></a></div>
+<p>So we can see that @@ROWCOUNT is not affected by the trigger.  However we also see that @@IDENTITY can be affected by triggers and the way to get around it is to use SCOPE_IDENTITY() instead.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/triggers-affect-on-sql-system/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>When should you store @@ROWCOUNT into a variable?</title>
+		<link>/index.php/datamgmt/dbprogramming/when-can-you-grab-rowcount-into-a-variab/</link>
+		<comments>/index.php/datamgmt/dbprogramming/when-can-you-grab-rowcount-into-a-variab/#comments</comments>
+		<pubDate>Fri, 10 Sep 2010 11:53:04 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[@@rowcount]]></category>
+		<category><![CDATA[error]]></category>
+		<category><![CDATA[gotcha]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[tip]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/09/when-can-you-grab-rowcount-into-a-variab/</guid>
+		<description><![CDATA[There was a question I answered the other day where someone complained that the rowcount was always 0. Below is a simplified version of the query, can you tell why @SomeCount will be 0? T-SQL1 2 3 4 5 6 7 8 9 10 declare @SomeCount int &#160; select 1 union all select 2 &#160; [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>There was a question I answered the other day where <a href="http://stackoverflow.com/questions/3575860/sql-why-cant-i-get-the-rowcount-value">someone complained that the rowcount was always 0</a>. Below is a simplified version of the query, can you tell why @SomeCount will be 0?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @SomeCount <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> <span class="nu0">1</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="nu0">2</span>
+&nbsp;
+<span class="kw1">print</span> <span class="st0">'1'</span>
+<span class="kw1">select</span> @SomeCount <span class="sy0">=</span> <span class="kw2">@@rowcount</span> 
+&nbsp;
+<span class="kw1">select</span> @SomeCount </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @SomeCount int
+
+select 1
+union all
+select 2
+
+print '1'
+select @SomeCount = @@rowcount 
+
+select @SomeCount </pre></div></div>
+
+<p>The value that the @SomeCount parameter returns will be 0 because print resets the value of @@ROWCOUNT to 0</p>
+<p>Let&#8217;s take a look at another example, but instead of using print we will use a <em>SET @param = value</em> statement. Can you guess what @SomeCount will return in the select statement?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @SomeCount <span class="kw1">INT</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="nu0">1</span>
+<span class="kw1">UNION</span> all
+<span class="kw1">SELECT</span> <span class="nu0">2</span>
+&nbsp;
+<span class="kw1">SET</span> &nbsp;@SomeCount <span class="sy0">=</span> <span class="nu0">0</span>
+<span class="kw1">SELECT</span> @SomeCount <span class="sy0">=</span> <span class="kw2">@@ROWCOUNT</span>
+&nbsp;
+<span class="kw1">SELECT</span> @SomeCount</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @SomeCount INT
+ 
+SELECT 1
+UNION all
+SELECT 2
+ 
+SET  @SomeCount = 0
+SELECT @SomeCount = @@ROWCOUNT
+ 
+SELECT @SomeCount</pre></div></div>
+
+<p>The value that the @SomeCount parameter returns will be 1 because the <em>SET @param = value</em> always sets the @@ROWCOUNT value to 1. Here is what Books On Line has on statements that make a simple assignment </p>
+<blockquote><p>Statements that make a simple assignment always set the @@ROWCOUNT value to 1. No rows are sent to the client. Examples of these statements are: SET @local_variable, RETURN, READTEXT, and select without query statements such as SELECT GETDATE() or SELECT &#8216;Generic Text&#8217;.</p></blockquote>
+<p>Let&#8217;s look at another example, what do you think will be returned in the query below</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @SomeCount <span class="kw1">INT</span>, @SomeOtherCount <span class="kw1">int</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> &nbsp;@SomeOtherCount <span class="sy0">=</span> number 
+<span class="kw1">FROM</span> master..<span class="me1">spt_values</span>
+<span class="kw1">SELECT</span> @SomeCount <span class="sy0">=</span> <span class="kw2">@@ROWCOUNT</span>
+&nbsp;
+<span class="kw1">SELECT</span> @SomeCount</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @SomeCount INT, @SomeOtherCount int
+ 
+ 
+SELECT  @SomeOtherCount = number 
+FROM master..spt_values
+SELECT @SomeCount = @@ROWCOUNT
+ 
+SELECT @SomeCount</pre></div></div>
+
+<p>On my machine it returns the value 2506, this is because SQL Server reads all the rows from the master..spt_values table</p>
+<p>Books On Line explanation on that one is the following</p>
+<blockquote><p>Statements that make an assignment in a query or use RETURN in a query set the @@ROWCOUNT value to the number of rows affected or read by the query, for example: SELECT @local_variable = c1 FROM t1. </p></blockquote>
+<p>Let&#8217;s take a look at another rather silly example</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @SomeCount <span class="kw1">INT</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="nu0">1</span>
+<span class="kw1">UNION</span> all
+<span class="kw1">SELECT</span> <span class="nu0">2</span>
+&nbsp;
+<span class="kw1">if</span> <span class="nu0">1</span><span class="sy0">=</span><span class="nu0">1</span>
+<span class="kw1">SELECT</span> @SomeCount <span class="sy0">=</span> <span class="kw2">@@ROWCOUNT</span>
+&nbsp;
+<span class="kw1">SELECT</span> @SomeCount</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @SomeCount INT
+ 
+SELECT 1
+UNION all
+SELECT 2
+ 
+if 1=1
+SELECT @SomeCount = @@ROWCOUNT
+ 
+SELECT @SomeCount</pre></div></div>
+
+<p>As you can see the IF statement also resets the @@ROWCOUNT and you get back 0</p>
+<h2>So when should you store @@ROWCOUNT into a variable?</h2>
+<p>If you want to store the rows that were affected by A DML statement then you need to grab @@ROWCOUNT immediately after the DML statement. There can&#8217;t be any code between the DML statement and your code that stores @@ROWCOUNT into a variable.</p>
+<p>So instead of this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @SomeCount <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> <span class="nu0">1</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="nu0">2</span>
+&nbsp;
+<span class="kw1">print</span> <span class="st0">'1'</span>
+<span class="kw1">select</span> @SomeCount <span class="sy0">=</span> <span class="kw2">@@rowcount</span> 
+&nbsp;
+<span class="kw1">select</span> @SomeCount </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @SomeCount int
+
+select 1
+union all
+select 2
+
+print '1'
+select @SomeCount = @@rowcount 
+
+select @SomeCount </pre></div></div>
+
+<p>You do this, move the print until after you populate your variable with the @@ROWCOUNT value</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @SomeCount <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> <span class="nu0">1</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="nu0">2</span>
+<span class="co1">-- no other code beyween the DML statement and populating @SomeCount </span>
+<span class="co1">-- with the @@rowcount value</span>
+<span class="kw1">select</span> @SomeCount <span class="sy0">=</span> <span class="kw2">@@rowcount</span> 
+<span class="kw1">print</span> <span class="st0">'1'</span>
+&nbsp;
+&nbsp;
+<span class="kw1">select</span> @SomeCount </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @SomeCount int
+
+select 1
+union all
+select 2
+-- no other code beyween the DML statement and populating @SomeCount 
+-- with the @@rowcount value
+select @SomeCount = @@rowcount 
+print '1'
+
+
+select @SomeCount </pre></div></div>
+
+<p>To learn more about @@ROWCOUNT visit Books On Line: http://msdn.microsoft.com/en-us/library/ms187316.aspx</p>
+<h2>What about @@error</h2>
+<p>I am just giving you a little more code here, the same also applies for @@ERROR, so if you have code that needs to store both @@ERROR and @@ROWCOUNT then do it in one assignment.</p>
+<p>There are 3 versions of the same query below, all of them will terminate with an error.<br />
+First let&#8217;s look at code that first grabs the rowcount and then the error</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @SomeCount <span class="kw1">int</span>, @Error <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> <span class="nu0">1</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="nu0">2</span><span class="sy0">/</span><span class="nu0">0</span>
+&nbsp;
+&nbsp;
+<span class="kw1">select</span> @SomeCount <span class="sy0">=</span> <span class="kw2">@@rowcount</span> 
+<span class="kw1">select</span> &nbsp;@Error <span class="sy0">=</span> <span class="kw2">@@error</span>
+&nbsp;
+&nbsp;
+<span class="kw1">select</span> @SomeCount <span class="kw1">as</span> TheRowcount, @Error <span class="kw1">as</span> TheErrorCount</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @SomeCount int, @Error int
+
+select 1
+union all
+select 2/0
+
+
+select @SomeCount = @@rowcount 
+select  @Error = @@error
+
+
+select @SomeCount as TheRowcount, @Error as TheErrorCount</pre></div></div>
+
+<pre>TheRowcount	TheErrorCount
+0	        0</pre>
+<p>As you can see both variables are 0, TheRowcount is 0 because the query terminated and no rows were returned, TheErrorCount is 0 because the statement that assigned @SomeCount was successful </p>
+<p>Here is another example, all we did was reversed the assignment of @SomeCount and @Error</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @SomeCount <span class="kw1">int</span>, @Error <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> <span class="nu0">1</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="nu0">2</span><span class="sy0">/</span><span class="nu0">0</span>
+&nbsp;
+<span class="kw1">select</span> &nbsp;@Error <span class="sy0">=</span> <span class="kw2">@@error</span>
+<span class="kw1">select</span> @SomeCount <span class="sy0">=</span> <span class="kw2">@@rowcount</span> 
+&nbsp;
+<span class="kw1">select</span> @SomeCount <span class="kw1">as</span> TheRowcount, @Error <span class="kw1">as</span> TheErrorCount</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @SomeCount int, @Error int
+
+select 1
+union all
+select 2/0
+
+select  @Error = @@error
+select @SomeCount = @@rowcount 
+
+select @SomeCount as TheRowcount, @Error as TheErrorCount</pre></div></div>
+
+<pre>TheRowcount	TheErrorCount
+1	        8134</pre>
+<p>In this case TheRowcount is 1 because the statement that assigned @Error reset @@ROWCOUNT to 0</p>
+<p>Finally we will look at what happens when you assign both variables with one statement</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @SomeCount <span class="kw1">int</span>, @Error <span class="kw1">int</span>
+&nbsp;
+<span class="kw1">select</span> <span class="nu0">1</span>
+<span class="kw1">union</span> all
+<span class="kw1">select</span> <span class="nu0">2</span><span class="sy0">/</span><span class="nu0">0</span>
+&nbsp;
+<span class="kw1">select</span> &nbsp;@Error <span class="sy0">=</span> <span class="kw2">@@error</span>, @SomeCount <span class="sy0">=</span> <span class="kw2">@@rowcount</span> 
+&nbsp;
+<span class="kw1">select</span> @SomeCount <span class="kw1">as</span> TheRowcount, @Error <span class="kw1">as</span> TheErrorCount</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @SomeCount int, @Error int
+
+select 1
+union all
+select 2/0
+
+select  @Error = @@error, @SomeCount = @@rowcount 
+
+select @SomeCount as TheRowcount, @Error as TheErrorCount</pre></div></div>
+
+<pre>TheRowcount	TheErrorCount
+0	        8134</pre>
+<p>This is correct, TheErrorCount returns the error number and TheRowcount returns 0 because the query blew up</p>
+<p>To learn more about @@ERROR visit Books On Line here: http://msdn.microsoft.com/en-us/library/ms188790.aspx</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/when-can-you-grab-rowcount-into-a-variab/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

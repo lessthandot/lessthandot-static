@@ -1,0 +1,433 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	>
+<channel>
+	<title>Comments on: Split string in SQL Server 2005+  CLR vs. T-SQL</title>
+	<atom:link href="/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/feed/" rel="self" type="application/rss+xml" />
+	<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Tue, 26 Feb 2019 12:40:14 +0000</lastBuildDate>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>By: Paul DeBrino</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-5554461</link>
+		<dc:creator><![CDATA[Paul DeBrino]]></dc:creator>
+		<pubDate>Fri, 10 Mar 2017 02:33:08 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-5554461</guid>
+		<description><![CDATA[While working on an interface between Pitney Bowes shipping system APIs and legacy data stored in Microsoft SQL Server, I needed a simple way to parse a delimited string. I knew how to accomplish this in Visual Basic but, after searching the internet, did not find a clean and simple approach using SQL stored procedures. I decided to write my own user-defined function which performed the duty with little effort. You are welcome to incorporate the solution into your own projects.
+
+---------------------------------------------------------------------------------------------------------
+
+/*
+Short Description: 
+A user-defined parsing function that enables SQL Server that also performs similarly to the VB &quot;Split&quot; function.
+
+Parameters: 
+1. String  : Value to parse, based on the specified delimiter. Limit 2000 characters (you may alter size limit as needed).
+2. String  : Delimiter value.  Single character value.
+3. Integer : Section To Return.  0 returns all sections as a table, otherwise specify the parsed section number you wish returned as nvarchar.
+4. String  : Section Data to Find.  Pass a zero-length string when not applicable. Section To Return defaults to 0 when using this feature.
+
+Returns:
+Table with one row per each parsed section:
+    String : SectionData
+    Identity : ID (useful when Section To Return parameter is 0 and you want to know the section number for each parsed value)
+
+General Usage:
+select * from splitstring_V2(&#039;ABC-123-DEF-789-Z&#039;, &#039;-&#039;, 0, &#039;&#039;)
+&#062;&#062; results in 5 rows -- 1 per each section parsed -- Use cursor or other method to process results.
+
+select * from splitstring_V2(&#039;ABC-123-DEF-789-Z&#039;, &#039;-&#039;, 0, &#039;DEF&#039;)
+&#062;&#062; results in 1 row: DEF, 3
+
+select * from splitstring_V2(&#039;ABC-123-DEF-789-Z&#039;, &#039;-&#039;, 4, &#039;&#039;)
+&#062;&#062; results in 1 row: 789, 4
+
+select * from splitstring_V2(&#039;ABC-123-DEF-789-S01&#039;, &#039;-S&#039;, 0, &#039;&#039;)
+&#062;&#062; results in 2 rows: ABC-123-DEF-789, 1  and  S01, 2 -- Use cursor or other method to process results.
+
+select * from splitstring_V2(&#039;ABC-123-DEF-789-S01&#039;, &#039;-S&#039;, 0, &#039;&#039;) where sectionnumber=2
+&#062;&#062; results in 1 row: S01, 2
+
+Usage to load result into a variable:
+select yourvariable = sectiondata from generic_use..splitstring(&#039;ABC-123-DEF-789-Z&#039;, &#039;-&#039;, 1, &#039;&#039;)
+
+Author: Paul DeBrino .:. InfinityRD.com .:. (C) Oct 2007
+Please retain the author, copyright and notes, if you adopt this user-defined function.
+
+Long Description: While working on an interface between Pitney Bowes shipping system APIs and legacy data stored in Microsoft SQL Server, I needed a simple way to parse a delimited string. I knew how to accomplish this in Visual Basic but, after searching the internet, did not find a clean and simple approach using SQL stored procedures. I decided to write my own user-defined function which performed the duty with little effort. You are welcome to incorporate the solution into your own projects.
+*/
+
+ALTER FUNCTION [dbo].[SplitString_V2]
+(
+    @p_StringToParse as nvarchar(2000), 
+    @p_Delimiter as varchar(5),
+    @p_SectionToReturn as int,
+    @p_SectionDataToSearchFor as varchar(2000)
+)
+RETURNS @v_Results TABLE 
+(
+    SectionData nvarchar(2000),
+    SectionNumber int 
+)
+AS
+BEGIN
+
+    declare @v_Index int, @v_Section int, @v_Slice nvarchar(2000), @v_SectionDataToSearchForFound bit
+    set @v_Index = 1
+    set @v_Section = 1
+    set @v_SectionDataToSearchForFound = 0
+
+    -- Monitor for incorrect use of parameters: SectionToReturn must be 0 when specifying SectionDataToSearchFor:
+    If ((isnull(@p_SectionDataToSearchFor,&#039;&#039;) &#062; &#039;&#039;) and (@p_SectionToReturn  0))
+        Set @p_SectionToReturn = 0
+
+    If @p_StringToParse is null RETURN
+
+	WHILE @v_Index !=0
+	BEGIN      
+		-- GET THE INDEX OF THE FIRST OCCURENCE OF THE DELIMITER:
+		SELECT @v_Index = CHARINDEX(@p_Delimiter,@p_StringToParse)
+
+		-- CAPTURE THE SECTION TO THE LEFT OF DELIMITER INTO THE SLICE VARIABLE:
+		IF @v_Index !=0
+			SELECT @v_Slice = LEFT(@p_StringToParse, @v_Index - 1)
+		ELSE
+			SELECT @v_Slice = @p_StringToParse
+
+		-- PLACE THE SLICE INTO THE RESULT:
+		IF @p_SectionToReturn = 0
+		BEGIN
+			IF ((isnull(@p_SectionDataToSearchFor,&#039;&#039;) &#062; &#039;&#039;) AND (@p_SectionDataToSearchFor = @v_Slice))
+			BEGIN
+				SET @v_SectionDataToSearchForFound = 1
+				INSERT INTO @v_Results(SectionData, SectionNumber) VALUES(@v_Slice, @v_Section)
+				BREAK
+			END
+			ELSE IF (isnull(@p_SectionDataToSearchFor,&#039;&#039;) = &#039;&#039;)
+				INSERT INTO @v_Results(SectionData, SectionNumber) VALUES(@v_Slice, @v_Section)
+		END
+		ELSE IF @v_Section = @p_SectionToReturn
+			BEGIN
+				INSERT INTO @v_Results(SectionData, SectionNumber) VALUES(@v_Slice, @v_Section)
+				BREAK
+		END
+
+		-- REMOVE THE CURRENT SECTION FROM THE STRING TO PARSE:
+		SELECT @p_StringToParse = RIGHT(@p_StringToParse, LEN(@p_StringToParse) - @v_Index)
+
+		-- BREAK IF NOTHING LEFT TO PARSE:
+		IF LEN(@p_StringToParse) = 0 
+		BREAK
+
+		SET @v_Section = @v_Section + 1 
+	END
+
+	IF ((isnull(@p_SectionDataToSearchFor,&#039;&#039;) &#062; &#039;&#039;) AND (@v_SectionDataToSearchForFound = 0))
+		Delete from @v_Results
+
+	RETURN
+
+END
+
+---------------------------------------------------------------------------------------------------------]]></description>
+		<content:encoded><![CDATA[<p>While working on an interface between Pitney Bowes shipping system APIs and legacy data stored in Microsoft SQL Server, I needed a simple way to parse a delimited string. I knew how to accomplish this in Visual Basic but, after searching the internet, did not find a clean and simple approach using SQL stored procedures. I decided to write my own user-defined function which performed the duty with little effort. You are welcome to incorporate the solution into your own projects.</p>
+<p>&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;</p>
+<p>/*<br />
+Short Description:<br />
+A user-defined parsing function that enables SQL Server that also performs similarly to the VB &#8220;Split&#8221; function.</p>
+<p>Parameters:<br />
+1. String  : Value to parse, based on the specified delimiter. Limit 2000 characters (you may alter size limit as needed).<br />
+2. String  : Delimiter value.  Single character value.<br />
+3. Integer : Section To Return.  0 returns all sections as a table, otherwise specify the parsed section number you wish returned as nvarchar.<br />
+4. String  : Section Data to Find.  Pass a zero-length string when not applicable. Section To Return defaults to 0 when using this feature.</p>
+<p>Returns:<br />
+Table with one row per each parsed section:<br />
+    String : SectionData<br />
+    Identity : ID (useful when Section To Return parameter is 0 and you want to know the section number for each parsed value)</p>
+<p>General Usage:<br />
+select * from splitstring_V2(&#8216;ABC-123-DEF-789-Z&#8217;, &#8216;-&#8216;, 0, &#8221;)<br />
+&gt;&gt; results in 5 rows &#8212; 1 per each section parsed &#8212; Use cursor or other method to process results.</p>
+<p>select * from splitstring_V2(&#8216;ABC-123-DEF-789-Z&#8217;, &#8216;-&#8216;, 0, &#8216;DEF&#8217;)<br />
+&gt;&gt; results in 1 row: DEF, 3</p>
+<p>select * from splitstring_V2(&#8216;ABC-123-DEF-789-Z&#8217;, &#8216;-&#8216;, 4, &#8221;)<br />
+&gt;&gt; results in 1 row: 789, 4</p>
+<p>select * from splitstring_V2(&#8216;ABC-123-DEF-789-S01&#8217;, &#8216;-S&#8217;, 0, &#8221;)<br />
+&gt;&gt; results in 2 rows: ABC-123-DEF-789, 1  and  S01, 2 &#8212; Use cursor or other method to process results.</p>
+<p>select * from splitstring_V2(&#8216;ABC-123-DEF-789-S01&#8217;, &#8216;-S&#8217;, 0, &#8221;) where sectionnumber=2<br />
+&gt;&gt; results in 1 row: S01, 2</p>
+<p>Usage to load result into a variable:<br />
+select yourvariable = sectiondata from generic_use..splitstring(&#8216;ABC-123-DEF-789-Z&#8217;, &#8216;-&#8216;, 1, &#8221;)</p>
+<p>Author: Paul DeBrino .:. InfinityRD.com .:. (C) Oct 2007<br />
+Please retain the author, copyright and notes, if you adopt this user-defined function.</p>
+<p>Long Description: While working on an interface between Pitney Bowes shipping system APIs and legacy data stored in Microsoft SQL Server, I needed a simple way to parse a delimited string. I knew how to accomplish this in Visual Basic but, after searching the internet, did not find a clean and simple approach using SQL stored procedures. I decided to write my own user-defined function which performed the duty with little effort. You are welcome to incorporate the solution into your own projects.<br />
+*/</p>
+<p>ALTER FUNCTION [dbo].[SplitString_V2]<br />
+(<br />
+    @p_StringToParse as nvarchar(2000),<br />
+    @p_Delimiter as varchar(5),<br />
+    @p_SectionToReturn as int,<br />
+    @p_SectionDataToSearchFor as varchar(2000)<br />
+)<br />
+RETURNS @v_Results TABLE<br />
+(<br />
+    SectionData nvarchar(2000),<br />
+    SectionNumber int<br />
+)<br />
+AS<br />
+BEGIN</p>
+<p>    declare @v_Index int, @v_Section int, @v_Slice nvarchar(2000), @v_SectionDataToSearchForFound bit<br />
+    set @v_Index = 1<br />
+    set @v_Section = 1<br />
+    set @v_SectionDataToSearchForFound = 0</p>
+<p>    &#8212; Monitor for incorrect use of parameters: SectionToReturn must be 0 when specifying SectionDataToSearchFor:<br />
+    If ((isnull(@p_SectionDataToSearchFor,&#8221;) &gt; &#8221;) and (@p_SectionToReturn  0))<br />
+        Set @p_SectionToReturn = 0</p>
+<p>    If @p_StringToParse is null RETURN</p>
+<p>	WHILE @v_Index !=0<br />
+	BEGIN<br />
+		&#8212; GET THE INDEX OF THE FIRST OCCURENCE OF THE DELIMITER:<br />
+		SELECT @v_Index = CHARINDEX(@p_Delimiter,@p_StringToParse)</p>
+<p>		&#8212; CAPTURE THE SECTION TO THE LEFT OF DELIMITER INTO THE SLICE VARIABLE:<br />
+		IF @v_Index !=0<br />
+			SELECT @v_Slice = LEFT(@p_StringToParse, @v_Index &#8211; 1)<br />
+		ELSE<br />
+			SELECT @v_Slice = @p_StringToParse</p>
+<p>		&#8212; PLACE THE SLICE INTO THE RESULT:<br />
+		IF @p_SectionToReturn = 0<br />
+		BEGIN<br />
+			IF ((isnull(@p_SectionDataToSearchFor,&#8221;) &gt; &#8221;) AND (@p_SectionDataToSearchFor = @v_Slice))<br />
+			BEGIN<br />
+				SET @v_SectionDataToSearchForFound = 1<br />
+				INSERT INTO @v_Results(SectionData, SectionNumber) VALUES(@v_Slice, @v_Section)<br />
+				BREAK<br />
+			END<br />
+			ELSE IF (isnull(@p_SectionDataToSearchFor,&#8221;) = &#8221;)<br />
+				INSERT INTO @v_Results(SectionData, SectionNumber) VALUES(@v_Slice, @v_Section)<br />
+		END<br />
+		ELSE IF @v_Section = @p_SectionToReturn<br />
+			BEGIN<br />
+				INSERT INTO @v_Results(SectionData, SectionNumber) VALUES(@v_Slice, @v_Section)<br />
+				BREAK<br />
+		END</p>
+<p>		&#8212; REMOVE THE CURRENT SECTION FROM THE STRING TO PARSE:<br />
+		SELECT @p_StringToParse = RIGHT(@p_StringToParse, LEN(@p_StringToParse) &#8211; @v_Index)</p>
+<p>		&#8212; BREAK IF NOTHING LEFT TO PARSE:<br />
+		IF LEN(@p_StringToParse) = 0<br />
+		BREAK</p>
+<p>		SET @v_Section = @v_Section + 1<br />
+	END</p>
+<p>	IF ((isnull(@p_SectionDataToSearchFor,&#8221;) &gt; &#8221;) AND (@v_SectionDataToSearchForFound = 0))<br />
+		Delete from @v_Results</p>
+<p>	RETURN</p>
+<p>END</p>
+<p>&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Comparing Simple Efficiencies: T-SQL UDF vs SQCLR UDF for Splitting Strings</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-1376382</link>
+		<dc:creator><![CDATA[Comparing Simple Efficiencies: T-SQL UDF vs SQCLR UDF for Splitting Strings]]></dc:creator>
+		<pubDate>Mon, 14 Jul 2014 11:45:31 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-1376382</guid>
+		<description><![CDATA[[&#8230;] Adam Machanic. Faster, More Scalable String Splitting. MSDN. Using CLR Integration in SQL Server 2005 MSDN. Regular Expressions Make Pattern Matching And Data Extraction Easier Simple-Talk. CLR Assembly RegEx Functions for SQL Server by Example SQLSkills White Paper. SQL Server DBA Guide to the SQLCLR StackOverflow Forum Question. Are CLR stored procedures preferred over TSQL stored procedures in SQL 2005+ ? StackOverflow Forum Question. Microsoft SQL Equivalent of MySQL REGEXP Ted Kreuger. Split String in SQL Server 2005+ CLR vs T-SQL [&#8230;]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] Adam Machanic. Faster, More Scalable String Splitting. MSDN. Using CLR Integration in SQL Server 2005 MSDN. Regular Expressions Make Pattern Matching And Data Extraction Easier Simple-Talk. CLR Assembly RegEx Functions for SQL Server by Example SQLSkills White Paper. SQL Server DBA Guide to the SQLCLR StackOverflow Forum Question. Are CLR stored procedures preferred over TSQL stored procedures in SQL 2005+ ? StackOverflow Forum Question. Microsoft SQL Equivalent of MySQL REGEXP Ted Kreuger. Split String in SQL Server 2005+ CLR vs T-SQL [&#8230;]</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: SQLSERVER2008中CTE的Split与CLR的性能比较 &#124; DevelopSearch</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-609942</link>
+		<dc:creator><![CDATA[SQLSERVER2008中CTE的Split与CLR的性能比较 &#124; DevelopSearch]]></dc:creator>
+		<pubDate>Sat, 19 Apr 2014 03:32:25 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-609942</guid>
+		<description><![CDATA[[&#8230;] 您还可以参考：Split string in SQL Server 2005+ CLR vs. T-SQLAuthor:Petter Liu [&#8230;]]]></description>
+		<content:encoded><![CDATA[<p>[&#8230;] 您还可以参考：Split string in SQL Server 2005+ CLR vs. T-SQLAuthor:Petter Liu [&#8230;]</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Pavel Pawlowski</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-1218</link>
+		<dc:creator><![CDATA[Pavel Pawlowski]]></dc:creator>
+		<pubDate>Sun, 01 Jan 2012 19:48:19 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-1218</guid>
+		<description><![CDATA[I was also playing with the strings splitting a while ago and found that the CLR is the fastest when used in wit small and even very large strings.&lt;br /&gt;
+&lt;br /&gt;
+It is only important to write the CLR in right way so CLR memory isn&#039;t wasted and App Domains are not recycled etc.&lt;br /&gt;
+&lt;br /&gt;
+I found, that the fastest method is simply iterate the characters in the string using a foreach loop and use an intermediate buffer.&lt;br /&gt;
+&lt;br /&gt;
+An article is here: http://www.pawlowski.cz/2010/10/fastest-csv-strings-splitting-using-clr-t-sql-vs-clr-revisited/&lt;br /&gt;
+&lt;br /&gt;
+The function mentioned on the site uses a parameter for defining maximum internal buffer lengths (maximum length of single delimited string) but it&#039;s very easy to update it to version which automatically adjusts the buffer if it&#039;s length isn&#039;t enough.]]></description>
+		<content:encoded><![CDATA[<p>I was also playing with the strings splitting a while ago and found that the CLR is the fastest when used in wit small and even very large strings.</p>
+<p>It is only important to write the CLR in right way so CLR memory isn&#8217;t wasted and App Domains are not recycled etc.</p>
+<p>I found, that the fastest method is simply iterate the characters in the string using a foreach loop and use an intermediate buffer.</p>
+<p>An article is here: <a href="http://www.pawlowski.cz/2010/10/fastest-csv-strings-splitting-using-clr-t-sql-vs-clr-revisited/" rel="nofollow">http://www.pawlowski.cz/2010/10/fastest-csv-strings-splitting-using-clr-t-sql-vs-clr-revisited/</a></p>
+<p>The function mentioned on the site uses a parameter for defining maximum internal buffer lengths (maximum length of single delimited string) but it&#8217;s very easy to update it to version which automatically adjusts the buffer if it&#8217;s length isn&#8217;t enough.</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Naomi Nosonovsky</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-1237</link>
+		<dc:creator><![CDATA[Naomi Nosonovsky]]></dc:creator>
+		<pubDate>Mon, 09 Aug 2010 12:39:44 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-1237</guid>
+		<description><![CDATA[Great round up by Aaron Bertrand here&lt;br /&gt;
+&lt;a href=&quot;http://sqlblog.com/blogs/aaron_bertrand/archive/2010/07/07/splitting-a-list-of-integers-another-roundup.aspx&quot;&gt;http://sqlblog.com/blogs/aaron_bertrand/archive/2010/07/07/splitting-a-list-of-integers-another-roundup.aspx&lt;/a&gt;&lt;br /&gt;
+&lt;br /&gt;
+CLR is a winner in his tests when we&#039;re dealing with big lists.]]></description>
+		<content:encoded><![CDATA[<p>Great round up by Aaron Bertrand here<br />
+<a href="http://sqlblog.com/blogs/aaron_bertrand/archive/2010/07/07/splitting-a-list-of-integers-another-roundup.aspx">http://sqlblog.com/blogs/aaron_bertrand/archive/2010/07/07/splitting-a-list-of-integers-another-roundup.aspx</a></p>
+<p>CLR is a winner in his tests when we&#8217;re dealing with big lists.</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: praveen</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-1235</link>
+		<dc:creator><![CDATA[praveen]]></dc:creator>
+		<pubDate>Fri, 04 Jun 2010 16:42:56 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-1235</guid>
+		<description><![CDATA[Here is my version of the T-SQL UDF function.&lt;br /&gt;
+http://praveenbattula.blogspot.com/2010/06/best-split-udf-function-with-delimeter.html]]></description>
+		<content:encoded><![CDATA[<p>Here is my version of the T-SQL UDF function.<br />
+<a href="http://praveenbattula.blogspot.com/2010/06/best-split-udf-function-with-delimeter.html" rel="nofollow">http://praveenbattula.blogspot.com/2010/06/best-split-udf-function-with-delimeter.html</a></p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Jeff Moden</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-1236</link>
+		<dc:creator><![CDATA[Jeff Moden]]></dc:creator>
+		<pubDate>Mon, 14 Sep 2009 00:10:43 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-1236</guid>
+		<description><![CDATA[@Paul White&lt;br /&gt;
+&lt;br /&gt;
+I&#039;ve got to revisit that rather long thread... except for the CLR test which did beat the Tally table on the longer (ie. Varchar(MAX)), Tally splits on VARCHAR(8000) came very close to the CLR.  The problem I have with the tests that where done is just as you say... most of the tests were done with equal space values.  Heh... except for Phil&#039;s Moby Dick split.&lt;br /&gt;
+&lt;br /&gt;
+What Phil didn&#039;t tell everyone is that he an I did a race on splitting the text of Moby Dick on another site.  On his machine, the While Loop he uses won.  On my machine, the Tally table won.  We didn&#039;t test using a CTE.&lt;br /&gt;
+&lt;br /&gt;
+That&#039;s kind of brings us to what Adam said... you need to test against the actual data you&#039;re going to be splitting and you need to do it on the machine that will be doing all the heavy lifting.&lt;br /&gt;
+&lt;br /&gt;
+Shifting gears, I will say that the Tally table has a comparative performance problem when splitting VARCHAR(MAX) even if it contains less than 8000 characters because of it&#039;s very nature to be &quot;out of row&quot;.  But, only a very well written very short CLR will beat the Tally table on VARCHAR(8000).  Even then, the Tally table comes so close that it&#039;s not worth the trip to the world of CLR&#039;s for me.&lt;br /&gt;
+&lt;br /&gt;
+Also, anyone who uses a user defined function to split a whole table of CSV&#039;s is making a mistake.  The ONLY exception to that rule is Erland&#039;s TVF splitter.&lt;br /&gt;
+&lt;br /&gt;
+VTW, Erland... nice article.]]></description>
+		<content:encoded><![CDATA[<p>@Paul White</p>
+<p>I&#8217;ve got to revisit that rather long thread&#8230; except for the CLR test which did beat the Tally table on the longer (ie. Varchar(MAX)), Tally splits on VARCHAR(8000) came very close to the CLR.  The problem I have with the tests that where done is just as you say&#8230; most of the tests were done with equal space values.  Heh&#8230; except for Phil&#8217;s Moby Dick split.</p>
+<p>What Phil didn&#8217;t tell everyone is that he an I did a race on splitting the text of Moby Dick on another site.  On his machine, the While Loop he uses won.  On my machine, the Tally table won.  We didn&#8217;t test using a CTE.</p>
+<p>That&#8217;s kind of brings us to what Adam said&#8230; you need to test against the actual data you&#8217;re going to be splitting and you need to do it on the machine that will be doing all the heavy lifting.</p>
+<p>Shifting gears, I will say that the Tally table has a comparative performance problem when splitting VARCHAR(MAX) even if it contains less than 8000 characters because of it&#8217;s very nature to be &#8220;out of row&#8221;.  But, only a very well written very short CLR will beat the Tally table on VARCHAR(8000).  Even then, the Tally table comes so close that it&#8217;s not worth the trip to the world of CLR&#8217;s for me.</p>
+<p>Also, anyone who uses a user defined function to split a whole table of CSV&#8217;s is making a mistake.  The ONLY exception to that rule is Erland&#8217;s TVF splitter.</p>
+<p>VTW, Erland&#8230; nice article.</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Erland Sommarskog</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-1234</link>
+		<dc:creator><![CDATA[Erland Sommarskog]]></dc:creator>
+		<pubDate>Sat, 05 Sep 2009 12:21:09 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-1234</guid>
+		<description><![CDATA[I see many comments about this and that being faster in that and that context. What all that leads to is that if you need the absolutely best solution in some real application, you need to run your own benchmark. &lt;br /&gt;
+&lt;br /&gt;
+If you want to read performance data about string-splitting until you are blue in the face, I can offer http://www.sommarskog.se/arrays-in-sql-perftest.html. &lt;br /&gt;
+&lt;br /&gt;
+I like to comment on Phil Factor who said: &quot;CLR-based routines are better for splitting small strings and TSQL solutions are better for large strings.&quot; I found nothing in my tests that indicates this. Au contrîare, when the string exceeds a certain size - around 600 KB on x64, 840 on x86 - execution times takes an incontiguous jump, and from there the slope is steeper. See my article above for details.&lt;br /&gt;]]></description>
+		<content:encoded><![CDATA[<p>I see many comments about this and that being faster in that and that context. What all that leads to is that if you need the absolutely best solution in some real application, you need to run your own benchmark. </p>
+<p>If you want to read performance data about string-splitting until you are blue in the face, I can offer <a href="http://www.sommarskog.se/arrays-in-sql-perftest.html" rel="nofollow">http://www.sommarskog.se/arrays-in-sql-perftest.html</a>. </p>
+<p>I like to comment on Phil Factor who said: &#8220;CLR-based routines are better for splitting small strings and TSQL solutions are better for large strings.&#8221; I found nothing in my tests that indicates this. Au contrîare, when the string exceeds a certain size &#8211; around 600 KB on x64, 840 on x86 &#8211; execution times takes an incontiguous jump, and from there the slope is steeper. See my article above for details.</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Ted Krueger (onpnt)</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-1233</link>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+		<pubDate>Wed, 02 Sep 2009 12:48:22 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-1233</guid>
+		<description><![CDATA[More than happy to do that.  I will later and post results.  In the 24 hours of pass sessions now :-)]]></description>
+		<content:encoded><![CDATA[<p>More than happy to do that.  I will later and post results.  In the 24 hours of pass sessions now 🙂</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: niikola</title>
+		<link>/index.php/datamgmt/dbprogramming/split-string-in-sql-server-2005-clr-vs-t/#comment-1232</link>
+		<dc:creator><![CDATA[niikola]]></dc:creator>
+		<pubDate>Wed, 02 Sep 2009 12:40:17 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2009/04/split-string-in-sql-server-2005-clr-vs-t/#comment-1232</guid>
+		<description><![CDATA[Could you compare results with the next one using CTE.&lt;br /&gt;
+My test shows this one is much faster.&lt;br /&gt;
+&lt;br /&gt;
+Alter Function fnSplitWithCTE(&lt;br /&gt;
+&#160;@List varchar(8000),&lt;br /&gt;
+&#160;@Delimiter char(1),&lt;br /&gt;
+&#160;@ShowEmpty bit&lt;br /&gt;
+)&lt;br /&gt;
+Returns @ret Table (&lt;br /&gt;
+&#160;pos int Primary Key,&lt;br /&gt;
+&#160;value varchar(8000)&lt;br /&gt;
+)&lt;br /&gt;
+as Begin&lt;br /&gt;
+&#160;&#160;&#160;Declare @len int&lt;br /&gt;
+&#160;&#160;&#160;Set @len=len(@List)+1&lt;br /&gt;
+&lt;br /&gt;
+&#160;&#160;&#160;;With a as&lt;br /&gt;
+&#160;&#160;&#160;( &lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;Select 1 as nStart, &lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;isNull(NullIf(charindex(@Delimiter,@List,1),0),@len) as nEnd,&lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;rtrim(ltrim(substring(@List,1,isNull(NullIf(charindex(@Delimiter,@List,1),0),@len)-1))) as value&lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;Union All&lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;Select nEnd+1, &lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;isNull(NullIf(charindex(@Delimiter,@List,nEnd+1),0),@len),&lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;rtrim(ltrim(substring(@List,nEnd+1,isNull(NullIf(charindex(@Delimiter,@List,nEnd+1),0),@len)-nEnd-1)))&lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;From a&lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;Where nEnd&#060;@len&lt;br /&gt;
+&#160;&#160;&#160;)&lt;br /&gt;
+&#160;&#160;&#160;Insert Into @ret&lt;br /&gt;
+&#160;&#160;&#160;Select Row_Number() over (order by nStart),&lt;br /&gt;
+&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;NullIf(value,&#039;&#039;)&lt;br /&gt;
+&#160;&#160;&#160;&#160;from a&lt;br /&gt;
+&#160;&#160;&#160;&#160;Where (@ShowEmpty=1 or Len(value)&#062;0)&lt;br /&gt;
+&#160;&#160;&#160;&#160;Return&lt;br /&gt;
+End&lt;br /&gt;]]></description>
+		<content:encoded><![CDATA[<p>Could you compare results with the next one using CTE.<br />
+My test shows this one is much faster.</p>
+<p>Alter Function fnSplitWithCTE(<br />
+&nbsp;@List varchar(8000),<br />
+&nbsp;@Delimiter char(1),<br />
+&nbsp;@ShowEmpty bit<br />
+)<br />
+Returns @ret Table (<br />
+&nbsp;pos int Primary Key,<br />
+&nbsp;value varchar(8000)<br />
+)<br />
+as Begin<br />
+&nbsp;&nbsp;&nbsp;Declare @len int<br />
+&nbsp;&nbsp;&nbsp;Set @len=len(@List)+1</p>
+<p>&nbsp;&nbsp;&nbsp;;With a as<br />
+&nbsp;&nbsp;&nbsp;( <br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Select 1 as nStart, <br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;isNull(NullIf(charindex(@Delimiter,@List,1),0),@len) as nEnd,<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rtrim(ltrim(substring(@List,1,isNull(NullIf(charindex(@Delimiter,@List,1),0),@len)-1))) as value<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Union All<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Select nEnd+1, <br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;isNull(NullIf(charindex(@Delimiter,@List,nEnd+1),0),@len),<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rtrim(ltrim(substring(@List,nEnd+1,isNull(NullIf(charindex(@Delimiter,@List,nEnd+1),0),@len)-nEnd-1)))<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;From a<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Where nEnd&lt;@len<br />
+&nbsp;&nbsp;&nbsp;)<br />
+&nbsp;&nbsp;&nbsp;Insert Into @ret<br />
+&nbsp;&nbsp;&nbsp;Select Row_Number() over (order by nStart),<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NullIf(value,&#8221;)<br />
+&nbsp;&nbsp;&nbsp;&nbsp;from a<br />
+&nbsp;&nbsp;&nbsp;&nbsp;Where (@ShowEmpty=1 or Len(value)&gt;0)<br />
+&nbsp;&nbsp;&nbsp;&nbsp;Return<br />
+End</p>
+]]></content:encoded>
+	</item>
+</channel>
+</rss>

@@ -1,0 +1,1003 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>maintenance &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/maintenance/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>How do you manage SQL Agent Jobs when using mirroring?</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/how-do-you-manage-sql/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/how-do-you-manage-sql/#comments</comments>
+		<pubDate>Fri, 25 Jan 2013 12:56:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[ha]]></category>
+		<category><![CDATA[ha/dr]]></category>
+		<category><![CDATA[jobs]]></category>
+		<category><![CDATA[maintenance]]></category>
+		<category><![CDATA[mirroring]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/how-do-you-manage-sql/</guid>
+		<description><![CDATA[I have a bunch of SQL Agent jobs that execute T-SQL against databases. A bunch of these databases are mirrored. Of course if the database is the principal then these jobs will work without a problem. But what happens if you failover? Now these jobs will&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I have a bunch of SQL Agent jobs that execute T-SQL against databases. A bunch of these databases are mirrored. Of course if the database is the principal then these jobs will work without a problem. But what happens if you failover? Now these jobs will start failing. You can either have the same jobs on both servers and have them enabled or disabled depending where the mirror or principal is. You can very easy enable or disable these whenever you failover. For example</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> msdb
+GO
+&nbsp;
+<span class="kw1">UPDATE</span> sysjobs
+<span class="kw1">SET</span> enabled <span class="sy0">=</span><span class="nu0">1</span>
+<span class="kw1">WHERE</span> name <span class="sy0">IN</span> <span class="br0">&#40;</span><span class="st0">''</span>,<span class="st0">''</span>....<span class="br0">&#41;</span> <span class="co1">--use a table that has all the jobs instead</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE msdb
+GO
+
+UPDATE sysjobs
+SET enabled =1
+WHERE name IN ('',''....) --use a table that has all the jobs instead</pre></div></div>
+
+<p>Or another way would be to check if the database is online to see if the job should continue running</p>
+<p>Here is such an example</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">IF</span> <span class="sy0">EXISTS</span><span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> &nbsp;<span class="nu0">1</span> &nbsp;<span class="kw1">FROM</span> sys.<span class="me1">databases</span>
+<span class="kw1">WHERE</span> state_desc <span class="sy0">=</span> <span class="st0">'ONLINE'</span>
+<span class="sy0">AND</span> collation_name <span class="kw1">IS</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="sy0">AND</span> name <span class="sy0">=</span> <span class="st0">'YourDB'</span><span class="br0">&#41;</span>
+<span class="kw1">BEGIN</span>
+<span class="kw1">PRINT</span> <span class="st0">'yep, good to go'</span>
+<span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">IF EXISTS(
+SELECT  1  FROM sys.databases
+WHERE state_desc = 'ONLINE'
+AND collation_name IS NOT NULL
+AND name = 'YourDB')
+BEGIN
+PRINT 'yep, good to go'
+END</pre></div></div>
+
+<p>The reason we also check for collation_name in addition to state_desc is documented in <a href="http://technet.microsoft.com/en-us/library/ms178534.aspx">Books On Line</a></p>
+<blockquote><p>A database that has just come online is not necessarily ready to accept connections. To identify when a database can accept connections, query the collation_name column of sys.databases or the Collation property of DATABASEPROPERTYEX. The database can accept connections when the database collation returns a non-null value. For AlwaysOn databases, query the database_state or database_state_desc columns of sys.dm_hadr_database_replica_states.</p></blockquote>
+<p>Yet another option would be to have a table with the &#8216;live&#8217; server for the database, this however is more used for jobs, SSIS packages and programs that live on other servers</p>
+<p>How do you manage your jobs when dealing with mirroring? Leave me a comment, I am interested in your approach.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/how-do-you-manage-sql/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 10: SQL Server Maintenance</title>
+		<link>/index.php/webdev/business-intelligence/sql-server-maintenance/</link>
+		<comments>/index.php/webdev/business-intelligence/sql-server-maintenance/#respond</comments>
+		<pubDate>Mon, 10 Dec 2012 14:50:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[checkdb]]></category>
+		<category><![CDATA[fragmentation]]></category>
+		<category><![CDATA[maintenance]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/sql-server-maintenance/</guid>
+		<description><![CDATA[This is day ten of the SQL Advent 2012 series of blog posts. Today we are going to look at SQL Server maintenance
+
+
+
+  
+That is all for day tenof the SQL Advent 2012 series, come back tomorrow for the next one, you can also check out all the posts f&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This is day ten of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to look at SQL Server maintenance<br />
+<a href="http://www.flickr.com/photos/43830351@N03/6052402695/" title="gear_shape by chance.press, on Flickr"><img src="http://farm7.staticflickr.com/6075/6052402695_6b30a5ea57_m.jpg" width="174" alt="gear_shape"style="float:left;margin:0 5px 0 0;" /></a></p>
+<p>Just like with a car or a house, you need to do maintenance on databases as well. SQL Server has gotten better over the years, there are less knobs you need to turn out of the box but maintenance is still required.<br />
+In this post I will be looking at some stuff that you need to be aware of. Some of the things I will mention can be thought of as maintenance as well as regular checks. Think of a DBA as a car mechanic, instead of an oil change, tune up or checking the tire pressure, the DBA will check index fragmentation, run DBCC CHECKDB and make sure you have enough space for the database to grow for the next predetermined period. The things I will cover in this post are: fragmentation of indexes, free drives space, space in filegroups, running DBCC CHECKDB  and finally making sure that you have the latest source code of your objects in a source control system.</p>
+<p>
+<h2>Check fragmentation of indexes</h2>
+<p>A lot of time your index will get fragmented over time if you do a lot of updates or inserts and deletes.<br />
+We will look at an example by creating a table, fragmenting the heck out of it and then doing a reorganize and rebuild on the index. I already wrote a blog post that shows this, you can find that post here: <a href="/index.php/DataMgmt/DataDesign/finding-fragmentation-of-an-index-and-fi">Finding Fragmentation Of An Index And Fixing It</a></p>
+<p>Now instead of rolling your own solution, I mentioned a couple of solutions that already exist in the <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2012-day-10">Reinventing the wheel</a> post from yesterday.  Take a look at <a href="http://ola.hallengren.com/sql-server-index-and-statistics-maintenance.html">SQL Server Index and Statistics Maintenance</a> by <a href="http://ola.hallengren.com/">Ola Hallengren</a></p>
+<p>Also check out this index defrag script by <a href="http://sqlfool.com/">Michelle Ufford</a> <a href="http://sqlfool.com/2011/06/index-defrag-script-v4-1/">Index Defrag Script, v4.1</a></p>
+<p><a href="http://www.sqlsentry.net/fragmentation-manager/sql-server-index-analysis-and-defrag.asp">SQL Sentry Fragmentation Manager</a> is another option, this tool is not free but does additional things like how many concurrent operations can run.</p>
+<p>
+<h2>Check that your database is healthy by running DBCC CHECKDB</h2>
+<p>What does DBCC CHECKDB do? Here is the explanation from <a href="http://msdn.microsoft.com/en-us/library/ms176064">Books On Line</a><br />
+<em>Checks the logical and physical integrity of all the objects in the specified database by performing the following operations:</p>
+<p>Runs DBCC CHECKALLOC on the database.</p>
+<p>Runs DBCC CHECKTABLE on every table and view in the database.</p>
+<p>Runs DBCC CHECKCATALOG on the database.</p>
+<p>Validates the contents of every indexed view in the database.</p>
+<p>Validates link-level consistency between table metadata and file system directories and files when storing varbinary(max) data in the file system using FILESTREAM.</p>
+<p>Validates the Service Broker data in the database.</em></p>
+<p>So how frequent should you be running DBCC CHECKDB? Ideally you should be running DBCC CHECKDB as frequent as possible, do you want to find out that there is corruption when it is very difficult to fix since two weeks have passed or do you want to find out the same day so that you can fix the table immediately.</p>
+<p>Paul Randal who worked on DBCC CHECKDB has a whole bunch of blog posts about DBCC CHECKDB, the posts can be found here http://www.sqlskills.com/blogs/paul/category/checkdb-from-every-angle.aspx</p>
+<p>
+<h2>Make sure that you have enough space left on the drives</h2>
+<p>Running out of space on a drive is not fun stuff, suddenly you can&#8217;t insert any more data into your tables because no new pages can be allocated. If you have tools in your shop like cacti then this is probably already monitored. If you don&#8217;t have any tools then either get a tool or roll your own. Here is how you can get the free space fo the drives with T-SQL</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #FixedDrives<span class="br0">&#40;</span>Drive <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>,MBFree <span class="kw1">INT</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">INSERT</span> #FixedDrives
+<span class="kw1">EXEC</span> xp_fixeddrives
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> #FixedDrives</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #FixedDrives(Drive CHAR(1),MBFree INT)
+
+INSERT #FixedDrives
+EXEC xp_fixeddrives
+
+SELECT * FROM #FixedDrives</pre></div></div>
+
+<p>Here is the output for one of my servers</p>
+<pre>Drive	MBFree
+------------------
+C	6916  -- System
+D	28921 -- Apps
+L	52403 -- Log
+M	4962  -- System databases
+T	86208 -- Temps
+U	71075 -- User databases 
+V	212075-- User databases </pre>
+<p>Here is a simple way of using T-SQL to create a SQL Agent job that runs every 10 minutes and will send an email if you go below the threshold that you specified. This code is very simple and is just to show you that you can do this in T-SQL. You can make it more dynamic/configurable by not hardcoding the drives or thresholds</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @MBFreeD <span class="kw1">INT</span>
+<span class="kw1">DECLARE</span> @MBFreeE <span class="kw1">INT</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #FixedDrives<span class="br0">&#40;</span>Drive <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>,MBFree <span class="kw1">INT</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">INSERT</span> #FixedDrives
+<span class="kw1">EXEC</span> xp_fixeddrives
+&nbsp;
+<span class="kw1">SELECT</span> @MBFreeD <span class="sy0">=</span> &nbsp;MBFree
+<span class="kw1">FROM</span> #FixedDrives
+<span class="kw1">WHERE</span> DRIVE <span class="sy0">=</span> <span class="st0">'D'</span>
+&nbsp;
+<span class="kw1">SELECT</span> @MBFreeE <span class="sy0">=</span> &nbsp;MBFree
+<span class="kw1">FROM</span> #FixedDrives
+<span class="kw1">WHERE</span> DRIVE <span class="sy0">=</span> <span class="st0">'E'</span>
+&nbsp;
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> #FixedDrives
+&nbsp;
+<span class="kw1">IF</span> @MBFreeD <span class="sy0">&lt;</span> <span class="nu0">30000</span> <span class="sy0">OR</span> @MBFreeE <span class="sy0">&lt;</span> <span class="nu0">10000</span>
+<span class="kw1">BEGIN</span>
+&nbsp; &nbsp; &nbsp; <span class="kw1">DECLARE</span> @Recipients <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">8000</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; <span class="kw1">SELECT</span> @Recipients <span class="sy0">=</span><span class="st0">'SomeGroup@SomeEmail.com'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">DECLARE</span> @p_body <span class="kw1">AS</span> <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="kw2">MAX</span><span class="br0">&#41;</span>, @p_subject <span class="kw1">AS</span> <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="kw2">MAX</span><span class="br0">&#41;</span>, @p_profile_name <span class="kw1">AS</span> <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="kw2">MAX</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">SET</span> @p_subject <span class="sy0">=</span> <span class="kw2">@@SERVERNAME</span> <span class="sy0">+</span> N<span class="st0">' &nbsp;Drive Space is running low'</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">SET</span> @p_body <span class="sy0">=</span> <span class="st0">' Drive Space is running low &lt;br&gt;&lt;br&gt;&lt;br&gt;'</span> <span class="sy0">+</span> <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">'Drive D has '</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">+</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,@MBFreeD<span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">' MB left &lt;br&gt;'</span> <span class="sy0">+</span> <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">13</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">'Drive E has '</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">+</span> <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,@MBFreeE<span class="br0">&#41;</span> <span class="sy0">+</span> <span class="st0">' MB left'</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">EXEC</span> msdb.<span class="me1">dbo</span>.<span class="me1">sp_send_dbmail</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;@recipients <span class="sy0">=</span> @Recipients,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;@body <span class="sy0">=</span> @p_body,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;@body_format <span class="sy0">=</span> <span class="st0">'HTML'</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;@subject <span class="sy0">=</span> @p_subject
+<span class="kw1">END</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @MBFreeD INT
+DECLARE @MBFreeE INT
+CREATE TABLE #FixedDrives(Drive CHAR(1),MBFree INT)
+
+INSERT #FixedDrives
+EXEC xp_fixeddrives
+
+SELECT @MBFreeD =  MBFree
+FROM #FixedDrives
+WHERE DRIVE = 'D'
+
+SELECT @MBFreeE =  MBFree
+FROM #FixedDrives
+WHERE DRIVE = 'E'
+
+
+DROP TABLE #FixedDrives
+
+IF @MBFreeD &lt; 30000 OR @MBFreeE &lt; 10000
+BEGIN
+      DECLARE @Recipients VARCHAR(8000)
+	  SELECT @Recipients ='SomeGroup@SomeEmail.com'
+		     
+		DECLARE @p_body AS NVARCHAR(MAX), @p_subject AS NVARCHAR(MAX), @p_profile_name AS NVARCHAR(MAX)
+
+		SET @p_subject = @@SERVERNAME + N'  Drive Space is running low'
+		SET @p_body = ' Drive Space is running low &lt;br&gt;&lt;br&gt;&lt;br&gt;' + CHAR(13) + CHAR(10) + 'Drive D has ' 
+		+ CONVERT(VARCHAR(20),@MBFreeD) + ' MB left &lt;br&gt;' + CHAR(13) + CHAR(10) + 'Drive E has ' 
+		+ CONVERT(VARCHAR(20),@MBFreeE) + ' MB left'
+
+		EXEC msdb.dbo.sp_send_dbmail
+		   @recipients = @Recipients,
+		   @body = @p_body,
+		   @body_format = 'HTML',
+		   @subject = @p_subject
+END</pre></div></div>
+
+<p>
+<h2>Make sure that you have enough space left for the filegroups</h2>
+<p>In the <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/sizing-database-files">Sizing database files</a> I talked about the importance of sizing database files. Just like you can run out of hard drive space, you can also fill up a file used by SQL Server. here is query that will tell you how big the file is, how much space is use and how much free space is left. You can use a query like this to alert you before you run out of space</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span>
+&nbsp; &nbsp; a.<span class="me1">FILEID</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>FILE_SIZE_MB<span class="br0">&#93;</span> <span class="sy0">=</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DECIMAL</span><span class="br0">&#40;</span><span class="nu0">12</span>,<span class="nu0">2</span><span class="br0">&#41;</span>,<span class="kw2">ROUND</span><span class="br0">&#40;</span>a.<span class="kw1">size</span><span class="sy0">/</span><span class="nu0">128.000</span>,<span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>SPACE_USED_MB<span class="br0">&#93;</span> <span class="sy0">=</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DECIMAL</span><span class="br0">&#40;</span><span class="nu0">12</span>,<span class="nu0">2</span><span class="br0">&#41;</span>,<span class="kw2">ROUND</span><span class="br0">&#40;</span><span class="kw2">FILEPROPERTY</span><span class="br0">&#40;</span>a.<span class="me1">name</span>,<span class="st0">'SpaceUsed'</span><span class="br0">&#41;</span><span class="sy0">/</span><span class="nu0">128.000</span>,<span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="br0">&#91;</span>FREE_SPACE_MB<span class="br0">&#93;</span> <span class="sy0">=</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">CONVERT</span><span class="br0">&#40;</span><span class="kw1">DECIMAL</span><span class="br0">&#40;</span><span class="nu0">12</span>,<span class="nu0">2</span><span class="br0">&#41;</span>,<span class="kw2">ROUND</span><span class="br0">&#40;</span><span class="br0">&#40;</span>a.<span class="me1">size</span><span class="sy0">-</span><span class="kw2">FILEPROPERTY</span><span class="br0">&#40;</span>a.<span class="me1">name</span>,<span class="st0">'SpaceUsed'</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">/</span><span class="nu0">128.000</span>,<span class="nu0">2</span><span class="br0">&#41;</span><span class="br0">&#41;</span> ,
+&nbsp; &nbsp; NAME <span class="sy0">=</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>a.<span class="me1">NAME</span>,<span class="nu0">35</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; FILENAME <span class="sy0">=</span> <span class="kw1">LEFT</span><span class="br0">&#40;</span>a.<span class="me1">FILENAME</span>,<span class="nu0">60</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span>
+&nbsp; &nbsp; dbo.<span class="me1">sysfiles</span> a</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT
+	a.FILEID,
+	[FILE_SIZE_MB] = 
+		CONVERT(DECIMAL(12,2),ROUND(a.size/128.000,2)),
+	[SPACE_USED_MB] =
+		CONVERT(DECIMAL(12,2),ROUND(FILEPROPERTY(a.name,'SpaceUsed')/128.000,2)),
+	[FREE_SPACE_MB] =
+		CONVERT(DECIMAL(12,2),ROUND((a.size-FILEPROPERTY(a.name,'SpaceUsed'))/128.000,2)) ,
+	NAME = LEFT(a.NAME,35),
+	FILENAME = LEFT(a.FILENAME,60)
+FROM
+	dbo.sysfiles a</pre></div></div>
+
+<p>
+<h2>Have the latest scripts of all your objects</h2>
+<p>You might say that you have all the code for your objects in the database. What if you want to go back to the version of the proc from 3 days ago, is it really easier to restore a 800 GB backup from 3 days ago just to get the stored proc code? Of course not, make sure that you have DDL scripts of every object in source control, your life will be much easier.</p>
+<p>I only touched on a couple of points here, some of the things mentioned here will also show up in the proactive notifications post in a couple of days. There is much more to maintenance than this, keep informed and make sure you understand what needs to be done.</p>
+<p>That is all for day ten of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a>, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/business-intelligence/sql-server-maintenance/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>You don&#8217;t need to shrink a database to get a smaller backup</title>
+		<link>/index.php/datamgmt/datadesign/you-don-t-need-to/</link>
+		<comments>/index.php/datamgmt/datadesign/you-don-t-need-to/#respond</comments>
+		<pubDate>Sat, 31 Mar 2012 16:23:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[maintenance]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/03/you-don-t-need-to/</guid>
+		<description><![CDATA[Last weekend I decided to do some maintenance on one of our database to see if I can get some freespace back. I use compression for some of the older tables and also reindexed the tables with a higher fill factor. After I was done, I got over 200 GB of&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Last weekend I decided to do some maintenance on one of our database to see if I can get some freespace back. I use compression for some of the older tables and also reindexed the tables with a higher fill factor. After I was done, I got over 200 GB of additional free space</p>
+<p>Here is what the database looked like before I did the maintenance</p>
+<pre>FILEID	FILE_SIZE_MB	SPACE_USED_MB	FREE_SPACE_MB
+1	179353.81	162922.13	16431.69
+2	    64.01	    14.33	   49.68
+3	297089.13	265538.44	31550.69
+4	344555.69	298126.69	46429.00
+5	165258.50	123946.63	41311.88</pre>
+<p>Here is what the database looked like after I did the maintenance</p>
+<pre>FILEID	FILE_SIZE_MB	SPACE_USED_MB	FREE_SPACE_MB
+1	179353.81	110124.50	 69229.31
+2	  2085.63	   994.09	  1091.54
+3	297089.13	259595.44	 37493.69
+4	344555.69	169405.19	175150.50
+5	186822.69	123962.00	 62860.69</pre>
+<p>As you can see I did nicely here, free space for fileid 4 went from 46 GB to 175 GB, for fileid 1 it went from 16 GB to 69 GB</p>
+<p>Of course I had to brag about this and then it happened&#8230;.the sentence you never want to hear&#8230;&#8230;.how come you didn&#8217;t shrink the database, the backups will still be as big&#8230;you are wasting space&#8230;.if only I could send Paul Randal or Ted Krueger to this person&#8230;&#8230;.</p>
+<p>So let&#8217;s debunk that myth shall we?</p>
+<p>First create these 3 database, they will be 3 MB, 3 GB and 9 GB in size</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestSmall<span class="br0">&#93;</span>
+&nbsp;<span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmall'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:SQLFilesTestSmall.mdf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 3072KB , FILEGROWTH <span class="sy0">=</span> 1024KB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmall_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:SQLFilesTestSmall_log.ldf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 1024KB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">10</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestLarge<span class="br0">&#93;</span>
+&nbsp;<span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmall'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:SQLFilesTestLarge.mdf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 3072MB , FILEGROWTH <span class="sy0">=</span> 1024KB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmall_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:SQLFilesTestLarge_log.ldf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 1024KB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">10</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestLarger<span class="br0">&#93;</span>
+&nbsp;<span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmall'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:SQLFilesTestLarger.mdf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 9072MB , FILEGROWTH <span class="sy0">=</span> 1024KB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmall_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:SQLFilesTestLarger_log.ldf'</span> , <span class="kw1">SIZE</span> <span class="sy0">=</span> 1024KB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">10</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE [TestSmall]
+ ON  PRIMARY 
+( NAME = N'TestSmall', FILENAME = N'C:SQLFilesTestSmall.mdf' , SIZE = 3072KB , FILEGROWTH = 1024KB )
+ LOG ON 
+( NAME = N'TestSmall_log', FILENAME = N'C:SQLFilesTestSmall_log.ldf' , SIZE = 1024KB , FILEGROWTH = 10%)
+GO
+
+
+
+CREATE DATABASE [TestLarge]
+ ON  PRIMARY 
+( NAME = N'TestSmall', FILENAME = N'C:SQLFilesTestLarge.mdf' , SIZE = 3072MB , FILEGROWTH = 1024KB )
+ LOG ON 
+( NAME = N'TestSmall_log', FILENAME = N'C:SQLFilesTestLarge_log.ldf' , SIZE = 1024KB , FILEGROWTH = 10%)
+GO
+
+
+
+CREATE DATABASE [TestLarger]
+ ON  PRIMARY 
+( NAME = N'TestSmall', FILENAME = N'C:SQLFilesTestLarger.mdf' , SIZE = 9072MB , FILEGROWTH = 1024KB )
+ LOG ON 
+( NAME = N'TestSmall_log', FILENAME = N'C:SQLFilesTestLarger_log.ldf' , SIZE = 1024KB , FILEGROWTH = 10%)
+GO</pre></div></div>
+
+<p>Here is what it looks like in file explorer</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/sqlfilesorig.PNG?mtime=1333217594"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/sqlfilesorig.PNG?mtime=1333217594" width="364" height="262" /></a></div>
+<p>Or if you want to do this from T-SQL</p>
+<p>exec sp_helpdb </p>
+<pre>name		db_size	    owner		dbid	created	
+----------      --------    ---------------     ----    -----------
+master		4.75 MB	    sa			1	Apr  8 2003	
+TestLarge    3073.00 MB	    Denis-PCDenis	9	Mar 31 2012	
+TestSmall	4.00 MB	    Denis-PCDenis	8	Mar 31 2012	
+TestLarger   9073.00 MB	    Denis-PCDenis	10	Mar 31 2012</pre>
+<p>You can see that the files are indeed in the GB and in the MB range</p>
+<p>Now back the database up, these are plain vanilla backups, no compression is applied</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestLarge<span class="br0">&#93;</span> <span class="kw1">TO</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'D:SQLBackupsTestLarge.BAK'</span> 
+<span class="kw1">WITH</span> NOF<span class="sy0">OR</span>MAT, NO<span class="sy0">IN</span>IT, &nbsp;NAME <span class="sy0">=</span> N<span class="st0">'TestLarge-Full Database Backup'</span>, SKIP, N<span class="sy0">OR</span>EW<span class="sy0">IN</span>D, NOUNLOAD, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">10</span>
+GO
+&nbsp;
+<span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestLarger<span class="br0">&#93;</span> <span class="kw1">TO</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'D:SQLBackupsTestLarger.BAK'</span> 
+<span class="kw1">WITH</span> NOF<span class="sy0">OR</span>MAT, NO<span class="sy0">IN</span>IT, &nbsp;NAME <span class="sy0">=</span> N<span class="st0">'TestLarger-Full Database Backup'</span>, SKIP, N<span class="sy0">OR</span>EW<span class="sy0">IN</span>D, NOUNLOAD, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">10</span>
+GO
+&nbsp;
+<span class="kw1">BACKUP</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestSmall<span class="br0">&#93;</span> <span class="kw1">TO</span> &nbsp;<span class="kw1">DISK</span> <span class="sy0">=</span> N<span class="st0">'D:SQLBackupsTestSmall.BAK'</span> 
+<span class="kw1">WITH</span> NOF<span class="sy0">OR</span>MAT, NO<span class="sy0">IN</span>IT, &nbsp;NAME <span class="sy0">=</span> N<span class="st0">'TestLarge-Full Database Backup'</span>, SKIP, N<span class="sy0">OR</span>EW<span class="sy0">IN</span>D, NOUNLOAD, &nbsp;STATS <span class="sy0">=</span> <span class="nu0">10</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">BACKUP DATABASE [TestLarge] TO  DISK = N'D:SQLBackupsTestLarge.BAK' 
+WITH NOFORMAT, NOINIT,  NAME = N'TestLarge-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10
+GO
+
+BACKUP DATABASE [TestLarger] TO  DISK = N'D:SQLBackupsTestLarger.BAK' 
+WITH NOFORMAT, NOINIT,  NAME = N'TestLarger-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10
+GO
+
+BACKUP DATABASE [TestSmall] TO  DISK = N'D:SQLBackupsTestSmall.BAK' 
+WITH NOFORMAT, NOINIT,  NAME = N'TestLarge-Full Database Backup', SKIP, NOREWIND, NOUNLOAD,  STATS = 10
+GO</pre></div></div>
+
+<p>Navigate to the folder and what do you see?</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Denis/sqlfiles.PNG?mtime=1333217577"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Denis/sqlfiles.PNG?mtime=1333217577" width="449" height="204" /></a></div>
+<p>That&#8217;s right there is only MBs difference between the 3MB database and the 3 GB database. I checked my production server and the backup took 30 minutes less to complete compared to the backups that ran before I freed up space</p>
+<p>I won&#8217;t go into details here why shrinking the database is bad but I can guarantee you that it is no coincidence that shrink could mean<em> making the database smaller</em> and <em>psychiatrist   </em><img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/you-don-t-need-to/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>12 ways to break your database server before the first transaction</title>
+		<link>/index.php/datamgmt/datadesign/configuring-sql-server-dba/</link>
+		<comments>/index.php/datamgmt/datadesign/configuring-sql-server-dba/#comments</comments>
+		<pubDate>Wed, 19 May 2010 10:15:58 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[dmf]]></category>
+		<category><![CDATA[dmv]]></category>
+		<category><![CDATA[index]]></category>
+		<category><![CDATA[maintenance]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/configuring-sql-server-dba/</guid>
+		<description><![CDATA[Defaults hurt.  They take a 3 inch splinter and try to bury it as far up and under your nail as far as they possibly can.  Every database server has a task.  A mission if you will.  That mission is to serve the data and secure the data.  Some need 32GB of RAM; some need 3GB of RAM.  This one might need 32 spindles on RAID 3 billion.]]></description>
+				<content:encoded><![CDATA[<p>
+<h3>1.	Not adjusting memory settings on your database server</h3>
+<p>Below is a screen shot of the dreaded default 214748367 maximum server memory allowed to SQL Server.  Will it take it? Yes, it will.  It holds no sympathy for others and will leave no crumbs behind for mere OS operations or paging.  Set this to an allowable maximum based on your server’s actual available memory.  Leave some for the OS to survive.  The server will thank you later.  Trust me!</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/memmaximum_BAD.gif" alt="" title="" width="448" height="401" /></div>
+</p>
+<p></p>
+<p><h3>2.	Installing EVERYTHING by default</h3>
+<p>Defaults hurt.  They take a 3 inch splinter and try to bury it as far up and under your nail as far as they possibly can.  Every database server has a task.  A mission if you will.  That mission is to serve the data and secure the data.  Some need 32GB of RAM; some need 3GB of RAM.  This one might need 32 spindles on RAID 3 billion.  Point is: There are no defaults that match your installation.  Do not take them for granted and do not expect them to be your saving grace preventing some research.  Know what hurts even more? Installing all of the features on one server when you only need one of them can cause as much of a problem as leaving default settings in place.  Try to install the features that you know will be utilized so you can utilize the resources of the server to what it is meant for?
+</p>
+<p></p>
+<p><h3>3.	Enabling CLR and abusing it</h3>
+<p>CLR is a foundation, a pillar of strength and power, a stance in front of an angry mob preventing chaos, the punk rocker that stands above the exhausted and pile-driven leftovers from a slam dance session.  Embrace CLR like it is hiding under the couch and can save the puzzle you spent days working on but has that one piece missing, causing nothing but pain and agony with failure to your hard work.  OK, now STOP!  With great power brings great failure.  CLR will and can take you to the next level of strength and functionality to your trials with SQL Server as a DBA and Developer.  CLR can also and will take everything it wants when not managed from your database server.  This will leave it starving for more and hung in the shadows begging for a restart.
+</p>
+<p></p>
+<p><h3>4.	Handing out the SA password like it was free ice cream day. </h3>
+<p>SA is a landmark and an object not to be tangled with.  Think of Dirty Harry and that monster 44 Magnum facing you down.  OK, now hand the 44 over to someone and ask them to point it at you.  Feel good?  NO!  Keep SA as your protection.  Do not use it unless it is called upon in a time of need.  Yes, even the sysadmin(s) should have their own security model and SA is not part of it.
+</p>
+<p></p>
+<p><h3>5.	Never maintaining indexes and statistics</h3>
+<p>You’ve spent days researching and configuring IO, memory, SQL Server configurations down to the last MAXDOP setting.  It truly is a remarkable feeling you can only explain by feeling it yourself.  Problem is, when it stops there and maintaining the database server is left to the planning and implementation.  Indexes and Statistics alike need special care.  They can enforce performance beyond your most exotic dreams when used and maintained.  They can become your nightmarish horrors if not maintained at the same time.
+</p>
+<p></p>
+<p><h3>6.	Installing EVERYTHING including binary, data and log files to the C drive</h3>
+<p>If you are installing SQL Server on your desktop or laptop at home and have one 25GB drive, then sure, install to the C drive.  Most of us have those “server” things.  They have drive bays, and sometimes we even get a D or an E drive.  When you install SQL Server it will want and request you to install everything to the C drive (or the volume letter you pick for the OS).  It’s ok for the setup team to do this.  I respect that not all best practices can be programmed into everything.  So here is the almighty: If you have a data drive, log drive and OS drive or anything other than the drive for the OS, please use it for your data.  Your database server will thank you when it is not contending with other IO operations.
+</p>
+<p></p>
+<p><h3>7.	Relying on RAID as a recovery plan</h3>
+<p>RAID is not going to save you.  Before last year or so when it was publicized that a company literally was found whimpering in the corner after losing all of their data from relying on RAID levels to protect against failures, we didn’t think it was possible to fathom this concept.  Who would think this way?  Well, someone did, so we need to say it.
+</p>
+<p></p>
+<p><h3>8.	Think you are protected from disasters without HA or DR?</h3>
+<p>Disasters are inevitable.  We cannot hide from them and they jump up behind us when we least expect it.  Plan for it, test for it and become familiar with it.  SQL Server has many native features that can be used to handle HA and DR.  When lightning hits the building, a river decides to create a lake near your cube, a tornado says hello to the data center (face to face) or even an earthquake decides to open a nice pretty hole in the earth and eat the very data you vowed to protect, HA and DR will be there to rescue you (and your job).
+</p>
+<p></p>
+<p><h3>9.	Under-sizing your installation</h3>
+<p>Sizing is an art for database servers.  It is also an art form to not size your database server correctly.  Not doing so will cost much more in the long run.  There will be cost both in dollars and downtime (which just means more dollars – lost).
+</p>
+<p></p>
+<p><h3>10.	Forgetting the network is just as important as IO performance</h3>
+<p>It’s the network! Blaming the network on slow performance is fun.  Network and database administrators like to blame each other on performance being slow.  The nice part about the network is if there isn’t much monitoring in place, we can get away with it as DBAs so much easier.  OK, is it really the network or not?  If you do not have a network that is stable and can handle your data flying around the business, your hardcore, supersonic, beefy, brat- eating server doesn’t help you at all.  Get with your network group and discuss the amount of expected data.  ASYNC_NETWORK_IO waits are not fun when you are plagued with them on a database server.
+</p>
+<p></p>
+<p><h3>11.	Allowing Jane and John to write T-SQL because they know how to write SELECT *</h3>
+<p>So the CFO comes to your office and he just went to this really cool lightshow expo in Vegas to release SQL Server 30099 R500.  Best lightshow he has ever seen.  Even better was that the really good sales guy up on the stage popped open SQL Server Management Studio version fifty billion and started bringing up data.  Yes, you guessed it.  He just asked for you to install that really neat tool on his laptop so he can, &#8220;Get data&#8221;.  Scary!  Put policies in place to prevent this.  Even for senior staff.  Someone in an office with their finger on the F5 key and a SELECT * FROM reallybloodyhugeandwidetable is your nightmare come true.
+</p>
+<p></p>
+<p><h3>12.	Backups are for sissies so I don’t do them or restore them to test</h3>
+<p>Everyone knows the signature.  It’s comical in passing and at user group meetings.  Is it true?  Not even close.  Backups are your foundation for recovery.  Your ability to save the universe from data gremlins that chew their way through your NIC port into the chassis, feasting on the RAM before moving to your beloved disk.  Wait, listen to this:</p>
+<p><b>Jan:</b><i> My database blew up.  Something about corrupt, torn pages and Google can’t save me.  John, can you help?</i></p>
+<p><b>John:</b><i> Jan, let’s just restore to the other server so we can figure this out without being on the verge of heart attacks.  </i></p>
+<p><b>jan :</b> <i>backups?</i></p>
+<p>Don’t be that person!  Backup your data and back it up as much as you possibly can.  Most of all restore it wherever you can to test it, well, can be restored.  This is a nice feature to know you have before you need to have it.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/configuring-sql-server-dba/feed/</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+		</item>
+		<item>
+		<title>Trusting Database Engine Tuning Advisor for Query Tuning</title>
+		<link>/index.php/datamgmt/datadesign/dta-index-creation-tools-sql-server/</link>
+		<comments>/index.php/datamgmt/datadesign/dta-index-creation-tools-sql-server/#comments</comments>
+		<pubDate>Tue, 11 May 2010 13:45:20 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[database engine tuning advisor]]></category>
+		<category><![CDATA[index]]></category>
+		<category><![CDATA[maintenance]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/05/dta-index-creation-tools-sql-server/</guid>
+		<description><![CDATA[So my tip for the day; don’t forget DTA as a beneficial tool to be the lazy DBA we all speak of.  It can truly help you even if that is simply taking some code writing shortcuts.  But, believe it as much as you believe the first Google hit you get back when researching a problem.]]></description>
+				<content:encoded><![CDATA[<p>
+Using Database Engine Tuning Advisor can lend a great deal to a DBA.  All you need to do is plug in a query, hit start and viola, instant 99% performance increase estimates.  OK, it might not be all that but it can give you some pretty good suggestions for increasing performance.  Is this too good to be true?  In some cases, yes, it is.
+</p>
+<p>
+Let’s look at something I just ran across.  I do actively use DTA.  It’s a great tool and it makes tuning extremely large queries quick with reviewing suggests along with execution plans to ensure recommendations are sound.  Even better and my primary reason for using DTA is it writes the CREATE statements for you.  Remember, a lazy DBA is actually a more efficient DBA.
+</p>
+<p>
+This morning however, DTA was being less than helpful.  </p>
+<p>A query went by my monitoring tools that sent my disk queue length threw the roof.  Well, it went to 8 but as most DBAs know, 3 will make us squirm in our chairs.  Once I reviewed the query, it wasn’t really all that bad. In fact, I think it was well written by the vendor.  Checking the execution plan I could see there was just some covering index needs to ensure parallelism and some key lookup steps were removed.  So I opened DTA already knowing pretty much what I wanted to do and ran the query through it.  The results were about what I expected but looking closer I saw this
+</p>
+<pre>CREATE NONCLUSTERED INDEX [_dta_index_9_379148396__K1] ON [dbo].[WHDR] 
+(
+	[WO_ID] ASC
+)WITH (SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, DROP_EXISTING = OFF, ONLINE = OFF) ON [PRIMARY]</pre>
+<p>
+Why is that a problem you might ask?  Well, it might not be a problem if you are working on a HEAP table and that typical work order ID is really in need of a nonclustered index.  At that point we would want the awesomeness of a clustered index anyhow.</p>
+<p><div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/omg.gif" alt="" title="" width="243" height="243" align="left" /></div>
+<p>Here is the biggest problem.  There is a clustered index on the table and that clustered index only consists of the WO_ID.  Yes, that would be an extremely big problem as far as performance goes.  You would have two indexes doing the same thing and on every change to the table, you would be updating them at the same time.  In a large table that cost can show quick and become painful to the users.</p>
+<p>So my tip for the day; don’t forget DTA as a beneficial tool to be the lazy DBA we all speak of.  It can truly help you even if that is simply taking some code writing shortcuts.  But, believe it as much as you believe the first Google hit you get back when researching a problem.  As Janice Lee (<a href="http://twitter.com/janiceclee">Twitter</a> | <a href="http://janiceclee.com/">Blog</a>) says in <a href="http://janiceclee.com/2010/05/10/google-and-suspect-databases/">Save Me, Google</a>, “Google told him to. He was in trouble, he panicked, and he trusted his salvation to Google.”  Well, don’t fall into the points that Janice put together so well in that blog.  Even the tools that are meant to assist us in doing our jobs better can be wrong.  They are suggestions that require as much review as anything else going into your database servers.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/dta-index-creation-tools-sql-server/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+		<item>
+		<title>Index DMV usage considerations</title>
+		<link>/index.php/datamgmt/datadesign/think-before-you-f5-on-dmvs/</link>
+		<comments>/index.php/datamgmt/datadesign/think-before-you-f5-on-dmvs/#comments</comments>
+		<pubDate>Wed, 31 Mar 2010 12:56:42 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[dmf]]></category>
+		<category><![CDATA[dmv]]></category>
+		<category><![CDATA[index]]></category>
+		<category><![CDATA[maintenance]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/03/think-before-you-f5-on-dmvs/</guid>
+		<description><![CDATA[Index DMV/DMF goodness!  SQL Server 2005 and up has given us the ability to truly be more efficient in gathering information in which we can be more proactive.  With everything these objects give us, a price has to be paid.  We will discuss that price but first, we’ll go over a few major features that DMV/DMF has provided to us in regards to indexes to help us in our daily tasks.]]></description>
+				<content:encoded><![CDATA[<h2>Let’s think about it for a minute</h2>
+<p>
+Index DMV (Dynamic Management Views)/DMF (Dynamic Management Functions) goodness!  SQL Server 2005 and up has given us the ability to truly be more efficient in gathering information with which we can be more proactive.  With everything these objects give us, a price has to be paid.  We will discuss that price but first, we’ll go over a few major features that DMV/DMF has provided to us in regards to indexes to help us in our daily tasks.
+</p>
+<p>
+Index maintenance is a major part in the typical day to day DBA tasks.  Monitoring fragmentation, usage, and lack of usage is something that, if gone without for long, will cause severe and noticeable performance problems.  There is no question about it, Indexes are essential.  We cannot afford to ignore embracing them as objects that save poor and even well structured queries from causing crippling resource consumption issues.  The user community has little patience for slow applications.  Users also will not stand for where the problems are and only want resolution so they can make it from 9 to 5 without headaches.  In short, the DBA is a hired gun by the users and as such, are our customers.  In this, it is our highest priority to keep the quality of our services as high as you would expect from any sale of services or goods.
+</p>
+<p>
+In order to maintain our primary task of keeping indexes from being the problem and always the solution, we have at our disposal in SQL Server 2005+, the sys.dm_db_index_physical_stats DMV.  Prior to SQL Server 2005, finding index usage and statistics was a painful process.  Profiler would need to be utilized while capturing execution plans and other pertinent information.  Once gathered, would be used in long daunting analysis tasks to determine index creation or maintenance needs.  In some cases those tasks ended still in index creation that may not be optimal.
+</p>
+<p>
+To use dm_db_index_physical_stats please refer to Denis Gobo’s (<a href="/index.php/All/?disp=authdir&amp;author=4">Blog</a> | <a href="http://twitter.com/denisgobo">Twitter</a>) blog, “<a href="/index.php/DataMgmt/DataDesign/finding-fragmentation-of-an-index-and-fi">Finding Fragmentation of an Index and Fixing It</a>”.  Denis does a very good job at showing cause and effect of the process of using this DMV in an efficient manner.<br />
+<br />
+Another SQL community favorite is Michelle Ufford’s (<a href="http://sqlfool.com/">Blog</a> | <a href="http://twitter.com/sqlfool">Twitter</a>) script on <a href="http://sqlfool.com/2009/06/index-defrag-script-v30/">finding and resolving index problems</a>.  This excellent script that can is an all in one scheduling plan to perform unattended maintenance on index fragmentation.</p>
+<p>
+The next major task a DBA can perform is actually finding indexes that the optimizer ‘thinks’ should be created.  We can return missing indexes primarily by using the sys.dm_db_missing_index_group_stats DMV.  This joined to several other key DMVs can show you not only missing indexes, but with a little scripting, actually result in the CREATE INDEX statement itself to create for review.  To pick on Michelle again, we can look to her excellent blog, “<a href="http://sqlfool.com/2009/04/a-look-at-missing-indexes/">A look at missing indexes</a>”.
+</p>
+<p>
+The third major key index operation is to find unused indexes.  Unused indexes can scream &#8220;performance killer&#8221;.  Not only are these indexes taking up space on disk and backups but they are causing transactions to run slower due to the need to update them along with the primary data.  Remember, when you insert/update/delete, you need to maintain all of the indexes.   This goes further into maintaining these unused indexes with the first fragmentation task discussed.  To find these unused indexes and determine if removing them is appropriate, we have the dm_db_index_usage_stats DMV.  This DMV can return unused indexes based on the sys.indexes system view.  This is done by using a NOT EXISTS or other means on the dm_db_index_usage_stats from the sys.indexes and results in any index that does not have an active log for usage.  Hence, is not being fully utilized and should be determined if required.  </p>
+<h2>Now for the meat of it and the point</h2>
+<p>
+All of this is extremely useful for maintaining, removing and creating indexes.  To bring this even further into lazy DBA themes, Jason Strate (<a href="http://stratesql.com/">Blog</a> | <a href="http://twitter.com/stratesql">Twitter</a>) has created the <a href="http://stratesql.com/2009/07/20/analyzing-your-indexes-with-a-custom-report.aspx">IndexAnalysis</a> reporting solution and scripts.  Jason has taken the best of all worlds of Index DMV and DMF usage to Reporting Services in a solution that can be easily reviewed for all these major key analysis steps.  </p>
+<p>Most DBAs in the community are going to tell you this is all without a doubt, critical knowledge.  In SQL forums around the community, they are also posted as quick information gathering tools to obtain information to assist in performance problems.  Again, this is all true and the best practice troubleshooting steps.  However, there is one major aspect to these types of queries that are also a critical piece of knowledge.  That is, these queries themselves are very resource intensive.  In order to show that, let’s run one of the typical fragmentation search queries on a test server.  </p>
+<p>The below charts are from Idera SQLDM and used only to show a high level view of the effects of the DMVs.  Disk IO is focused on as that pertains to one of the largest performance bottlenecks you can have.  IO will also starve other normal operations from working optimally. </p>
+<p>The query that will be used is below and part from Denis Gobo’s blog referred to above while removing the direct condition to look at only one index.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">OBJECT_NAME</span><span class="br0">&#40;</span><span class="kw2">OBJECT_ID</span><span class="br0">&#41;</span> <span class="kw1">AS</span> Tablename,s.<span class="me1">name</span> <span class="kw1">AS</span> Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> d
+join sysindexes s <span class="kw1">ON</span> d.<span class="kw2">OBJECT_ID</span> <span class="sy0">=</span> s.<span class="me1">id</span>
+and d.<span class="me1">index_id</span> <span class="sy0">=</span> s.<span class="me1">indid</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT OBJECT_NAME(OBJECT_ID) AS Tablename,s.name AS Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') d
+join sysindexes s ON d.OBJECT_ID = s.id
+and d.index_id = s.indid</pre></div></div>
+
+<p>
+Prior to executing this query, our server was running as follows<br />
+</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/dmv_idx_1.gif" alt="" title="" width="426" height="161" /></div>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/dmv_idx_2.gif" alt="" title="" width="426" height="161" /></div>
+<p>Once executing the query we quickly see extremely high IO.  IO is our major concern here.  This will slow the server down noticeably and cause other operations to suffer its wrath.</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/dmv_idx_3.gif" alt="" title="" width="433" height="161" /></div>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/dmv_idx_4.gif" alt="" title="" width="435" height="161" /></div>
+</p>
+<p>
+This test was crude and we didn’t go into detail of the IO and exact reactions to running the query on the server.  You can see from the charts that the query was killed very quickly.  We only wanted to show the start of the resource consumption and overhead.  The objective and take away is the knowledge that these queries do in fact have their own resource intensive requirements.  When running them due to maintenance, forum support from community members or other means in obtaining them, take care in the time that you do so.  In some cases, these queries and other DMVs cannot be stopped until completion.  For a truly in-depth and excellent look at usage, check Paul Randal&#8217;s (<a href="http://www.sqlskills.com/BLOGS/PAUL/">Blog</a> | <a href="http://www.twitter.com/PaulRandal">Twitter</a>) blog, &#8220;<a href="http://www.sqlskills.com/BLOGS/PAUL/post/Inside-sysdm_db_index_physical_stats.aspx">Inside sys.dm_db_index_physical_stats</a>&#8220;.</p>
+<p>It is much more optimal when executing these queries during normal business hours if a query can be singled out as a performance problem. This provides the ability to select only the statistics for one index or one table.  When obtaining help, always question the queries provided by any of the members helping.  No offense will be taken by the SQL community supporters if questions are asked of the performance factor of running provided scripts during normal operating times.  If offense it taken, this typically means the impact is unknown and more reason to question it.
+</p>
+<p><strong>Special thanks to Jes (<a href="http://jesborland.wordpress.com/">Blog</a> | <a href="http://twitter.com/grrl_geek">Twitter</a>) for the review <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></strong></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/think-before-you-f5-on-dmvs/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Finding Fragmentation Of An Index And Fixing It</title>
+		<link>/index.php/datamgmt/datadesign/finding-fragmentation-of-an-index-and-fi/</link>
+		<comments>/index.php/datamgmt/datadesign/finding-fragmentation-of-an-index-and-fi/#comments</comments>
+		<pubDate>Fri, 07 Nov 2008 14:45:12 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[fragmentation]]></category>
+		<category><![CDATA[indexing]]></category>
+		<category><![CDATA[maintenance]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/11/finding-fragmentation-of-an-index-and-fi/</guid>
+		<description><![CDATA[A lof of time your index will get fragmented over time if you do a lot of updates or inserts and deletes.
+We will look at an example by creating a table, fragmenting the heck out of it and then doing a reorganize and rebuild on the index.
+
+First crea&#8230;]]></description>
+				<content:encoded><![CDATA[<p>A lof of time your index will get fragmented over time if you do a lot of updates or inserts and deletes.<br />
+We will look at an example by creating a table, fragmenting the heck out of it and then doing a reorganize and rebuild on the index.</p>
+<p>First create this table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestIndex <span class="br0">&#40;</span>name1 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">500</span><span class="br0">&#41;</span> 
+not null,id <span class="kw1">int</span> 
+not null,userstat &nbsp;<span class="kw1">int</span> not null,
+name2 <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">500</span><span class="br0">&#41;</span> not null,
+SomeVal <span class="kw1">uniqueidentifier</span> not null<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestIndex (name1 varchar(500) 
+not null,id int 
+not null,userstat  int not null,
+name2 varchar(500) not null,
+SomeVal uniqueidentifier not null)</pre></div></div>
+
+<p>Now insert 50000 rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestIndex
+<span class="kw1">SELECT</span> <span class="kw1">top</span> <span class="nu0">50000</span> s.<span class="me1">name</span>,s.<span class="me1">id</span>,s.<span class="me1">userstat</span>,s2.<span class="me1">name</span>,newid<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> master..<span class="me1">sysobjects</span> s
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> master..<span class="me1">sysobjects</span> s2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestIndex
+SELECT top 50000 s.name,s.id,s.userstat,s2.name,newid() 
+FROM master..sysobjects s
+CROSS JOIN master..sysobjects s2</pre></div></div>
+
+<p>Now create this index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">CLUSTERED</span> <span class="kw1">INDEX</span> IX_TestIndex_Index <span class="kw1">ON</span> TestIndex<span class="br0">&#40;</span>SomeVal<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE CLUSTERED INDEX IX_TestIndex_Index ON TestIndex(SomeVal)</pre></div></div>
+
+<p>Now let us look at some data by using the sys.dm_db_index_physical_stats DMV. Keep this query handy, we will run it many times</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">Object_name</span><span class="br0">&#40;</span><span class="kw2">object_id</span><span class="br0">&#41;</span> <span class="kw1">as</span> Tablename,s.<span class="me1">name</span> <span class="kw1">as</span> Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+<span class="kw1">FROM</span> sys.<span class="me1">dm_db_index_physical_stats</span> <span class="br0">&#40;</span><span class="kw2">DB_ID</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span> , <span class="sy0">NULL</span>, N<span class="st0">'LIMITED'</span><span class="br0">&#41;</span> d
+join sysindexes s <span class="kw1">on</span> d.<span class="kw2">object_id</span> <span class="sy0">=</span> s.<span class="me1">id</span>
+and d.<span class="me1">index_id</span> <span class="sy0">=</span> s.<span class="me1">indid</span>
+and s.<span class="me1">name</span> <span class="sy0">=</span><span class="st0">'IX_TestIndex_Index'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT Object_name(object_id) as Tablename,s.name as Indexname
+,index_type_desc
+,avg_fragmentation_in_percent
+,page_count
+FROM sys.dm_db_index_physical_stats (DB_ID(), NULL, NULL , NULL, N'LIMITED') d
+join sysindexes s on d.object_id = s.id
+and d.index_id = s.indid
+and s.name ='IX_TestIndex_Index'</pre></div></div>
+
+<p>(Result Set)</p>
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 0.22172949002217296
+</td>
+<td> 451
+</td>
+</tr>
+</table>
+<p>That is good, almost no fragmentation. Let&#8217;s change that shall we?</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> TestIndex
+<span class="kw1">SET</span> SomeVal <span class="sy0">=</span> NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE TestIndex
+SET SomeVal = NEWID()</pre></div></div>
+
+<p>Okay, now you can see that the index is completely fragmented, we are also using 955 pages to store the data instead of 451<br />
+(Result Set)</p>
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 99.3717277486911
+</td>
+<td> 955
+</td>
+</tr>
+</table>
+<p>There are two ways to fix fragmentation, one is to reorganize the index and the other is to rebuild the index. Reorganize is an online operation while rebuild is not unless you specify ONLINE = ON, ONLINE = ON will only work on Enterprise editions of SQL Server.<br />
+Here is how to do a reorganize</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> IX_TestIndex_Index <span class="kw1">ON</span> TestIndex
+RE<span class="sy0">OR</span>GANIZE;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX IX_TestIndex_Index ON TestIndex
+REORGANIZE;</pre></div></div>
+
+<p>(Result Set)</p>
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 2.8824833702882482
+</td>
+<td> 451
+</td>
+</tr>
+</table>
+<p>As you can see after the reorganize(DBCC INDEXDEFRAG for you SQL Server 2000 folks) fragmentation levels dropped to less than 3 percent.</p>
+<p>Just for fun let&#8217;s also rebuild (Drop and recreate the index for you SQL Server 2000 folks) the index</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">INDEX</span> IX_TestIndex_Index <span class="kw1">ON</span> TestIndex
+REBUILD;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER INDEX IX_TestIndex_Index ON TestIndex
+REBUILD;</pre></div></div>
+
+<p>(Result Set)</p>
+<table border="1">
+<tr>
+<th>Tablename
+</th>
+<th> Indexname
+</th>
+<th> index_type_desc
+</th>
+<th> avg_fragmentation_in_percent
+</th>
+<th> page_count
+</th>
+</tr>
+<tr>
+<td> TestIndex
+</td>
+<td> IX_TestIndex_Index
+</td>
+<td> CLUSTERED INDEX
+</td>
+<td> 0.22222222222222221
+</td>
+<td> 450
+</td>
+</tr>
+</table>
+<p>As you can see the rebuild made fragmentation almost 0</p>
+<p>Here are two differences between REBUILD ONLINE = ON and REBUILD ONLINE = OFF<br />
+<strong>ON</strong><br />
+Long-term table locks are not held for the duration of the index operation. During the main phase of the index operation, only an Intent Share (IS) lock is held on the source table. This allows queries or updates to the underlying table and indexes to continue. At the start of the operation, a Shared (S) lock is very briefly held on the source object. At the end of the operation, an S lock is very briefly held on the source if a nonclustered index is being created, or an SCH-M (Schema Modification) lock is acquired when a clustered index is created or dropped online, or when a clustered or nonclustered index is being rebuilt. ONLINE cannot be set to ON when an index is being created on a local temporary table.</p>
+<p><strong>OFF</strong><br />
+Table locks are applied for the duration of the index operation. An offline index operation that creates, rebuilds, or drops a clustered, spatial, or XML index, or rebuilds or drops a nonclustered index, acquires a Schema modification (Sch-M) lock on the table. This prevents all user access to the underlying table for the duration of the operation. An offline index operation that creates a nonclustered index acquires a Shared (S) lock on the table. This prevents updates to the underlying table but allows read operations, such as SELECT statements.</p>
+<p>Of course you will not run rebuild/reorganize manually for every index in your database, Michelle Ufford from the <a href="http://sqlfool.com/" class="external text" title="http://sqlfool.com/" rel="nofollow">SQL Fool</a> blog has a nice post with just a script which can do this automatically, you can find that here: <a href="http://sqlfool.com/?p=63" class="external text" title="http://sqlfool.com/?p=63" rel="nofollow">Index Defrag Script</a> </p>
+<h2>Permissions</h2>
+<p>I added this section because our <a href="http://sqlcop.lessthandot.com/">SQLCop</a> tool has an index fragmentation check, unfortunately if you don&#8217;t have permissions you get an error. Big thanks to <a href="/index.php/All/?disp=authdir&amp;author=10">George</a> for taking the time to write this section.</p>
+<p>In order to run the query that checks for fragmented indexes, you need to have VIEW DATABASE STATE permissions.</p>
+<p>To determine if you have this permission:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">IF</span> Exists<span class="br0">&#40;</span><span class="kw1">SELECT</span> <span class="nu0">1</span> <span class="kw1">FROM</span> fn_my_permissions <span class="br0">&#40;</span><span class="sy0">NULL</span>, <span class="st0">'DATABASE'</span><span class="br0">&#41;</span> <span class="kw1">WHERE</span> permission_name <span class="sy0">=</span> <span class="st0">'VIEW DATABASE STATE'</span><span class="br0">&#41;</span>
+  <span class="kw1">SELECT</span> <span class="st0">'You have permission'</span>
+<span class="kw1">ELSE</span>
+  <span class="kw1">SELECT</span> <span class="st0">'You do not have permission'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">IF Exists(SELECT 1 FROM fn_my_permissions (NULL, 'DATABASE') WHERE permission_name = 'VIEW DATABASE STATE')
+  SELECT 'You have permission'
+ELSE
+  SELECT 'You do not have permission'</pre></div></div>
+
+<p>If you do not have permissions, a security admin on your server can grant you permissions with the following query:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">GRANT</span> <span class="kw1">VIEW</span> <span class="kw1">DATABASE</span> <span class="kw1">STATE</span> <span class="kw1">TO</span> YourLoginName</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">GRANT VIEW DATABASE STATE TO YourLoginName</pre></div></div>
+
+<p> </p>
+<p>You can also deny this permission to a user with the following query:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DENY</span> <span class="kw1">VIEW</span> <span class="kw1">DATABASE</span> <span class="kw1">STATE</span> <span class="kw1">TO</span> YourLoginName</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DENY VIEW DATABASE STATE TO YourLoginName</pre></div></div>
+
+<p>This  post is also on our <a href="http://wiki.lessthandot.com/index.php/SQL_Server_Admin_Hacks">SQL Server Admin Hacks</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/finding-fragmentation-of-an-index-and-fi/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

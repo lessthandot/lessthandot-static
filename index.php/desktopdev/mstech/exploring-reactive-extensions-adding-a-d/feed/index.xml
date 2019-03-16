@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	>
+<channel>
+	<title>Comments on: Exploring Reactive Extensions &#8211; Adding a Dash of Linq</title>
+	<atom:link href="/index.php/desktopdev/mstech/exploring-reactive-extensions-adding-a-d/feed/" rel="self" type="application/rss+xml" />
+	<link>/index.php/desktopdev/mstech/exploring-reactive-extensions-adding-a-d/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Tue, 26 Feb 2019 12:40:14 +0000</lastBuildDate>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>By: Alex Ullrich</title>
+		<link>/index.php/desktopdev/mstech/exploring-reactive-extensions-adding-a-d/#comment-3381</link>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+		<pubDate>Thu, 02 Dec 2010 09:56:08 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/exploring-reactive-extensions-adding-a-d/#comment-3381</guid>
+		<description><![CDATA[I think I see where you&#039;re going Jim. I ended up with something like this:&lt;br /&gt;
+&lt;br /&gt;
+&lt;codeblock lang=&quot;csharp&quot; line=&quot;1&quot;&gt;&lt;br /&gt;
+var otherSelectedMovementEvents =&lt;br /&gt;
+	from startLocation in mouseDown&lt;br /&gt;
+	from moveLocation in mouseMove.TakeUntil(mouseUp)&lt;br /&gt;
+		.Let(mvmnt =&gt; mvmnt.Zip(mvmnt.Skip(1),&lt;br /&gt;
+					(previous, current) =&gt; new {&lt;br /&gt;
+						current = current.EventArgs.Location,&lt;br /&gt;
+						previous = previous.EventArgs.Location&lt;br /&gt;
+					}))&lt;br /&gt;
+		.Repeat()&lt;br /&gt;
+	select moveLocation;&lt;/codeblock&gt;&lt;br /&gt;
+&lt;br /&gt;
+It certainly does draw the line, but takeUntil doesn&#039;t seem to work as I expected.  So I ended up needing to use this:&lt;br /&gt;
+&lt;br /&gt;
+&lt;codeblock lang=&quot;&quot; line=&quot;1&quot;&gt;var selectedMovementEvents =&lt;br /&gt;
+	from down in mouseDown&lt;br /&gt;
+	from move in mouseMove.TakeWhile(x =&gt; x.EventArgs.Button == MouseButtons.Left)&lt;br /&gt;
+		.Let(mv =&gt; mv.Zip(mouseMove.Skip(1),&lt;br /&gt;
+			(previous, current) =&gt; new {&lt;br /&gt;
+				current = current.EventArgs.Location,&lt;br /&gt;
+				previous = previous.EventArgs.Location&lt;br /&gt;
+			}))&lt;br /&gt;
+		.Repeat()&lt;br /&gt;
+	select move;&lt;/codeblock&gt;&lt;br /&gt;
+&lt;br /&gt;
+I think the other way might be a bit more explicit about what its doing, but I need to think about it some.  The extra lambda in this alternative makes it a bit more difficult to read for me, but of course YMMV.&lt;br /&gt;
+&lt;br /&gt;
+Thanks again for the tip.]]></description>
+		<content:encoded><![CDATA[<p>I think I see where you&#8217;re going Jim. I ended up with something like this:</p>
+<p><codeblock lang="csharp" line="1"><br />
+var otherSelectedMovementEvents =<br />
+	from startLocation in mouseDown<br />
+	from moveLocation in mouseMove.TakeUntil(mouseUp)<br />
+		.Let(mvmnt => mvmnt.Zip(mvmnt.Skip(1),<br />
+					(previous, current) => new {<br />
+						current = current.EventArgs.Location,<br />
+						previous = previous.EventArgs.Location<br />
+					}))<br />
+		.Repeat()<br />
+	select moveLocation;</codeblock></p>
+<p>It certainly does draw the line, but takeUntil doesn&#8217;t seem to work as I expected.  So I ended up needing to use this:</p>
+<p><codeblock lang="" line="1">var selectedMovementEvents =<br />
+	from down in mouseDown<br />
+	from move in mouseMove.TakeWhile(x => x.EventArgs.Button == MouseButtons.Left)<br />
+		.Let(mv => mv.Zip(mouseMove.Skip(1),<br />
+			(previous, current) => new {<br />
+				current = current.EventArgs.Location,<br />
+				previous = previous.EventArgs.Location<br />
+			}))<br />
+		.Repeat()<br />
+	select move;</codeblock></p>
+<p>I think the other way might be a bit more explicit about what its doing, but I need to think about it some.  The extra lambda in this alternative makes it a bit more difficult to read for me, but of course YMMV.</p>
+<p>Thanks again for the tip.</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Jim Wooley</title>
+		<link>/index.php/desktopdev/mstech/exploring-reactive-extensions-adding-a-d/#comment-3380</link>
+		<dc:creator><![CDATA[Jim Wooley]]></dc:creator>
+		<pubDate>Wed, 01 Dec 2010 12:46:35 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/exploring-reactive-extensions-adding-a-d/#comment-3380</guid>
+		<description><![CDATA[I wonder if your performance could be improved in this case by starting your query with &lt;br /&gt;
+&lt;br /&gt;
+from startLocation in MouseDown &lt;br /&gt;
+from moveLocation in MouseMove.TakeUntil(MouseUp)&lt;br /&gt;
+&lt;br /&gt;
+Rather than starting with MouseMove. This way, you don&#039;t start listening to the events until you click down. Otherwise, you are monitoring all mousemove events regardless of whether you want to listen or not. As another alternative, see http://www.thinqlinq.com/Post.aspx/Title/Reactive-Extensions-responding-to-UI-events.]]></description>
+		<content:encoded><![CDATA[<p>I wonder if your performance could be improved in this case by starting your query with </p>
+<p>from startLocation in MouseDown <br />
+from moveLocation in MouseMove.TakeUntil(MouseUp)</p>
+<p>Rather than starting with MouseMove. This way, you don&#8217;t start listening to the events until you click down. Otherwise, you are monitoring all mousemove events regardless of whether you want to listen or not. As another alternative, see <a href="http://www.thinqlinq.com/Post.aspx/Title/Reactive-Extensions-responding-to-UI-events" rel="nofollow">http://www.thinqlinq.com/Post.aspx/Title/Reactive-Extensions-responding-to-UI-events</a>.</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Tahir Khalid</title>
+		<link>/index.php/desktopdev/mstech/exploring-reactive-extensions-adding-a-d/#comment-3379</link>
+		<dc:creator><![CDATA[Tahir Khalid]]></dc:creator>
+		<pubDate>Wed, 01 Dec 2010 08:34:23 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/exploring-reactive-extensions-adding-a-d/#comment-3379</guid>
+		<description><![CDATA[LINQ is &#039;teh awesome&#039;]]></description>
+		<content:encoded><![CDATA[<p>LINQ is &#8216;teh awesome&#8217;</p>
+]]></content:encoded>
+	</item>
+</channel>
+</rss>

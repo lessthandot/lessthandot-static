@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>orm &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/orm-2/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Followup on ORMs for Batch Performance</title>
+		<link>/index.php/enterprisedev/orm/followup-on-orms-for-batch/</link>
+		<comments>/index.php/enterprisedev/orm/followup-on-orms-for-batch/#comments</comments>
+		<pubDate>Mon, 06 Aug 2012 16:02:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[ORM]]></category>
+		<category><![CDATA[orm]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/08/followup-on-orms-for-batch/</guid>
+		<description><![CDATA[A few weeks ago I looked at a project by Luke McGregor that benchmarks a variety of ORMs doing common operations at the 1 to 10,000 record scales. I was curious to see how the ORMs he had included would fare against common ADO methods and how those ADO methods would compare to one another. This is a followup with Simple.Data, PetaPoco, and NHibernate.]]></description>
+				<content:encoded><![CDATA[<p>A few weeks ago I looked at a project by Luke McGregor (<a href="http://blog.staticvoid.co.nz/" title="static void; blog">blog</a>|<a href="https://twitter.com/staticv0id" title="staticv0id on twitter">twitter</a>) that benchmarks a variety of ORMs doing common operations at the 1 to 10,000 record scales. I was curious to see how the ORMs he had included would fare against common ADO methods and how those ADO methods would compare to one another. </p>
+<p>My Original Post: <a href="/index.php/EnterpriseDev/ORM/evaluating-orms-for-batch-data" title="Evaluating ORMs for Batch Data Performance">Evaluating ORMs for Batch Data Performance</a><br />
+Source Code: <a href="https://github.com/tarwn/StaticVoid.OrmPerformance" title="My fork of Luke's project on Github">My fork of StaticVoid.OrmPerformance</a></p>
+<p>I received a lot of good feedback and suggestions on that post, and implemented all of the additions (except Kermit&#8217;s, oops). While I am still looking primarily at bulk insert performance, I also implemented the other test operations and Luke has pulled most of the changes back into his project (I am behind on issuing a pull request for NHibernate, sorry). This post is a follow-up on those additions with an updated conclusion, if you hadn&#8217;t read the <a href="/index.php/EnterpriseDev/ORM/evaluating-orms-for-batch-data" title="Evaluating ORMs for Batch Data Performance">previous post</a>, it&#8217;s probably still worth a read.</p>
+<h2>The Updated Lineup</h2>
+<p>The updated lineup for tests now looks like:</p>
+<ul>
+<li>EntityFramework 4.1
+<ul>
+<li>Basic Configuration (No optimizations)</li>
+<li>AutoDetectChanges Disabled</li>
+<li>Tuned</li>
+</ul>
+</li>
+<li>EntityFramework 5.0 beta1
+<ul>
+<li>Basic Configuration (No optimizations)</li>
+<li>AutoDetectChanges Disabled</li>
+<li>Proxy Entities</li>
+<li>Tuned</li>
+</ul>
+</li>
+<li>Dapper 1.8
+<ul>
+<li>Dapper Rainbow</li>
+<li>My Best effort at making it go fast</li>
+<li>Batching inserts/updates using transactions</li>
+</ul>
+</li>
+<li>LINQ to SQL
+<ul>
+<li>Basic Configuration (No optimizations)</li>
+<li>Tuned</li>
+</ul>
+</li>
+<li>NHibernate 3.2.0.4
+<ul>
+<li>Basic implementation</li>
+<li>Stateless + 200 record batches</li>
+<li>Stateless + 1000 record batches</li>
+</ul>
+</li>
+<li>PetaPoco 3.04
+<ul>
+<li>Basic implementation</li>
+<li>Batching inserts via transaction</li>
+</ul>
+</li>
+<li>Simple.Data 1.0.0 rc 0
+<ul>
+<li>Basic implementation</li>
+<li>Batch inserts (built-in, automagical)</li>
+</ul>
+</li>
+<li>Raw ADO methods
+<ul>
+<li>Basic SQL Command</li>
+<li>SQL Command w/ Transaction</li>
+<li>Bulk insert via SqlDataAdapter</li>
+<li>Bulk insert via SqlBulkCopy and SqlBulkCopy w/ Table Lock option</li>
+<li>Bulk insert via one really big SQL string (single insert w/ lots of concatenated value statements)</li>
+</ul>
+</li>
+</ul>
+<p>Along the way I also updated the project to include more information in failing assertions (the state is asserted after each test is run).</p>
+<h2>The Results</h2>
+<p>I was simultaneously surprised and not surprised at the results. With Mark Rendle (<a href="http://blog.markrendle.net/" title="Mark's blog">blog</a>|<a href="https://twitter.com/markrendle" title="MarkRendle on twitter">twitter</a>) suggesting I add Simple.Data, I fully expected it to keep up with SqlBulkCopy, but it was still surprising to see the real, raw data.</p>
+<div style="text-align: center; color: #666666; font-size: 90%">
+	<img src="http://tiernok.com/LTDBlog/ORM/GraphB-1.png" alt="Graph of best bulk insert times for each major method" /><br />
+		10,000 row inserts, Best times for each category
+</div>
+<p>Raw SqlBulkCopy was still the best option for 10,000 records (this is the TabLock option variant), but Simple.Data was right up there with it. PetaPoco and NHibernate are our other new additions and they were fairly close, about 20-25% slower than Dapper, or about 7x the SqlBulkCopy test.</p>
+<p>But the important item on this graph really is Simple.Data. There are many that argue that all ORMs are slow and not worth spending time on but this is clearly not so. Simple.Data was a little slower than SqlBulkCopy and much faster than the other raw ADO variants. And it does this with no column mappings, no tricks and no special configurations. That is a huge milestone for ORMs and makes it tempting to use instead of SqlBulkCopy, as this method may actually be less fragile (no column mappings have to be manually defined).</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> BatchConfiguration<span class="br0">&#40;</span>IConnectionString connectionString<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; _db <span class="sy0">=</span> Database<span class="sy0">.</span><span class="me1">OpenConnection</span><span class="br0">&#40;</span>connectionString<span class="sy0">.</span><span class="me1">FormattedConnectionString</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; _entitiesToInsert <span class="sy0">=</span> <span class="kw3">new</span> List<span class="sy0">&lt;</span>TestEntity<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw4">void</span> <span class="kw1">Add</span><span class="br0">&#40;</span>TestEntity entity<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; _entitiesToInsert<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span>entity<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; 
+<span class="kw1">public</span> <span class="kw4">void</span> Commit<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; _db<span class="sy0">.</span><span class="me1">TestEntities</span><span class="sy0">.</span><span class="me1">Insert</span><span class="br0">&#40;</span>_entitiesToInsert<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public BatchConfiguration(IConnectionString connectionString) {
+	_db = Database.OpenConnection(connectionString.FormattedConnectionString);
+	_entitiesToInsert = new List&lt;TestEntity&gt;();
+}
+
+public void Add(TestEntity entity) {
+	_entitiesToInsert.Add(entity);
+}
+		
+public void Commit() {
+	_db.TestEntities.Insert(_entitiesToInsert);
+}</pre></div></div>
+
+<p>Create a connection, add as many items as you want to the list, then call Insert on the whole list. Magic.</p>
+<h2>More Detail</h2>
+<p>In the last post I included a comparison of all of the various methods used to insert data as a single graph. Unfortunately that graph was hard to read, as the basic Entity Framework methods were operating about an order of magnitude slower than everything else. I still thought the data was interesting, though, so I have created a graph with those values truncated as I did in the original post&#8217;s followup. The one critical difference is that I am plotting the 10,000 record inserts instead of 100,000 like last time. That just took too long to run <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<div style="text-align: center; color: #666666; font-size: 90%">
+	<img src="http://tiernok.com/LTDBlog/ORM/GraphB-2.png" alt="10,000 row inserts, All categories and variants" /><br />
+		10,000 row inserts, All categories and variants
+</div>
+<p>With more details we can see the spread and variation a little more clearly. </p>
+<p><b>Big &#8216;Ol String method:</b> One of the other surprises I ran into when doing this was how slow the &#8220;cram it all into one long string&#8221; method was (&#8220;SqlCommand &#8211; Insert Once&#8221; above). This is often suggested as a quick and dirty way to do batch insertion, basically by concatenating all the data into a single long INSERT statement with multiple VALUE rows or UNIONs. At 100 records this option tied with Dapper as the fastest method. Unfortunately it scales really horribly, moving up to nearly last, leading me to believe that people suggesting this method only tested it in lower ranges.</p>
+<h2>Conclusions</h2>
+<p>In my last post I concluded that I wouldn&#8217;t use an ORM for batch processing, but Simple.Data has forced me to reconsider that statement. Raw speed is not the only measure I would use to select a tool for getting data A into database B, but it is clear that if my requirements include bulk data insertion, ORMs are no longer automatically taken off the table. Congratulations to Mark for making a very clean, very fast way to get a whole lot of data into a database for very little up front effort (and thanks for adding it to my todo list).</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/orm/followup-on-orms-for-batch/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Evaluating ORMs for Batch Data Performance</title>
+		<link>/index.php/enterprisedev/orm/evaluating-orms-for-batch-data/</link>
+		<comments>/index.php/enterprisedev/orm/evaluating-orms-for-batch-data/#comments</comments>
+		<pubDate>Tue, 10 Jul 2012 10:32:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[ORM]]></category>
+		<category><![CDATA[orm]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/07/evaluating-orms-for-batch-data/</guid>
+		<description><![CDATA[Earlier this week I came upon a post (Entity Framework Comparative Performance) by Luke McGregor that compared the performance of several ORMs for handling batch data. Given the amount of batch data I've processed, I was curious how those ORM tests would line up against a couple common non-ORM methods.]]></description>
+				<content:encoded><![CDATA[<p>Earlier this week I came upon a post (<a href="http://blog.staticvoid.co.nz/2012/03/entity-framework-comparative.html" title="Entity Framework Comparative Performance at static void; blog">Entity Framework Comparative Performance</a>) by Luke McGregor (<a href="http://blog.staticvoid.co.nz/" title="static void; blog">b</a>|<a href="https://twitter.com/staticv0id" title="staticv0id on twitter">t</a>) that compared the performance of several ORMs for handling batch data. Given the amount of batch data I&#8217;ve processed, I was curious how those ORM tests would line up against a couple common non-ORM methods.</p>
+<p>I decided to stick to ADO.Net methods for data and to focus on the insert, as a fast insert can be used to replace updates and deletes. SSIS and bcp would be alternative options, but would require additional setup to test alongside the .Net code.</p>
+<div style="background-color: #dddddd; font-style: italic; padding: .5em; margin: bottom: .5em">2012-07-11: In response to a comment below, I added a followup section to the post with a graph showing all the test results in the 100,000 record tests. </div>
+<h2>Method</h2>
+<p>The method for these tests closely resembles the one Luke followed in his original post. The main exception is that I am using a local SQL Server 2008 R2 instance rather than a remote VM. Unfortunately attempts to run a full test set against my remote SQL Server VM ran into errors each time I tried, generally in the Entity Framework setup, teardown, and assertion code. My local system has a large enough amount of RAM and cores that any impact from running the tests locally should be limited, with only the network constraint removed from the equation.</p>
+<h2>Tests</h2>
+<p>I focused entirely on the insert tests, adding two new tests to use SqlDataAdapter and SqlBulkCopy. The test lineup then became:</p>
+<ul>
+<li>EntityFramework 4.1
+<ul>
+<li>Basic Configuration (No optimizations)</li>
+<li>AutoDetectChanges Disabled</li>
+<li>Tuned</li>
+</ul>
+</li>
+<li>EntityFramework 5.0 beta1
+<ul>
+<li>Basic Configuration (No optimizations)</li>
+<li>AutoDetectChanges Disabled</li>
+<li>Proxy Entities</li>
+<li>Tuned</li>
+</ul>
+</li>
+<li>Dapper 1.8
+<ul>
+<li>Dapper Rainbow</li>
+<li>My Best effort at making it go fast</li>
+<li>EDIT Batching inserts/updates using transactions</li>
+</ul>
+</li>
+<li>LINQ to SQL
+<ul>
+<li>Basic Configuration (No optimizations)</li>
+<li>Tuned</li>
+</ul>
+</li>
+<li>Raw ADO methods
+<ul>
+<li>Basic SQL Command</li>
+<li>SQL Command w/ Transaction</li>
+<li><a href="https://github.com/tarwn/StaticVoid.OrmPerformance/blob/master/Harness.SqlCommand/InsertViaDataAdapterConfiguration.cs" title="Code for the SqlDataAdapter Scenario">SqlDataAdapter</a></li>
+<li><a href="https://github.com/tarwn/StaticVoid.OrmPerformance/blob/master/Harness.SqlCommand/InsertSqlBulkConfiguration.cs" title="Code for the SqlBulkCopy method">SqlBulkCopy</a></li>
+</ul>
+</li>
+</ul>
+<p><i>The raw code is available on my branch at github: <a href="https://github.com/tarwn/StaticVoid.OrmPerformance">https://github.com/tarwn/StaticVoid.OrmPerformance</a> and the original is located on Luke&#8217;s here: <a href="https://github.com/lukemcgregor/StaticVoid.OrmPerformance">https://github.com/lukemcgregor/StaticVoid.OrmPerformance</a>.</i></p>
+<h3>SqlDataAdapter Method</h3>
+<p>The SqlDataAdapter method is to create a local DataSet or DataTable then provide this to a SqlDataAdapter with a configured SqlCommand object and parameters. The SqlDataAdapter takes care of the details, getting all the individual rows of data into the database via that insert command. Because we are operating on the full set of data, the test stores all of the values in memory until it is told to commit them.</p>
+<h3>SqlBulkCopy Method</h3>
+<p>The SqlBulkCopy object is designed to &#8220;let you efficiently bulk load a SQL Server table&#8221; (<a href="http://msdn.microsoft.com/en-us/library/system.data.sqlclient.sqlbulkcopy.aspx" title="MSDN - SQLBulkCopy">MSDN</a>). It provides similar functionality as bcp, but from inside our .Net code and without the format files. This test works similarly to the SqlDataAdapter test, in that it holds the entire DataTable of test data in memory until it is told to commit it in one go (some of the tests are iterative, some are bulk, the test method caters to both).</p>
+<h2>Results</h2>
+<p>I&#8217;ll admit the results were not that surprising. SqlBulkCopy was the fastest method for inserting larger amounts of data, but had some initial overhead that made it slower for the 1, 10, and 100 record tests. Compared to the best times from the other methods (SqlBulkCopy is the SqlCommand representative in the chart), the performance difference is clear:</p>
+<div style="color: #666666; text-align: center; font-size: 90%">
+<img src="http://tiernok.com/LTDBlog/ORM/Graph-1.png" alt="Graph of Best Times for 1-10000 records" /><br />
+Best Times for 1, 10, 100, 1000, 10000 scenarios
+</div>
+<p>Extending this to a larger set of 100000 records and the difference is relatively the same. Relative to the prior set of results, SqlBulkCopy is not as much faster on the 100,000 run as it was on the 10,000. It would be interesting to switch to increments of 10,000 and see if there is a pattern to it.</p>
+<div style="color: #666666; text-align: center; font-size: 90%">
+<img src="http://tiernok.com/LTDBlog/ORM/Graph-2.png" alt="Graph of Best Times for 1-100000 records" /><br />
+Best Times for 1, 10, 100, 1000, 10000, 100000 scenarios
+</div>
+<p>I also thought it was interesting to see how well the tuning improved some of the ORM methods. In the case of Entity Framework, it&#8217;s clear that if you intend to use it for batch data then tuning is a requirement, not an option. The out-of-the-box experience for Entity Framework 4.1 and 5 were roughly an order of magnitude slower than all other tests.</p>
+<div style="color: #666666; text-align: center; font-size: 90%">
+<img src="http://tiernok.com/LTDBlog/ORM/Graph-3.png" alt="Scaled out to show EF 4.1 and 5 Basic Performance" /><br />
+Scaled out to show EF 4.1 and 5 Basic Performance
+</div>
+<p>The other key indicator is memory. Our two new methods store all the data and send it in a single command, so they will have a higher memory footprint to accommodate that data. The methods that incrementally send the data, like the Dapper scenarios and basic SqlCommand option, will use very little data since they are flushing each addition directly to SQL.</p>
+<div style="color: #666666; text-align: center; font-size: 90%">
+<img src="http://tiernok.com/LTDBlog/ORM/Graph-4.png" alt="Memory Usage per Test Type" /><br />
+Memory Usage per Test Type
+</div>
+<p>This graph shows the memory/record of the 1000, 10000, and 100000 test runs. As we would expect, the memory/record for the full batch methods is reduced as the overhead is spread across more records. Entity Framework show consistently high memory usage, but the Proxy Entities method does bring it down to just about twice as much as Linq2SQL, which is in turn about 50% higher than the SqlCommand/SqlBulkCopy methods.</p>
+<h2>Conclusions</h2>
+<p>For pure, batch insertions, I still wouldn&#8217;t use an ORM. These tests show that the ORMs tested are still significantly slower at batch insertion than tools built specifically for bulk operations, like SqlBulkCopy. We&#8217;ve also seen that when we do use an ORM, understanding it&#8217;s performance characteristics and how to tune the ORM can make an enormous difference in how well or poorly it works.</p>
+<h2>Follow-up</h2>
+<p>Based on Tudor&#8217;s comment below, I&#8217;ve generated a graph of the times for each method in the 100,000 record tests. Unlike the full chart above, I&#8217;ve scaled it to ignore the two basic Entity Framework entries that cause the line chart above to be so unreadable. </p>
+<div style="color: #666666; text-align: center; font-size: 90%">
+<img src="http://tiernok.com/LTDBlog/ORM/Graph-Followup.png" alt="Readable Execution Times for 1000,000 records" /><br />
+Readable Execution Times for 1000,000 records
+</div>
+<p>Using ADO.Net does not automatically mean better performance than an ORM. SqlBulkCopy does clearly perform better, but using a SqlCommand.ExecuteNonQuery or a SqlAdapter.InsertCommand does not achieve the same level of performance. Many of the ORM tests kept up or outperformed the non-transactional SqlCommand and SqlAdapter tests, and Dapper kept up with the Transactional SqlCommand test. ADO.Net itself is not giving the boost in speed we see from SqlBulkCopy, it&#8217;s the use of a tool that is built specifically for batch processing (all of the rest operate at the row level, ADO.Net or ORM).</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/orm/evaluating-orms-for-batch-data/feed/</wfw:commentRss>
+		<slash:comments>12</slash:comments>
+		</item>
+		<item>
+		<title>Django 1.0 Released</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/django-1-0-released/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/django-1-0-released/#respond</comments>
+		<pubDate>Thu, 04 Sep 2008 00:18:26 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[django]]></category>
+		<category><![CDATA[jython]]></category>
+		<category><![CDATA[orm]]></category>
+		<category><![CDATA[python]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/09/django-1-0-released/</guid>
+		<description><![CDATA[Yes it is true, Django 1.0 has been released today. Here is a part of the announcement: No, you&#8217;re not hallucinating, it&#8217;s really here. Around three years ago, Adrian, Simon, Wilson and I released some code to the world. Our plan was to hack quietly on it for a bit, release a solid 1.0 release, [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Yes it is true, Django 1.0 has been released today. Here is a part of the announcement:</p>
+<blockquote><p>No, you&#8217;re not hallucinating, it&#8217;s really here.</p>
+<p>Around three years ago, Adrian, Simon, Wilson and I released some code to the world. Our plan was to hack quietly on it for a bit, release a solid 1.0 release, and then really get the ball rolling.</p>
+<p>Well.</p>
+<p>What happened, of course, was that an amazing community sprung up literally overnight — our IRC channel had over a hundred people in it the day after release, and it’s never been that “empty” since.</p>
+<p>I really can’t stress enough how amazing our community of users and developers are. About half of the code that’s gone into Django over the past three years has been contributed by someone other than a core committer. Since our last stable release, we’ve made over 4,000 code commits, fixed more than 2,000 bugs, and edited, added, or removed around 350,000 lines of code. We’ve also added 40,000 lines of new documentation, and greatly improved what was already there.</p>
+<p>Django 1.0 represents a the largest milestone in Django’s development to date: a web framework that a group of perfectionists can truly be proud of. Without this amazing community, though, it would have never happened.</p></blockquote>
+<p>Read the release notes here: http://docs.djangoproject.com/en/dev/releases/1.0/</p>
+<p>Download Django 1.0 here http://www.djangoproject.com/download/</p>
+<p>And of course congratulations to the team  <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/django-1-0-released/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
+		<link rel="shortcut icon" href="http://lessthandot.com/favicon.ico" type="image/vnd.microsoft.icon" />
+	<title>Less Than Dot - Blog -   A Look Inside SQL Server Row and Page Compression</title>
+	<meta prefix="og: http://ogp.me/ns#" property="og:title" content="Less Than Dot - Blog -   A Look Inside SQL Server Row and Page Compression" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:url" content="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/" />
+		<meta prefix="og: http://ogp.me/ns#" property="og:image" content="http://lessthandot.com/images/logo_prod.png" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:site_name" content="LessThanDot" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:description" content="Have you ever been curious about how row and page compression in SQL Server works?" />
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0" href="/index.php/feed/" />
+	<link rel="alternate" type="application/atom+xml" title="Atom" href="/index.php/feed/atom/" />
+
+	<!-- this page is the canonical URL -->	
+	<link rel="stylesheet" href="/wp-content/themes/lessthandot2009/style.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsite.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsiteprint.css" media="print" type="text/css" />
+
+	<link rel='dns-prefetch' href='//ajax.googleapis.com' />
+<link rel='dns-prefetch' href='//s.w.org' />
+<link rel="alternate" type="application/rss+xml" title="LessthanDot &raquo; A Look Inside SQL Server Row and Page Compression Comments Feed" href="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/feed/" />
+		<script type="text/javascript">
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/svg\/","svgExt":".svg","source":{"concatemoji":"\/wp-includes\/js\/wp-emoji-release.min.js?ver=4.6.1"}};
+			!function(a,b,c){function d(a){var c,d,e,f,g,h=b.createElement("canvas"),i=h.getContext&&h.getContext("2d"),j=String.fromCharCode;if(!i||!i.fillText)return!1;switch(i.textBaseline="top",i.font="600 32px Arial",a){case"flag":return i.fillText(j(55356,56806,55356,56826),0,0),!(h.toDataURL().length<3e3)&&(i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,65039,8205,55356,57096),0,0),c=h.toDataURL(),i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,55356,57096),0,0),d=h.toDataURL(),c!==d);case"diversity":return i.fillText(j(55356,57221),0,0),e=i.getImageData(16,16,1,1).data,f=e[0]+","+e[1]+","+e[2]+","+e[3],i.fillText(j(55356,57221,55356,57343),0,0),e=i.getImageData(16,16,1,1).data,g=e[0]+","+e[1]+","+e[2]+","+e[3],f!==g;case"simple":return i.fillText(j(55357,56835),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode8":return i.fillText(j(55356,57135),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode9":return i.fillText(j(55358,56631),0,0),0!==i.getImageData(16,16,1,1).data[0]}return!1}function e(a){var c=b.createElement("script");c.src=a,c.type="text/javascript",b.getElementsByTagName("head")[0].appendChild(c)}var f,g,h,i;for(i=Array("simple","flag","unicode8","diversity","unicode9"),c.supports={everything:!0,everythingExceptFlag:!0},h=0;h<i.length;h++)c.supports[i[h]]=d(i[h]),c.supports.everything=c.supports.everything&&c.supports[i[h]],"flag"!==i[h]&&(c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&c.supports[i[h]]);c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&!c.supports.flag,c.DOMReady=!1,c.readyCallback=function(){c.DOMReady=!0},c.supports.everything||(g=function(){c.readyCallback()},b.addEventListener?(b.addEventListener("DOMContentLoaded",g,!1),a.addEventListener("load",g,!1)):(a.attachEvent("onload",g),b.attachEvent("onreadystatechange",function(){"complete"===b.readyState&&c.readyCallback()})),f=c.source||{},f.concatemoji?e(f.concatemoji):f.wpemoji&&f.twemoji&&(e(f.twemoji),e(f.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+<link rel='stylesheet' id='bwp-syntax-css'  href='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/css/bwp-syntax-global.css?ver=4.6.1' type='text/css' media='all' />
+<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js?ver=1.12.4'></script>
+<script type='text/javascript' src='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/js/bwp-syntax.js?ver=4.6.1'></script>
+<link rel='https://api.w.org/' href='/wp-json/' />
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="/wp-includes/wlwmanifest.xml" /> 
+<link rel='prev' title='SQL Advent 2012 Day 18: Stay relevant and marketable' href='/index.php/datamgmt/dbadmin/mssqlserveradmin/stay-relevant-and-marketable/' />
+<link rel='next' title='SQL Advent 2012 Day 19: How to improve your tech skills' href='/index.php/datamgmt/dbprogramming/how-to-improve-your-tech/' />
+<meta name="generator" content="WordPress 4.6.1" />
+<link rel="canonical" href="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/" />
+<link rel='shortlink' href='/?p=1868' />
+<link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdbprogramming%2Fhow-sql-server-data-compression%2F" />
+<link rel="alternate" type="text/xml+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdbprogramming%2Fhow-sql-server-data-compression%2F&#038;format=xml" />
+<style type='text/css'>.rp4wp-related-posts ul{width:100%;padding:0;margin:0;float:left;}
+.rp4wp-related-posts ul>li{list-style:none;padding:0;margin:0;padding-bottom:20px;clear:both;}
+.rp4wp-related-posts ul>li>p{margin:0;padding:0;}
+.rp4wp-related-post-image{width:35%;padding-right:25px;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;float:left;}</style>
+	<script src="http://lessthandot.com/includes/allsite.js" type="text/javascript" ></script>
+</head>
+<body>
+<div id="contain"><div id="subcontain"><div id="ttl"><div id="hdr"><div id="snav"><a href="http://lessthandot.com/login.php?backtrack=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/?">Member Login</a>
+</div><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="logoc"><img src="http://lessthandot.com/images/logo_prod.png" alt="LessThanDot Site Logo" border="0" /></a><h1>LessThanDot</h1><div class="pgsttl">A decade of helpful technical content</div></div><div id="nav">
+<ul>
+<li><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="h" ><span>Launchpad</span></a></li>
+<li class="cur"><a href="/" title="LessThanDot Blogs" id="b" ><span>Blogs</span></a></li>
+<li><a href="http://forum.lessthandot.com/" title="LessThanDot Community Forums" id="f" ><span>Forum</span></a></li>
+<li><a href="http://wiki.lessthandot.com/" title="LessThanDot Wiki Articles" id="w" ><span>Wiki</span></a></li>
+<li><a href="http://sqlcop.lessthandot.com/" title="LessThanDot SQLCop" id="a" ><span>SQLCop</span></a></li>
+<li><a href="http://lessthandot.com/account.php" title="Your Account Settings" id="r"  class="l_ie"><span>My Account</span></a></li></ul></div>
+</div><div id="content">
+<div id="fac"><div id="fa">
+		<p>Less Than Dot is a community of passionate IT professionals and enthusiasts dedicated to sharing technical knowledge, experience, and assistance. Inside you will find reference materials, interesting technical discussions, and expert tips and commentary.</p></div></div><div class="content-sidebar">
+	<div id="social" class="sdsec">
+		<h2>LTD Social Sitings</h2>
+		<div>
+		<a id="social_twitter" href="http://twitter.com/LessThanDot/" title="Follow us on Twitter" ><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Lessthandot twitter"/></a> 
+		<a href="http://www.linkedin.com/groups?home=&amp;gid=113440" title="Join us on LinkedIn" ><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="Lessthandot Linkedin" /></a> 
+		<a href="http://www.facebook.com/group.php?gid=19330511063" title="Join us on Facebook" ><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Lessthandot facebook"/></a> 
+		<a href="http://lessthandot.com/rss.php" title="LessThanDot News Feed" ><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="Lessthandot rss"/></a> 
+		</div>
+		<p><em>Note: Watch for social icons on posts by your favorite authors to follow their postings on these and other social sites.</em></p>
+	</div><div class="content-sidebar-section">
+<h2>Tag cloud</h2>
+	<p class="tag-cloud">
+		<a href='/index.php/tag/net/' class='tag-link-245 tag-link-position-1' title='21 topics' style='font-size: 8.9565217391304pt;'>.net</a> <a href='/index.php/tag/asp-net/' class='tag-link-168 tag-link-position-2' title='21 topics' style='font-size: 8.9565217391304pt;'>asp.net</a> <a href='/index.php/tag/azure-2/' class='tag-link-321 tag-link-position-3' title='29 topics' style='font-size: 10.173913043478pt;'>azure</a> <a href='/index.php/tag/book/' class='tag-link-130 tag-link-position-4' title='26 topics' style='font-size: 9.7391304347826pt;'>book</a> <a href='/index.php/tag/business-intelligence-2/' class='tag-link-256 tag-link-position-5' title='30 topics' style='font-size: 10.260869565217pt;'>business intelligence</a> <a href='/index.php/tag/c/' class='tag-link-138 tag-link-position-6' title='40 topics' style='font-size: 11.304347826087pt;'>c#</a> <a href='/index.php/tag/database/' class='tag-link-134 tag-link-position-7' title='31 topics' style='font-size: 10.434782608696pt;'>database</a> <a href='/index.php/tag/excel/' class='tag-link-155 tag-link-position-8' title='16 topics' style='font-size: 8pt;'>excel</a> <a href='/index.php/tag/gotcha/' class='tag-link-240 tag-link-position-9' title='19 topics' style='font-size: 8.6086956521739pt;'>gotcha</a> <a href='/index.php/tag/how-to/' class='tag-link-272 tag-link-position-10' title='44 topics' style='font-size: 11.652173913043pt;'>how to</a> <a href='/index.php/tag/mongodb/' class='tag-link-765 tag-link-position-11' title='17 topics' style='font-size: 8.2608695652174pt;'>mongodb</a> <a href='/index.php/tag/nosql/' class='tag-link-775 tag-link-position-12' title='18 topics' style='font-size: 8.4347826086957pt;'>nosql</a> <a href='/index.php/tag/performance/' class='tag-link-179 tag-link-position-13' title='26 topics' style='font-size: 9.7391304347826pt;'>performance</a> <a href='/index.php/tag/security-2/' class='tag-link-398 tag-link-position-14' title='25 topics' style='font-size: 9.5652173913043pt;'>security</a> <a href='/index.php/tag/sql/' class='tag-link-132 tag-link-position-15' title='42 topics' style='font-size: 11.478260869565pt;'>sql</a> <a href='/index.php/tag/sql-advent-2012/' class='tag-link-1416 tag-link-position-16' title='18 topics' style='font-size: 8.4347826086957pt;'>sql advent 2012</a> <a href='/index.php/tag/sql-friday/' class='tag-link-377 tag-link-position-17' title='18 topics' style='font-size: 8.4347826086957pt;'>sql friday</a> <a href='/index.php/tag/sql-server/' class='tag-link-154 tag-link-position-18' title='145 topics' style='font-size: 16.086956521739pt;'>sql server</a> <a href='/index.php/tag/sql-server-2000/' class='tag-link-366 tag-link-position-19' title='45 topics' style='font-size: 11.739130434783pt;'>sql server 2000</a> <a href='/index.php/tag/sql-server-2005/' class='tag-link-327 tag-link-position-20' title='118 topics' style='font-size: 15.391304347826pt;'>sql server 2005</a> <a href='/index.php/tag/sql-server-2008/' class='tag-link-152 tag-link-position-21' title='237 topics' style='font-size: 18pt;'>sql server 2008</a> <a href='/index.php/tag/sql-server-2008-r2/' class='tag-link-548 tag-link-position-22' title='38 topics' style='font-size: 11.130434782609pt;'>sql server 2008 r2</a> <a href='/index.php/tag/sql-server-2012/' class='tag-link-1161 tag-link-position-23' title='76 topics' style='font-size: 13.739130434783pt;'>sql server 2012</a> <a href='/index.php/tag/ssis-2/' class='tag-link-501 tag-link-position-24' title='52 topics' style='font-size: 12.260869565217pt;'>ssis</a> <a href='/index.php/tag/ssms/' class='tag-link-640 tag-link-position-25' title='18 topics' style='font-size: 8.4347826086957pt;'>ssms</a> <a href='/index.php/tag/ssrs-2/' class='tag-link-557 tag-link-position-26' title='27 topics' style='font-size: 9.9130434782609pt;'>ssrs</a> <a href='/index.php/tag/syndicated/' class='tag-link-1407 tag-link-position-27' title='67 topics' style='font-size: 13.217391304348pt;'>syndicated</a> <a href='/index.php/tag/t-sql/' class='tag-link-185 tag-link-position-28' title='26 topics' style='font-size: 9.7391304347826pt;'>t-sql</a> <a href='/index.php/tag/tip/' class='tag-link-194 tag-link-position-29' title='46 topics' style='font-size: 11.826086956522pt;'>tip</a> <a href='/index.php/tag/unit-testing/' class='tag-link-162 tag-link-position-30' title='17 topics' style='font-size: 8.2608695652174pt;'>unit testing</a>	</p>
+</div>		<div class="content-sidebar-section">
+		<h2>Authors</h2>
+			<ul class="author-list dimmed">
+				<li><a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis">SQLDenis</a> <a href="/index.php/author/SQLDenis/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (597)</li><li><a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)">Ted Krueger (onpnt)</a> <a href="/index.php/author/onpnt/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (355)</li><li><a href="/index.php/author/grrlgeek/" title="Posts by Jes Borland">Jes Borland</a> <a href="/index.php/author/grrlgeek/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (202)</li><li><a href="/index.php/author/tarwn/" title="Posts by Eli Weinstock-Herman (tarwn)">Eli Weinstock-Herman (tarwn)</a> <a href="/index.php/author/tarwn/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (190)</li><li><a href="/index.php/author/koenverbeeck/" title="Posts by Koen Verbeeck">Koen Verbeeck</a> <a href="/index.php/author/koenverbeeck/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (100)</li><li><a href="/index.php/author/alexcuse/" title="Posts by Alex Ullrich">Alex Ullrich</a> <a href="/index.php/author/alexcuse/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (55)</li><li><a href="/index.php/author/gmmastros/" title="Posts by George Mastros (gmmastros)">George Mastros (gmmastros)</a> <a href="/index.php/author/gmmastros/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (45)</li><li><a href="/index.php/author/axel8s/" title="Posts by Axel Achten (axel8s)">Axel Achten (axel8s)</a> <a href="/index.php/author/axel8s/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (28)</li><li><a href="/index.php/author/naomi/" title="Posts by Naomi Nosonovsky">Naomi Nosonovsky</a> <a href="/index.php/author/naomi/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (27)</li><li><a href="/index.php/author/thirster42/" title="Posts by David Forck (thirster42)">David Forck (thirster42)</a> <a href="/index.php/author/thirster42/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (24)</li><li><a href="/index.php/author/chopstik/" title="Posts by chopstik">chopstik</a> <a href="/index.php/author/chopstik/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (20)</li><li><a href="/index.php/author/kconan/" title="Posts by Kevin Conan">Kevin Conan</a> <a href="/index.php/author/kconan/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (18)</li><li><a href="/index.php/author/robearl/" title="Posts by Rob Earl">Rob Earl</a> <a href="/index.php/author/robearl/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (14)</li><li><a href="/index.php/author/thatrickguy/" title="Posts by ThatRickGuy">ThatRickGuy</a> <a href="/index.php/author/thatrickguy/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (12)</li><li><a href="/index.php/author/sqlarcher/" title="Posts by SQLArcher">SQLArcher</a> <a href="/index.php/author/sqlarcher/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (11)</li>                <li><a href="http://lessthandot.com/Stats/BlogAuthors.php">More...</a></li>
+			</ul>
+		</div>
+				<div class="content-sidebar-section">
+		<h2>Categories</h2>
+			<ul class="categories-list">
+					<li class="cat-item cat-item-10"><a href="/index.php/category/all/" >All Blogs</a>
+</li>
+	<li class="cat-item cat-item-5"><a href="/index.php/category/architect/" >Architecture, Design and Strategy</a>
+</li>
+	<li class="cat-item cat-item-1759"><a href="/index.php/category/artificial-intelligence/" >Artificial Intelligence</a>
+</li>
+	<li class="cat-item cat-item-6"><a href="/index.php/category/datamgmt/" >Data Management</a>
+</li>
+	<li class="cat-item cat-item-7"><a href="/index.php/category/desktopdev/" >Desktop Developer</a>
+</li>
+	<li class="cat-item cat-item-8"><a href="/index.php/category/enterprisedev/" >Enterprise Developer</a>
+</li>
+	<li class="cat-item cat-item-11"><a href="/index.php/category/itprofessionals/" >IT Professionals</a>
+</li>
+	<li class="cat-item cat-item-12"><a href="/index.php/category/itstudents/" >IT Students and Researchers</a>
+</li>
+	<li class="cat-item cat-item-1743"><a href="/index.php/category/management/" >Management</a>
+</li>
+	<li class="cat-item cat-item-9"><a href="/index.php/category/sysadmins/" >System Admins</a>
+</li>
+	<li class="cat-item cat-item-1"><a href="/index.php/category/uncategorized/" >Uncategorized</a>
+</li>
+	<li class="cat-item cat-item-4"><a href="/index.php/category/webdev/" >Web Developer</a>
+</li>
+			</ul>
+		</div>
+		</div><div class="content-main">
+				<div class="post-navigation">
+				<div class="post-navigation-forward"><a href="/index.php/datamgmt/dbprogramming/how-to-improve-your-tech/" rel="next">SQL Advent 2012 Day 19: How to improve your tech skills</a> &raquo; </div>
+				<div class="post-navigation-back">&laquo; <a href="/index.php/datamgmt/dbadmin/mssqlserveradmin/stay-relevant-and-marketable/" rel="prev">SQL Advent 2012 Day 18: Stay relevant and marketable</a></div>
+			</div>
+			<div class="post-area instapaper_body">
+				<div class="post-title-line">
+										<h1 class="instapaper_ignore"><a href="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/" class="post-title">A Look Inside SQL Server Row and Page Compression</a></h1>
+					<div class="post-byline">by <a href="/index.php/author/grrlgeek/" title="Posts by Jes Borland" rel="author">Jes Borland</a> on December 19, 2012 in category <a href="/index.php/category/datamgmt/dbadmin/" rel="category tag">Database Administration</a> <a href="/index.php/category/datamgmt/dbprogramming/" rel="category tag">Database Programming</a> <a href="/index.php/category/datamgmt/dbprogramming/mssqlserver/" rel="category tag">Microsoft SQL Server</a> <a href="/index.php/category/datamgmt/dbadmin/mssqlserveradmin/" rel="category tag">Microsoft SQL Server Admin</a>. Article views: 37,757 </div>
+				</div>
+				<div class="post-tagline"><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&text=RT @LessThanDot Blog - A Look Inside SQL Server Row and Page Compression by @grrl_geek" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&title=A Look Inside SQL Server Row and Page Compression&source=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&title=A Look Inside SQL Server Row and Page Compression" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&quote=A Look Inside SQL Server Row and Page Compression" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&title=A Look Inside SQL Server Row and Page Compression" class="instapaper_button">Instapaper</a></div>
+
+				<div class="post-content"><p>Take a look at the books in your office. Think about how much space they take up. Now pick one up and page through it. Is there a lot of white space? Some pages may only have a couple paragraphs on them. There are a lot of words and letters repeated. If there was a way to compress the book, it would be much lighter to store and carry around, wouldn&#8217;t it?</p>
+<p>The same principle applies to your SQL Server databases. Pages have free space on them. They also have bits of data that are repeated. A great feature of SQL Server is data compression, which will reduce the size of a database on disk, making storage and administration easier.</p>
+<p>SQL Server 2008 (and newer versions) <strong>Enterprise Edition</strong> includes two types of data compression: row and page. The following demos were done in SQL Server 2012 Enterprise Edition in order to show the value data compression has and efficiency gains that can be had by utilizing this enterprise-level feature.&#8217; The demos will also show key performance factors to be aware of that may, or may not, be effected by data compression.</p>
+<h3>Row Compression</h3>
+<p>Row compression reduces the amount of space rows take up on a page in several ways:</p>
+<ul>
+<li>Metadata overhead is reduced. </li>
+<li>It uses the least amount of storage possible for some data types. Some numeric data types are reduced in size, and some character data types remove padding. For a full list of which data types can be compressed, and the method used, read <a href="http://msdn.microsoft.com/en-us/library/cc280576.aspx">Row Compression Implementation</a>. </li>
+<li>NULL and 0 values take up no space on a page. </li>
+</ul>
+<p>Let&#8217;s see this in action. I&#8217;ll walk you through creating and populating a table, checking the size of the table, and viewing the size of the rows with DBCC PAGE. Then, I&#8217;ll enable row compression, rebuild the table, and revisit the page to see what&#8217;s changed.</p>
+<p>First, I&#8217;ll create a table with several data types INT, CHAR(50), DATETIME, MONEY, and DECIMAL, to show the effects of compression on each.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> AdventureWorks2012; 
+GO &nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestRowCompression 
+<span class="br0">&#40;</span> ItemID <span class="kw1">INT</span> , 
+&nbsp; ItemName <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span> , 
+&nbsp; DateAdded <span class="kw1">DATETIME</span> , 
+&nbsp; UnitPrice <span class="kw1">MONEY</span> , 
+&nbsp; ItemLength <span class="kw1">DECIMAL</span> , 
+&nbsp; ItemWidth <span class="kw1">DECIMAL</span> &nbsp;<span class="br0">&#41;</span> 
+<span class="kw1">WITH</span> <span class="br0">&#40;</span> DATA_COMPRESSION <span class="sy0">=</span> <span class="kw1">NONE</span><span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE AdventureWorks2012; 
+GO  
+CREATE TABLE TestRowCompression 
+( ItemID INT , 
+  ItemName CHAR(50) , 
+  DateAdded DATETIME , 
+  UnitPrice MONEY , 
+  ItemLength DECIMAL , 
+  ItemWidth DECIMAL  ) 
+WITH ( DATA_COMPRESSION = NONE);</pre></div></div>
+
+<p>Then, I&#8217;ll insert data into the table. I&#8217;m using a variety of values, including 0 and NULL, to show how that is compressed.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> TestRowCompression 
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span> <span class="nu0">100000</span>, <span class="st0">'Small Red Lego Brick'</span>, <span class="st0">'2012/12/4'</span>, <span class="st0">'0.75'</span>, <span class="nu0">0</span>, <span class="nu0">0</span> <span class="br0">&#41;</span>; 
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> TestRowCompression 
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span> <span class="nu0">100001</span>, <span class="st0">'Medium Blue Lego Brick'</span>, <span class="st0">'2012/12/04'</span>, <span class="sy0">NULL</span>, <span class="nu0">1.5</span>, .5 <span class="br0">&#41;</span>; 
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> TestRowCompression &nbsp;
+<span class="kw1">VALUES</span> <span class="br0">&#40;</span> <span class="nu0">12</span>, <span class="st0">'Green Plate'</span>, <span class="st0">'2012/12/01 08:34:56'</span>, <span class="st0">'500.00'</span>, <span class="nu0">12</span>, <span class="nu0">12</span> <span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO TestRowCompression 
+VALUES ( 100000, 'Small Red Lego Brick', '2012/12/4', '0.75', 0, 0 ); 
+INSERT INTO TestRowCompression 
+VALUES ( 100001, 'Medium Blue Lego Brick', '2012/12/04', NULL, 1.5, .5 ); 
+INSERT INTO TestRowCompression  
+VALUES ( 12, 'Green Plate', '2012/12/01 08:34:56', '500.00', 12, 12 );</pre></div></div>
+
+<p>Let&#8217;s see how the data appears when selected in a normal query.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> ItemID , 
+&nbsp;ItemName , &nbsp;
+&nbsp;DateAdded , 
+&nbsp;UnitPrice , 
+&nbsp;ItemLength , 
+&nbsp;ItemWidth 
+<span class="kw1">FROM</span> TestRowCompression;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT ItemID , 
+ ItemName ,  
+ DateAdded , 
+ UnitPrice , 
+ ItemLength , 
+ ItemWidth 
+FROM TestRowCompression;</pre></div></div>
+
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%201.JPG?mtime=1355883902" alt="" width="562" height="112" /></p>
+<p>What I want to know now is how much space these rows are taking up in the database, and on the page. I can use <a href="http://msdn.microsoft.com/en-us/library/ms188776.aspx">sp_spaceused</a> to find the reserved and used disk space of the table.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">sp_spaceused</span> <span class="st0">'dbo.TestRowCompression'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">sp_spaceused 'dbo.TestRowCompression';</pre></div></div>
+
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%202.JPG?mtime=1355883902" alt="" width="422" height="71" /></p>
+<p>Here, I can see that there are three rows, and the data is taking up 8KB of space that&#8217;s one page. How do I tell how much space each row is using? I can view the page, using DBCC PAGE, to find that information.</p>
+<blockquote><p><em>Note</em>: if you&#8217;re not familiar with DBCC IND and DBCC PAGE, I recommend reading <a href="http://www.sqlskills.com/blogs/paul/post/inside-the-storage-engine-using-dbcc-page-and-dbcc-ind-to-find-out-if-page-splits-ever-roll-back.aspx">Using DBCC PAGE and DBCC IND to find out if page splits ever roll back</a> by Paul Randal.</p></blockquote>
+<p>I&#8217;ll use DBCC IND to find the file number and page number.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DBCC</span> <span class="sy0">IN</span>D <span class="br0">&#40;</span><span class="st0">'AdventureWorks2012'</span>, <span class="st0">'TestRowCompression'</span>, <span class="nu0">0</span><span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DBCC IND ('AdventureWorks2012', 'TestRowCompression', 0);</pre></div></div>
+
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%203.JPG?mtime=1355883902" alt="" width="768" height="62" /></p>
+<p>I&#8217;ll run DBCC PAGE, using the data page &#8211; PageType 1, PagePID 23816 &#8211; to view the data on the page.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DBCC</span> TRACEON <span class="br0">&#40;</span><span class="nu0">3604</span><span class="br0">&#41;</span>; 
+GO 
+<span class="kw1">DBCC</span> PAGE <span class="br0">&#40;</span><span class="st0">'AdventureWorks2012'</span>, <span class="nu0">1</span>, <span class="nu0">23816</span>, <span class="nu0">3</span><span class="br0">&#41;</span>; 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DBCC TRACEON (3604); 
+GO 
+DBCC PAGE ('AdventureWorks2012', 1, 23816, 3); 
+GO</pre></div></div>
+
+<p>I&#8217;m going to skim past the header and go to the information for the first row. Here, in the top right, I can see the entire row uses 95 bytes. You can see the bytes used by each field by reviewing &#8216;Length (physical)&#8217;. The ItemID field is an INT, which takes 4 bytes for storage. The ItemName field is declared as CHAR(50), and even though it is only 20 characters in length, it&#8217;s using 50 bytes. ItemLength and ItemWidth take up 9 bytes each, even though they are values of 0. This is the way data is normally stored on pages.</p>
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%204.JPG?mtime=1355883902" alt="" width="610" height="518" /></p>
+<p>Reviewing the data for the third record, we can see that also takes up 95 bytes, even though the values for ItemID and ItemName are shorter in length.</p>
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%205.JPG?mtime=1355883902" alt="" width="618" height="485" /></p>
+<p>If I am looking to reduce the space used by data in my database, I could enable row compression to do so. Before you start rebuilding all your tables in a development environment, use the stored procedure <a href="http://msdn.microsoft.com/en-us/library/cc280574.aspx">sp_estimate_data_compression_savings</a> to determine what level of compression can be achieved. This will help you determine how much space can be saved, and if it is worth making the change.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> sp_estimate_data_compression_savings <span class="st0">'dbo'</span>, <span class="st0">'TestRowCompression'</span>, <span class="sy0">NULL</span>, <span class="sy0">NULL</span>, <span class="st0">'ROW'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_estimate_data_compression_savings 'dbo', 'TestRowCompression', NULL, NULL, 'ROW';</pre></div></div>
+
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%206.JPG?mtime=1355884192" alt="" width="950" height="36" /></p>
+<p>Compressing this table would offer very little benefit, since at this time there are only three rows. However, I decide I want to enable row compression, to manage future data growth.</p>
+<blockquote><p><em>Note</em>: this will rebuild the table you are working with. Depending on the size of your table, this may take some time. Always test this in a development environment first.</p></blockquote>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">TestRowCompression</span> REBUILD 
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DATA_COMPRESSION <span class="sy0">=</span> <span class="kw1">ROW</span><span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.TestRowCompression REBUILD 
+WITH (DATA_COMPRESSION = ROW);</pre></div></div>
+
+<p>I&#8217;ll run sp_spaceused again to compare the space used for the table.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">sp_spaceused</span> <span class="st0">'dbo.TestRowCompression'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">sp_spaceused 'dbo.TestRowCompression';</pre></div></div>
+
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%207.JPG?mtime=1355884192" alt="" width="407" height="44" /></p>
+<p>The data size has remained the same, but the unused size has increased. But, what this doesn&#8217;t tell me is how much space is SQL Server using for each field in each row? What effect has row compression had on the rows? Let&#8217;s view the page again.</p>
+<p>I will run DBCC IND again to get the page number. Then, I run DBCC PAGE to view the results. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DBCC</span> <span class="sy0">IN</span>D <span class="br0">&#40;</span><span class="st0">'AdventureWorks2012'</span>, <span class="st0">'TestRowCompression'</span>, <span class="nu0">0</span><span class="br0">&#41;</span>;
+<span class="kw1">DBCC</span> TRACEON <span class="br0">&#40;</span><span class="nu0">3604</span><span class="br0">&#41;</span>;
+GO
+<span class="kw1">DBCC</span> PAGE <span class="br0">&#40;</span><span class="st0">'AdventureWorks2012'</span>, <span class="nu0">1</span>, <span class="nu0">183656</span>, <span class="nu0">3</span><span class="br0">&#41;</span>;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DBCC IND ('AdventureWorks2012', 'TestRowCompression', 0);
+DBCC TRACEON (3604);
+GO
+DBCC PAGE ('AdventureWorks2012', 1, 183656, 3);
+GO</pre></div></div>
+
+<p>I can see things have changed drastically! The overall row size is reduced to 42 bytes. ItemID is only using 3 bytes. ItemName is now using 20 bytes. DateAdded has been reduced from 8 to 7 bytes. UnitPrice has decreased from 8 to 2 bytes. ItemLength and ItemWidth are using 0 bytes.</p>
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%208.JPG?mtime=1355884192" alt="" width="643" height="507" /></p>
+<p>Looking at the third row, I can see even less space is being used &#8216; 36 bytes. Here, the INT field, ItemID, is reduced to 1 byte, and ItemName is using only 11 bytes.</p>
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%209.JPG?mtime=1355884192" alt="" width="630" height="484" /></p>
+<p>This proves that row compression can be a powerful tool for reducing the space taken up by data on pages! Here are a few examples, ranging from Person.Person barely compressing, to dbo.bigProduct showing over 50% compression.</p>
+<p style="text-align: center;"><img src="/wp-content/uploads/users/grrlgeek/compression%2015.JPG?mtime=1355884466" alt="" width="637" height="490" /></p>
+<p><strong> </strong></p>
+<p><strong> </strong></p>
+<h3>Page Compression</h3>
+<p>The next level of data compression is page compression. The leaf level of tables and indexes will have three operations performed on it, in order:</p>
+<ul>
+<li>Row compression </li>
+<li>Prefix compression </li>
+<li>Dictionary compression </li>
+</ul>
+<p>We&#8217;ve already covered row compression. How do prefix and dictionary work?</p>
+<h4>Prefix Compression</h4>
+<p>This type will look at the data stored in each column. It will find a pattern in the beginning &#8216; the prefix &#8216; of each value, store that in a section of the page called the compression information structure (CIS), and reference the prefix in the row, instead of the entire value.</p>
+<p>Let&#8217;s use names as an example, since that is something you could have with many repeating values.</p>
+<table border="1" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td colspan="3" width="638" valign="top">
+<p style="text-align: center;">Header</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p>Jenna</p>
+</td>
+<td width="213" valign="top">
+<p>Jen</p>
+</td>
+<td width="213" valign="top">
+<p>Jennifer</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p>Jennie</p>
+</td>
+<td width="213" valign="top">
+<p>Jenny</p>
+</td>
+<td width="213" valign="top">
+<p>Jeren</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p>Jeri</p>
+</td>
+<td width="213" valign="top">
+<p>Jessica</p>
+</td>
+<td width="213" valign="top">
+<p>Jess</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p>Jes</p>
+</td>
+<td width="213" valign="top">
+<p>Joseph</p>
+</td>
+<td width="213" valign="top">
+<p>Jonathan</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>After prefix compression is applied, the prefixes are stored in the CIS and then referenced in the rows.</p>
+<table border="1" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td colspan="3" width="638" valign="top">
+<p style="text-align: center;">Header</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p>Jen (<span style="color: #ff0000;">0</span>)</p>
+</td>
+<td width="213" valign="top">
+<p>Jes (<span style="color: #339966;">1</span>)</p>
+</td>
+<td width="213" valign="top">
+<p>Jo (<span style="color: #3366ff;">2</span>)</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span>na</p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span></p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span>nifer</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span>nie</p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span>ny</p>
+</td>
+<td width="213" valign="top">
+<p>Jeren</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p>Jeri</p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #339966;">1</span>sica</p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #339966;">1</span>s</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p><span style="color: #339966;">1</span></p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #3366ff;">2</span>seph</p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #3366ff;">2</span>nathan</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h4>Dictionary Compression</h4>
+<p>Dictionary compression takes this one step further and replaces repeating values on the page, regardless of whether they are at the beginning of the value, in the middle, or at the end.</p>
+<table border="1" cellspacing="0" cellpadding="0">
+<tbody>
+<tr>
+<td colspan="3" width="638" valign="top">
+<p style="text-align: center;">Header</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p>Jen (<span style="color: #ff0000;">0</span>)</p>
+</td>
+<td width="213" valign="top">
+<p>Jes (<span style="color: #339966;">1</span>)</p>
+</td>
+<td width="213" valign="top">
+<p>Jo (<span style="color: #3366ff;">2</span>)</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p>er (<span style="color: #00ff00;">3</span>)</p>
+</td>
+<td width="213" valign="top">
+<p>ni (<span style="color: #cc99ff;">4</span>)</p>
+</td>
+<td width="213" valign="top">
+<p>na (<span style="color: #ff00ff;">5</span>)</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span><span style="color: #ff00ff;">5</span></p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span></p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span><span style="color: #cc99ff;">4</span>f<span style="color: #00ff00;">3</span></p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span><span style="color: #cc99ff;">4</span>e</p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #ff0000;">0</span>ny</p>
+</td>
+<td width="213" valign="top">
+<p>J<span style="color: #00ff00;">3</span>en</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p>J<span style="color: #00ff00;">3</span>i</p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #339966;">1</span>sica</p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #339966;">1</span>s</p>
+</td>
+</tr>
+<tr>
+<td width="213" valign="top">
+<p><span style="color: #339966;">1</span></p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #3366ff;">2</span>seph</p>
+</td>
+<td width="213" valign="top">
+<p><span style="color: #3366ff;">2</span><span style="color: #ff00ff;">5</span>than</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>To show the effects, let&#8217;s copy the data from TestRowCompression into a new table.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> ItemID , 
+&nbsp;ItemName , 
+&nbsp;DateAdded , 
+&nbsp;UnitPrice , 
+&nbsp;ItemLength , 
+&nbsp;ItemWidth 
+<span class="kw1">INTO</span><span class="st0">''</span><span class="st0">' TestPageCompression </span>
+<span class="st0">FROM'</span><span class="st0">''</span> TestRowCompression;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT ItemID , 
+ ItemName , 
+ DateAdded , 
+ UnitPrice , 
+ ItemLength , 
+ ItemWidth 
+INTO''' TestPageCompression 
+FROM''' TestRowCompression;</pre></div></div>
+
+<p>I&#8217;ll alter the table to use page compression and check the size.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">TestPageCompression</span> REBUILD 
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DATA_COMPRESSION <span class="sy0">=</span> PAGE<span class="br0">&#41;</span>;
+<span class="kw3">sp_spaceused</span> <span class="st0">'dbo.TestPageCompression'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.TestPageCompression REBUILD 
+WITH (DATA_COMPRESSION = PAGE);
+sp_spaceused 'dbo.TestPageCompression';</pre></div></div>
+
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%2010.JPG?mtime=1355884192" alt="" width="416" height="68" /></p>
+<p>Right now, this is no different from when I applied row compression. Because this is a small table, with few repeating values, this does not surprise me. I have another table in my database, <a href="http://sqlblog.com/blogs/adam_machanic/archive/2011/10/17/thinking-big-adventure.aspx">dbo.bigTransactionHistory</a>, which is larger and may offer better results. Let&#8217;s look.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">sp_spaceused</span> <span class="st0">'dbo.bigTransactionHistory'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">sp_spaceused 'dbo.bigTransactionHistory';</pre></div></div>
+
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%2011.JPG?mtime=1355884637" alt="" width="504" height="74" /></p>
+<p>We can see the table has approximately 1100 MB of data.</p>
+<p>First, I will apply row compression and check the size.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">bigTransactionHistory</span> REBUILD 
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DATA_COMPRESSION <span class="sy0">=</span> <span class="kw1">ROW</span><span class="br0">&#41;</span>;
+<span class="kw3">sp_spaceused</span> <span class="st0">'dbo.bigTransactionHistory'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.bigTransactionHistory REBUILD 
+WITH (DATA_COMPRESSION = ROW);
+sp_spaceused 'dbo.bigTransactionHistory';</pre></div></div>
+
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%2012.JPG?mtime=1355884638" alt="" width="492" height="77" /></p>
+<p>The space used by data is now down to 725 MB.</p>
+<p>Now I will apply page compression to see if this can be reduced further.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> dbo.<span class="me1">bigTransactionHistory</span> REBUILD 
+<span class="kw1">WITH</span> <span class="br0">&#40;</span>DATA_COMPRESSION <span class="sy0">=</span> PAGE<span class="br0">&#41;</span>;
+<span class="kw3">sp_spaceused</span> <span class="st0">'dbo.bigTransactionHistory'</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE dbo.bigTransactionHistory REBUILD 
+WITH (DATA_COMPRESSION = PAGE);
+sp_spaceused 'dbo.bigTransactionHistory';</pre></div></div>
+
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%2013.JPG?mtime=1355884638" alt="" width="493" height="70" /></p>
+<p>It has indeed reduced the space used, down to 472 MB. This is roughly 58% space savings.</p>
+<p>Using DBCC PAGE, I can view the CIS.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DBCC</span> <span class="sy0">IN</span>D <span class="br0">&#40;</span><span class="st0">'AdventureWorks2012'</span>, <span class="st0">'bigTransactionHistory'</span>, <span class="nu0">0</span><span class="br0">&#41;</span>;
+<span class="kw1">DBCC</span> TRACEON <span class="br0">&#40;</span><span class="nu0">3604</span><span class="br0">&#41;</span>;
+GO 
+<span class="kw1">DBCC</span> PAGE <span class="br0">&#40;</span><span class="st0">'AdventureWorks2012'</span>, <span class="nu0">1</span>, <span class="nu0">380976</span>, <span class="nu0">3</span><span class="br0">&#41;</span>; 
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DBCC IND ('AdventureWorks2012', 'bigTransactionHistory', 0);
+DBCC TRACEON (3604);
+GO 
+DBCC PAGE ('AdventureWorks2012', 1, 380976, 3); 
+GO</pre></div></div>
+
+<p>The compression information is stored below the header and above the rows.</p>
+<p><img src="/wp-content/uploads/users/grrlgeek/compression%2014.JPG?mtime=1355884638" alt="" width="816" height="152" /></p>
+<p>Page compression can also greatly reduce the space your database is using on disk. Here are a few examples of tables that have had page compression applied. In these examples, space savings range from 38% to 61%.</p>
+<p style="text-align: center;"><img src="/wp-content/uploads/users/grrlgeek/compression%2016.JPG?mtime=1355884817" alt="" width="526" height="333" /></p>
+<blockquote><p><em>Question</em>:&#8217;if I have enabled row or page compression, can I take a backup of the database, which is on Enterprise Edition, and restore it to a server that is Standard Edition? No, that can&#8217;t be done. Paul Randal demonstrates this in <a href="http://www.sqlskills.com/blogs/paul/post/sql-server-2008-does-my-database-contain-enterprise-only-features.aspx">Does my database contain Enterprise-only features?</a> Be aware of this, and the need to manage and be aware of your compression settings, if this could happen in your environment.</p></blockquote>
+<h3>There Has To Be A Negative, Right? </h3>
+<p>Data compression sounds fantastic, and it is. But, as Robert Heinlein would say, <a href="http://en.wikipedia.org/wiki/There_ain't_no_such_thing_as_a_free_lunch">TANSTAAFL</a>. The price you pay for your data taking up less space on disk is higher CPU usage. When the data is written to the table, or indexes are rebuilt, additional CPU will be needed to compress it. If your system currently experiences CPU pressure, it&#8217;s not a good idea to enable compression on it.</p>
+<h3>Resources</h3>
+<p>SQL Server Technical Paper &#8211; <a href="http://msdn.microsoft.com/en-us/library/dd894051(v=sql.100).aspx">Data Compression: Strategy, Capacity Planning and Best Practices </a> </p>
+<div class='rp4wp-related-posts'>
+<h3>Related Posts</h3>
+<ul>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/datadesign/scripting-data-in-sql-server/'>Scripting data in SQL Server 2012</a><p>SQL Server 2008 has the Generate Scripts option inside the script wizard. In SQL Server&hellip;</p></div>
+</li>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/dbadmin/compressing-data-with-uniqueidentifier-columns/'>Compressing Data with Uniqueidentifier columns</a><p>I was running some tests on compression for row and page level, and noticed something&hellip;</p></div>
+</li>
+</ul>
+</div>
+</div>
+				<div class="post-author">
+					<div class="userInfo"><h2>About the Author</h2><img class="bioPic" src="/wp-content/uploads/2014/03/IMG_8755-300x300.jpg" alt="User bio image"/>Jes Borland is a Premier Field Engineer - SQL Server for Microsoft, where she is a trusted technical adviser, deep technical support, and teacher for her customers. Her experience as a DBA, consultant, and 5-time Data Platform MVP allow her to help the business and the IT teams reach their goals. She has worked with SQL Server as a developer, report writer, DBA, and consultant. Her favorite topics are administration, automation, and performance. She frequently presents at user groups, SQL Saturdays, and other community events. She is also an avid runner and chef.
+<br style="clear: left" /><div class="bioSoc"><span class="bioSocTitle">Social Sitings</span><a href="http://twitter.com/grrl_geek" title="grrlgeek at Twitter" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Twitter" /></a><a href="http://www.linkedin.com/pub/jes-schultz-borland/9/393/705" title="grrlgeek at LinkedIn" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="LinkedIn" /></a><a href="/index.php/author/grrlgeek/feed/" title="Blog RSS feed for grrlgeek" class="bioSocLink"><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="LTD RSS Feed" /></a></div></div>				</div>
+				<div class="post-foot instapaper_ignore">
+					<div class="post-tagline">
+						<div class="post-foot-views"><label>Article views:</label> 37,757 </div>
+						<div class="post-foot-more-posts">
+                            <a href="/index.php/author/grrlgeek/">Read More Posts by Jes Borland</a>
+						</div>
+					</div>
+					<div>
+						 
+					</div>
+					<div class="post-tagline" style="height: auto">
+						<span class="social-button-label">Share:</span><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&text=RT @LessThanDot Blog - A Look Inside SQL Server Row and Page Compression by @grrl_geek" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&title=A Look Inside SQL Server Row and Page Compression&source=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&title=A Look Inside SQL Server Row and Page Compression" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&quote=A Look Inside SQL Server Row and Page Compression" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/&title=A Look Inside SQL Server Row and Page Compression" class="instapaper_button">Instapaper</a>					</div>			
+				</div>
+				<div class="comments-area instapaper_ignore">
+	<h4 class="comments-title">
+		5 Comments	</h4>
+			<ol class="comments-list">
+					<li class="comment byuser comment-author-SQLDenis even thread-even depth-1" id="comment-5730">
+				<div id="div-comment-5730" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">SQLDenis</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/#comment-5730">
+			December 19, 2012 at 2:53 pm</a>		</div>
+
+		<p>Good post&#8230;using compression for a while now, I noticed that if your indexes are sorted in a certain order you can get really nice savings out of compression</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/?replytocom=5730#respond' onclick='return addComment.moveForm( "div-comment-5730", "5730", "respond", "1868" )' aria-label='Reply to SQLDenis'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-5731">
+				<div id="div-comment-5731" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/1c2b3f4c764429281f441d617945ac89?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/1c2b3f4c764429281f441d617945ac89?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Lelala</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/#comment-5731">
+			May 4, 2013 at 7:33 am</a>		</div>
+
+		<p>Any idea, why they came up with this 8kb thingy?<br />
+Is it because earlier in IT-tech CPUs first-level-cache was 8kb?</p>
+<p>Regards</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/?replytocom=5731#respond' onclick='return addComment.moveForm( "div-comment-5731", "5731", "respond", "1868" )' aria-label='Reply to Lelala'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1 parent" id="comment-2797554">
+				<div id="div-comment-2797554" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/f1489601dda24819cefd10119d663f92?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/f1489601dda24819cefd10119d663f92?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn"><a href='http://pcgroup.co.il/' rel='external nofollow' class='url'>Shmuel</a></cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/#comment-2797554">
+			November 24, 2014 at 3:14 am</a>		</div>
+
+		<p>Does compression also cause slower reads from the DB (because data has to be decompressed on each read)?</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/?replytocom=2797554#respond' onclick='return addComment.moveForm( "div-comment-2797554", "2797554", "respond", "1868" )' aria-label='Reply to Shmuel'>Reply</a></div>
+				</div>
+		<ol class="children">
+		<li class="comment byuser comment-author-grrlgeek bypostauthor odd alt depth-2" id="comment-2803972">
+				<div id="div-comment-2803972" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9a2d253ad20c63844964e14d3571d431?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9a2d253ad20c63844964e14d3571d431?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Jes Borland</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/#comment-2803972">
+			November 24, 2014 at 2:42 pm</a>		</div>
+
+		<p>Not necessarily &#8211; the data stays compressed in memory. What can slow things down is when modifications need to be made to pages. More information can be found at <a href="https://www.microsoftpressstore.com/articles/article.aspx?p=2225060&#038;seqNum=4" rel="nofollow">https://www.microsoftpressstore.com/articles/article.aspx?p=2225060&#038;seqNum=4</a>.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/?replytocom=2803972#respond' onclick='return addComment.moveForm( "div-comment-2803972", "2803972", "respond", "1868" )' aria-label='Reply to Jes Borland'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+</ol><!-- .children -->
+</li><!-- #comment-## -->
+		<li class="comment even thread-odd thread-alt depth-1" id="comment-5474670">
+				<div id="div-comment-5474670" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/3f6efcbddcbce010f74cad131a86ca1f?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/3f6efcbddcbce010f74cad131a86ca1f?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Johnson</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/#comment-5474670">
+			January 11, 2017 at 7:52 am</a>		</div>
+
+		<p>Thanks for the sharing this great information. Here is another article related to data compression. <a href="http://www.sqlmvp.org/sql-server-data-compression/" rel="nofollow">http://www.sqlmvp.org/sql-server-data-compression/</a></p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/?replytocom=5474670#respond' onclick='return addComment.moveForm( "div-comment-5474670", "5474670", "respond", "1868" )' aria-label='Reply to Johnson'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		</ol>
+						<div id="respond" class="comment-respond">
+			<h3 id="reply-title" class="comment-reply-title">Leave a Reply <small><a rel="nofollow" id="cancel-comment-reply-link" href="/index.php/datamgmt/dbprogramming/how-sql-server-data-compression/#respond" style="display:none;">Cancel reply</a></small></h3>				<form action="/wp-comments-post.php" method="post" id="commentform" class="comment-form">
+					<p class="comment-notes"><span id="email-notes">Your email address will not be published.</span> Required fields are marked <span class="required">*</span></p><p class="comment-form-comment"><label for="comment">Comment</label> <textarea id="comment" name="comment" cols="45" rows="8" maxlength="65525" aria-required="true" required="required"></textarea></p><p class="comment-form-author"><label for="author">Name <span class="required">*</span></label> <input id="author" name="author" type="text" value="" size="30" maxlength="245" aria-required='true' required='required' /></p>
+<p class="comment-form-email"><label for="email">Email <span class="required">*</span></label> <input id="email" name="email" type="text" value="" size="30" maxlength="100" aria-describedby="email-notes" aria-required='true' required='required' /></p>
+<p class="comment-form-url"><label for="url">Website</label> <input id="url" name="url" type="text" value="" size="30" maxlength="200" /></p>
+<p class="form-submit"><input name="submit" type="submit" id="submit" class="submit" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='1868' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='0' />
+</p><input type="hidden" id="killer_value" name="killer_value" value="d56b9fc4b0f1be8871f5e1c40c0067e7"/><noscript>Sorry, but you are required to use a javascript enabled brower to comment here.</noscript>				</form>
+					</div><!-- #respond -->
+		</div>			</div>
+				<br style="clear: both;" />
+</div>
+		</div>
+		<div id="page-footer">
+			<div id="botnav"><a href="http://lessthandot.com/" title="LessThanDot Launchpad">Launchpad</a> | <a href="http://lessthandot.com/account.php" title="Your Account Settings">My Account</a> | <a href="http://lessthandot.com/statistics.php" title="Statistics">Statistics</a> | <a href="http://lessthandot.com/donate.php" title="Donate">Donate</a> | <a href="http://lessthandot.com/contactus.php" title="Contact Us">Contact Us</a> | <a href="http://lessthandot.com/aboutus.php" title="About the LessThanDot Team">&copy;2008 - 2019 LessThanDot, LLC</a></div>
+
+		<script type='text/javascript'>
+		var _gaq = _gaq || [];
+		_gaq.push(['_setAccount', 'UA-4471405-1']);
+		_gaq.push(['_trackPageview']);
+		_gaq.push(['_setCustomVar', 1, 'Environment', 'lessthandot.com', 3]);
+
+		(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		})();
+	  </script>			<div class="validator"><a href="http://validator.w3.org/check?uri=referer">Valid XHTML</a> | <a href="http://jigsaw.w3.org/css-validator/check/referer" title="Validate the CSS for this page at the W3C website">Valid CSS</a> | 2018-11-11 15:52</div>
+		</div>
+	</div>
+</div>
+<!-- <script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script> -->
+<script type='text/javascript' src='/wp-includes/js/wp-embed.min.js?ver=4.6.1'></script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var spam_destroyer = {"key":"159ff9dcc225580310c2de238cdd1f1a","lifetime":"3600","limit":"1552765857"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='/wp-content/plugins/spam-destroyer/kill.js?ver=1.2'></script>
+</body>
+</html>

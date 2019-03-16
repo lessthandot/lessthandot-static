@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>delete &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/delete/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Why do you need additional privileges for truncate table compared to delete?</title>
+		<link>/index.php/datamgmt/datadesign/why-do-you-need-additional/</link>
+		<comments>/index.php/datamgmt/datadesign/why-do-you-need-additional/#comments</comments>
+		<pubDate>Sun, 07 Oct 2012 12:04:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[delete]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[permissions]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[truncate table]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/10/why-do-you-need-additional/</guid>
+		<description><![CDATA[One of the people on my team wants to have the ability to truncate tables on the staging database while this person is testing, why are special permissions required compared to a delete?]]></description>
+				<content:encoded><![CDATA[<p>One of the people on my team wants to have the ability to truncate tables on the staging database while this person is testing. Here is what Books On Line has about permissions for the TRUNCATED statement</p>
+<blockquote><p>The minimum permission required is ALTER on table_name. TRUNCATE TABLE permissions default to the table owner, members of the sysadmin fixed server role, and the db_owner and db_ddladmin fixed database roles, and are not transferable.</p></blockquote>
+<p>Before I answer why someone would need ALTER TABLE permissions when the person already has DELETE permissions, let&#8217;s run some code that will show the &#8216;problem&#8217;.</p>
+<p>First create a Test database, add one table and insert one row</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> Test
+go
+&nbsp;
+<span class="kw1">USE</span> Test
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestTruncate<span class="br0">&#40;</span>Id <span class="kw1">int</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> TestTruncate <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE Test
+go
+
+USE Test
+GO
+
+CREATE TABLE TestTruncate(Id int)
+GO
+
+INSERT TestTruncate values(1)
+GO</pre></div></div>
+
+<p>Now create a new user and give the user datareader and datawriter permissions</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> master
+GO
+<span class="kw1">CREATE</span> LOG<span class="sy0">IN</span> TestLogin <span class="kw1">WITH</span> PASSW<span class="sy0">OR</span>D<span class="sy0">=</span>N<span class="st0">'Test'</span>, 
+DEFAULT_DATABASE<span class="sy0">=</span>master, CHECK_EXPIRATION<span class="sy0">=</span><span class="kw1">OFF</span>, CHECK_POLICY<span class="sy0">=</span><span class="kw1">OFF</span>
+GO
+<span class="kw1">USE</span> Test
+GO
+<span class="kw1">CREATE</span> <span class="kw1">USER</span> TestLogin <span class="kw1">FOR</span> LOG<span class="sy0">IN</span> TestLogin
+GO
+<span class="kw1">USE</span> Test
+GO
+<span class="kw1">ALTER</span> <span class="kw1">ROLE</span> db_datareader <span class="kw1">ADD</span> MEMBER TestLogin
+GO
+<span class="kw1">USE</span> Test
+GO
+<span class="kw1">ALTER</span> <span class="kw1">ROLE</span> db_datawriter <span class="kw1">ADD</span> MEMBER TestLogin
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE master
+GO
+CREATE LOGIN TestLogin WITH PASSWORD=N'Test', 
+DEFAULT_DATABASE=master, CHECK_EXPIRATION=OFF, CHECK_POLICY=OFF
+GO
+USE Test
+GO
+CREATE USER TestLogin FOR LOGIN TestLogin
+GO
+USE Test
+GO
+ALTER ROLE db_datareader ADD MEMBER TestLogin
+GO
+USE Test
+GO
+ALTER ROLE db_datawriter ADD MEMBER TestLogin
+GO</pre></div></div>
+
+<p>Now that the user is created, login as that user and run the TRUNCATE TABLE command</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> TestTruncate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">TRUNCATE TABLE TestTruncate</pre></div></div>
+
+<p><em>Msg 1088, Level 16, State 7, Line 1<br />
+Cannot find the object &#8220;TestTruncate&#8221; because it does not exist or you do not have permissions.</em></p>
+<p>As you can see, you don&#8217;t have permission. A delete will work just fine</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DELETE</span> TestTruncate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DELETE TestTruncate</pre></div></div>
+
+<p>(1 row(s) affected)</p>
+<p>Before I give you a workaround, let&#8217;s try to figure out why the minimum requirement is ALTER TABLE. What is the difference between a DELETE and a TRUNCATE in terms of logging? When  a TRUNCATE occurs, the operation does not log individual row deletions, a DELETE operation does. The reason this is important is because if you have a trigger on the table, in needs to be disabled before the TRUNCATE occurs. <strong>Now you know why ALTER TABLE is required, triggers need to be disabled.</strong></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> SomeTable DISABLE <span class="kw1">TRIGGER</span> SomeTrigger</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE SomeTable DISABLE TRIGGER SomeTrigger</pre></div></div>
+
+<p>And in order to disable the trigger, ALTER TABLE permissions are required as a minimum.</p>
+<p>But I don&#8217;t want people altering tables on our staging and QA servers, so here is one way of giving the person the ability to TRUNCATE a table without giving them permissions explicitly. Create a stored procedure and use WITH EXECUTE AS, this will define the execution context of the stored procedure. In the example below, I picked a user that has sufficient privileges to perform the TRUNCATE.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">PROCEDURE</span> prTruncate
+<span class="kw1">WITH</span> <span class="kw1">EXECUTE</span> <span class="kw1">AS</span> <span class="st0">'SuperUser'</span>
+<span class="kw1">AS</span>
+<span class="kw1">TRUNCATE</span> <span class="kw1">TABLE</span> TestTruncate
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE PROCEDURE prTruncate
+WITH EXECUTE AS 'SuperUser'
+AS
+TRUNCATE TABLE TestTruncate
+GO</pre></div></div>
+
+<p>All you have to do is give your user execute permissions to the stored procedure you just created</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">GRANT</span> <span class="kw1">EXECUTE</span> <span class="kw1">ON</span> prTruncate <span class="kw1">TO</span> TestLogin
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">GRANT EXECUTE ON prTruncate TO TestLogin
+GO</pre></div></div>
+
+<p>Now if you execute the stored procedure as the TestLogin user, you will see it will run just fine</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> prTruncate</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC prTruncate</pre></div></div>
+
+<p>Hope this helps someone in the future who is filling up his log these days</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/why-do-you-need-additional/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2011 Day 11: DML statements with the OUTPUT clause</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-11/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-11/#comments</comments>
+		<pubDate>Sun, 11 Dec 2011 10:11:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[delete]]></category>
+		<category><![CDATA[dml]]></category>
+		<category><![CDATA[insert]]></category>
+		<category><![CDATA[output]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-11/</guid>
+		<description><![CDATA[In my Are you ready for SQL Server 2012 or are you still partying like it is 1999? post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code tha&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>Today we are going to take a look at the OUTPUT clause as part of an INSERT, DELETE or UPDATE statement</p>
+<p>In yesterday&#8217;s post <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-10">SQL Advent 2011 Day 10: Upsert by using the Merge statement</a> I already showed the OUTPUT clause in one or two examples, in today&#8217;s post I will only focus on the OUTPUT clause</p>
+<p>First we need to create a test table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestOutput <span class="br0">&#40;</span>id <span class="kw1">int</span> <span class="kw1">identity</span> not null,SomeCol <span class="kw1">datetime</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestOutput (id int identity not null,SomeCol datetime)
+GO</pre></div></div>
+
+<p>
+<h2>OUTPUT clause and insert statements</h2>
+<p>This code uses a <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/sql-advent-2011-day-5">Common Table Expression</a> combined with the <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-day-6">ROW_NUMBER</a> function to generate 10 rows. We then use the dateadd function to generate 10 different days. We insert these 10 rows into the TestOutput output table, this table has an identity column and the id will be generated by SQL Server. We use the output statement to return the id as well as the SomeCol column values. The nice thing with the OUTPUT clause compared to the SCOPE_IDENTITY function is that the OUTPUT clause will return all values, SCOPE_IDENTITY only returns the last value generated</p>
+<p>Run this code to see how it works</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">10</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> number
+<span class="kw1">from</span> sysobjects<span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestOutput
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span>
+<span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>d,number,<span class="st0">'20110101'</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> CTE</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH cte AS(
+SELECT TOP 10 ROW_NUMBER() OVER(ORDER BY name) AS number
+from sysobjects)
+
+
+INSERT TestOutput
+OUTPUT inserted.id,inserted.SomeCol
+SELECT DATEADD(d,number,'20110101')
+FROM CTE</pre></div></div>
+
+<p>Output<br />
+
+<pre>id      SomeCol
+--      -----------------------
+1	2011-01-02 00:00:00.000
+2	2011-01-03 00:00:00.000
+3	2011-01-04 00:00:00.000
+4	2011-01-05 00:00:00.000
+5	2011-01-06 00:00:00.000
+6	2011-01-07 00:00:00.000
+7	2011-01-08 00:00:00.000
+8	2011-01-09 00:00:00.000
+9	2011-01-10 00:00:00.000
+10	2011-01-11 00:00:00.000</pre>
+<p></p>
+<p>If you check the table itself, you will see that you have exactly the same result as with the OUTPUT clause</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestOutput</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestOutput</pre></div></div>
+
+<p>
+<pre>id      SomeCol
+--      -----------------------
+1	2011-01-02 00:00:00.000
+2	2011-01-03 00:00:00.000
+3	2011-01-04 00:00:00.000
+4	2011-01-05 00:00:00.000
+5	2011-01-06 00:00:00.000
+6	2011-01-07 00:00:00.000
+7	2011-01-08 00:00:00.000
+8	2011-01-09 00:00:00.000
+9	2011-01-10 00:00:00.000
+10	2011-01-11 00:00:00.000</pre>
+<p></p>
+<p>Instead of outputting the results right back, you can insert them in a table, temporary table or table variable, I am showing you how to do it with a table variable</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @TableVar <span class="kw1">table</span> <span class="br0">&#40;</span>id <span class="kw1">int</span>,SomeDate <span class="kw1">datetime</span><span class="br0">&#41;</span>
+&nbsp;
+;<span class="kw1">WITH</span> cte <span class="kw1">AS</span><span class="br0">&#40;</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">10</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span><span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> name<span class="br0">&#41;</span> <span class="kw1">AS</span> number
+<span class="kw1">FROM</span> sysobjects<span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">INSERT</span> TestOutput
+<span class="kw1">OUTPUT</span> inserted.<span class="me1">id</span>,inserted.<span class="me1">SomeCol</span> <span class="kw1">INTO</span> @TableVar
+<span class="kw1">SELECT</span> <span class="kw2">DATEADD</span><span class="br0">&#40;</span>d,number,<span class="st0">'20110101'</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> cte
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> @TableVar</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @TableVar table (id int,SomeDate datetime)
+
+;WITH cte AS(
+SELECT TOP 10 ROW_NUMBER() OVER(ORDER BY name) AS number
+FROM sysobjects)
+
+
+INSERT TestOutput
+OUTPUT inserted.id,inserted.SomeCol INTO @TableVar
+SELECT DATEADD(d,number,'20110101')
+FROM cte
+
+SELECT * FROM @TableVar</pre></div></div>
+
+<p>
+<pre>id      SomeCol
+--      -----------------------
+11	2011-01-02 00:00:00.000
+12	2011-01-03 00:00:00.000
+13	2011-01-04 00:00:00.000
+14	2011-01-05 00:00:00.000
+15	2011-01-06 00:00:00.000
+16	2011-01-07 00:00:00.000
+17	2011-01-08 00:00:00.000
+18	2011-01-09 00:00:00.000
+19	2011-01-10 00:00:00.000
+20	2011-01-11 00:00:00.000</pre>
+<h2>OUTPUT clause and delete statements</h2>
+<p>To return the rows that were deleted, you would use deleted.ColumnName instead of inserted.ColumnName.<br />
+In the code block below, we are deleting all rows that are 0 if we divide them by 5, this is accomplished by using the  modulo arithmetic operator which is % in T-SQL</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DELETE</span> TestOutput
+<span class="kw1">OUTPUT</span> deleted.<span class="me1">id</span>,deleted.<span class="me1">SomeCol</span>
+<span class="kw1">WHERE</span> id <span class="sy0">%</span> <span class="nu0">5</span> <span class="sy0">=</span> <span class="nu0">0</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DELETE TestOutput
+OUTPUT deleted.id,deleted.SomeCol
+WHERE id % 5 = 0</pre></div></div>
+
+<p>
+<pre>id      SomeCol
+--      -----------------------
+5	2011-01-06 00:00:00.000
+10	2011-01-11 00:00:00.000
+15	2011-01-06 00:00:00.000
+20	2011-01-11 00:00:00.000</pre>
+<p></p>
+<p>As you can see we get 4 rows back, if you check what is in the table now, you will see that those 4 rows are missing.</p>
+<p>
+<h2>OUTPUT clause and update statements</h2>
+<p>When you do an update statement, you will have the previous value (deleted) and the current value (inserted) available as part of the OUTPUT clause. Running the code below will output the value you had and the value that it got update to</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">UPDATE</span> TestOutput
+<span class="kw1">SET</span> SomeCol <span class="sy0">=</span> <span class="kw2">dateadd</span><span class="br0">&#40;</span>yy,<span class="nu0">1</span>,SomeCol<span class="br0">&#41;</span>
+<span class="kw1">OUTPUT</span> deleted.<span class="me1">id</span>,deleted.<span class="me1">SomeCol</span>,inserted.<span class="me1">SomeCol</span>
+<span class="kw1">WHERE</span> id in<span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">2</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">UPDATE TestOutput
+SET SomeCol = dateadd(yy,1,SomeCol)
+OUTPUT deleted.id,deleted.SomeCol,inserted.SomeCol
+WHERE id in(1,2)</pre></div></div>
+
+<p>
+<pre>id      SomeCol                 SomeCol
+--      ----------------------- -----------------------
+1	2011-01-02 00:00:00.000	2012-01-02 00:00:00.000
+2	2011-01-03 00:00:00.000	2012-01-03 00:00:00.000</pre>
+<p></p>
+<p>That is all for today, come back tomorrow for another post</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-11/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Using Database Snapshot As A Protection Against Rogue Deletes</title>
+		<link>/index.php/datamgmt/datadesign/using-database-snapsot-as-a/</link>
+		<comments>/index.php/datamgmt/datadesign/using-database-snapsot-as-a/#respond</comments>
+		<pubDate>Wed, 02 Feb 2011 10:50:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[delete]]></category>
+		<category><![CDATA[snapshot]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/02/using-database-snapsot-as-a/</guid>
+		<description><![CDATA[Let me first start by saying that this is not a foolproof solution, it is just another way that could help you out when you by mistake delete some data. If someone deletes the data in the table just before you create the database snapshot then you will&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Let me first start by saying that this is not a foolproof solution, it is just another way that could help you out when you by mistake delete some data. If someone deletes the data in the table just before you create the database snapshot then you will be out of luck.</p>
+<p>The option in this article is also nice if your backups are terabyte size because your restore would take a while and even then all the tables would be affected. You would have to restore to another DB and then just pull down the data from the table you want.</p>
+<p>Everyday we create a database snapshot on our mirrored instance at 9 AM. Just a little after 9 AM someone deleted some data from a table because the WHERE clause was incorrect. Since we had a database snapshot, we could easily pull the data back and it saved us some time since we didn&#8217;t need to restore the database or recreate the data.</p>
+<p>Now let&#8217;s take a look at some code to see what can be done after a bad delete</p>
+<p>First create a test database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> master
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>test<span class="br0">&#93;</span> <span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span>
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'test'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:test.mdf'</span> &nbsp;<span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span>
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'test_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:test_log.LDF'</span> <span class="br0">&#41;</span>
+&nbsp;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE master
+GO
+ 
+CREATE DATABASE [test] ON  PRIMARY
+( NAME = N'test', FILENAME = N'C:test.mdf'  )
+ LOG ON
+( NAME = N'test_log', FILENAME = N'C:test_log.LDF' )
+ 
+GO</pre></div></div>
+
+<p>Now create a table and populate it with some data</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> test
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestTable <span class="br0">&#40;</span>id <span class="kw1">INT</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,somecol <span class="kw1">CHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span> <span class="kw1">DEFAULT</span> <span class="st0">'a'</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> TestTable<span class="br0">&#40;</span>id<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> ROW_NUMBER<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="kw1">OVER</span> <span class="br0">&#40;</span><span class="kw1">ORDER</span> <span class="kw1">BY</span> s1.<span class="me1">id</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> sysobjects s1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sysobjects s2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE test
+GO
+ 
+ 
+CREATE TABLE TestTable (id INT NOT NULL,somecol CHAR(100) DEFAULT 'a')
+GO
+ 
+INSERT TestTable(id)
+SELECT ROW_NUMBER() OVER (ORDER BY s1.id)
+FROM sysobjects s1
+CROSS JOIN sysobjects s2</pre></div></div>
+
+<p>Now it is time to create your snapshot</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> master
+GO
+&nbsp;
+&nbsp; &nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> TestSnapshot <span class="kw1">ON</span> &nbsp;
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'test'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'C:testss.mdf'</span> <span class="br0">&#41;</span>
+&nbsp; <span class="kw1">AS</span> SNAPSHOT <span class="kw1">OF</span> Test;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE master
+GO
+ 
+   
+CREATE DATABASE TestSnapshot ON  
+( NAME = N'test', FILENAME = N'C:testss.mdf' )
+  AS SNAPSHOT OF Test;
+GO</pre></div></div>
+
+<p>If you run this, you will see that both the test database and the snapshot database table have the same number of rows</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> TestSnapshot..<span class="me1">TestTable</span>
+<span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="kw1">FROM</span> Test..<span class="me1">TestTable</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT COUNT(*) FROM TestSnapshot..TestTable
+SELECT COUNT(*) FROM Test..TestTable</pre></div></div>
+
+<p>A database snapshot is read only and you cannot delete data, try it out.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> TestSnapshot
+GO
+&nbsp;
+<span class="kw1">DELETE</span> TestTable</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE TestSnapshot
+GO
+ 
+DELETE TestTable</pre></div></div>
+
+<p><em>Msg 3906, Level 16, State 1, Line 1<br />
+Failed to update database &#8220;TestSnapshot&#8221; because the database is read-only.<br />
+</em><br />
+Now let&#8217;s delete all the data from the table in the test database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> Test
+GO
+&nbsp;
+<span class="kw1">DELETE</span> &nbsp;TestTable</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE Test
+GO
+ 
+DELETE  TestTable</pre></div></div>
+
+<p>Just to verify, grab the count from the table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;<span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;TestTable</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  COUNT(*)
+FROM    TestTable</pre></div></div>
+
+<p>So the table is empty, but you can still get all the data back by inserting into the table from the database snapshot</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> &nbsp;TestTable
+<span class="kw1">SELECT</span> &nbsp;<span class="sy0">*</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;TestSnapshot..<span class="me1">TestTable</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT  TestTable
+SELECT  *
+FROM    TestSnapshot..TestTable</pre></div></div>
+
+<p>And now both tables have the same number of rows again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> &nbsp;<span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;TestSnapshot..<span class="me1">TestTable</span>
+<span class="kw1">SELECT</span> &nbsp;<span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> &nbsp; &nbsp;Test..<span class="me1">TestTable</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT  COUNT(*)
+FROM    TestSnapshot..TestTable
+SELECT  COUNT(*)
+FROM    Test..TestTable</pre></div></div>
+
+<p>Just a couple of things to consider. If you have a lot of activity in your database then the database snapshot might grow considerably, be aware of that or you will run out of space if you placed the database snapshot on a drive that doesn&#8217;t have a lot of space.</p>
+<p>If you data gets updated frequently then this won&#8217;t work either, the table in question for us was one where we had end of day values stored.</p>
+<p>To drop the snapshot, you just use a regular DROP DATABASE  command</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">DATABASE</span> TestSnapshot </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP DATABASE TestSnapshot </pre></div></div>
+
+<p>To learn more about database snapshots, visit books on line: http://msdn.microsoft.com/en-us/library/ms175158.aspx</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/using-database-snapsot-as-a/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

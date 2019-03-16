@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head prefix="og: http://ogp.me/ns# fb: http://ogp.me/ns/fb# article: http://ogp.me/ns/article#">
+		<link rel="shortcut icon" href="http://lessthandot.com/favicon.ico" type="image/vnd.microsoft.icon" />
+	<title>Less Than Dot - Blog -   CTE and hierarchical queries</title>
+	<meta prefix="og: http://ogp.me/ns#" property="og:title" content="Less Than Dot - Blog -   CTE and hierarchical queries" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:url" content="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/" />
+		<meta prefix="og: http://ogp.me/ns#" property="og:image" content="http://lessthandot.com/images/logo_prod.png" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:type" content="article" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:site_name" content="LessThanDot" />
+	<meta prefix="og: http://ogp.me/ns#" property="og:description" content="One of my favorite additions to T-SQL language in SQL Server 2005 is Common Table Expressions, CTE for short. Primarily I use them instead of derived tables to improve maintenance and code readability.See also this interesting article on recursive C&hellip;" />
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0" href="/index.php/feed/" />
+	<link rel="alternate" type="application/atom+xml" title="Atom" href="/index.php/feed/atom/" />
+
+	<!-- this page is the canonical URL -->	
+	<link rel="stylesheet" href="/wp-content/themes/lessthandot2009/style.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsite.css" type="text/css" />
+	<link rel="stylesheet" href="http://lessthandot.com/includes/allsiteprint.css" media="print" type="text/css" />
+
+	<link rel='dns-prefetch' href='//ajax.googleapis.com' />
+<link rel='dns-prefetch' href='//s.w.org' />
+<link rel="alternate" type="application/rss+xml" title="LessthanDot &raquo; CTE and hierarchical queries Comments Feed" href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/feed/" />
+		<script type="text/javascript">
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/2\/svg\/","svgExt":".svg","source":{"concatemoji":"\/wp-includes\/js\/wp-emoji-release.min.js?ver=4.6.1"}};
+			!function(a,b,c){function d(a){var c,d,e,f,g,h=b.createElement("canvas"),i=h.getContext&&h.getContext("2d"),j=String.fromCharCode;if(!i||!i.fillText)return!1;switch(i.textBaseline="top",i.font="600 32px Arial",a){case"flag":return i.fillText(j(55356,56806,55356,56826),0,0),!(h.toDataURL().length<3e3)&&(i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,65039,8205,55356,57096),0,0),c=h.toDataURL(),i.clearRect(0,0,h.width,h.height),i.fillText(j(55356,57331,55356,57096),0,0),d=h.toDataURL(),c!==d);case"diversity":return i.fillText(j(55356,57221),0,0),e=i.getImageData(16,16,1,1).data,f=e[0]+","+e[1]+","+e[2]+","+e[3],i.fillText(j(55356,57221,55356,57343),0,0),e=i.getImageData(16,16,1,1).data,g=e[0]+","+e[1]+","+e[2]+","+e[3],f!==g;case"simple":return i.fillText(j(55357,56835),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode8":return i.fillText(j(55356,57135),0,0),0!==i.getImageData(16,16,1,1).data[0];case"unicode9":return i.fillText(j(55358,56631),0,0),0!==i.getImageData(16,16,1,1).data[0]}return!1}function e(a){var c=b.createElement("script");c.src=a,c.type="text/javascript",b.getElementsByTagName("head")[0].appendChild(c)}var f,g,h,i;for(i=Array("simple","flag","unicode8","diversity","unicode9"),c.supports={everything:!0,everythingExceptFlag:!0},h=0;h<i.length;h++)c.supports[i[h]]=d(i[h]),c.supports.everything=c.supports.everything&&c.supports[i[h]],"flag"!==i[h]&&(c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&c.supports[i[h]]);c.supports.everythingExceptFlag=c.supports.everythingExceptFlag&&!c.supports.flag,c.DOMReady=!1,c.readyCallback=function(){c.DOMReady=!0},c.supports.everything||(g=function(){c.readyCallback()},b.addEventListener?(b.addEventListener("DOMContentLoaded",g,!1),a.addEventListener("load",g,!1)):(a.attachEvent("onload",g),b.attachEvent("onreadystatechange",function(){"complete"===b.readyState&&c.readyCallback()})),f=c.source||{},f.concatemoji?e(f.concatemoji):f.wpemoji&&f.twemoji&&(e(f.twemoji),e(f.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style type="text/css">
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+<link rel='stylesheet' id='bwp-syntax-css'  href='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/css/bwp-syntax-global.css?ver=4.6.1' type='text/css' media='all' />
+<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js?ver=1.12.4'></script>
+<script type='text/javascript' src='/wp-content/plugins/better-wordpress-syntax-based-on-geshi/js/bwp-syntax.js?ver=4.6.1'></script>
+<link rel='https://api.w.org/' href='/wp-json/' />
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="/wp-includes/wlwmanifest.xml" /> 
+<link rel='prev' title='Using Mirroring to Reduce DB Migration Downtime (Part 2)' href='/index.php/datamgmt/dbprogramming/using-mirroring-to-reduce-db-migration-d-2/' />
+<link rel='next' title='6 ways to import data into SQL Server' href='/index.php/datamgmt/dbprogramming/title-12/' />
+<meta name="generator" content="WordPress 4.6.1" />
+<link rel="canonical" href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/" />
+<link rel='shortlink' href='/?p=557' />
+<link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdatadesign%2Fcte-and-hierarchical-queries%2F" />
+<link rel="alternate" type="text/xml+oembed" href="/wp-json/oembed/1.0/embed?url=http%3A%2F%2F%2Findex.php%2Fdatamgmt%2Fdatadesign%2Fcte-and-hierarchical-queries%2F&#038;format=xml" />
+<style type='text/css'>.rp4wp-related-posts ul{width:100%;padding:0;margin:0;float:left;}
+.rp4wp-related-posts ul>li{list-style:none;padding:0;margin:0;padding-bottom:20px;clear:both;}
+.rp4wp-related-posts ul>li>p{margin:0;padding:0;}
+.rp4wp-related-post-image{width:35%;padding-right:25px;-moz-box-sizing:border-box;-webkit-box-sizing:border-box;box-sizing:border-box;float:left;}</style>
+	<script src="http://lessthandot.com/includes/allsite.js" type="text/javascript" ></script>
+</head>
+<body>
+<div id="contain"><div id="subcontain"><div id="ttl"><div id="hdr"><div id="snav"><a href="http://lessthandot.com/login.php?backtrack=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?">Member Login</a>
+</div><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="logoc"><img src="http://lessthandot.com/images/logo_prod.png" alt="LessThanDot Site Logo" border="0" /></a><h1>LessThanDot</h1><div class="pgsttl">A decade of helpful technical content</div></div><div id="nav">
+<ul>
+<li><a href="http://lessthandot.com/" title="LessThanDot Launchpad" id="h" ><span>Launchpad</span></a></li>
+<li class="cur"><a href="/" title="LessThanDot Blogs" id="b" ><span>Blogs</span></a></li>
+<li><a href="http://forum.lessthandot.com/" title="LessThanDot Community Forums" id="f" ><span>Forum</span></a></li>
+<li><a href="http://wiki.lessthandot.com/" title="LessThanDot Wiki Articles" id="w" ><span>Wiki</span></a></li>
+<li><a href="http://sqlcop.lessthandot.com/" title="LessThanDot SQLCop" id="a" ><span>SQLCop</span></a></li>
+<li><a href="http://lessthandot.com/account.php" title="Your Account Settings" id="r"  class="l_ie"><span>My Account</span></a></li></ul></div>
+</div><div id="content">
+<div id="fac"><div id="fa">
+		<p>Less Than Dot is a community of passionate IT professionals and enthusiasts dedicated to sharing technical knowledge, experience, and assistance. Inside you will find reference materials, interesting technical discussions, and expert tips and commentary.</p></div></div><div class="content-sidebar">
+	<div id="social" class="sdsec">
+		<h2>LTD Social Sitings</h2>
+		<div>
+		<a id="social_twitter" href="http://twitter.com/LessThanDot/" title="Follow us on Twitter" ><img src="http://lessthandot.com/images/bdg_twitter.png" alt="Lessthandot twitter"/></a> 
+		<a href="http://www.linkedin.com/groups?home=&amp;gid=113440" title="Join us on LinkedIn" ><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="Lessthandot Linkedin" /></a> 
+		<a href="http://www.facebook.com/group.php?gid=19330511063" title="Join us on Facebook" ><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Lessthandot facebook"/></a> 
+		<a href="http://lessthandot.com/rss.php" title="LessThanDot News Feed" ><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="Lessthandot rss"/></a> 
+		</div>
+		<p><em>Note: Watch for social icons on posts by your favorite authors to follow their postings on these and other social sites.</em></p>
+	</div><div class="content-sidebar-section">
+<h2>Tag cloud</h2>
+	<p class="tag-cloud">
+		<a href='/index.php/tag/net/' class='tag-link-245 tag-link-position-1' title='21 topics' style='font-size: 8.9565217391304pt;'>.net</a> <a href='/index.php/tag/asp-net/' class='tag-link-168 tag-link-position-2' title='21 topics' style='font-size: 8.9565217391304pt;'>asp.net</a> <a href='/index.php/tag/azure-2/' class='tag-link-321 tag-link-position-3' title='29 topics' style='font-size: 10.173913043478pt;'>azure</a> <a href='/index.php/tag/book/' class='tag-link-130 tag-link-position-4' title='26 topics' style='font-size: 9.7391304347826pt;'>book</a> <a href='/index.php/tag/business-intelligence-2/' class='tag-link-256 tag-link-position-5' title='30 topics' style='font-size: 10.260869565217pt;'>business intelligence</a> <a href='/index.php/tag/c/' class='tag-link-138 tag-link-position-6' title='40 topics' style='font-size: 11.304347826087pt;'>c#</a> <a href='/index.php/tag/database/' class='tag-link-134 tag-link-position-7' title='31 topics' style='font-size: 10.434782608696pt;'>database</a> <a href='/index.php/tag/excel/' class='tag-link-155 tag-link-position-8' title='16 topics' style='font-size: 8pt;'>excel</a> <a href='/index.php/tag/gotcha/' class='tag-link-240 tag-link-position-9' title='19 topics' style='font-size: 8.6086956521739pt;'>gotcha</a> <a href='/index.php/tag/how-to/' class='tag-link-272 tag-link-position-10' title='44 topics' style='font-size: 11.652173913043pt;'>how to</a> <a href='/index.php/tag/mongodb/' class='tag-link-765 tag-link-position-11' title='17 topics' style='font-size: 8.2608695652174pt;'>mongodb</a> <a href='/index.php/tag/nosql/' class='tag-link-775 tag-link-position-12' title='18 topics' style='font-size: 8.4347826086957pt;'>nosql</a> <a href='/index.php/tag/performance/' class='tag-link-179 tag-link-position-13' title='26 topics' style='font-size: 9.7391304347826pt;'>performance</a> <a href='/index.php/tag/security-2/' class='tag-link-398 tag-link-position-14' title='25 topics' style='font-size: 9.5652173913043pt;'>security</a> <a href='/index.php/tag/sql/' class='tag-link-132 tag-link-position-15' title='42 topics' style='font-size: 11.478260869565pt;'>sql</a> <a href='/index.php/tag/sql-advent-2012/' class='tag-link-1416 tag-link-position-16' title='18 topics' style='font-size: 8.4347826086957pt;'>sql advent 2012</a> <a href='/index.php/tag/sql-friday/' class='tag-link-377 tag-link-position-17' title='18 topics' style='font-size: 8.4347826086957pt;'>sql friday</a> <a href='/index.php/tag/sql-server/' class='tag-link-154 tag-link-position-18' title='145 topics' style='font-size: 16.086956521739pt;'>sql server</a> <a href='/index.php/tag/sql-server-2000/' class='tag-link-366 tag-link-position-19' title='45 topics' style='font-size: 11.739130434783pt;'>sql server 2000</a> <a href='/index.php/tag/sql-server-2005/' class='tag-link-327 tag-link-position-20' title='118 topics' style='font-size: 15.391304347826pt;'>sql server 2005</a> <a href='/index.php/tag/sql-server-2008/' class='tag-link-152 tag-link-position-21' title='237 topics' style='font-size: 18pt;'>sql server 2008</a> <a href='/index.php/tag/sql-server-2008-r2/' class='tag-link-548 tag-link-position-22' title='38 topics' style='font-size: 11.130434782609pt;'>sql server 2008 r2</a> <a href='/index.php/tag/sql-server-2012/' class='tag-link-1161 tag-link-position-23' title='76 topics' style='font-size: 13.739130434783pt;'>sql server 2012</a> <a href='/index.php/tag/ssis-2/' class='tag-link-501 tag-link-position-24' title='52 topics' style='font-size: 12.260869565217pt;'>ssis</a> <a href='/index.php/tag/ssms/' class='tag-link-640 tag-link-position-25' title='18 topics' style='font-size: 8.4347826086957pt;'>ssms</a> <a href='/index.php/tag/ssrs-2/' class='tag-link-557 tag-link-position-26' title='27 topics' style='font-size: 9.9130434782609pt;'>ssrs</a> <a href='/index.php/tag/syndicated/' class='tag-link-1407 tag-link-position-27' title='67 topics' style='font-size: 13.217391304348pt;'>syndicated</a> <a href='/index.php/tag/t-sql/' class='tag-link-185 tag-link-position-28' title='26 topics' style='font-size: 9.7391304347826pt;'>t-sql</a> <a href='/index.php/tag/tip/' class='tag-link-194 tag-link-position-29' title='46 topics' style='font-size: 11.826086956522pt;'>tip</a> <a href='/index.php/tag/unit-testing/' class='tag-link-162 tag-link-position-30' title='17 topics' style='font-size: 8.2608695652174pt;'>unit testing</a>	</p>
+</div>		<div class="content-sidebar-section">
+		<h2>Authors</h2>
+			<ul class="author-list dimmed">
+				<li><a href="/index.php/author/SQLDenis/" title="Posts by SQLDenis">SQLDenis</a> <a href="/index.php/author/SQLDenis/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (597)</li><li><a href="/index.php/author/onpnt/" title="Posts by Ted Krueger (onpnt)">Ted Krueger (onpnt)</a> <a href="/index.php/author/onpnt/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (355)</li><li><a href="/index.php/author/grrlgeek/" title="Posts by Jes Borland">Jes Borland</a> <a href="/index.php/author/grrlgeek/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (202)</li><li><a href="/index.php/author/tarwn/" title="Posts by Eli Weinstock-Herman (tarwn)">Eli Weinstock-Herman (tarwn)</a> <a href="/index.php/author/tarwn/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (190)</li><li><a href="/index.php/author/koenverbeeck/" title="Posts by Koen Verbeeck">Koen Verbeeck</a> <a href="/index.php/author/koenverbeeck/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (100)</li><li><a href="/index.php/author/alexcuse/" title="Posts by Alex Ullrich">Alex Ullrich</a> <a href="/index.php/author/alexcuse/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (55)</li><li><a href="/index.php/author/gmmastros/" title="Posts by George Mastros (gmmastros)">George Mastros (gmmastros)</a> <a href="/index.php/author/gmmastros/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (45)</li><li><a href="/index.php/author/axel8s/" title="Posts by Axel Achten (axel8s)">Axel Achten (axel8s)</a> <a href="/index.php/author/axel8s/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (28)</li><li><a href="/index.php/author/naomi/" title="Posts by Naomi Nosonovsky">Naomi Nosonovsky</a> <a href="/index.php/author/naomi/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (27)</li><li><a href="/index.php/author/thirster42/" title="Posts by David Forck (thirster42)">David Forck (thirster42)</a> <a href="/index.php/author/thirster42/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (24)</li><li><a href="/index.php/author/chopstik/" title="Posts by chopstik">chopstik</a> <a href="/index.php/author/chopstik/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (20)</li><li><a href="/index.php/author/kconan/" title="Posts by Kevin Conan">Kevin Conan</a> <a href="/index.php/author/kconan/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (18)</li><li><a href="/index.php/author/robearl/" title="Posts by Rob Earl">Rob Earl</a> <a href="/index.php/author/robearl/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (14)</li><li><a href="/index.php/author/thatrickguy/" title="Posts by ThatRickGuy">ThatRickGuy</a> <a href="/index.php/author/thatrickguy/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (12)</li><li><a href="/index.php/author/sqlarcher/" title="Posts by SQLArcher">SQLArcher</a> <a href="/index.php/author/sqlarcher/feed/"><img src="http://lessthandot.com/images/bdg_rss_icon_sm.png" style="border: none;" /></a> (11)</li>                <li><a href="http://lessthandot.com/Stats/BlogAuthors.php">More...</a></li>
+			</ul>
+		</div>
+				<div class="content-sidebar-section">
+		<h2>Categories</h2>
+			<ul class="categories-list">
+					<li class="cat-item cat-item-10"><a href="/index.php/category/all/" >All Blogs</a>
+</li>
+	<li class="cat-item cat-item-5"><a href="/index.php/category/architect/" >Architecture, Design and Strategy</a>
+</li>
+	<li class="cat-item cat-item-1759"><a href="/index.php/category/artificial-intelligence/" >Artificial Intelligence</a>
+</li>
+	<li class="cat-item cat-item-6"><a href="/index.php/category/datamgmt/" >Data Management</a>
+</li>
+	<li class="cat-item cat-item-7"><a href="/index.php/category/desktopdev/" >Desktop Developer</a>
+</li>
+	<li class="cat-item cat-item-8"><a href="/index.php/category/enterprisedev/" >Enterprise Developer</a>
+</li>
+	<li class="cat-item cat-item-11"><a href="/index.php/category/itprofessionals/" >IT Professionals</a>
+</li>
+	<li class="cat-item cat-item-12"><a href="/index.php/category/itstudents/" >IT Students and Researchers</a>
+</li>
+	<li class="cat-item cat-item-1743"><a href="/index.php/category/management/" >Management</a>
+</li>
+	<li class="cat-item cat-item-9"><a href="/index.php/category/sysadmins/" >System Admins</a>
+</li>
+	<li class="cat-item cat-item-1"><a href="/index.php/category/uncategorized/" >Uncategorized</a>
+</li>
+	<li class="cat-item cat-item-4"><a href="/index.php/category/webdev/" >Web Developer</a>
+</li>
+			</ul>
+		</div>
+		</div><div class="content-main">
+				<div class="post-navigation">
+				<div class="post-navigation-forward"><a href="/index.php/datamgmt/dbprogramming/title-12/" rel="next">6 ways to import data into SQL Server</a> &raquo; </div>
+				<div class="post-navigation-back">&laquo; <a href="/index.php/datamgmt/dbprogramming/using-mirroring-to-reduce-db-migration-d-2/" rel="prev">Using Mirroring to Reduce DB Migration Downtime (Part 2)</a></div>
+			</div>
+			<div class="post-area instapaper_body">
+				<div class="post-title-line">
+										<h1 class="instapaper_ignore"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/" class="post-title">CTE and hierarchical queries</a></h1>
+					<div class="post-byline">by <a href="/index.php/author/naomi/" title="Posts by Naomi Nosonovsky" rel="author">Naomi Nosonovsky</a> on September 13, 2009 in category <a href="/index.php/category/datamgmt/datadesign/" rel="category tag">Data Modelling and Design</a>. Article views: 42,663 </div>
+				</div>
+				<div class="post-tagline"><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&text=RT @LessThanDot Blog - CTE and hierarchical queries by naomi" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&title=CTE and hierarchical queries&source=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&title=CTE and hierarchical queries" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&quote=CTE and hierarchical queries" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&title=CTE and hierarchical queries" class="instapaper_button">Instapaper</a></div>
+
+				<div class="post-content"><p>One of my favorite additions to T-SQL language in SQL Server 2005 is Common Table Expressions, CTE for short. Primarily I use them instead of derived tables to improve maintenance and code readability.</p>
+<p><img src="/wp-content/uploads/blogs/DataMgmt/olap_1.gif" alt="T-SQL Tuesday logo" title="T-SQL Tuesday logo" /> </p>
+<p>See also this interesting article on recursive CTE implementation <a href="http://smehrozalam.wordpress.com/2009/06/09/t-sql-using-common-table-expressions-cte-to-generate-sequences/">T-SQL: Using common table expressions (CTE) to generate sequences</a> and this interesting <a href="http://forum.lessthandot.com/viewtopic.php?f=17&amp;t=7566&amp;st=0&amp;sk=t&amp;sd=a">discussion</a> about commonly-known problem of splitting delimited values.</p>
+<p>You may find this <a href="http://www.sqlusa.com/bestpractices2005/organizationtree/">article</a> by SQLUSA (Kalman Toth) very interesting.</p>
+<p>I think you will find these blogs by Brad Schulz <a href="http://bradsruminations.blogspot.com/2009/10/viva-la-famiglia.html">Viva la Famiglia!</a> and <a href="http://bradsruminations.blogspot.com/2010/03/this-article-on-recurson-is-entitled.html">This Article On Recurson Is Entitled &#8220;This Article On Recursion Is Entitled &#8220;This Article&#8230;</a> interesting and useful and enjoyable reading.</p>
+<p>See also <a href="http://beyondrelational.com/blogs/tc/archive/2009/11/16/tsql-challenge-17-creating-cross-rows-references-with-inline-hyperlinks.aspx">Challenge 17</a> and its solutions at <a href="http://beyondrelational.com/blogs/tc/archive/2010/03/16/tsql-challenge-17-winners.aspx">Challenge 17 &#8211; Winners</a></p>
+<p>For instance, this code is much easier to read now after moving some logic into CTE</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">WITH</span>
+&nbsp;
+<span class="co1">-- -----------------------------------------------</span>
+&nbsp;
+<span class="co1">-- Calcualtes sum of active taxes</span>
+&nbsp;
+<span class="co1">-- for each of Tax Groups</span>
+&nbsp;
+<span class="co1">-- -----------------------------------------------</span>
+&nbsp;
+Taxes <span class="kw1">as</span>
+&nbsp;
+<span class="br0">&#40;</span>
+&nbsp;
+&nbsp; <span class="kw1">SELECT</span> tg.<span class="me1">nTaxGroupID</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">as</span> nTaxGroupID,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;tg.<span class="me1">cName</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">as</span> TaxGroupName,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw2">Sum</span><span class="br0">&#40;</span>isNull<span class="br0">&#40;</span>ti.<span class="me1">nPercent</span>,<span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">as</span> TaxPercent
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">FROM</span> TaxGroups &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;tg
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">LEFT</span> <span class="sy0">JOIN</span> TaxGroupsToTaxItems tgi <span class="kw1">on</span> tg.<span class="me1">nTaxGroupID</span> <span class="sy0">=</span> tgi.<span class="me1">nTaxGroupID</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">LEFT</span> <span class="sy0">JOIN</span> TaxItems &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;ti &nbsp;<span class="kw1">on</span> tgi.<span class="me1">nTaxItemID</span> <span class="sy0">=</span> ti.<span class="me1">nTaxItemID</span>
+&nbsp;
+&nbsp; &nbsp;<span class="kw1">WHERE</span> tg.<span class="me1">lActive</span> <span class="sy0">=</span> <span class="nu0">1</span>
+&nbsp;
+&nbsp; &nbsp;<span class="kw1">GROUP</span> <span class="kw1">BY</span> tg.<span class="me1">nTaxGroupID</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; tg.<span class="me1">cName</span>
+&nbsp;
+<span class="br0">&#41;</span>,
+&nbsp;
+<span class="co1">-- -----------------------------------------------</span>
+&nbsp;
+<span class="co1">-- calculates total cost per Job</span>
+&nbsp;
+<span class="co1">-- -----------------------------------------------</span>
+&nbsp;
+JDS <span class="kw1">as</span>
+&nbsp;
+<span class="br0">&#40;</span>
+&nbsp;
+&nbsp; <span class="kw1">SELECT</span> nJobHeaderID,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw2">Sum</span><span class="br0">&#40;</span>nAmount <span class="sy0">*</span> nQuantity<span class="br0">&#41;</span> <span class="kw1">as</span> TotalAmount
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">FROM</span> JobDetail
+&nbsp;
+&nbsp; &nbsp;<span class="kw1">GROUP</span> <span class="kw1">BY</span> nJobHeaderID
+&nbsp;
+<span class="br0">&#41;</span>,
+&nbsp;
+<span class="co1">-- -----------------------------------------------</span>
+&nbsp;
+<span class="co1">-- concatenates all Customer's phone numbers</span>
+&nbsp;
+<span class="co1">-- into one string (LF delimited)</span>
+&nbsp;
+<span class="co1">-- -----------------------------------------------</span>
+&nbsp;
+P <span class="kw1">as</span>
+&nbsp;
+<span class="br0">&#40;</span>
+&nbsp;
+&nbsp; <span class="kw1">SELECT</span> nCustomerID,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw2">Stuff</span><span class="br0">&#40;</span>PhoneInfo, <span class="nu0">1</span>, <span class="nu0">1</span>, <span class="st0">''</span><span class="br0">&#41;</span> <span class="kw1">AS</span> PhoneInfo &nbsp; &nbsp; &nbsp;
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">FROM</span> <span class="br0">&#40;</span> <span class="kw1">SELECT</span> InnerData.<span class="me1">nCustomerID</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#40;</span> <span class="kw1">SELECT</span> <span class="kw1">Char</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span> <span class="sy0">+</span> P.<span class="me1">cPhoneNumber</span> <span class="sy0">+</span> <span class="st0">' - '</span> <span class="sy0">+</span> <span class="kw2">rTrim</span><span class="br0">&#40;</span>PT.<span class="me1">cType</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> PhoneNumbers &nbsp; P
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">INNER</span> <span class="sy0">JOIN</span> PhoneType PT <span class="kw1">on</span> P.<span class="me1">nPhoneTypeID</span> <span class="sy0">=</span> PT.<span class="me1">nPhoneTypeID</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">WHERE</span> P.<span class="me1">nCustomerID</span> <span class="sy0">=</span> InnerData.<span class="me1">nCustomerID</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">FOR</span> XML <span class="kw1">PATH</span><span class="br0">&#40;</span><span class="st0">''</span><span class="br0">&#41;</span> <span class="co1">-- this does string concatenation</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#41;</span> <span class="kw1">as</span> PhoneInfo
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">FROM</span> <span class="br0">&#40;</span> <span class="kw1">SELECT</span> <span class="kw1">DISTINCT</span> nCustomerID
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">FROM</span> PhoneNumbers
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#41;</span> <span class="kw1">as</span> InnerData
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="br0">&#41;</span> <span class="kw1">as</span> OuterData
+&nbsp;
+<span class="br0">&#41;</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> J.<span class="me1">nRouteHeaderID</span> &nbsp; <span class="kw1">as</span> nRouteHeaderID, 
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;JH.<span class="me1">nCustomerID</span> &nbsp; &nbsp; <span class="kw1">as</span> nCustomerID,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;JH.<span class="me1">nJobHeaderID</span> &nbsp; &nbsp;<span class="kw1">as</span> JobHeaderID,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;J.<span class="me1">ScheduleTime</span> &nbsp; &nbsp; <span class="kw1">as</span> ScheduleTime,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;JH.<span class="me1">cContact</span> &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">as</span> Contact,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;J.<span class="me1">SplitAmount</span> &nbsp; &nbsp; &nbsp;<span class="kw1">as</span> SplitAmount,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;vJ.<span class="me1">cAddr1</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">as</span> Address1,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;vJ.<span class="me1">cAddr2</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">as</span> Address2,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;vJ.<span class="me1">cCity</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">as</span> City,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;vJ.<span class="me1">cState</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">as</span> <span class="kw1">State</span>,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;vJ.<span class="me1">cZip</span> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">as</span> Zip,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;vJ.<span class="me1">JobDescription</span> &nbsp;<span class="kw1">as</span> JobDescription,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;JH.<span class="me1">nDiscountPercent</span><span class="sy0">/</span><span class="nu0">100</span> <span class="sy0">*</span> JDS.<span class="me1">TotalAmount</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">as</span> DiscountAmount,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;JH.<span class="me1">nAmount</span> &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">as</span> JobTotal,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;T.<span class="me1">TaxGroupName</span> &nbsp; &nbsp; <span class="kw1">as</span> TaxType,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;T.<span class="me1">TaxPercent</span> &nbsp; &nbsp; &nbsp; <span class="kw1">as</span> TaxPercent,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;J.<span class="me1">PermanentNote</span> &nbsp; &nbsp;<span class="kw1">as</span> PermanentNote,
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp;P.<span class="me1">PhoneInfo</span> &nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">as</span> PhoneInfo
+&nbsp;
+&nbsp; <span class="kw1">FROM</span> @Jobs &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; J
+&nbsp;
+&nbsp;<span class="kw1">INNER</span> <span class="sy0">JOIN</span> dbo.<span class="me1">JobHeader</span> JH &nbsp;<span class="kw1">on</span> J.<span class="me1">nJobHeaderID</span> &nbsp; <span class="sy0">=</span> JH.<span class="me1">nJobHeaderID</span>
+&nbsp;
+&nbsp; <span class="kw1">LEFT</span> <span class="sy0">JOIN</span> v_JobAddress &nbsp;vJ &nbsp;<span class="kw1">on</span> J.<span class="me1">nJobHeaderID</span> &nbsp; <span class="sy0">=</span> vJ.<span class="me1">nJobHeaderID</span>
+&nbsp;
+&nbsp; <span class="kw1">LEFT</span> <span class="sy0">JOIN</span> Taxes &nbsp; &nbsp; &nbsp; &nbsp; T &nbsp; <span class="kw1">on</span> JH.<span class="me1">nTaxGroupID</span> &nbsp; <span class="sy0">=</span> T.<span class="me1">nTaxGroupID</span>
+&nbsp;
+&nbsp; <span class="kw1">LEFT</span> <span class="sy0">JOIN</span> JDS &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; JDS <span class="kw1">on</span> JH.<span class="me1">nJobHeaderID</span> &nbsp;<span class="sy0">=</span> JDS.<span class="me1">nJobHeaderID</span>
+&nbsp;
+&nbsp; <span class="kw1">LEFT</span> <span class="sy0">JOIN</span> P &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; P &nbsp; <span class="kw1">on</span> JH.<span class="br0">&#91;</span>nCustomerID<span class="br0">&#93;</span> <span class="sy0">=</span> P.<span class="br0">&#91;</span>nCustomerID<span class="br0">&#93;</span>
+&nbsp;
+&nbsp;<span class="kw1">ORDER</span> <span class="kw1">BY</span> J.<span class="me1">IdField</span> <span class="co1">-- Used for order but not retrieved</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;WITH
+
+-- -----------------------------------------------
+
+-- Calcualtes sum of active taxes
+
+-- for each of Tax Groups
+
+-- -----------------------------------------------
+
+Taxes as
+
+(
+
+  SELECT tg.nTaxGroupID             as nTaxGroupID,
+
+         tg.cName                   as TaxGroupName,
+
+         Sum(isNull(ti.nPercent,0)) as TaxPercent
+
+    FROM TaxGroups                tg
+
+    LEFT JOIN TaxGroupsToTaxItems tgi on tg.nTaxGroupID = tgi.nTaxGroupID
+
+    LEFT JOIN TaxItems            ti  on tgi.nTaxItemID = ti.nTaxItemID
+
+   WHERE tg.lActive = 1
+
+   GROUP BY tg.nTaxGroupID,
+
+            tg.cName
+
+),
+
+-- -----------------------------------------------
+
+-- calculates total cost per Job
+
+-- -----------------------------------------------
+
+JDS as
+
+(
+
+  SELECT nJobHeaderID,
+
+         Sum(nAmount * nQuantity) as TotalAmount
+
+    FROM JobDetail
+
+   GROUP BY nJobHeaderID
+
+),
+
+-- -----------------------------------------------
+
+-- concatenates all Customer's phone numbers
+
+-- into one string (LF delimited)
+
+-- -----------------------------------------------
+
+P as
+
+(
+
+  SELECT nCustomerID,
+
+         Stuff(PhoneInfo, 1, 1, '') AS PhoneInfo      
+
+    FROM ( SELECT InnerData.nCustomerID,
+
+                  ( SELECT Char(10) + P.cPhoneNumber + ' - ' + rTrim(PT.cType)
+                           
+                      FROM PhoneNumbers   P
+
+                     INNER JOIN PhoneType PT on P.nPhoneTypeID = PT.nPhoneTypeID
+
+                     WHERE P.nCustomerID = InnerData.nCustomerID
+
+                       FOR XML PATH('') -- this does string concatenation
+
+                  ) as PhoneInfo
+
+             FROM ( SELECT DISTINCT nCustomerID
+
+                      FROM PhoneNumbers
+
+                  ) as InnerData
+
+         ) as OuterData
+
+)          
+
+SELECT J.nRouteHeaderID   as nRouteHeaderID, 
+
+       JH.nCustomerID     as nCustomerID,
+
+       JH.nJobHeaderID    as JobHeaderID,
+
+       J.ScheduleTime     as ScheduleTime,
+
+       JH.cContact        as Contact,
+
+       J.SplitAmount      as SplitAmount,
+
+       vJ.cAddr1          as Address1,
+
+       vJ.cAddr2          as Address2,
+
+       vJ.cCity           as City,
+
+       vJ.cState          as State,
+
+       vJ.cZip            as Zip,
+
+       vJ.JobDescription  as JobDescription,
+
+       JH.nDiscountPercent/100 * JDS.TotalAmount
+
+                          as DiscountAmount,
+
+       JH.nAmount         as JobTotal,
+
+       T.TaxGroupName     as TaxType,
+
+       T.TaxPercent       as TaxPercent,
+
+       J.PermanentNote    as PermanentNote,
+
+       P.PhoneInfo        as PhoneInfo
+
+  FROM @Jobs               J
+
+ INNER JOIN dbo.JobHeader JH  on J.nJobHeaderID   = JH.nJobHeaderID
+
+  LEFT JOIN v_JobAddress  vJ  on J.nJobHeaderID   = vJ.nJobHeaderID
+
+  LEFT JOIN Taxes         T   on JH.nTaxGroupID   = T.nTaxGroupID
+
+  LEFT JOIN JDS           JDS on JH.nJobHeaderID  = JDS.nJobHeaderID
+
+  LEFT JOIN P             P   on JH.[nCustomerID] = P.[nCustomerID]
+
+ ORDER BY J.IdField -- Used for order but not retrieved</pre></div></div>
+
+<p>One of the most interesting applications of CTE is in solving hierarchical queries by using recursive CTEs. In SQL Server 2000 you would need to use temporary table and looping to solve the problem of hierarchical query, which can now be solved with 1 select in SQL Server 2005 and up.</p>
+<p>The example of it which I always refer when I need to solve such a problem could be found in BOL: <a href="http://msdn.microsoft.com/en-us/library/ms186243.aspx">Recursive Queries Using Common Table Expressions</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> AdventureWorks;
+&nbsp;
+<span class="kw1">WITH</span> DirectReports <span class="br0">&#40;</span>ManagerID, EmployeeID, Title, DeptID, <span class="kw1">Level</span><span class="br0">&#41;</span>
+<span class="kw1">AS</span>
+<span class="br0">&#40;</span>
+<span class="co1">-- Anchor member definition</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> e.<span class="me1">ManagerID</span>, e.<span class="me1">EmployeeID</span>, e.<span class="me1">Title</span>, edh.<span class="me1">DepartmentID</span>, 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="nu0">0</span> <span class="kw1">AS</span> <span class="kw1">Level</span>
+&nbsp; &nbsp; <span class="kw1">FROM</span> HumanResources.<span class="me1">Employee</span> <span class="kw1">AS</span> e
+&nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> HumanResources.<span class="me1">EmployeeDepartmentHistory</span> <span class="kw1">AS</span> edh
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> e.<span class="me1">EmployeeID</span> <span class="sy0">=</span> edh.<span class="me1">EmployeeID</span> <span class="sy0">AND</span> edh.<span class="me1">EndDate</span> <span class="kw1">IS</span> <span class="sy0">NULL</span>
+&nbsp; &nbsp; <span class="kw1">WHERE</span> ManagerID <span class="kw1">IS</span> <span class="sy0">NULL</span>
+&nbsp; &nbsp; <span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="co1">-- Recursive member definition</span>
+&nbsp; &nbsp; <span class="kw1">SELECT</span> e.<span class="me1">ManagerID</span>, e.<span class="me1">EmployeeID</span>, e.<span class="me1">Title</span>, edh.<span class="me1">DepartmentID</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">Level</span> <span class="sy0">+</span> <span class="nu0">1</span>
+&nbsp; &nbsp; <span class="kw1">FROM</span> HumanResources.<span class="me1">Employee</span> <span class="kw1">AS</span> e
+&nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> HumanResources.<span class="me1">EmployeeDepartmentHistory</span> <span class="kw1">AS</span> edh
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> e.<span class="me1">EmployeeID</span> <span class="sy0">=</span> edh.<span class="me1">EmployeeID</span> <span class="sy0">AND</span> edh.<span class="me1">EndDate</span> <span class="kw1">IS</span> <span class="sy0">NULL</span>
+&nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> DirectReports <span class="kw1">AS</span> d
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ON</span> e.<span class="me1">ManagerID</span> <span class="sy0">=</span> d.<span class="me1">EmployeeID</span>
+<span class="br0">&#41;</span>
+<span class="co1">-- Statement that executes the CTE</span>
+<span class="kw1">SELECT</span> ManagerID, EmployeeID, Title, <span class="kw1">Level</span>
+<span class="kw1">FROM</span> DirectReports
+<span class="kw1">INNER</span> <span class="sy0">JOIN</span> HumanResources.<span class="me1">Department</span> <span class="kw1">AS</span> dp
+&nbsp; &nbsp; <span class="kw1">ON</span> DirectReports.<span class="me1">DeptID</span> <span class="sy0">=</span> dp.<span class="me1">DepartmentID</span>
+<span class="kw1">WHERE</span> dp.<span class="me1">GroupName</span> <span class="sy0">=</span> N<span class="st0">'Research and Development'</span> <span class="sy0">OR</span> <span class="kw1">Level</span> <span class="sy0">=</span> <span class="nu0">0</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE AdventureWorks;
+
+WITH DirectReports (ManagerID, EmployeeID, Title, DeptID, Level)
+AS
+(
+-- Anchor member definition
+    SELECT e.ManagerID, e.EmployeeID, e.Title, edh.DepartmentID, 
+        0 AS Level
+    FROM HumanResources.Employee AS e
+    INNER JOIN HumanResources.EmployeeDepartmentHistory AS edh
+        ON e.EmployeeID = edh.EmployeeID AND edh.EndDate IS NULL
+    WHERE ManagerID IS NULL
+    UNION ALL
+-- Recursive member definition
+    SELECT e.ManagerID, e.EmployeeID, e.Title, edh.DepartmentID,
+        Level + 1
+    FROM HumanResources.Employee AS e
+    INNER JOIN HumanResources.EmployeeDepartmentHistory AS edh
+        ON e.EmployeeID = edh.EmployeeID AND edh.EndDate IS NULL
+    INNER JOIN DirectReports AS d
+        ON e.ManagerID = d.EmployeeID
+)
+-- Statement that executes the CTE
+SELECT ManagerID, EmployeeID, Title, Level
+FROM DirectReports
+INNER JOIN HumanResources.Department AS dp
+    ON DirectReports.DeptID = dp.DepartmentID
+WHERE dp.GroupName = N'Research and Development' OR Level = 0;</pre></div></div>
+
+<p>Another slight variation of this same theme can be found in this <a href="http://social.msdn.microsoft.com/Forums/en-US/transactsql/thread/6dfd0140-d018-481f-9363-c0ab49d9517f">MSDN thread</a><br />
+&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;<br />
+Below I describe few recent problems I solved using recursive CTE technique:</p>
+<p>Problem definition:</p>
+<p><code class="codespan"><br />
+I use SQL Server 2005 and I have a list of appr. 7700 items. In the list there is the complete stock quantity for each item and I also have the typical amount for each pallet. I need a list with all individual pallets and its stock</code></p>
+<div class="tables">
+<table border="1" cellpadding ="2" cellspacing = "2">
+<tr>
+<th>Item   </th>
+<th>   stock  </th>
+<th> amount/pallet</th>
+</tr>
+<tr>
+<td>100-001</td>
+<td>   2500 </td>
+<td>   1000</td>
+</tr>
+</table>
+<p><code class="codespan">I need the list to look like this</code></p>
+<div class="tables">
+<table border="1" cellpadding ="2" cellspacing = "2">
+<tr>
+<td>100-001</td>
+<td>  1000</td>
+</tr>
+<tr>
+<td>100-001 </td>
+<td> 1000</td>
+</tr>
+<tr>
+<td>100-001 </td>
+<td> 500</td>
+</tr>
+</table>
+<p><code class="codespan">Is this possible to do?</code></p>
+<p>It took me at least 20 minutes to come up with the following solution:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">declare</span> @t <span class="kw1">table</span> <span class="br0">&#40;</span>item <span class="kw1">Varchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span>, Stock <span class="kw1">money</span>, Pallet <span class="kw1">money</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">insert</span> <span class="kw1">into</span> @t <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'100-001'</span>, &nbsp; <span class="nu0">2500</span>, &nbsp; &nbsp;<span class="nu0">1000</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @t <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'100-002'</span>, &nbsp; <span class="nu0">3000</span>, &nbsp; &nbsp;<span class="nu0">400</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @t <span class="kw1">values</span><span class="br0">&#40;</span><span class="st0">'100-003'</span>, &nbsp; <span class="nu0">2000</span>, &nbsp; &nbsp;<span class="nu0">400</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp;
+;<span class="kw1">with</span> cte_toInsert <span class="kw1">as</span> 
+<span class="br0">&#40;</span><span class="kw1">select</span> Item, Pallet, Amount, Original_Stock, Stock <span class="sy0">-</span> Amount <span class="kw1">as</span> Stock 
+<span class="kw1">from</span> <span class="br0">&#40;</span><span class="kw1">select</span> Item, Pallet, Stock <span class="kw1">as</span> Original_Stock, Stock, <span class="kw1">case</span> <span class="kw1">when</span> Stock<span class="sy0">-</span>Pallet <span class="sy0">&gt;</span> <span class="nu0">0</span> <span class="kw1">then</span> Pallet <span class="kw1">else</span> Stock <span class="kw1">end</span> <span class="kw1">as</span> Amount <span class="kw1">from</span> @t<span class="br0">&#41;</span> X 
+<span class="kw1">where</span> Stock <span class="sy0">=</span> <span class="nu0">0</span> or <span class="br0">&#40;</span>Stock <span class="sy0">&gt;=</span><span class="nu0">0</span> and Amount <span class="sy0">&gt;</span> <span class="nu0">0</span><span class="br0">&#41;</span> 
+<span class="kw1">union</span> all <span class="kw1">select</span> Item, Pallet, Amount, Original_Stock, Stock <span class="sy0">-</span> Amount <span class="kw1">as</span> Stock 
+<span class="kw1">from</span> <span class="br0">&#40;</span><span class="kw1">select</span> Item, Pallet, Original_Stock, Stock, 
+<span class="kw1">case</span> <span class="kw1">when</span> Stock<span class="sy0">-</span>Pallet <span class="sy0">&gt;</span> <span class="nu0">0</span> <span class="kw1">then</span> Pallet <span class="kw1">else</span> Stock <span class="kw1">end</span> <span class="kw1">as</span> Amount <span class="kw1">from</span> cte_toInsert<span class="br0">&#41;</span> X 
+<span class="kw1">where</span> <span class="br0">&#40;</span>Stock <span class="sy0">=</span> <span class="nu0">0</span> and Amount <span class="sy0">&gt;</span> <span class="nu0">0</span><span class="br0">&#41;</span> <span class="sy0">OR</span> Stock <span class="sy0">&gt;</span> <span class="nu0">0</span> <span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> cte_toInsert <span class="kw1">order</span> <span class="kw1">by</span> Item, Amount <span class="kw1">DESC</span> <span class="kw1">OPTION</span> <span class="br0">&#40;</span>MAXRECURSION <span class="nu0">10</span><span class="br0">&#41;</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">declare @t table (item Varchar(10), Stock money, Pallet money)
+
+insert into @t values('100-001',   2500,    1000)
+insert into @t values('100-002',   3000,    400)
+insert into @t values('100-003',   2000,    400)
+
+
+;with cte_toInsert as 
+(select Item, Pallet, Amount, Original_Stock, Stock - Amount as Stock 
+from (select Item, Pallet, Stock as Original_Stock, Stock, case when Stock-Pallet &gt; 0 then Pallet else Stock end as Amount from @t) X 
+where Stock = 0 or (Stock &gt;=0 and Amount &gt; 0) 
+union all select Item, Pallet, Amount, Original_Stock, Stock - Amount as Stock 
+from (select Item, Pallet, Original_Stock, Stock, 
+case when Stock-Pallet &gt; 0 then Pallet else Stock end as Amount from cte_toInsert) X 
+where (Stock = 0 and Amount &gt; 0) OR Stock &gt; 0 )
+
+select * from cte_toInsert order by Item, Amount DESC OPTION (MAXRECURSION 10) </pre></div></div>
+
+<p>Here is another interesting problem where I had to use Nikola&#8217;s help to come up to the final solution:</p>
+<p>Given the initial list like this</p>
+<pre>pk_rights   fk_rights   RightsName                                         RightsOrder Description
+----------- ----------- -------------------------------------------------- ----------- ------------------------------
+
+1           NULL        Open Category Library                              0           Open Category Library
+18          NULL        Open Portfolio Footnote Library                    1           Open Portfolio Footnote Library
+2           1           Add Category Library                               0           Add Category Library
+3           1           Delete Category Library                            1           Delete Category Library
+11          2           Edit Category Library                              0           Edit Category Library
+7           2           Add Category                                       2           Add Category
+12          2           Add Category Language                              4           Add Category Language
+14          2           Add Category Caption                               6           Add Category Caption
+9           2           Delete Category                                    3           Delete Category
+16          2           Delete Category Caption                            7           Delete Category Caption
+17          2           Delete Category Language                           5           Delete Category Language
+8           7           Edit Category                                      0           Edit Category
+13          12          Edit Category Lanaguage                            0           Edit Category Lanaguage
+15          14          EditCategory Caption                               0           EditCategory Caption</pre>
+<p>I need the output to look like this&#8230;. the indents are for readability only but the rows must be ordered in this sequence.</p>
+<pre>pk_rights   fk_rights   RightsName                                         RightsOrder Description
+----------- ----------- -------------------------------------------------- ----------- ------------------------------
+
+1           NULL        Open Category Library                              0           Open Category Library
+2           1              Add Category Library                               0        Add Category Library
+11          2                 Edit Category Library                              0     Edit Category Library
+3           1              Delete Category Library                            1        Delete Category Library
+7           2              Add Category                                       2        Add Category
+8           7                 Edit Category                                      0     Edit Category
+9           2              Delete Category                                    3        Delete Category
+12          2              Add Category Language                              4        Add Category Language
+13          12                Edit Category Lanaguage                            0     Edit Category Lanaguage
+17          2              Delete Cateogry Language                           5        Delete Cateogry Language
+14          2              Add Category Caption                               6        Add Category Caption
+15          14                EditCategory Caption                               0     EditCategory Caption
+16          2              Delete Category Caption                            7        Delete Category Caption
+18          NULL        Open Portfolio Footnote Library                    1           Open Portfolio Footnote Library</pre>
+<p>Here is a solution by Nikola:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1">;<span class="kw1">with</span> cte_t <span class="kw1">AS</span>
+&nbsp;<span class="br0">&#40;</span>
+&nbsp;<span class="kw1">SELECT</span> T1.<span class="me1">pk_rights</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; t1.<span class="me1">fk_rights</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; T1.<span class="me1">RightsName</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="nu0">0</span> <span class="kw1">AS</span> <span class="kw1">LEVEL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; T1.<span class="me1">RightsOrder</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; T1.<span class="me1">Description</span> <span class="kw1">AS</span> ChildDescr,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">CAST</span><span class="br0">&#40;</span><span class="kw1">RIGHT</span><span class="br0">&#40;</span><span class="st0">'000'</span><span class="sy0">+</span><span class="kw1">CAST</span><span class="br0">&#40;</span>t1.<span class="me1">RightsOrder</span> <span class="kw1">AS</span> <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,<span class="nu0">2</span><span class="br0">&#41;</span> &nbsp;<span class="kw1">AS</span> <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">AS</span> ro
+&nbsp; <span class="kw1">FROM</span> @Test T1
+&nbsp;<span class="kw1">WHERE</span> T1.<span class="me1">fk_rights</span> <span class="kw1">IS</span> <span class="sy0">NULL</span>
+&nbsp;<span class="kw1">UNION</span> all
+&nbsp;<span class="kw1">SELECT</span> T1.<span class="me1">pk_rights</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; T1.<span class="me1">fk_rights</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; T1.<span class="me1">RightsName</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">LEVEL</span> <span class="sy0">+</span> <span class="nu0">1</span> <span class="kw1">AS</span> <span class="kw1">LEVEL</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; T1.<span class="me1">RightsOrder</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; T1.<span class="me1">Description</span> <span class="kw1">AS</span> ChildDescr,
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">CAST</span><span class="br0">&#40;</span>D.<span class="me1">ro</span> <span class="sy0">+</span> <span class="st0">'-'</span> <span class="sy0">+</span> <span class="kw1">RIGHT</span><span class="br0">&#40;</span><span class="st0">'000'</span><span class="sy0">+</span><span class="kw1">CAST</span><span class="br0">&#40;</span>t1.<span class="me1">RightsOrder</span> <span class="kw1">AS</span> <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,<span class="nu0">2</span><span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="kw1">AS</span> ro
+&nbsp; <span class="kw1">FROM</span> @Test T1
+&nbsp;<span class="kw1">INNER</span> join cte_t D <span class="kw1">ON</span> T1.<span class="me1">fk_rights</span> <span class="sy0">=</span> D.<span class="me1">pk_rights</span>
+<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> cte.<span class="me1">pk_rights</span>,
+&nbsp; &nbsp; &nbsp; &nbsp;cte.<span class="me1">fk_rights</span>,
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">LEFT</span><span class="br0">&#40;</span><span class="kw2">REPLICATE</span><span class="br0">&#40;</span><span class="st0">' &nbsp; '</span>,cte.<span class="kw1">LEVEL</span><span class="br0">&#41;</span><span class="sy0">+</span>cte.<span class="me1">RightsName</span>,<span class="nu0">50</span><span class="br0">&#41;</span> <span class="kw1">AS</span> RightsName,
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">LEFT</span><span class="br0">&#40;</span><span class="kw2">REPLICATE</span><span class="br0">&#40;</span><span class="st0">' &nbsp; '</span>,cte.<span class="kw1">LEVEL</span><span class="br0">&#41;</span><span class="sy0">+</span><span class="kw1">CAST</span><span class="br0">&#40;</span>RightsOrder <span class="kw1">AS</span> <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span><span class="br0">&#41;</span>,<span class="nu0">15</span><span class="br0">&#41;</span> <span class="kw1">AS</span> RightsOrder,
+&nbsp; &nbsp; &nbsp; &nbsp;<span class="kw1">LEFT</span><span class="br0">&#40;</span>cte.<span class="me1">ChildDescr</span>,<span class="nu0">50</span><span class="br0">&#41;</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>Description<span class="br0">&#93;</span>
+&nbsp; <span class="kw1">FROM</span> cte_t cte
+&nbsp;<span class="kw1">ORDER</span> <span class="kw1">BY</span> ro</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">;with cte_t AS
+ (
+ SELECT T1.pk_rights,
+        t1.fk_rights,
+        T1.RightsName,
+        0 AS LEVEL,
+        T1.RightsOrder,
+        T1.Description AS ChildDescr,
+        CAST(RIGHT('000'+CAST(t1.RightsOrder AS VARCHAR(3)),2)  AS VARCHAR(50)) AS ro
+  FROM @Test T1
+ WHERE T1.fk_rights IS NULL
+ UNION all
+ SELECT T1.pk_rights,
+        T1.fk_rights,
+        T1.RightsName,
+        LEVEL + 1 AS LEVEL,
+        T1.RightsOrder,
+        T1.Description AS ChildDescr,
+        CAST(D.ro + '-' + RIGHT('000'+CAST(t1.RightsOrder AS VARCHAR(3)),2) AS VARCHAR(50)) AS ro
+  FROM @Test T1
+ INNER join cte_t D ON T1.fk_rights = D.pk_rights
+)
+SELECT cte.pk_rights,
+       cte.fk_rights,
+       LEFT(REPLICATE('   ',cte.LEVEL)+cte.RightsName,50) AS RightsName,
+       LEFT(REPLICATE('   ',cte.LEVEL)+CAST(RightsOrder AS VARCHAR(5)),15) AS RightsOrder,
+       LEFT(cte.ChildDescr,50) AS [Description]
+  FROM cte_t cte
+ ORDER BY ro</pre></div></div>
+
+<p>Another simple problem was presented in this <a href="http://forums.asp.net/p/1476562/3434155.aspx#3434155">thread</a></p>
+<p>Find sum of products which have multiple level of categories and subcategories:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="co1">-- creating test data</span>
+<span class="kw1">declare</span> @Test <span class="kw1">table</span> <span class="br0">&#40;</span>ID <span class="kw1">int</span> <span class="kw1">identity</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span>, Valore <span class="kw1">int</span>, IDRef <span class="kw1">int</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> <span class="kw1">into</span> @Test <span class="br0">&#40;</span>Valore, IDRef<span class="br0">&#41;</span> <span class="kw1">values</span> <span class="br0">&#40;</span><span class="nu0">100</span>,null<span class="br0">&#41;</span>, <span class="br0">&#40;</span><span class="nu0">20</span>,<span class="nu0">1</span><span class="br0">&#41;</span>, <span class="br0">&#40;</span><span class="nu0">15</span>,<span class="nu0">2</span><span class="br0">&#41;</span>,<span class="br0">&#40;</span><span class="sy0">-</span><span class="nu0">10</span>,<span class="nu0">3</span><span class="br0">&#41;</span>, <span class="br0">&#40;</span><span class="nu0">200</span>,null<span class="br0">&#41;</span>,<span class="br0">&#40;</span><span class="nu0">20</span>,<span class="nu0">5</span><span class="br0">&#41;</span>,<span class="br0">&#40;</span><span class="nu0">335</span>,<span class="nu0">6</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="co1">-- now creating recursive CTE</span>
+<span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> @Test
+; <span class="kw1">with</span> cte <span class="kw1">as</span> <span class="br0">&#40;</span><span class="kw1">select</span> ID <span class="kw1">as</span> Root, ID <span class="kw1">as</span> IDRef, Valore, ID <span class="kw1">from</span> @Test <span class="kw1">where</span> IdRef <span class="kw1">IS</span> <span class="sy0">NULL</span> 
+<span class="kw1">union</span> all
+<span class="kw1">select</span> C.<span class="me1">Root</span>, T.<span class="me1">IDRef</span>, T.<span class="me1">Valore</span>, T.<span class="me1">ID</span> <span class="kw1">from</span> cte C <span class="kw1">inner</span> join @Test T <span class="kw1">on</span> T.<span class="me1">IDRef</span> <span class="sy0">=</span> C.<span class="me1">ID</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="co1">-- Our final result</span>
+<span class="kw1">select</span> C.<span class="me1">Root</span>, <span class="kw2">SUM</span><span class="br0">&#40;</span>Valore<span class="br0">&#41;</span> <span class="kw1">as</span> Total <span class="kw1">from</span> cte C <span class="kw1">group</span> <span class="kw1">by</span> C.<span class="me1">Root</span> <span class="kw1">option</span> <span class="br0">&#40;</span>MaxRecursion <span class="nu0">10</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">-- creating test data
+declare @Test table (ID int identity(1,1), Valore int, IDRef int NULL)
+insert into @Test (Valore, IDRef) values (100,null), (20,1), (15,2),(-10,3), (200,null),(20,5),(335,6)
+
+-- now creating recursive CTE
+select * from @Test
+; with cte as (select ID as Root, ID as IDRef, Valore, ID from @Test where IdRef IS NULL 
+union all
+select C.Root, T.IDRef, T.Valore, T.ID from cte C inner join @Test T on T.IDRef = C.ID)
+
+-- Our final result
+select C.Root, SUM(Valore) as Total from cte C group by C.Root option (MaxRecursion 10)</pre></div></div>
+
+<p>There is a similar problem discussed in this <a href="http://social.msdn.microsoft.com/Forums/en-US/transactsql/thread/cc672149-0318-475b-b8fa-3ac986a571c1">thread</a>:</p>
+<p>and you can view very interesting solution in this <a href="http://www.sqlmag.com/Articles/ArticleID/92997/92997.html?Ad=1">blog</a> by Itzik Ben-Gan.</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></div>
+</div>
+<div class='rp4wp-related-posts'>
+<h3>Related Posts</h3>
+<ul>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/datadesign/use-common-table-expressions-to-simplify-your-updates-in-sql-server/'>Use common table expressions to simplify your updates in SQL Server</a><p>Someone asked two interesting questions last night 1) Is there a way to construct an&hellip;</p></div>
+</li>
+<li><div class='rp4wp-related-post-content'>
+<a href='/index.php/datamgmt/datadesign/sql-advent-2011-day-5/'>SQL Advent 2011 Day 5: Common Table Expressions</a><p>In my Are you ready for SQL Server 2012 or are you still partying like&hellip;</p></div>
+</li>
+</ul>
+</div>
+</div>
+				<div class="post-author">
+					<div class="userInfo"><h2>About the Author</h2>Naomi Nosonovsky, Senior Software Developer, has more than 15 years of enterprise experience in analysis, design, development and implementation of high-performance client/server data management solutions.
+
+She is a Personality of the Year for 2008, 2009, 2010 and 2011 at www.universalthread.com in .NET, SQL Server & VFP categories.
+
+She is also an All Star contributor/MCC Community Contributor at forums.asp.net and MSDN T-SQL forum.
+
+
+ 
+	
+
+
+
+    
+
+    
+
+
+<br style="clear: left" /><div class="bioSoc"><span class="bioSocTitle">Social Sitings</span><a href="http://www.facebook.com/profile.php?id=http://www.facebook.com/?sk=messages&tid=1240691655679#!/profile.php?id=10395470" title="Naomi at Facebook" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_facebook.png" alt="Facebook" /></a><a href="http://www.linkedin.com/profile?viewProfile=&key=55538716&trk=tab_pro" title="Naomi at LinkedIn" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_linkedin.png" alt="LinkedIn" /></a><a href="http://delicious.com/http://delicious.com/naomi_nos" title="Naomi at delicious" class="bioSocLink" rel="author"><img src="http://lessthandot.com/images/bdg_delicious.png" alt="delicious" /></a><a href="/index.php/author/naomi/feed/" title="Blog RSS feed for Naomi" class="bioSocLink"><img src="http://lessthandot.com/images/bdg_rss_icon.png" alt="LTD RSS Feed" /></a></div></div>				</div>
+				<div class="post-foot instapaper_ignore">
+					<div class="post-tagline">
+						<div class="post-foot-views"><label>Article views:</label> 42,663 </div>
+						<div class="post-foot-more-posts">
+                            <a href="/index.php/author/naomi/">Read More Posts by Naomi Nosonovsky</a>
+						</div>
+					</div>
+					<div>
+						 
+					</div>
+					<div class="post-tagline" style="height: auto">
+						<span class="social-button-label">Share:</span><a href="https://twitter.com/intent/tweet?url=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&text=RT @LessThanDot Blog - CTE and hierarchical queries by naomi" class="twitter-share-button-static" target="_blank"><i></i><span class="label">Tweet</span></a><a href="http://www.linkedin.com/shareArticle?mini=true&url=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&title=CTE and hierarchical queries&source=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/" target="_blank" title="Share on LinkedIn" class="svg-button"><img alt="Share on LinkedIn"  src="http://lessthandot.com/images/LinkedIn.svg" /></a><a href="http://www.reddit.com/submit?url=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&title=CTE and hierarchical queries" target="_blank" title="Submit to Reddit" class="svg-button"><img alt="Submit to Reddit" src="http://lessthandot.com/images/Reddit.svg" /></a><a href="https://www.facebook.com/sharer/sharer.php?u=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&quote=CTE and hierarchical queries" title="Share on Facebook" target="_blank" class="svg-button"><img alt="Share on Facebook" src="http://lessthandot.com/images/Facebook.svg" /></a> <a href="http://www.instapaper.com/hello2?url=/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/&title=CTE and hierarchical queries" class="instapaper_button">Instapaper</a>					</div>			
+				</div>
+				<div class="comments-area instapaper_ignore">
+	<h4 class="comments-title">
+		11 Comments	</h4>
+			<ol class="comments-list">
+					<li class="comment byuser comment-author-SQLDenis even thread-even depth-1" id="comment-1801">
+				<div id="div-comment-1801" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/7a49149d4d4b9242348b95a2c561c20d?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">SQLDenis</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1801">
+			September 14, 2009 at 10:08 am</a>		</div>
+
+		<p>CTEs are one of the more useful but underused enhancements to T-SQL. More developers should start using them instead of derived tables</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1801#respond' onclick='return addComment.moveForm( "div-comment-1801", "1801", "respond", "557" )' aria-label='Reply to SQLDenis'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-1802">
+				<div id="div-comment-1802" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/3688209133993047e6bbcd4d63477c72?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/3688209133993047e6bbcd4d63477c72?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn"><a href='http://www.webdesignexpert.me/' rel='external nofollow' class='url'>Web Design</a></cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1802">
+			September 15, 2009 at 12:28 am</a>		</div>
+
+		<p>I wonder if CTE&#8217;s (like the CTE used in solving the pallet problem) would become more readable and understandable if the logic moved to code other than SQL. SQL is not well suited to be a programming language.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1802#respond' onclick='return addComment.moveForm( "div-comment-1802", "1802", "respond", "557" )' aria-label='Reply to Web Design'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment byuser comment-author-naomi bypostauthor even thread-even depth-1" id="comment-1803">
+				<div id="div-comment-1803" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/61e248e3f536e25c08658d205808b113?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/61e248e3f536e25c08658d205808b113?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Naomi Nosonovsky</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1803">
+			September 15, 2009 at 7:04 am</a>		</div>
+
+		<p>Yes, I agree, that in many cases the processing can be also done on the client. I guess in every case it depends on  many different factors what would be preferable.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1803#respond' onclick='return addComment.moveForm( "div-comment-1803", "1803", "respond", "557" )' aria-label='Reply to Naomi Nosonovsky'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-1799">
+				<div id="div-comment-1799" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/1b5b7a9f9b2af80bfc6a3e3c016cbfc8?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/1b5b7a9f9b2af80bfc6a3e3c016cbfc8?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn"><a href='http://blog.ysatech.com/' rel='external nofollow' class='url'>Bryian Tan</a></cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1799">
+			October 13, 2009 at 3:16 pm</a>		</div>
+
+		<p>nice post.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1799#respond' onclick='return addComment.moveForm( "div-comment-1799", "1799", "respond", "557" )' aria-label='Reply to Bryian Tan'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-1795">
+				<div id="div-comment-1795" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://2.gravatar.com/avatar/57659521e5a59c59ffaf6abf40e213ff?s=64&#038;d=mm&#038;r=g' srcset='http://2.gravatar.com/avatar/57659521e5a59c59ffaf6abf40e213ff?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn"><a href='http://aaliyah.wblogin.com/' rel='external nofollow' class='url'>Alfred Brevell</a></cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1795">
+			November 18, 2010 at 11:53 pm</a>		</div>
+
+		<p>Greetings I recently finished reading through your blog and Iâ€™m very impressed. I do have a couple queries for you personally however. Do you consider youâ€™re thinking about doing a follow-up publishing about this? Will you be planning to keep bringing up-to-date also?</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1795#respond' onclick='return addComment.moveForm( "div-comment-1795", "1795", "respond", "557" )' aria-label='Reply to Alfred Brevell'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-1804">
+				<div id="div-comment-1804" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/499a8f1067696d018ec8d01774b3a7e2?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/499a8f1067696d018ec8d01774b3a7e2?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Berneice Celentano</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1804">
+			November 25, 2010 at 12:14 pm</a>		</div>
+
+		<p>Most what i read online is trash and copy paste but i think you offer something different. Bravo.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1804#respond' onclick='return addComment.moveForm( "div-comment-1804", "1804", "respond", "557" )' aria-label='Reply to Berneice Celentano'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-1805">
+				<div id="div-comment-1805" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/4b12abd0915003956f367640718aef6c?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/4b12abd0915003956f367640718aef6c?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn"><a href='http://www.polinios.com/' rel='external nofollow' class='url'>Elizabeth Beehler</a></cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1805">
+			November 25, 2010 at 2:19 pm</a>		</div>
+
+		<p>Most of the times i visit a blog I notice that most blogs are amateurish.On the other hand,I could honestly say that you writting is decent and your website solid.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1805#respond' onclick='return addComment.moveForm( "div-comment-1805", "1805", "respond", "557" )' aria-label='Reply to Elizabeth Beehler'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-1796">
+				<div id="div-comment-1796" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/3cacc7fa2c15b34c21744e962a44a6ed?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/3cacc7fa2c15b34c21744e962a44a6ed?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Jeremy</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1796">
+			December 2, 2010 at 2:44 am</a>		</div>
+
+		<p>Great post full of useful tips! My site is fairly new and I am also having a hard time getting my readers to leave comments. Analytics shows they are coming to the site but I have a feeling nobody wants to be first.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1796#respond' onclick='return addComment.moveForm( "div-comment-1796", "1796", "respond", "557" )' aria-label='Reply to Jeremy'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-1797">
+				<div id="div-comment-1797" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/a203b91c5d1a478fe026aa7e07c395bd?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/a203b91c5d1a478fe026aa7e07c395bd?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn"><a href='http://www.fineartglass.info/art-fish' rel='external nofollow' class='url'>Roselee Novencido</a></cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1797">
+			December 2, 2010 at 3:23 am</a>		</div>
+
+		<p>This domain appears to get a good ammount of visitors. How do you advertise it? It gives a nice individual twist on things. I guess having something real or substantial to give info on is the most important thing.</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1797#respond' onclick='return addComment.moveForm( "div-comment-1797", "1797", "respond", "557" )' aria-label='Reply to Roselee Novencido'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment odd alt thread-odd thread-alt depth-1" id="comment-1798">
+				<div id="div-comment-1798" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://1.gravatar.com/avatar/4dc46c991ec704f7167ed9f1594ea193?s=64&#038;d=mm&#038;r=g' srcset='http://1.gravatar.com/avatar/4dc46c991ec704f7167ed9f1594ea193?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn"><a href='http://www.bobpusateri.com/' rel='external nofollow' class='url'>Bob Pusateri</a></cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1798">
+			May 10, 2011 at 10:13 am</a>		</div>
+
+		<p>Thanks for the great post, Naomi, and also for submitting this to T-SQL Tuesday!</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1798#respond' onclick='return addComment.moveForm( "div-comment-1798", "1798", "respond", "557" )' aria-label='Reply to Bob Pusateri'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		<li class="comment even thread-even depth-1" id="comment-1800">
+				<div id="div-comment-1800" class="comment-body">
+				<div class="comment-author vcard">
+			<img alt='' src='http://0.gravatar.com/avatar/9e1e4a2cfea4e192c4e425a12a0024b6?s=64&#038;d=mm&#038;r=g' srcset='http://0.gravatar.com/avatar/9e1e4a2cfea4e192c4e425a12a0024b6?s=128&amp;d=mm&amp;r=g 2x' class='avatar avatar-64 photo' height='64' width='64' />			<cite class="fn">Samaniego7766</cite> <span class="says">says:</span>		</div>
+		
+		<div class="comment-meta commentmetadata"><a href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#comment-1800">
+			September 6, 2012 at 6:36 pm</a>		</div>
+
+		<p>Quite a good read, I always enjoy informational pieces.  I hope to see more like it soon!</p>
+
+		<div class="reply"><a rel='nofollow' class='comment-reply-link' href='/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/?replytocom=1800#respond' onclick='return addComment.moveForm( "div-comment-1800", "1800", "respond", "557" )' aria-label='Reply to Samaniego7766'>Reply</a></div>
+				</div>
+		</li><!-- #comment-## -->
+		</ol>
+						<div id="respond" class="comment-respond">
+			<h3 id="reply-title" class="comment-reply-title">Leave a Reply <small><a rel="nofollow" id="cancel-comment-reply-link" href="/index.php/datamgmt/datadesign/cte-and-hierarchical-queries/#respond" style="display:none;">Cancel reply</a></small></h3>				<form action="/wp-comments-post.php" method="post" id="commentform" class="comment-form">
+					<p class="comment-notes"><span id="email-notes">Your email address will not be published.</span> Required fields are marked <span class="required">*</span></p><p class="comment-form-comment"><label for="comment">Comment</label> <textarea id="comment" name="comment" cols="45" rows="8" maxlength="65525" aria-required="true" required="required"></textarea></p><p class="comment-form-author"><label for="author">Name <span class="required">*</span></label> <input id="author" name="author" type="text" value="" size="30" maxlength="245" aria-required='true' required='required' /></p>
+<p class="comment-form-email"><label for="email">Email <span class="required">*</span></label> <input id="email" name="email" type="text" value="" size="30" maxlength="100" aria-describedby="email-notes" aria-required='true' required='required' /></p>
+<p class="comment-form-url"><label for="url">Website</label> <input id="url" name="url" type="text" value="" size="30" maxlength="200" /></p>
+<p class="form-submit"><input name="submit" type="submit" id="submit" class="submit" value="Post Comment" /> <input type='hidden' name='comment_post_ID' value='557' id='comment_post_ID' />
+<input type='hidden' name='comment_parent' id='comment_parent' value='0' />
+</p><input type="hidden" id="killer_value" name="killer_value" value="33e8075e9970de0cfea955afd4644bb2"/><noscript>Sorry, but you are required to use a javascript enabled brower to comment here.</noscript>				</form>
+					</div><!-- #respond -->
+		</div>			</div>
+				<br style="clear: both;" />
+</div>
+		</div>
+		<div id="page-footer">
+			<div id="botnav"><a href="http://lessthandot.com/" title="LessThanDot Launchpad">Launchpad</a> | <a href="http://lessthandot.com/account.php" title="Your Account Settings">My Account</a> | <a href="http://lessthandot.com/statistics.php" title="Statistics">Statistics</a> | <a href="http://lessthandot.com/donate.php" title="Donate">Donate</a> | <a href="http://lessthandot.com/contactus.php" title="Contact Us">Contact Us</a> | <a href="http://lessthandot.com/aboutus.php" title="About the LessThanDot Team">&copy;2008 - 2019 LessThanDot, LLC</a></div>
+
+		<script type='text/javascript'>
+		var _gaq = _gaq || [];
+		_gaq.push(['_setAccount', 'UA-4471405-1']);
+		_gaq.push(['_trackPageview']);
+		_gaq.push(['_setCustomVar', 1, 'Environment', 'lessthandot.com', 3]);
+
+		(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		})();
+	  </script>			<div class="validator"><a href="http://validator.w3.org/check?uri=referer">Valid XHTML</a> | <a href="http://jigsaw.w3.org/css-validator/check/referer" title="Validate the CSS for this page at the W3C website">Valid CSS</a> | 2018-11-11 15:52</div>
+		</div>
+	</div>
+</div>
+<!-- <script type="text/javascript" src="http://apis.google.com/js/plusone.js"></script> -->
+<script type='text/javascript' src='/wp-includes/js/wp-embed.min.js?ver=4.6.1'></script>
+<script type='text/javascript'>
+/* <![CDATA[ */
+var spam_destroyer = {"key":"159ff9dcc225580310c2de238cdd1f1a","lifetime":"3600","limit":"1552766016"};
+/* ]]> */
+</script>
+<script type='text/javascript' src='/wp-content/plugins/spam-destroyer/kill.js?ver=1.2'></script>
+</body>
+</html>

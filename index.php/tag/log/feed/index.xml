@@ -1,0 +1,616 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>log &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/log/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2012 Day 2: Data types storage differences</title>
+		<link>/index.php/datamgmt/dbprogramming/data-types/</link>
+		<comments>/index.php/datamgmt/dbprogramming/data-types/#comments</comments>
+		<pubDate>Sun, 02 Dec 2012 15:53:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[backup]]></category>
+		<category><![CDATA[conversions]]></category>
+		<category><![CDATA[log]]></category>
+		<category><![CDATA[performance]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[storage]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/data-types/</guid>
+		<description><![CDATA[SQL Server has two data types to store character data, both of them come in fixed and variable length sizes. The char and varchar data type uses one byte of store to store one character, the nchar and nvarchar data type uses two bytes of store to store one character. The nchar and nvarchar data types are  used to store unicode of data]]></description>
+				<content:encoded><![CDATA[<p>This is day two of the <a href="/index.php/DataMgmt/DBProgramming/sql-advent-2012-here-is">SQL Advent 2012 series</a> of blog posts. Today we are going to take a look at how data types can have an impact in queries and also the size of your database.</p>
+<h2>Char vs NChar</h2>
+<p>SQL Server has two data types to store character data[1], both of them come in fixed and variable length sizes. The char and varchar data type uses one byte of store to store one character, the nchar and nvarchar data type uses two bytes of store to store one character. The nchar and nvarchar data types are  used to store unicode of data</p>
+<p>Let&#8217;s think about that for a second, what we are saying is that the char and varchar data type can store twice the number of characters in the same amount of store as the nchar and nvarchar data type. Why does this matter, space is cheap right?  True, space is getting cheaper but we are also storing more and more data every year.</p>
+<p>Now think about what happens you have everything stored as unicode data</p>
+<ul>
+<li>What happens to your backup and restore process, will it be faster or slower, will the files be bigger if not compressed?</li>
+<li>What about when transferring the results to and from your database server, are the packets able to store the same number of characters.</li>
+<li>What about the amount of data on a page, what does this do to indexes and index lookups, how does it affect index maintenance?</li>
+</ul>
+<p><strong>If you don&#8217;t need it, then don&#8217;t use unicode data</strong>.<br />
+Some examples of what I have seen stored in nchar and nvarchar when realy you shouldn&#8217;t:</p>
+<p>Zip Code for US addresses<br />
+US addresses<br />
+Social Security Numbers (which were stored in plain text none the less)<br />
+Integer data (enforced by constraints or the app layer to make sure these were only digits)</p>
+<p>Let&#8217;s take a quick look by running some T-SQL</p>
+<p>First create these two tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestChar <span class="br0">&#40;</span>SomeCol <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestNChar <span class="br0">&#40;</span>SomeCol <span class="kw1">nchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestChar (SomeCol char(10))
+GO
+
+CREATE TABLE TestNChar (SomeCol nchar(10))
+GO</pre></div></div>
+
+<p>Now populate each with some data</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestChar
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1000000</span> <span class="st0">'1234567890'</span>
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span> c1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c4
+GO
+&nbsp;
+<span class="kw1">INSERT</span> TestNChar
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1000000</span> <span class="st0">'1234567890'</span>
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span> c1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c4
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestChar
+SELECT TOP 1000000 '1234567890'
+FROM sys.sysobjects c1
+CROSS JOIN sys.sysobjects c2
+CROSS JOIN sys.sysobjects c3
+CROSS JOIN sys.sysobjects c4
+GO
+
+INSERT TestNChar
+SELECT TOP 1000000 '1234567890'
+FROM sys.sysobjects c1
+CROSS JOIN sys.sysobjects c2
+CROSS JOIN sys.sysobjects c3
+CROSS JOIN sys.sysobjects c4
+GO</pre></div></div>
+
+<p>Let&#8217;s see how much space is used by both tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_spaceused</span> <span class="st0">'TestChar'</span>
+&nbsp;
+<span class="kw1">EXEC</span> <span class="kw3">sp_spaceused</span> <span class="st0">'TestNChar'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_spaceused 'TestChar'
+
+EXEC sp_spaceused 'TestNChar'</pre></div></div>
+
+<p>18,824 KB<br />
+28,744 KB</p>
+<p>If you looked at the reserved column, you will see that the nchar data is using 10 MB more than the char data</p>
+<h2>Implicit conversions</h2>
+<p>Besides the storage increase there is also a problem when querying for data that looks like varchar but is stored as unicode. Run the code below. </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">ON</span>
+GO
+<span class="kw1">DECLARE</span> @v <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'0123456789'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestChar <span class="kw1">WHERE</span> SomeCol <span class="sy0">LIKE</span> &nbsp;@v <span class="sy0">+</span><span class="st0">'%'</span>
+GO
+&nbsp;
+<span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET SHOWPLAN_TEXT ON
+GO
+DECLARE @v varchar(10) = '0123456789'
+
+SELECT * FROM TestChar WHERE SomeCol LIKE  @v +'%'
+GO
+
+SET SHOWPLAN_TEXT OFF
+GO</pre></div></div>
+
+<p>Here is the plan for that query</p>
+<blockquote><p>|&#8211;Table Scan(OBJECT:([tempdb].[dbo].[TestChar]),<br />
+WHERE:([tempdb].[dbo].[TestChar].[SomeCol] like [@v]+&#8217;%&#8217;))</p></blockquote>
+<p>If we look at the plan we can see that this looks pretty good<br />
+Usually people will sometimes change the datatype of a column but will not change any code that access this column. Let&#8217;s now change the data type of the column to nchar</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> TestChar <span class="kw1">ALTER</span> <span class="kw1">COLUMN</span> SomeCol <span class="kw1">nchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE TestChar ALTER COLUMN SomeCol nchar(10)
+GO</pre></div></div>
+
+<p>Run the query that gives you the plan again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">ON</span>
+GO
+<span class="kw1">DECLARE</span> @v <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'0123456789'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestChar <span class="kw1">WHERE</span> SomeCol <span class="sy0">LIKE</span> &nbsp;@v <span class="sy0">+</span><span class="st0">'%'</span>
+GO
+&nbsp;
+<span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET SHOWPLAN_TEXT ON
+GO
+DECLARE @v varchar(10) = '0123456789'
+
+SELECT * FROM TestChar WHERE SomeCol LIKE  @v +'%'
+GO
+
+SET SHOWPLAN_TEXT OFF
+GO</pre></div></div>
+
+<p>Here is the plan</p>
+<blockquote><p>|&#8211;Table Scan(OBJECT:([tempdb].[dbo].[TestChar]),<br />
+WHERE:([tempdb].[dbo].[TestChar].[SomeCol] like CONVERT_IMPLICIT(nvarchar(11),[@v]+&#8217;%&#8217;,0)))</p></blockquote>
+<p>As you can see, there is a conversion going on right now.</p>
+<p>In order to get rid of the conversion, use the correct data types</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">ON</span>
+GO
+<span class="kw1">DECLARE</span> @v <span class="kw1">nvarchar</span><span class="br0">&#40;</span><span class="nu0">10</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="st0">'0123456789'</span>
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestChar <span class="kw1">WHERE</span> SomeCol <span class="sy0">LIKE</span> &nbsp;@v <span class="sy0">+</span><span class="st0">'%'</span>
+GO
+&nbsp;
+<span class="kw1">SET</span> SHOWPLAN_TEXT <span class="kw1">OFF</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SET SHOWPLAN_TEXT ON
+GO
+DECLARE @v nvarchar(10) = '0123456789'
+
+SELECT * FROM TestChar WHERE SomeCol LIKE  @v +'%'
+GO
+
+SET SHOWPLAN_TEXT OFF
+GO</pre></div></div>
+
+<p></p>
+<h2>Using larger datatypes when it is not needed</h2>
+<p>I see this problem mostly with the integer data types. Below is a list of the integer data types together with their storage size and range</p>
+<p><strong>tinyint</strong><br />
+Storage size is 1 byte. Integer data from 0 through 255. </p>
+<p><strong>smallint</strong><br />
+Storage size is 2 bytes. Integer data from -2^15 (-32,768) through 2^15 &#8211; 1 (32,767). </p>
+<p><strong>int</strong><br />
+Storage size is 4 bytes. Integer data from -2^31 (-2,147,483,648) through 2^31 &#8211; 1 (2,147,483,647). </p>
+<p><strong>bigint</strong><br />
+Storage size is 8 bytes. Integer data from -2^63 (-9,223,372,036,854,775,808) through 2^63-1 (9,223,372,036,854,775,807).</p>
+<p>Now imagine facebook with a billion users decided to use bigint as CountryID in their Country table, this key is then uses as a foreign key in the user demographics table. This is wasteful,either use a smallint since we won&#8217;t go through 32 thousand countries in the forseeable feature or use the 2 or 3 character ISO code. The problem is even worse if you have a compound 6 column key and it is used as a foreign key in tons of other tables&#8230;that was real fun to clean up&#8230;.use a surrogate 1 column key in that case&#8230;but be sure to test&#8230;.normalize till it hurts then denormalize till it works&#8230;.I will cover normalization in another post&#8230;just wanted to mention it</p>
+<p>That is all for day two of the SQL Advent 2012 series, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+<p>[1]  I know there is text and ntext but hose are deprecated</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/data-types/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2012 Day 1: Sizing database files</title>
+		<link>/index.php/datamgmt/dbprogramming/sizing-database-files/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sizing-database-files/#comments</comments>
+		<pubDate>Sat, 01 Dec 2012 08:42:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[filegroups]]></category>
+		<category><![CDATA[files]]></category>
+		<category><![CDATA[log]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[tempdb]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/sizing-database-files/</guid>
+		<description><![CDATA[This post shows how having a database that is not correctly sized will impact performance]]></description>
+				<content:encoded><![CDATA[<p>This post will demonstrate that there is a difference in performance if you don&#8217;t size your database file accordingly. It is a good practice to have your database sized correctly for the next 6 to 12 months, you don&#8217;t want your server wasting cycles with growing files all the time. Figure out how big your files are now, figure out how much they will grow in the next year and size your files accordingly, check back every month or so to see if your estimates were correct. </p>
+<p>By default SQL Server will create databases wilt very small files when you create a database and you don&#8217;t specify the sizes. If you have people creating databases on your servers, consider adding a DDL trigger to notify you when a new DB is added so that you can talk to the database creator and size the files. You also can change the defaults on the server so that you don&#8217;t have the 10% growth either.</p>
+<p>First let&#8217;s see what the difference is when we have a database where the files will have to grow versus one where the files are big enough for the data that will be inserted.</p>
+<p>Here we are creating two databases, one with much bigger files than the other one</p>
+<p>This DB is correctly sized for the data that will be inserted</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestBigger<span class="br0">&#93;</span>
+&nbsp;<span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestBigger'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'f:TempTestBigger.mdf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 509600KB , FILEGROWTH <span class="sy0">=</span> 1024KB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestBigger_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'f:TempTestBigger_log.ldf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 502400KB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">10</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE [TestBigger]
+ ON  PRIMARY 
+( NAME = N'TestBigger', FILENAME = N'f:TempTestBigger.mdf' , 
+SIZE = 509600KB , FILEGROWTH = 1024KB )
+ LOG ON 
+( NAME = N'TestBigger_log', FILENAME = N'f:TempTestBigger_log.ldf' , 
+SIZE = 502400KB , FILEGROWTH = 10%)
+GO</pre></div></div>
+
+<p>This database is very small and will have to be expanded many times to accommodate all the data I will be inserting later on</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestSmaller<span class="br0">&#93;</span>
+&nbsp;<span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmaller'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'f:TempTestSmaller.mdf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 1280KB , FILEGROWTH <span class="sy0">=</span> 1024KB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmaller_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'f:TempTestSmaller_log.ldf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 504KB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">10</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE [TestSmaller]
+ ON  PRIMARY 
+( NAME = N'TestSmaller', FILENAME = N'f:TempTestSmaller.mdf' , 
+SIZE = 1280KB , FILEGROWTH = 1024KB )
+ LOG ON 
+( NAME = N'TestSmaller_log', FILENAME = N'f:TempTestSmaller_log.ldf' , 
+SIZE = 504KB , FILEGROWTH = 10%)
+GO</pre></div></div>
+
+<p>[edit]<br />
+<em>On sql server 2012, you might need to make the size of the &#8216;TestSmaller file larger</p>
+<p>If you get an error like the following</p>
+<p>Msg 1803, Level 16, State 1, Line 1<br />
+The CREATE DATABASE statement failed. The primary file must be at least 4 MB to accommodate a copy of the model database.</p>
+<p>Make the size of the primary file bigger, change the bold part from 1280KB to  5280KB or bigger if you still get the error</p>
+<p> NAME = N&#8217;TestSmaller&#8217;, FILENAME = N&#8217;f:TempTestSmaller.mdf&#8217; ,<br />
+SIZE = <strong>1280KB</strong> , FILEGROWTH = 1024KB</em></p>
+<p>[/edit]<br />
+These two stored proc calls are just to verify that the files match with what we specified, you can use sp_helpdb to check the size of a database that you created when you don&#8217;t specify the file sizes</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_helpdb</span> <span class="st0">'TestBigger'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_helpdb 'TestBigger'</pre></div></div>
+
+<pre>name	        filename	            filegroup	SIZE
+TestBigger	f:TempTestBigger.mdf	     PRIMARY	509632 KB
+TestBigger_log	f:TempTestBigger_log.ldf	NULL	502400 KB</pre>
+<p></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_helpdb</span> <span class="st0">'TestSmaller'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_helpdb 'TestSmaller'</pre></div></div>
+
+<pre>name	        filename	             filegroup	SIZE
+TestSmaller	f:TempTestSmaller.mdf	     PRIMARY	1280 KB
+TestSmaller_log	f:TempTestSmaller_log.ldf	NULL	 512 KB</pre>
+<p>
+Next, we are creating two identical tables, one in each database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> TestSmaller
+GO
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> test <span class="br0">&#40;</span>SomeName <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, SomeID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">36</span><span class="br0">&#41;</span>, SomeOtherID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, SomeDate <span class="kw1">DATETIME</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE TestSmaller
+GO
+CREATE TABLE test (SomeName VARCHAR(100), SomeID VARCHAR(36), SomeOtherID VARCHAR(100), SomeDate DATETIME)</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> TestBigger
+GO
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> test <span class="br0">&#40;</span>SomeName <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, SomeID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">36</span><span class="br0">&#41;</span>, SomeOtherID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, SomeDate <span class="kw1">DATETIME</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE TestBigger
+GO
+CREATE TABLE test (SomeName VARCHAR(100), SomeID VARCHAR(36), SomeOtherID VARCHAR(100), SomeDate DATETIME)</pre></div></div>
+
+<p>This query is just used so that the data is cached for the two inserts later on, this way the data doesn&#8217;t have to be fatched from disk for either inserts, you can discard the results after the query is done</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> master
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1000000</span> c1.<span class="me1">name</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span> c1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c4</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE master
+GO
+
+
+SELECT TOP 1000000 c1.name,NEWID(),NEWID(),GETDATE() 
+FROM sys.sysobjects c1
+CROSS JOIN sys.sysobjects c2
+CROSS JOIN sys.sysobjects c3
+CROSS JOIN sys.sysobjects c4</pre></div></div>
+
+<p>Here is the first insert into the bigger database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestBigger.<span class="me1">dbo</span>.<span class="me1">test</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1000000</span> c1.<span class="me1">name</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span> c1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c4</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestBigger.dbo.test
+SELECT TOP 1000000 c1.name,NEWID(),NEWID(),GETDATE() 
+FROM sys.sysobjects c1
+CROSS JOIN sys.sysobjects c2
+CROSS JOIN sys.sysobjects c3
+CROSS JOIN sys.sysobjects c4</pre></div></div>
+
+<p>Here is the second insert into the smaller database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestSmaller.<span class="me1">dbo</span>.<span class="me1">test</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1000000</span> c1.<span class="me1">name</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span> c1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c4</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestSmaller.dbo.test
+SELECT TOP 1000000 c1.name,NEWID(),NEWID(),GETDATE() 
+FROM sys.sysobjects c1
+CROSS JOIN sys.sysobjects c2
+CROSS JOIN sys.sysobjects c3
+CROSS JOIN sys.sysobjects c4</pre></div></div>
+
+<p>On several machines I tested on, it takes half the time or less to insert the data in the bigger database compared to the smaller database. How about on your machine, do you see that the insert into the bigger database takes less than half the time it takes to insert into the smaller database?</p>
+<p>Check the sizes of the databases again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">exec</span> <span class="kw3">sp_helpdb</span> <span class="st0">'TestBigger'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">exec sp_helpdb 'TestBigger'</pre></div></div>
+
+<pre>name	        filename	           filegroup	size
+TestBigger	f:TempTestBigger.mdf	     PRIMARY	509632 KB
+TestBigger_log	f:TempTestBigger_log.ldf	NULL	502400 KB</pre>
+<p></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">exec</span> <span class="kw3">sp_helpdb</span> <span class="st0">'TestSmaller'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">exec sp_helpdb 'TestSmaller'</pre></div></div>
+
+<pre>name	        filename	             filegroup	size
+TestSmaller	f:TempTestSmaller.mdf	     PRIMARY	215296 KB
+TestSmaller_log	f:TempTestSmaller_log.ldf	NULL	427392 KB</pre>
+<p>
+As you can see, the bigger database did not expand, the smaller database expanded a lot.</p>
+<p><strong>Autogrow</strong><br />
+If you do use autogrow, then make sure you don&#8217;t use the default 10%, take a look at this message</p>
+<blockquote><p>Date		11/30/2012 12:57:56 PM<br />
+Log		SQL Server (Current &#8211; 11/25/2012 5:00:00 AM)</p>
+<p>Source		spid62</p>
+<p>Message<br />
+Autogrow of file &#8216;MyDB_Log&#8217; in database &#8216;MyDB&#8217; took 104381 milliseconds.  Consider using ALTER DATABASE to set a smaller FILEGROWTH for this file.</p></blockquote>
+<p>See that, it took a long time, you don&#8217;t want to grow a one terabyte file by ten percent, that would be one hundred gigabytes, that is huge. Use something smaller and don&#8217;t use percent, the bigger the file gets the longer it will take to expand the file.</p>
+<p><strong>File placement</strong><br />
+Separate the log files from the data files by placing them on separate hard drives. Placing the files on separate drives allows I/O activity to occur at the same time for both the data and log files. Instead of having huge files consider having smaller files in separate filegroups. Put different tables used in the same join queries in different filegroups as well. This will improve performance, because of parallel disk I/O searching for joined data.</p>
+<p>Put heavily accessed tables and the nonclustered indexes that belong to those tables on different filegroups. This will improve performance, because of parallel I/O if the files are located on different physical disks. Just remember that you can&#8217;t separate the clustered indexes from the base table, you can only do this for non clustered indexes. Of course people can get very creative, I have worked with a database once where each table was placed in its own filegroups, there were hundreds of files&#8230;.what a mess</p>
+<p><strong>Tempdb</strong><br />
+There are all kinds of recommendations about how many data files you should have for tempdb. Start with 4 files and add more files if you see contention. Paul Randal, has a detailed post here: <a href="http://www.sqlskills.com/blogs/paul/post/A-SQL-Server-DBA-myth-a-day-(1230)-tempdb-should-always-have-one-data-file-per-processor-core.aspx">A SQL Server DBA myth a day: (12/30) tempdb should always have one data file per processor core</a>.<br />
+If you can, place tempdb on its own physical drive as well, separated from the user databases.</p>
+<p><strong>Test, test, test</strong><br />
+Never ever blindly follow what you read on the internet, make sure that you test it out first on a QA server before promoting the changes to production!!</p>
+<p>That is all for day one of the SQL Advent 2012 series, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sizing-database-files/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Catching the OUTPUT of your DML statements</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/catching-the-output-of-your/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/catching-the-output-of-your/#comments</comments>
+		<pubDate>Fri, 25 May 2012 12:04:00 +0000</pubDate>
+		<dc:creator><![CDATA[Axel Achten (axel8s)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[audit]]></category>
+		<category><![CDATA[log]]></category>
+		<category><![CDATA[output clause]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/05/catching-the-output-of-your/</guid>
+		<description><![CDATA[Suppose you need to log the old and new version of the data you change in a table in your database. If you ask a DBA how this could be done, I guess 80% will tell you to do it with an after trigger (the number is going down because every new edition of&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Suppose you need to log the old and new version of the data you change in a table in your database. If you ask a DBA how this could be done, I guess 80% will tell you to do it with an after trigger (the number is going down because every new edition of SQL Server comes with new features to do this). If you ask a DBA what he thinks of triggers, 95% will tell you to avoid them as much as possible&#8230; So what should you do? Well it all depends on the requirements you have and how you&#8217;re data is saved. If you need to be sure that all changes are logged, also the direct changes not coming from a business application you&#8217;d better be looking at triggers and/or audits. If you just want to log from within your application you can consume the OUTPUT directly from your INSERT, UPDATE, DELETE or MERGE statement. Let&#8217;s see how it works. First of all gather some data to work with; I&#8217;ll use some data from the AdventureWorks database:</p>
+<pre>SELECT TOP (10) ProductID, Name, ListPrice, ModifiedDate
+INTO ProductPrice
+FROM Production.Product
+WHERE MakeFlag = 1
+	AND ListPrice &gt; 0</pre>
+<p>We also need a table to hold the old and new versions of the data and I also want to store who changed the data:</p>
+<pre>CREATE TABLE PriceLog (
+	ProductID int,
+	OldListPrice money,
+	NewListPrice money,
+	OldModifiedDate datetime,
+	NewModifiedDate datetime,
+	ModifyingUser varchar(20))</pre>
+<p>Now the data and logtable are in place we can start using the OUTPUT clause. The OUTPUT clause is used directly after the DML query and uses the DELETED and INSERTED prefixes to get the old and the new version of the data. Note that there is no UPDATED prefix. An update puts the original data in the DELETED, and the new values in the INSERTED OUTPUT. So this is how an update query will look:</p>
+<pre>UPDATE ProductPrice
+SET ListPrice = ListPrice * 1.1, 
+	ModifiedDate = GETDATE()
+OUTPUT deleted.ProductID,
+	deleted.ListPrice,
+	inserted.ListPrice,
+	deleted.ModifiedDate,
+	inserted.ModifiedDate,
+	SYSTEM_USER
+	INTO PriceLog
+WHERE ProductID = 517</pre>
+<p>When we look at the data in the PriceLog we see all the requested data:</p>
+<div class="image_block"><a href="/wp-content/uploads/users/axel8s/OUTPUT1.png?mtime=1337954208"><img alt="" src="/wp-content/uploads/users/axel8s/OUTPUT1.png?mtime=1337954208" width="622" height="63" /></a></div>
+<p>Now we can wrap the code in a stored procedure:</p>
+<pre>CREATE PROCEDURE PriceUpdate
+	@ProductID int,
+	@NewPrice money
+AS
+	SET NOCOUNT ON;
+	UPDATE ProductPrice
+	SET ListPrice = @NewPrice,
+		ModifiedDate = GETDATE()
+	OUTPUT deleted.ProductID,
+		deleted.ListPrice,
+		inserted.ListPrice,
+		deleted.ModifiedDate,
+		inserted.ModifiedDate,
+		SYSTEM_USER
+	INTO PriceLog
+	WHERE ProductID = @ProductID
+GO</pre>
+<p>This time we update a price using the stored procedure:</p>
+<pre>Exec PriceUpdate 520, 175.83</pre>
+<p>And check to see if the change is stored in the PriceLog table:</p>
+<div class="image_block"><a href="/wp-content/uploads/users/axel8s/OUTPUT2.png?mtime=1337954220"><img alt="" src="/wp-content/uploads/users/axel8s/OUTPUT2.png?mtime=1337954220" width="621" height="84" /></a></div>
+<p>So as you can see, using the OUTPUT clause can be a very effective way of logging changes to the data. The biggest disadvantage is when somebody is updating the data with a direct query. But in a production system this shouldn&#8217;t be the case.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/catching-the-output-of-your/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

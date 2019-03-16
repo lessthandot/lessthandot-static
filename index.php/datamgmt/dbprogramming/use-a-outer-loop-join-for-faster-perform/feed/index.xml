@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	
+	>
+<channel>
+	<title>Comments on: Use an  OUTER LOOP JOIN for faster performance when one of the tables is much smaller</title>
+	<atom:link href="/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/feed/" rel="self" type="application/rss+xml" />
+	<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Tue, 26 Feb 2019 12:40:14 +0000</lastBuildDate>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>By: Gert-Jan Strik</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3323</link>
+		<dc:creator><![CDATA[Gert-Jan Strik]]></dc:creator>
+		<pubDate>Wed, 18 Jan 2012 19:38:34 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3323</guid>
+		<description><![CDATA[I ran your example.&lt;br /&gt;
+&lt;br /&gt;
+The query plan I got for the first query was slightly different (executed on SQL Server 2008, 10.0.5500.0). There is an extra BitMap operator in the query plan, although I don&#039;t see it every time. See below.&lt;br /&gt;
+&lt;br /&gt;
+&#124;--Compute Scalar(DEFINE:(Expr1006=CONVERT_IMPLICIT(int,Expr1010,0)))&lt;br /&gt;
+   &#124;--Stream Aggregate(DEFINE:(Expr1010=Count(*)))&lt;br /&gt;
+      &#124;--Parallelism(Gather Streams)&lt;br /&gt;
+         &#124;--Filter(WHERE:(TestLarge.SomeValue as t2.SomeValue IS NULL))&lt;br /&gt;
+            &#124;--Hash Match(Left Outer Join, HASH:(t1.SomeValue, t1.SomeDate, t1.SomeFlag, t1.SomeOtherValue)=(t2.SomeValue, t2.SomeDate, t2.SomeFlag, t2.SomeOtherValue), RESIDUAL:(TestSmall.SomeValue as t1.SomeValue=TestLarge.SomeValue as t2.SomeValue AND TestSmall.SomeDate as t1.SomeDate=TestLarge.SomeDate as t2.SomeDate AND TestSmall.SomeFlag as t1.SomeFlag=TestLarge.SomeFlag as t2.SomeFlag AND TestSmall.SomeOtherValue as t1.SomeOtherValue=TestLarge.SomeOtherValue as t2.SomeOtherValue))&lt;br /&gt;
+                 &#124;--Bitmap(HASH:(t1.SomeValue, t1.SomeDate, t1.SomeFlag, t1.SomeOtherValue), DEFINE:(Bitmap1009))&lt;br /&gt;
+                 &#124;  &#124;--Parallelism(Repartition Streams, Hash Partitioning, PARTITION COLUMNS:(t1.SomeValue, t1.SomeDate, t1.SomeFlag, t1.SomeOtherValue))&lt;br /&gt;
+                 &#124;     &#124;--Clustered Index Scan(OBJECT:(TestSmall.ix_TestSmall AS t1))&lt;br /&gt;
+                 &#124;--Parallelism(Repartition Streams, Hash Partitioning, PARTITION COLUMNS:(t2.SomeValue, t2.SomeDate, t2.SomeFlag, t2.SomeOtherValue))&lt;br /&gt;
+                    &#124;--Clustered Index Scan(OBJECT:(TestLarge.ix_TestLarge AS t2), WHERE:(PROBE(Bitmap1009,TestLarge.SomeValue as t2.SomeValue,TestLarge.SomeDate as t2.SomeDate,TestLarge.SomeFlag as t2.SomeFlag,TestLarge.SomeOtherValue as t2.SomeOtherValue)))&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;
+When I ran the queries with a hot cache, the Loop Join version blew the other out of the water.&lt;br /&gt;
+&lt;br /&gt;
+However, with a cold cache, on my system, the Loop Join version performs slightly worse than the Hash Match version, approximately 12%.&lt;br /&gt;
+&lt;br /&gt;
+The Outer Apply version that poster Erik suggested performs about the same as the default query plan, both with a hot and cold cache.&lt;br /&gt;
+&lt;br /&gt;
+I have to say, that you have chosen a very specific setup. You have declared both tables without any Unique index / constraint. Even the clustered index is not unique (in both tables), even though both tables only have unique data for the clustered index keys. I don&#039;t think that that is a very common scenario...&lt;br /&gt;]]></description>
+		<content:encoded><![CDATA[<p>I ran your example.</p>
+<p>The query plan I got for the first query was slightly different (executed on SQL Server 2008, 10.0.5500.0). There is an extra BitMap operator in the query plan, although I don&#8217;t see it every time. See below.</p>
+<p>|&#8211;Compute Scalar(DEFINE:(Expr1006=CONVERT_IMPLICIT(int,Expr1010,0)))<br />
+   |&#8211;Stream Aggregate(DEFINE:(Expr1010=Count(*)))<br />
+      |&#8211;Parallelism(Gather Streams)<br />
+         |&#8211;Filter(WHERE:(TestLarge.SomeValue as t2.SomeValue IS NULL))<br />
+            |&#8211;Hash Match(Left Outer Join, HASH:(t1.SomeValue, t1.SomeDate, t1.SomeFlag, t1.SomeOtherValue)=(t2.SomeValue, t2.SomeDate, t2.SomeFlag, t2.SomeOtherValue), RESIDUAL:(TestSmall.SomeValue as t1.SomeValue=TestLarge.SomeValue as t2.SomeValue AND TestSmall.SomeDate as t1.SomeDate=TestLarge.SomeDate as t2.SomeDate AND TestSmall.SomeFlag as t1.SomeFlag=TestLarge.SomeFlag as t2.SomeFlag AND TestSmall.SomeOtherValue as t1.SomeOtherValue=TestLarge.SomeOtherValue as t2.SomeOtherValue))<br />
+                 |&#8211;Bitmap(HASH:(t1.SomeValue, t1.SomeDate, t1.SomeFlag, t1.SomeOtherValue), DEFINE:(Bitmap1009))<br />
+                 |  |&#8211;Parallelism(Repartition Streams, Hash Partitioning, PARTITION COLUMNS:(t1.SomeValue, t1.SomeDate, t1.SomeFlag, t1.SomeOtherValue))<br />
+                 |     |&#8211;Clustered Index Scan(OBJECT:(TestSmall.ix_TestSmall AS t1))<br />
+                 |&#8211;Parallelism(Repartition Streams, Hash Partitioning, PARTITION COLUMNS:(t2.SomeValue, t2.SomeDate, t2.SomeFlag, t2.SomeOtherValue))<br />
+                    |&#8211;Clustered Index Scan(OBJECT:(TestLarge.ix_TestLarge AS t2), WHERE:(PROBE(Bitmap1009,TestLarge.SomeValue as t2.SomeValue,TestLarge.SomeDate as t2.SomeDate,TestLarge.SomeFlag as t2.SomeFlag,TestLarge.SomeOtherValue as t2.SomeOtherValue)))</p>
+<p>
+When I ran the queries with a hot cache, the Loop Join version blew the other out of the water.</p>
+<p>However, with a cold cache, on my system, the Loop Join version performs slightly worse than the Hash Match version, approximately 12%.</p>
+<p>The Outer Apply version that poster Erik suggested performs about the same as the default query plan, both with a hot and cold cache.</p>
+<p>I have to say, that you have chosen a very specific setup. You have declared both tables without any Unique index / constraint. Even the clustered index is not unique (in both tables), even though both tables only have unique data for the clustered index keys. I don&#8217;t think that that is a very common scenario&#8230;</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Luciano Evaristo Guerche (Gor</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3324</link>
+		<dc:creator><![CDATA[Luciano Evaristo Guerche (Gor]]></dc:creator>
+		<pubDate>Mon, 08 Nov 2010 14:03:43 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3324</guid>
+		<description><![CDATA[Dennis,&lt;br /&gt;
+&lt;br /&gt;
+I am quite sure what is changing the join type is not the &quot;left&quot; nor the &quot;outer&quot;, but the &quot;loop&quot; join hint.&lt;br /&gt;
+&lt;br /&gt;
+&quot;loop&quot;, &quot;merge&quot; and &quot;hash&quot; can also be used with inner and right joins. I don&#039;t like giving hints because sql server is supposed to select better execution plan (but sometimes it does not, unfortunately), so that&#039;s why the hints were advised for.&lt;br /&gt;
+&lt;br /&gt;
+Cheers.&lt;br /&gt;
+&lt;br /&gt;
+--&lt;br /&gt;
+P.S.: I just gave the following T-SQL statement a hint so that the NOT EXISTS clause also uses a nested/loop join. Take a look and let me know what do you think about.&lt;br /&gt;
+&lt;br /&gt;
+SELECT COUNT(*)  --105456&lt;br /&gt;
+FROM TestSmall t1&lt;br /&gt;
+WHERE not exists (&lt;br /&gt;
+SELECT 1 FROM  TestLarge t2 WHERE t1.SomeValue = t2.SomeValue&lt;br /&gt;
+and t1.SomeDate =t2.SomeDate&lt;br /&gt;
+and t1.SomeFlag = t2.SomeFlag&lt;br /&gt;
+and t1.SomeOtherValue = t2.SomeOtherValue)&lt;br /&gt;
+OPTION (LOOP JOIN)&lt;br /&gt;]]></description>
+		<content:encoded><![CDATA[<p>Dennis,</p>
+<p>I am quite sure what is changing the join type is not the &#8220;left&#8221; nor the &#8220;outer&#8221;, but the &#8220;loop&#8221; join hint.</p>
+<p>&#8220;loop&#8221;, &#8220;merge&#8221; and &#8220;hash&#8221; can also be used with inner and right joins. I don&#8217;t like giving hints because sql server is supposed to select better execution plan (but sometimes it does not, unfortunately), so that&#8217;s why the hints were advised for.</p>
+<p>Cheers.</p>
+<p>&#8212;<br />
+P.S.: I just gave the following T-SQL statement a hint so that the NOT EXISTS clause also uses a nested/loop join. Take a look and let me know what do you think about.</p>
+<p>SELECT COUNT(*)  &#8211;105456<br />
+FROM TestSmall t1<br />
+WHERE not exists (<br />
+SELECT 1 FROM  TestLarge t2 WHERE t1.SomeValue = t2.SomeValue<br />
+and t1.SomeDate =t2.SomeDate<br />
+and t1.SomeFlag = t2.SomeFlag<br />
+and t1.SomeOtherValue = t2.SomeOtherValue)<br />
+OPTION (LOOP JOIN)</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Ramireddy</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3322</link>
+		<dc:creator><![CDATA[Ramireddy]]></dc:creator>
+		<pubDate>Mon, 08 Nov 2010 01:10:29 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3322</guid>
+		<description><![CDATA[Hi dennis,&lt;br /&gt;
+ &lt;br /&gt;
+      Nice Article.&lt;br /&gt;
+&lt;br /&gt;
+       I removed the final 3 join conditions and kept only one condition &quot;t1.somevalue = t2.somevalue&quot; and run the 3 queries again. It Give the CPU times as &quot;28766ms&quot;, &quot;953ms&quot;  ,&quot;30359&quot;  for the query 1,2,3 respectively. It seems to be some other factors like no of join conditions also effecting the CPU time. One wild assumption is If the join involves 2 or more conditions, &quot;Merge&quot; join will evaluate all comparision operations all at a time, where as Nested loops will do it one by one?????]]></description>
+		<content:encoded><![CDATA[<p>Hi dennis,</p>
+<p>      Nice Article.</p>
+<p>       I removed the final 3 join conditions and kept only one condition &#8220;t1.somevalue = t2.somevalue&#8221; and run the 3 queries again. It Give the CPU times as &#8220;28766ms&#8221;, &#8220;953ms&#8221;  ,&#8221;30359&#8243;  for the query 1,2,3 respectively. It seems to be some other factors like no of join conditions also effecting the CPU time. One wild assumption is If the join involves 2 or more conditions, &#8220;Merge&#8221; join will evaluate all comparision operations all at a time, where as Nested loops will do it one by one?????</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Paul White NZ</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3321</link>
+		<dc:creator><![CDATA[Paul White NZ]]></dc:creator>
+		<pubDate>Sat, 06 Nov 2010 15:14:43 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3321</guid>
+		<description><![CDATA[Hi Dennis,&lt;br /&gt;
+&lt;br /&gt;
+Did you record elapsed times for the tests with DBCC DROPCLEANBUFFERS included?&lt;br /&gt;
+&lt;br /&gt;
+The total physical reads (including read-ahead) look very similar for all the methods.&lt;br /&gt;
+&lt;br /&gt;
+I enjoyed reading this entry, thank you.&lt;br /&gt;
+&lt;br /&gt;
+Paul]]></description>
+		<content:encoded><![CDATA[<p>Hi Dennis,</p>
+<p>Did you record elapsed times for the tests with DBCC DROPCLEANBUFFERS included?</p>
+<p>The total physical reads (including read-ahead) look very similar for all the methods.</p>
+<p>I enjoyed reading this entry, thank you.</p>
+<p>Paul</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Oscar Zamora</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3320</link>
+		<dc:creator><![CDATA[Oscar Zamora]]></dc:creator>
+		<pubDate>Fri, 05 Nov 2010 16:35:34 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3320</guid>
+		<description><![CDATA[This is what I found out. When the cache is empty, it takes 10 seconds on my test system to return the results using a nested loop and 11 seconds using a merge join.&lt;br /&gt;
+&lt;br /&gt;
+What I can infer from this test is that if the data is in cache, RAM is much faster to scan than disk hence it takes just a few seconds to return using a nested loop.&lt;br /&gt;
+&lt;br /&gt;
+But because the optimizer does not really know how fast is your disk subsystem or RAM speed, it tries to infer that due to the huge amount of scan counts that the nested loop will generate, it is automatically more expensive than just issuing a merge join.&lt;br /&gt;
+&lt;br /&gt;
+In any case, this is still a great example that shows that the optimizer is pretty darn good, but not perfect.]]></description>
+		<content:encoded><![CDATA[<p>This is what I found out. When the cache is empty, it takes 10 seconds on my test system to return the results using a nested loop and 11 seconds using a merge join.</p>
+<p>What I can infer from this test is that if the data is in cache, RAM is much faster to scan than disk hence it takes just a few seconds to return using a nested loop.</p>
+<p>But because the optimizer does not really know how fast is your disk subsystem or RAM speed, it tries to infer that due to the huge amount of scan counts that the nested loop will generate, it is automatically more expensive than just issuing a merge join.</p>
+<p>In any case, this is still a great example that shows that the optimizer is pretty darn good, but not perfect.</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Oscar Zamora</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3319</link>
+		<dc:creator><![CDATA[Oscar Zamora]]></dc:creator>
+		<pubDate>Fri, 05 Nov 2010 15:49:58 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3319</guid>
+		<description><![CDATA[SQLDenis, this is a great example. I always pay attention to reads, and this simply blew up the optimizer as it implied that the amount of reads was higher than just performing a MERGE JOIN.&lt;br /&gt;
+&lt;br /&gt;
+Now, I always thought that there was a reverse correlation between I/O reads and performance. But this sample clearly implies that higher reads does not necessarily mean bad performance.&lt;br /&gt;
+&lt;br /&gt;
+I need an explanation about that tho.... Will research]]></description>
+		<content:encoded><![CDATA[<p>SQLDenis, this is a great example. I always pay attention to reads, and this simply blew up the optimizer as it implied that the amount of reads was higher than just performing a MERGE JOIN.</p>
+<p>Now, I always thought that there was a reverse correlation between I/O reads and performance. But this sample clearly implies that higher reads does not necessarily mean bad performance.</p>
+<p>I need an explanation about that tho&#8230;. Will research</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: Erik</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3318</link>
+		<dc:creator><![CDATA[Erik]]></dc:creator>
+		<pubDate>Fri, 05 Nov 2010 15:15:16 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3318</guid>
+		<description><![CDATA[Thanks for checking. It would be cool if you could OUTER LOOP APPLY...]]></description>
+		<content:encoded><![CDATA[<p>Thanks for checking. It would be cool if you could OUTER LOOP APPLY&#8230;</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: SQLDenis</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3317</link>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+		<pubDate>Fri, 05 Nov 2010 14:02:17 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3317</guid>
+		<description><![CDATA[Jeremy, I just ran this&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;
+DBCC DROPCLEANBUFFERS&lt;br /&gt;
+DBCC FREEPROCCACHE&lt;br /&gt;
+&lt;br /&gt;
+SET STATISTICS IO ON&lt;br /&gt;
+go&lt;br /&gt;
+SELECT COUNT(*) -- 105456&lt;br /&gt;
+FROM TestSmall t1&lt;br /&gt;
+LEFT join TestLarge t2 ON t1.SomeValue = t2.SomeValue&lt;br /&gt;
+and t1.SomeDate =t2.SomeDate&lt;br /&gt;
+and t1.SomeFlag = t2.SomeFlag&lt;br /&gt;
+and t1.SomeOtherValue = t2.SomeOtherValue&lt;br /&gt;
+WHERE t2.SomeValue IS null&lt;br /&gt;
+ &lt;br /&gt;
+SET STATISTICS IO OFF&lt;br /&gt;
+go&lt;br /&gt;
+&lt;br /&gt;
+DBCC DROPCLEANBUFFERS&lt;br /&gt;
+DBCC FREEPROCCACHE&lt;br /&gt;
+&lt;br /&gt;
+SET STATISTICS IO ON&lt;br /&gt;
+go&lt;br /&gt;
+SELECT COUNT(*)  --105456&lt;br /&gt;
+FROM TestSmall t1&lt;br /&gt;
+WHERE not exists (&lt;br /&gt;
+SELECT 1 FROM  TestLarge t2 WHERE t1.SomeValue = t2.SomeValue&lt;br /&gt;
+and t1.SomeDate =t2.SomeDate&lt;br /&gt;
+and t1.SomeFlag = t2.SomeFlag&lt;br /&gt;
+and t1.SomeOtherValue = t2.SomeOtherValue)&lt;br /&gt;
+ &lt;br /&gt;
+SET STATISTICS IO OFF&lt;br /&gt;
+go&lt;br /&gt;
+&lt;br /&gt;
+DBCC DROPCLEANBUFFERS&lt;br /&gt;
+DBCC FREEPROCCACHE&lt;br /&gt;
+&lt;br /&gt;
+SET STATISTICS IO ON&lt;br /&gt;
+go&lt;br /&gt;
+SELECT COUNT(*) -- 105456&lt;br /&gt;
+FROM TestSmall t1&lt;br /&gt;
+LEFT outer loop join TestLarge t2 ON t1.SomeValue = t2.SomeValue&lt;br /&gt;
+and t1.SomeDate =t2.SomeDate&lt;br /&gt;
+and t1.SomeFlag = t2.SomeFlag&lt;br /&gt;
+and t1.SomeOtherValue = t2.SomeOtherValue&lt;br /&gt;
+WHERE t2.SomeValue IS null&lt;br /&gt;
+ &lt;br /&gt;
+SET STATISTICS IO OFF&lt;br /&gt;
+go&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;
+Here is the output&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;
+&lt;br /&gt;
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.&lt;br /&gt;
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.&lt;br /&gt;
+&lt;br /&gt;
+(1 row(s) affected)&lt;br /&gt;
+Table &#039;TestSmall&#039;. Scan count 9, logical reads 1011, physical reads 24, read-ahead reads 954&lt;br /&gt;
+Table &#039;TestLarge&#039;. Scan count 9, logical reads 160192, physical reads 732, read-ahead reads 159204&lt;br /&gt;
+Table &#039;Worktable&#039;. Scan count 0, logical reads 0, physical reads 0, read-ahead reads 0&lt;br /&gt;
+&lt;br /&gt;
+(1 row(s) affected)&lt;br /&gt;
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.&lt;br /&gt;
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.&lt;br /&gt;
+&lt;br /&gt;
+(1 row(s) affected)&lt;br /&gt;
+Table &#039;TestSmall&#039;. Scan count 1, logical reads 917, physical reads 9, read-ahead reads 954&lt;br /&gt;
+Table &#039;TestLarge&#039;. Scan count 1, logical reads 159184, physical reads 114, read-ahead reads 159209&lt;br /&gt;
+&lt;br /&gt;
+(1 row(s) affected)&lt;br /&gt;
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.&lt;br /&gt;
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.&lt;br /&gt;
+Warning: The join order has been enforced because a local join hint is used.&lt;br /&gt;
+&lt;br /&gt;
+(1 row(s) affected)&lt;br /&gt;
+Table &#039;TestLarge&#039;. Scan count 115456, logical reads 1065175, physical reads 27, read-ahead reads 145092&lt;br /&gt;
+Table &#039;TestSmall&#039;. Scan count 9, logical reads 1011, physical reads 17, read-ahead reads 954&lt;br /&gt;
+Table &#039;Worktable&#039;. Scan count 0, logical reads 0, physical reads 0, read-ahead reads 0&lt;br /&gt;
+&lt;br /&gt;
+(1 row(s) affected)&lt;br /&gt;]]></description>
+		<content:encoded><![CDATA[<p>Jeremy, I just ran this</p>
+<p>
+DBCC DROPCLEANBUFFERS<br />
+DBCC FREEPROCCACHE</p>
+<p>SET STATISTICS IO ON<br />
+go<br />
+SELECT COUNT(*) &#8212; 105456<br />
+FROM TestSmall t1<br />
+LEFT join TestLarge t2 ON t1.SomeValue = t2.SomeValue<br />
+and t1.SomeDate =t2.SomeDate<br />
+and t1.SomeFlag = t2.SomeFlag<br />
+and t1.SomeOtherValue = t2.SomeOtherValue<br />
+WHERE t2.SomeValue IS null</p>
+<p>SET STATISTICS IO OFF<br />
+go</p>
+<p>DBCC DROPCLEANBUFFERS<br />
+DBCC FREEPROCCACHE</p>
+<p>SET STATISTICS IO ON<br />
+go<br />
+SELECT COUNT(*)  &#8211;105456<br />
+FROM TestSmall t1<br />
+WHERE not exists (<br />
+SELECT 1 FROM  TestLarge t2 WHERE t1.SomeValue = t2.SomeValue<br />
+and t1.SomeDate =t2.SomeDate<br />
+and t1.SomeFlag = t2.SomeFlag<br />
+and t1.SomeOtherValue = t2.SomeOtherValue)</p>
+<p>SET STATISTICS IO OFF<br />
+go</p>
+<p>DBCC DROPCLEANBUFFERS<br />
+DBCC FREEPROCCACHE</p>
+<p>SET STATISTICS IO ON<br />
+go<br />
+SELECT COUNT(*) &#8212; 105456<br />
+FROM TestSmall t1<br />
+LEFT outer loop join TestLarge t2 ON t1.SomeValue = t2.SomeValue<br />
+and t1.SomeDate =t2.SomeDate<br />
+and t1.SomeFlag = t2.SomeFlag<br />
+and t1.SomeOtherValue = t2.SomeOtherValue<br />
+WHERE t2.SomeValue IS null</p>
+<p>SET STATISTICS IO OFF<br />
+go</p>
+<p>
+Here is the output</p>
+<p>
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.<br />
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.</p>
+<p>(1 row(s) affected)<br />
+Table &#8216;TestSmall&#8217;. Scan count 9, logical reads 1011, physical reads 24, read-ahead reads 954<br />
+Table &#8216;TestLarge&#8217;. Scan count 9, logical reads 160192, physical reads 732, read-ahead reads 159204<br />
+Table &#8216;Worktable&#8217;. Scan count 0, logical reads 0, physical reads 0, read-ahead reads 0</p>
+<p>(1 row(s) affected)<br />
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.<br />
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.</p>
+<p>(1 row(s) affected)<br />
+Table &#8216;TestSmall&#8217;. Scan count 1, logical reads 917, physical reads 9, read-ahead reads 954<br />
+Table &#8216;TestLarge&#8217;. Scan count 1, logical reads 159184, physical reads 114, read-ahead reads 159209</p>
+<p>(1 row(s) affected)<br />
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.<br />
+DBCC execution completed. If DBCC printed error messages, contact your system administrator.<br />
+Warning: The join order has been enforced because a local join hint is used.</p>
+<p>(1 row(s) affected)<br />
+Table &#8216;TestLarge&#8217;. Scan count 115456, logical reads 1065175, physical reads 27, read-ahead reads 145092<br />
+Table &#8216;TestSmall&#8217;. Scan count 9, logical reads 1011, physical reads 17, read-ahead reads 954<br />
+Table &#8216;Worktable&#8217;. Scan count 0, logical reads 0, physical reads 0, read-ahead reads 0</p>
+<p>(1 row(s) affected)</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: SQLDenis</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3316</link>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+		<pubDate>Fri, 05 Nov 2010 14:00:23 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3316</guid>
+		<description><![CDATA[Emtucifor, LEFT JOIN and OUTER APPLY generate the same plan]]></description>
+		<content:encoded><![CDATA[<p>Emtucifor, LEFT JOIN and OUTER APPLY generate the same plan</p>
+]]></content:encoded>
+	</item>
+	<item>
+		<title>By: SQLDenis</title>
+		<link>/index.php/datamgmt/dbprogramming/use-a-outer-loop-join-for-faster-perform/#comment-3315</link>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+		<pubDate>Fri, 05 Nov 2010 13:55:51 +0000</pubDate>
+		<guid isPermaLink="false">/index.php/2010/11/use-a-outer-loop-join-for-faster-perform/#comment-3315</guid>
+		<description><![CDATA[Oscar, stats are up to date, I actually just manually updated them and no change]]></description>
+		<content:encoded><![CDATA[<p>Oscar, stats are up to date, I actually just manually updated them and no change</p>
+]]></content:encoded>
+	</item>
+</channel>
+</rss>

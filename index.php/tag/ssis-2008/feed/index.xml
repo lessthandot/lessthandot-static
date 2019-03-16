@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>ssis 2008 &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/ssis-2008/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>T-SQL Tuesday &#8211; Give me my cores SSIS 2008!</title>
+		<link>/index.php/datamgmt/dbprogramming/ssis-2008-multiproc-usage/</link>
+		<comments>/index.php/datamgmt/dbprogramming/ssis-2008-multiproc-usage/#respond</comments>
+		<pubDate>Tue, 08 Jun 2010 08:39:46 +0000</pubDate>
+		<dc:creator><![CDATA[Ted Krueger (onpnt)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql community]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server integration services]]></category>
+		<category><![CDATA[ssis]]></category>
+		<category><![CDATA[ssis 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/06/ssis-2008-multiproc-usage/</guid>
+		<description><![CDATA[I’m jumping into the T-SQL Tuesday fun this week.  It is a busy week at that with SQL University writing and everything going on in the SQL Community.  The SQL Server 2008 (R2) hottest, most favorite new feature topic had me wanting to throw SSIS out there once more and show off the Data Flow Engine changes.]]></description>
+				<content:encoded><![CDATA[<p><a href="http://sqlchicken.com/2010/06/t-sql-tuesday-007-summertime-in-the-sql/">
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday1.gif" alt="" title="T-SQL Tuesday" width="154" height="154" align="left" /></div>
+<p></a>I’m jumping into the T-SQL Tuesday fun this week.  The very well known, Jorge Segarra (<a href="http://sqlchicken.com/">blog</a> | <a href="http://twitter.com/sqlchicken">twitter</a>) is <a href="http://sqlchicken.com/2010/06/t-sql-tuesday-007-summertime-in-the-sql/">hosting the fun</a> this time around.  It is a busy week at that with SQL University writing and everything going on in the SQL Community.  The SQL Server 2008 (R2) hottest, most favorite new feature topic had me wanting to throw SSIS out there once more and show off the Data Flow Engine changes.  OK, the Data Flow Engine isn&#8217;t a, &#8220;New Feature&#8221; but given the redesign, I&#8217;m throwing it into the mix with the rest.
+</p>
+<p>
+This was a big, big and did I say BIG change in SSIS 2008.  Being a performance freak, the changes to the Data Flow and the effective use of multi-core processors was what had me the most excited.  See, with SSIS 2005, Data Flow was sent off on its merry way running execution trees with only one lonely execution thread.  That meant one thread!  This doesn’t help us much in a core happy world we live in.  So in SSIS 2008 we had a big change to this architecture.  Did I mention this was big?  </p>
+<h3><strong>Off to the races we go with Pipeline Parallelism</strong></h3>
+<p>What SSIS 2008 has given us over SSIS 2005 and the execution tree is the ability to run more than one component from the single tree.  This is really a huge change.  Before this change and automated thread scheduling in SSIS, we had to try making our own with designing methods.  In some cases the changes in designs caused other performance problems themselves.  Now with a thread pool, threads are assigned dynamically (yes, auto-magically) to components.  Thread pooling is not a new concept to the computing world (and .NET framework).   Thread pooling manages where and what work a set of threads will work on.   When work is thrown at the pool, the work is sent off to threads that can work on it.  This means multiple threads working on multiple jobs in parallel execution.  Thread pooling can be done manually but with SSIS and SQL Server, we like the concept of this being controlled without us causing problems.  In SSIS 2008 we were given just that automatic scheduling.</p>
+<p>The question of the hour is, does this help us with performance?  The performance shines from the massive tests that have been done already and can answer the question for us.  If you haven’t heard of the <a href="http://blogs.msdn.com/b/sqlperf/archive/2008/02/27/etl-world-record.aspx">ETL World Record</a>, you need to get over there and check it out.  1 TB in 30 minutes!!  Yes, on SSIS 2008 and the architecture behind it.  </p>
+<p>
+The best way to check this out is to show the differences.  Robert Sheldon also went over this test on the, <a href="http://www.simple-talk.com/sql/ssis/sql-server-2008-ssis-cribsheet/">SSIS 2008 Crib sheet</a>.  Very cool write-up and recommended reading it.</p>
+<h3><strong>The truth is in the pipe by logging it</strong></h3>
+<p>
+Let’s create a package that will run some data through so we can log the execution.</p>
+<blockquote><p><span class="MT_red">Note: the SSIS 2008 Crib sheet shows pretty much the same here.  Robert did an awesome job explaining all of this.  Highly recommend reading it.</span></p></blockquote>
+<p>Steps to the test SSIS in 2005 and 2008 so we can see the execution changes and speed differences
+</p>
+<ol>
+<li>In BIDS 2005, create a new package named Pipes 2005</li>
+<li>Bring over an OLE DB Source and connect this source to AdventureWorks.  </li>
+<li>Bring in the table, Sales.SalesOrderDetail</li>
+<li>Drop a Conditional Split into the Data Flow tab</li>
+<li>Make the condition based on OrderQty being greater than one.  </li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday2.gif" alt="" title="" width="628" height="76" /></div>
+<li>Next, drag and drop two Derived Column’s</li>
+<li>Make one Derived column the Case 1 output by connecting the first Path to it and selecting Case 1 output</li>
+<li>Make the Expression (DT_STR,3,1252)ProductID + &#8221; for &#8221; + (DT_STR,3,1252)OrderQty</li>
+<li>Change the Data Type to DT_STR (non-unicode string)</li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday3.gif" alt="" title="" width="628" height="112" /></div>
+<li>Do this for the next Derived Column by connecting the remaining output path to it.  </li>
+<li>Name the column Under2orders and leave the Expression the same</li>
+<li>Connect both Derived Columns to two unique SQL Server Destinations</li>
+<li>In the SQL Server Destinations, use the same connection of AdventureWorks.  Click, New to create a new table.  Use the following CREATE TABLE statement:
+<pre>CREATE TABLE [Playing_1] (
+OrderOver1Unit varchar(10)
+)</pre>
+</li>
+<li>Use this for the second destination but name the table, [Playing_2]</li>
+<p>Our finished product should appear like below</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday4.gif" alt="" title="" width="444" height="381" /></div>
+<li>Next, click the menu option SSIS and select Logging</li>
+<li>Select package in the Containers and add a new SSIS log provider for Text files.</li>
+<li>Add a path to the new log of C:ExecutionTreeSSIS_Test2005</li>
+<li>Highlight Data Flow Task to move into logging the task.</li>
+<li>Click Details in the right tabs and click the Advanced button </li>
+<li>Scroll down a bit and check PipelineExecutionTree. </li>
+<li>Uncheck everything except MessageText</li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday5.gif" alt="" title="" width="628" height="317" /></div>
+<li>Click OK until out of the editors and save the package. </li>
+<li>Run the package from BIDS </li>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday6.gif" alt="" title="" width="474" height="409" /></div>
+<p>And we have our data split and loaded</p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/sqltuesday7.gif" alt="" title="" width="380" height="419" /></div>
+<p>Execution time was 936 Milliseconds</p>
+<p>SSIS 2005 PipelineExecutionTrees log</p>
+<blockquote><p>begin execution tree 0<br />
+   output &#8220;OLE DB Source Output&#8221; (11)<br />
+   input &#8220;Conditional Split Input&#8221; (17)<br />
+   output &#8220;Case 1&#8221; (146)<br />
+   input &#8220;Derived Column Input&#8221; (163)<br />
+   output &#8220;Derived Column Output&#8221; (164)<br />
+   input &#8220;SQL Server Destination Input&#8221; (61)<br />
+   output &#8220;Derived Column Error Output&#8221; (165)<br />
+   output &#8220;Conditional Split Default Output&#8221; (18)<br />
+   input &#8220;Derived Column Input&#8221; (169)<br />
+   output &#8220;Derived Column Output&#8221; (170)<br />
+   input &#8220;SQL Server Destination Input&#8221; (78)<br />
+   output &#8220;Derived Column Error Output&#8221; (171)<br />
+   output &#8220;Conditional Split Error Output&#8221; (20)<br />
+end execution tree 0<br />
+begin execution tree 1<br />
+   output &#8220;OLE DB Source Error Output&#8221; (12)<br />
+end execution tree 1</p></blockquote>
+</ol>
+<p>
+We can see all of the work was primarily done in execution tree 0.   936 Milliseconds isn’t the greatest for what we just did either.</p>
+<p>Now upgrade the package to 2008 by creating a new SSIS project.  Right click SSIS Packages in the Solution Explorer and select Add Existing.  Browse to the package we just created in SSIS 2005 (found in your projects folder in My Documents by default).  Double click the package to bring it in.<br />
+You will receive the succeeded upgrade to SSIS 2008 message.  Click OK to close it and load the upgraded 2008 package.</p>
+<p>Click the SSIS option in the menu strip and select lopping.  Change the path to the text file to be C:ExecutionTreeSSIS_Test2008<br />
+Save and run the package</p>
+<p>Package execution time for this was 640 Milliseconds.  Now check the log<br />
+<blockquote>ExecutionTreeSSIS_Test2008</p>
+<p>Begin path plan<br />
+   Begin Path Plan 0<br />
+      Call ProcessInput on component &#8220;Conditional Split&#8221; (16) for input &#8220;Conditional Split Input&#8221; (17)<br />
+      Create new execution item for subpath 0<br />
+      Create new execution item for subpath 1<br />
+      Begin Subpath Plan 0<br />
+         Create new row view for output &#8220;Case 1&#8221; (146)<br />
+         Call ProcessInput on component &#8220;Derived Column&#8221; (162) for input &#8220;Derived Column Input&#8221; (163)<br />
+         Create new row view for output &#8220;Derived Column Output&#8221; (164)<br />
+         Call ProcessInput on component &#8220;SQL Server Destination&#8221; (45) for input &#8220;SQL Server Destination Input&#8221; (61)<br />
+      End Subpath Plan 0<br />
+      Begin Subpath Plan 1<br />
+         Create new row view for output &#8220;Conditional Split Default Output&#8221; (18)<br />
+         Call ProcessInput on component &#8220;Derived Column 1&#8221; (168) for input &#8220;Derived Column Input&#8221; (169)<br />
+         Create new row view for output &#8220;Derived Column Output&#8221; (170)<br />
+         Call ProcessInput on component &#8220;SQL Server Destination 1&#8221; (62) for input &#8220;SQL Server Destination Input&#8221; (78)<br />
+      End Subpath Plan 1<br />
+   End Path Plan 0</p>
+<p>End path plan</p></blockquote>
+<p>Changes we can see in the logging are the Paths and the Subpaths.  This is showing the tasks being executed in the main path in parallel by using Subpaths.  </p>
+<p>And our execution time was increased.  </p>
+<h3><strong>Where’s the beef? Right there, in the Data Flow Engine</strong></h3>
+<p>
+The Data Flow Engine changes are truly an enhancement that pushes SSIS to the Enterprise ETL levels.  Don’t sell yourself short by dismissing the abilities of SSIS as anything less than performing at that level.
+</p>
+<blockquote><p>References and in-depth reading materials<br />
+<a href="http://msdn.microsoft.com/en-us/library/bb522498.aspx">Architecture of Integration Services</a></p>
+<p><a href="http://sqlcat.com/top10lists/archive/2009/02/24/top-10-performance-and-productivity-reasons-to-use-sql-server-2008-for-your-business-intelligence-solutions.aspx">Top 10 Performance and Productivity Reasons to Use SQL Server 2008 for Your Business Intelligence Solutions</a></p>
+<p><a href="http://www.simple-talk.com/sql/ssis/sql-server-2008-ssis-cribsheet/">SSIS 2008 Crib Sheet</a></p></blockquote>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/ssis-2008-multiproc-usage/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

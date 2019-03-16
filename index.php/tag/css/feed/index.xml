@@ -1,0 +1,598 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>css &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/css/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>CSS, Javascript, T4 Templates, and Less, Oh My</title>
+		<link>/index.php/webdev/serverprogramming/aspnet/css-javascript-t4-templates-and-less/</link>
+		<comments>/index.php/webdev/serverprogramming/aspnet/css-javascript-t4-templates-and-less/#comments</comments>
+		<pubDate>Fri, 02 Dec 2011 13:02:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[css]]></category>
+		<category><![CDATA[javascript]]></category>
+		<category><![CDATA[less]]></category>
+		<category><![CDATA[t4-template]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/css-javascript-t4-templates-and-less/</guid>
+		<description><![CDATA[For the past few months, I have been looking for a way to define some JS and CSS files that would be shared between multiple projects in an ASP.Net solution. The intent is to define common scripts and CSS in one place instead of trying to keep multiple copies of it in sync or implementing an internal CDN with a versioning scheme. The challenge is finding a way to do this with a minimum of impact on the development, deployment, and production processes.]]></description>
+				<content:encoded><![CDATA[<p>For the past few months, I have been looking for a way to define some JS and CSS files that would be shared between multiple projects in an ASP.Net solution. The intent is to define common scripts and CSS in one place instead of trying to keep multiple copies of it in sync or implementing an internal CDN with a versioning scheme. The challenge is finding a way to do this with a minimum of impact on the development, deployment, and production processes.</p>
+<h2>The Shared Project</h2>
+<p>Yesterday the best solution I was also the best one I had thought of on my own, which was to create a shared project and use pre- or post-build commands to copy the common files to the relevant web projects. Unfortunately this doesn&#8217;t solve the &#8220;let me edit a file without rebuilding&#8221; unless I then edit the copied file, test, and remember to paste the changes back into the source without first building and wiping out my temporary changes.</p>
+<p>Yuck.</p>
+<p>This wasn&#8217;t going to make life that much easier.</p>
+<h2>Start with just the CSS?</h2>
+<p>This morning, while looking into the potential of using LESS or SASS to reduce the repetitiveness of the files, I realized I had the potential for a much better solution. If I had a way to compile a LESS or SASS file on the fly into a CSS file, then I could still put my common CSS in a central location and just use an import statement in a template in each project to pull those common values in. </p>
+<p>I initially looked at using SASS with the <a href="http://visualstudiogallery.msdn.microsoft.com/2b96d16a-c986-4501-8f97-8008f9db141a" title="Mindscape Web Workbench extension on VisualStudioGallery">Mindscape Web Workbench</a> plugin. This seemed like a good solution, but something I read recently about design-time T4 templates led me to wonder if someone had created a T4 template that would transform LESS or SASS syntax into a nice clean CSS file. </p>
+<p>What did we do before search engines&#8230;</p>
+<h2>Implement T4CSS Template</h2>
+<p>Phil Haack (<a href="http://haacked.com/" title="Phil's blog">blog</a>|<a href="https://twitter.com/#!/haacked" title="@haacked on twitter">twitter</a>) posted a blog in 2009 on <a href="http://haacked.com/archive/2009/12/02/t4-template-for-less-css.aspx" title="T4CSS: A T4 Template for .Less CSS With Compression">exactly this topic</a>. He created a T4 template for Visual Studio 2008 that would use the dotless C# assembly to convert LESS files to static CSS files and provided to the <a href="http://www.dotlesscss.org/" title="Visit the .Less Site">.Less site</a>.</p>
+<p>Now we&#8217;re cooking.</p>
+<p>First we need to download the t4css package from github: https://github.com/dotless/dotless/downloads</p>
+<p>There are two files we are concerned with, the dotless.Core DLL and the T4CSS.tt template file. The template file is placed in our CSS folder in our site. </p>
+<div style="font-size: .9em; background-color: #eeeeee; padding: .5em;">
+<h3>Referencing the Assembly</h3>
+<p>Unfortunately Visual Studio 2010&#8217;s T4 implementation no longer accesses assemblies through the project references, but this still leaves us with <a href="http://weblogs.asp.net/lhunt/archive/2010/05/04/t4-template-error-assembly-directive-cannot-locate-referenced-assembly-in-visual-studio-2010-project.aspx" title="T4 Template error - Assembly Directive cannot locate referenced assembly in Visual Studio 2010 project">a few options</a>. Given that I want to share this among several projects, I put the dotless.Core DLL in a folder at my solution level and updated the path in the T4 template to use the solution path macro.
+</div>
+<p>Next I created a sample file to play with, which I called test.less.css (fancy, I know). I also modified the settings section of the T4CSS.tt file, setting _runOnBuild and _useCssExtension to &#8220;true&#8221;. This will cause the template to run on each build, as well as when I trigger it, and it will look for files ending in &#8220;.less.css&#8221; instead of just &#8220;.less&#8221;. This gives us some CSS intellisense with minimal hassle, though Mindscape&#8217;s Web Workbench apparently handles this out of the box and there is <a href="http://visualstudiogallery.msdn.microsoft.com/dd5635b0-3c70-484f-abcb-cbdcabaa9923" title="CSS Is Less">an extension</a> to make VS treat the less extension as a CSS format.</p>
+<div style="font-size: .9em; background-color: #eeeeee; padding: .5em;">
+There is also a <a href="http://visualstudiogallery.msdn.microsoft.com/e646c6ec-87a7-45ea-81e8-d655a3d3e73e?SRC=VSIDE" title="LessExtension">LessExtension</a> in the gallery that seems to offer some of the functionality I already have with the T4 template, but I didn&#8217;t have a chance to play with it.
+</div>
+<p>If we keep the T4CSS file open, it will mark itself as unsaved each time it runs, so using Ctrl+Shift+S will save it and regenerate the output CSS. At least that&#8217;s the theory. Unfortunately in my case, it seems that the template file was being saved prior to the css file, so I&#8217;ve taken to pressing Ctrl+S and then Ctrl+Shift+S after making a quick change in my CSS (which is still way better than a Rebuild All would be).</p>
+<p><i>Note: There is also  the &#8220;Transform All Templates&#8221; button on the top of the solution explorer if I don&#8217;t feel like double-saving. I could also add a shortcut in  the keyboard commands list (Tools -> Options -> Environment -> Keyboard) for &#8220;TextTransformation.TransformAllTemplates</i></p>
+<h2>Working Across Projects</h2>
+<p>This solution hasn&#8217;t quite given me the &#8220;save the file and refresh the page&#8221; ease of use of a static CSS file. This means if you are editing a less file that more than one template references, and you don&#8217;t have all the templates open, you could get out of sync. To help keep things clean in source control, this means you should run a complete build (to let all the transforms run) or use. </p>
+<p>To make this work for multiple projects we can add a folder at the solution level with our less files and use the @import statement to pull them in. Except now we can&#8217;t do the .less.css trick anymore because less doesn&#8217;t process @import&#8217;s ending in CSS, assuming they are intended to be regular css imports. At this point, it&#8217;s probably time to stop fighting it, apply the &#8220;Less is CSS&#8221; extension I mentioned above, and change back to using .less instead of .less.css. Fun times.</p>
+<p>So what we end up with is a folder structure that looks like:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">&nbsp; &nbsp; 
+/SolutionName/Common/dotless.Core.dll
+/SolutionName/Common/common.less
+/SolutionName/Project1/css/T4CSS.tt
+/SolutionName/Project1/css/stylesheet.less
+/SolutionName/Project2/css/T4CSS.tt
+/SolutionName/Project2/css/stylesheet.less</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">	
+/SolutionName/Common/dotless.Core.dll
+/SolutionName/Common/common.less
+/SolutionName/Project1/css/T4CSS.tt
+/SolutionName/Project1/css/stylesheet.less
+/SolutionName/Project2/css/T4CSS.tt
+/SolutionName/Project2/css/stylesheet.less</pre></div></div>
+
+<p>And inside the project-specific .less files we have an import at the top, like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="css"><thead><tr><td colspan="2"  class="head">CSS</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="co1">@import &quot;../../Common/common.less&quot;;</span>
+&nbsp;
+<span class="coMULTI">/* plus some project specific-stuff */</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">@import "../../Common/common.less";
+
+/* plus some project specific-stuff */</pre></div></div>
+
+<p>And there we have it, shared CSS. I posted a <a href="https://bitbucket.org/tarwn/aspnet_sharedresourceswitht4/overview" title="See project on BitBucket">working sample project on BitBucket</a> if you want to browse it in detail.</p>
+<h2>I Specifically Heard You Say JavaScript</h2>
+<p>I intend to solve the common javascript issue the same way, except in this case I will write my own T4 templates to directly copy the files from the common area that are needed in each project. This will provide me with an easy way to manage common scripts in a central location, the ability to edit and refresh my page to test changes without rebuilds, and can easily be extended to include minified versions of the files.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/serverprogramming/aspnet/css-javascript-t4-templates-and-less/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>What Does a Web Developer Need To Know</title>
+		<link>/index.php/webdev/uidevelopment/what-does-a-web-developer/</link>
+		<comments>/index.php/webdev/uidevelopment/what-does-a-web-developer/#comments</comments>
+		<pubDate>Tue, 28 Jun 2011 09:54:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[AJAX]]></category>
+		<category><![CDATA[Javascript]]></category>
+		<category><![CDATA[Server Programming]]></category>
+		<category><![CDATA[UI Development]]></category>
+		<category><![CDATA[XHTML and CSS]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[competency]]></category>
+		<category><![CDATA[css]]></category>
+		<category><![CDATA[design]]></category>
+		<category><![CDATA[html]]></category>
+		<category><![CDATA[javascript]]></category>
+		<category><![CDATA[jsp]]></category>
+		<category><![CDATA[php]]></category>
+		<category><![CDATA[seo]]></category>
+		<category><![CDATA[table layout]]></category>
+		<category><![CDATA[w3c]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/06/what-does-a-web-developer/</guid>
+		<description><![CDATA[What is a web developer? Recently I was involved in a discussion about the skills a web developer is expected to have and how interesting it has been to watch common bad practices (like table layout and SQL injection) continue to spread. So in the nature of Denis's What does a SQL Server developer need to know? post, I present the web developer breakdown.]]></description>
+				<content:encoded><![CDATA[<p>What is a web developer? Recently I was involved in a discussion about the skills a web developer is expected to have and how interesting it has been to watch common bad practices (like table layout and SQL injection) continue to spread. So in the nature of Denis&#8217;s <a href="/index.php/DataMgmt/DBProgramming/MSSQLServer/what-does-a-sql-server" title="Read Denis's post">What does a SQL Server developer need to know?</a> post, I present the web developer breakdown.</p>
+<h2>What Level Am I?</h2>
+<p>Rather than try and attach years of experience to this scale, I&#8217;m going to present a list of major areas and skills, questions, or topics in each area. I&#8217;ve tried to capture whether I feel a skill is required to be an Intermediate or Advanced web developer. </p>
+<p>I put this list together based on my own experience, 20-30 web developer interview lists, and some feedback from others.</p>
+<p>Beginner: Knows some of the items on the list<br />
+Intermediate: Knows most intermediate items and some advanced<br />
+Advanced: Knows almost everything on the list</p>
+<style>
+.oneshottable { border: 1px solid #444444; border-collapse: collapse; width: 100%; margin-bottom: 12px; }
+.oneshottable th { background-color: #444444; color: white; text-transform: uppercase; font-weight: bold; padding: 4px;font-size: 90%; }
+.oneshottable td{ padding: 1px 2px; min-width: 20px; border-bottom: 1px solid #999999; font-size: 80%;}
+.oneshottable td.summary:first-child{ text-align: left; font-weight: normal; padding: 3px;}
+.oneshottable td:first-child{ text-align: center; font-weight: bold }
+</style>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">HTML</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">The ability to produce clean, valid, maintainable HTML is critical for a web developer. Current standards include HTML 4.01 (1999), XHTML 1 (2000), and the beginning of HTML 5 (2011)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>The effect of doctypes, can code a mostly valid site without looking up the rules</td>
+</tr>
+<tr>
+<td>A</td>
+<td>The effect of content-types and how to set or debug them</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows (and use) all of these without looking them up:  html, head, title, meta, script, style, link, body, a, strong, em, ul, ol, li, table, tr, th, td, h1-5, input, select, option, img, p, span, div, pre, textarea</td>
+</tr>
+<tr>
+<td>A</td>
+<td>And most of these: dl/dt/dd, thead, tbody, tfoot, abbr, acronym, applet, object, blockquote, iframe, label, map, optgroup, sup, sub, base, fieldset</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name/explain at least 15 of the new HTML5 tags</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows the escapes for &amp;, &lt;, &gt;, &copy;, ASCII characters (though you may have to look up the character code)</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can explain how HTTP works (headers, redirects, header requests, clientside caching)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows how to link to a position in a page</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">CSS</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Cascading Style Sheets are used to describe the way an HTML documented should be presented. CSS 1 was released in 1996 and the latest published recommendation is CSS 3. </td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between display inline, block, and inline-block and what the default value is for div, span, a, b</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between position static, relative, fixed, absolute</td>
+</tr>
+<tr>
+<td>I</td>
+<td>What z-index is and how to use it</td>
+</tr>
+<tr>
+<td>A</td>
+<td>How z-index is calculated by individual browsers</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between padding and margin</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between display: none and visibility: hidden</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Purpose and use of &#8220;media&#8221;</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Able to describe and calculate specificity</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows at least a few attribute selectors</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can describe pseudo-classes and know many without looking them up</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Javascript</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Javascript has become the defacto scripting language for web browsers, one of only a few ways to create client-side interactions consistently across available browsers. JavaScript was first shipped in 1995 as part of the Netscape browser.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>How to write a basic function, inline event handler, and a non-inline event handler (raw or w/ a package)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can write one or or more methods to make an AJAX call with reference material</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can write one or or more methods to make an AJAX call without reference material</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows at least one framework (jQuery, Prototype, YUI, Dojo, MooTools, …)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can create classes (function or literal)</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Knows and can use prototype (little &#8216;p&#8217;, not the framework)</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can dynamically find and add elements to the page using DOM or a framework (without looking it up)</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Tools</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Along with standard languages, there are numerous tools available to help validate, evaluate, and improve existing websites. Similar to a spell-checking tool in a word processing application, these tools can help us catch errors and oversights in our websites.</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name at least one site, application, or organization that has an HTML validation tool</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name at least one site, application, or organization that has an CSS validation tool</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name at least one site, application, or organization that has an SEO scoring tool</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can name at least one site, application, or organization that has an Accessibility evaluation tool</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Server-Side Programming</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">The shift to dynamic, server-generated websites in the mid-to-late 90&#8217;s was responsible for shifting the focus of the web from document retrieval to interactivity, commerce, and services.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows at least 2 server-side technologies &#8211; Perl, PHP, ASP 3, JSP, Java Servlets, CFM, ASP.Net (WebPages, Web Forms, MVC), Ruby on Rails, Python (WSGI, CGI, mod_python), etc</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Knows more than 4 of the above list</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can explain difference between stateful and stateless development</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can explain how sessions work</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can explain how cookies work</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Difference between GET and POST and how known languages present this information</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Pros and cons of client-side vs server-side validation</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Understands the basics of (SOAP) web services, how to implement them, and how they work</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Data</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Most web applications have some form of data store behind them. Several forms of storage and caching mechanisms exist and being able to build a basic system often requires at least a basic level of knowledge in these areas.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can build databases, define queries, and debug on at least one major RDBMS</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Knows basics for normalization and can create a basic data model to describe their database</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can work with at least one NoSQL database or data cache</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Can write match and search regular expressions</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can write match and search regular expressions without a reference in more than one language</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Web Server</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Using a server-side technology to generate HTML generally requires a web server. The two largest install bases are Microsoft IIS 7.5 and Apache 2.2.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Understands the basics of how the web server (Apache or IIS) works and can create a new site</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can explain URL rewriting and implement on at least one system</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Performance</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Tuning a website to run in an optimal fashion can sometimes be the difference between paying for a single server or multiple servers, between a responsive site and one that fails under load. </td>
+</tr>
+<tr>
+<td>A</td>
+<td>Understands and can implement data caching</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Understands and can implement page caching</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can use one or more page performance or load testing tools</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Tools/methods and purpose of minification of JS and CSS</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Understands and uses CDNs when possible</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Testing</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">As the technology behind the web has developed, tools to help automate some of the repetition involved in testing websites has likewise evolved.</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can use one or more automated tools for interface testing</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Security</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">As recent news stories have reminded us, security is an ongoing requirement for websites. Understanding the basics of security can help us build security in from day one rather than trying to squeeze it in at the end.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>SQL Injection &#8211; what it is, how to prevent it</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Cross site scripting &#8211; what it is, how to prevent it</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Cross Site Request Forgery &#8211; what it is, how to prevent it</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Understand hashing, salting, and importance of storing critical information in hashed or encrypted formats</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Cookies &#8211; Understand session hijacking and dangers of storing user information or identification</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Design Principles</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Being able to implement common design patterns without restoring to hacks is an important part of being a web developer (as opposed to a hobbiest). While it may prove impossible to build a site without some form of hack, hacks should not be the only tool in the toolbox.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Table Layout &#8211; what it is, why it&#8217;s bad (at least three reasons)</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can implement multi-column fixed, fluid, and elastic layouts without reference material</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Table Layout &#8211; and why using CSS for table layout (display: table, table-cell, etc) is not bad</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can explain and implement fixed, fluid (liquid), and elastic layouts</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Can implement multi-column fixed, fluid, and elastic layouts without reference material</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Meta</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">Metadata (data about data) is critical to helping people and search engines find resources in our sites and applications.</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows purpose of description, keyword tags</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Knows purpose of robots.txt file</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Knows purpose and can implement sitemap.xml file</td>
+</tr>
+<tr>
+<td>A</td>
+<td>You know the basics for SEO</td>
+</tr>
+<tr>
+<td>A</td>
+<td>You&#8217;ve implemented some form of browser analytics</td>
+</tr>
+<tr>
+<td>A</td>
+<td>Microformats </td>
+</tr>
+<tr>
+<td>A</td>
+<td>You know what WCAG is and how to test conformance</td>
+</tr>
+<tr>
+<td>A</td>
+<td>You know what semantic markup is</td>
+</tr>
+</tbody>
+</table>
+<table class="oneshottable">
+<tbody>
+<tr>
+<th colspan="2">Disqualifiers/Limiters</th>
+</tr>
+<tr>
+<td colspan="2" class="summary">These are topics I consider to be critical to advancement. They reflect common misunderstandings or bad practices that an experienced web developer has to grow past in order to advance their skillset.</td>
+</tr>
+<tr>
+<td>B</td>
+<td>Backbutton doesn&#8217;t work w/ your sites, would prefer to disable it altogether</td>
+</tr>
+<tr>
+<td>B</td>
+<td>You protect images from download by implementing right click intercepts, layering transparent images in top, etc</td>
+</tr>
+<tr>
+<td>I</td>
+<td>Implement performance tuning without before/after measurements</td>
+</tr>
+<tr>
+<td>B</td>
+<td>Table layout</td>
+</tr>
+</tbody>
+</table>
+<p><em>Note: Disqualifiers indicate that you won&#8217;t progress past [B]eginner or [I]ntermediate levels until you stop doing them and understand why doing them was a bad idea</em></p>
+<h2>What&#8217;s Missing</h2>
+<p>There are several things that were intentionally left out of this list. Some were hard to quantity in a general manner, others I was unsure how relevant they were. And I&#8217;m sure people will be kind enough to add additional oversights and revisions below.</p>
+<p>Missing Categories:</p>
+<ul>
+<li>Level of knowledge with server-side languages</li>
+<li>Project management skills</li>
+<li>Documentation and Modeling skills</li>
+<li>Design and Graphics skills</li>
+<li>Application Lifecycle Management &#8211; Source Control, Deployment, etc</li>
+</ul>
+<p>Extra items that didn&#8217;t make it in:</p>
+<ul>
+<li>Can implement RSS and ATOM feeds</li>
+<li>Can implement a web farm</li>
+<li>Implemented single-signon (openID, SAML, etc)</li>
+<li>Knows how to implement XML data islands (still relevant?)</li>
+<li>Knows how to create DTDs and/or XSDs</li>
+<li>Can write regular expressions without a reference</li>
+<li>Knows relevant tools for Yahoo (SiteExplorer), Google, Bing for managing site information</li>
+<li>Schema.org &#8211; it belongs in the Meta category but I didn&#8217;t know what level of skill, knowledge, or adoption I should include considering it&#8217;s newness and several other factors</li>
+</ul>
+<p>There is also the fact that we often get caught up maintaining or even adding on to a site that violates many of the skills and standards you see in this list. This doesn&#8217;t prevent us from writing good, clean, semantic sites the rest of the time and being forced to write poor code does not make on inherently less skilled.</p>
+<h2>A Brief Digression, or Why an App Dev is Not a Web Dev</h2>
+<p>At one point web development was seen as less exciting and far less complex than application development. It is still seen as extremely similar to application development, so much so that it is quite normal to hire a good or great application developer and expect them to be a good or great web developer. </p>
+<p>Unfortunately it doesn&#8217;t quite work that way, as web development has grown extremely complex since the first dynamic sites started showing up in the late 90&#8217;s. Doubly unfortunately, web development is based on a stateless model instead of the stateful one most application developers are used to, uses a fluid layout instead of the grid layout, and sneaks a lot of extra communications and caching into the mix. This is a series of paradigm shifts not unlike the one between procedural, object oriented, and functional programming.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/uidevelopment/what-does-a-web-developer/feed/</wfw:commentRss>
+		<slash:comments>9</slash:comments>
+		</item>
+	</channel>
+</rss>

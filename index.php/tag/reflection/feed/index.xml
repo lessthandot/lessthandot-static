@@ -1,0 +1,1159 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>reflection &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/reflection/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>ASP.Net &#8211; Ensure your Actions aren&#8217;t missing Authorization with Unit Tests</title>
+		<link>/index.php/webdev/asp-net-ensure-your-actions-arent-missing-authorization-with-unit-tests/</link>
+		<comments>/index.php/webdev/asp-net-ensure-your-actions-arent-missing-authorization-with-unit-tests/#comments</comments>
+		<pubDate>Fri, 08 Apr 2016 13:44:47 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[ASP.NET]]></category>
+		<category><![CDATA[Web Developer]]></category>
+		<category><![CDATA[asp.net]]></category>
+		<category><![CDATA[reflection]]></category>
+
+		<guid isPermaLink="false">/?p=4470</guid>
+		<description><![CDATA[Have you ever found yourself working on an ASP.net Action and noticed there isn&#8217;t a single Authorization attribute in sight? Or gone to edit an endpoint in WebAPI, only to realize you took a coffee break at exactly the wrong time and forgot to come back and add the authorization attribute&#8230;a month ago? Or the [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Have you ever found yourself working on an ASP.net Action and noticed there isn&#8217;t a single Authorization attribute in sight? Or gone to edit an endpoint in WebAPI, only to realize you took a coffee break at exactly the wrong time and forgot to come back and add the authorization attribute&#8230;a month ago? Or the time you found an MVC endpoint with WebAPI Authorization attributes on it? </p>
+<p>While relying on code reviews and regular reminders to the team can reduce occurrences of this, we&#8217;re human and can only catch so much. Instead, it would be nice if a warning popped up before we ever pushed the code out: &#8220;You haven&#8217;t defined authentication for the XYZ endpoint yet!&#8221;. Luckily we have a CI environment (right???), so we can use Unit Tests to provide that warning and serve as a safety net to make sure we can&#8217;t push unprotected endpoints out to production.</p>
+<p>Code for this post: <a href="https://github.com/tarwn/Blog_KnockoutMVVMPatterns/blob/master/CrossPlatformApp/CrossPlatformAppTests/AuthorizationSafetyNetTests.cs" title="Github: tarwn/Blog_KnockoutMVVMPatterns/.../AuthorizationSafetyNetTests.cs on github">Github: tarwn/Blog_KnockoutMVVMPatterns/&#8230;/AuthorizationSafetyNetTests.cs</a></p>
+<h2>Detecting Authentication Holes for ASP.Net MVC</h2>
+<p>The key ingredients of the test are going to be searching all of the Actions in Controllers and identifying whether they have a specific type of attribute at the Action, Controller, or Global level. A quick search could end you up on a StackOverflow post like these:</p>
+<ul>
+<li><a href="http://stackoverflow.com/questions/5796909/is-there-a-way-to-iterate-all-controllers-actions-in-an-asp-net-mvc3-site" title="StackOverflow: Is there a way to Iterate all Controllers/Actions in an ASP.NET MVC3 Site?">Is there a way to Iterate all Controllers/Actions in an ASP.NET MVC3 Site?</a></li>
+<li><a href="http://stackoverflow.com/questions/21583278/getting-all-controllers-and-actions-names-in-c-sharp" title="StackOverflow: Getting All Controllers and Actions names in C#">Getting All Controllers and Actions names in C#</a></li>
+</ul>
+<p>The second actually has better examples which we can repurpose into a unit test:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">Assembly asm <span class="sy0">=</span> Assembly<span class="sy0">.</span><span class="me1">GetExecutingAssembly</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+asm<span class="sy0">.</span><span class="me1">GetTypes</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>type<span class="sy0">=&gt;</span> <span class="kw3">typeof</span><span class="br0">&#40;</span>Controller<span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">IsAssignableFrom</span><span class="br0">&#40;</span>type<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="co1">//filter controllers</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="me1">SelectMany</span><span class="br0">&#40;</span>type <span class="sy0">=&gt;</span> type<span class="sy0">.</span><span class="me1">GetMethods</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>method <span class="sy0">=&gt;</span> method<span class="sy0">.</span><span class="me1">IsPublic</span> <span class="sy0">&amp;&amp;</span> <span class="sy0">!</span> method<span class="sy0">.</span><span class="me1">IsDefined</span><span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>NonActionAttribute<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Assembly asm = Assembly.GetExecutingAssembly();
+
+asm.GetTypes()
+    .Where(type=&gt; typeof(Controller).IsAssignableFrom(type)) //filter controllers
+    .SelectMany(type =&gt; type.GetMethods())
+    .Where(method =&gt; method.IsPublic &amp;&amp; ! method.IsDefined(typeof(NonActionAttribute)));</pre></div></div>
+
+<p>For the purposes of this example, I know all of my MVC actions will have either an Authorization attribute implementing IAuthorizationFilter or the AllowAnonymous Attribute, so I can write a test that loops through each controller and then each action capturing a list of Actions that do not have one of these:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+</pre></td><td class="de1"><pre class="de1"><span class="co1">// 0</span>
+Func<span class="sy0">&lt;</span><span class="kw4">object</span>, <span class="kw4">bool</span><span class="sy0">&gt;</span> IsMVCAttributeAuth <span class="sy0">=</span> <span class="br0">&#40;</span>o<span class="br0">&#41;</span> <span class="sy0">=&gt;</span> <span class="br0">&#40;</span>o <span class="kw3">is</span> <span class="kw5">System.<span class="me1">Web</span></span><span class="sy0">.</span><span class="me1">Mvc</span><span class="sy0">.</span><span class="me1">IAuthorizationFilter</span> <span class="sy0">||</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; o <span class="kw3">is</span> <span class="kw5">System.<span class="me1">Web</span></span><span class="sy0">.</span><span class="me1">Mvc</span><span class="sy0">.</span><span class="me1">AllowAnonymousAttribute</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> AllMvcActionsHaveExplicitAuthorizationDefined_UsingStandardReflection<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> actionsMissingAuth <span class="sy0">=</span> <span class="kw3">new</span> List<span class="sy0">&lt;</span><span class="kw4">string</span><span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// 1</span>
+&nbsp; &nbsp; <span class="kw1">var</span> controllers <span class="sy0">=</span> Assembly<span class="sy0">.</span><span class="me1">GetAssembly</span><span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>HomeController<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">GetTypes</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>t <span class="sy0">=&gt;</span> <span class="kw3">typeof</span><span class="br0">&#40;</span>IController<span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">IsAssignableFrom</span><span class="br0">&#40;</span>t<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> controller <span class="kw1">in</span> controllers<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// 2</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// if the controller has it, all it's actions are covered also</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>controller<span class="sy0">.</span><span class="me1">GetCustomAttributes</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span>a <span class="sy0">=&gt;</span> IsMVCAttributeAuth<span class="br0">&#40;</span>a<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">continue</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> actions <span class="sy0">=</span> controller<span class="sy0">.</span><span class="me1">GetMethods</span><span class="br0">&#40;</span>BindingFlags<span class="sy0">.</span><span class="me1">Instance</span> <span class="sy0">|</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; BindingFlags<span class="sy0">.</span><span class="me1">DeclaredOnly</span> <span class="sy0">|</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; BindingFlags<span class="sy0">.</span><span class="kw1">Public</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> action <span class="kw1">in</span> actions<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// 3</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// if the action has a defined authorization filter, it's covered</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>action<span class="sy0">.</span><span class="me1">GetCustomAttributes</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span>a <span class="sy0">=&gt;</span> IsMVCAttributeAuth<span class="br0">&#40;</span>a<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">continue</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// no controller or action defined, add it to the list</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; actionsMissingAuth<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0}.{1}&quot;</span>, controller<span class="sy0">.</span><span class="me1">Name</span>, action<span class="sy0">.</span><span class="me1">Name</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// 4</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>actionsMissingAuth<span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">Fail</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0} action(s) do not have explicit authorization: {1}&quot;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; actionsMissingAuth<span class="sy0">.</span><span class="me1">Count</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">String</span><span class="sy0">.</span><span class="kw1">Join</span><span class="br0">&#40;</span><span class="st0">&quot;,&quot;</span>, actionsMissingAuth<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">// 0
+Func&lt;object, bool&gt; IsMVCAttributeAuth = (o) =&gt; (o is System.Web.Mvc.IAuthorizationFilter || 
+                                                o is System.Web.Mvc.AllowAnonymousAttribute);
+
+[Test]
+public void AllMvcActionsHaveExplicitAuthorizationDefined_UsingStandardReflection()
+{
+    var actionsMissingAuth = new List&lt;string&gt;();
+
+    // 1
+    var controllers = Assembly.GetAssembly(typeof(HomeController)).GetTypes()
+			      .Where(t =&gt; typeof(IController).IsAssignableFrom(t));
+
+    foreach (var controller in controllers)
+    {
+        // 2
+        // if the controller has it, all it's actions are covered also
+        if (controller.GetCustomAttributes().Any(a =&gt; IsMVCAttributeAuth(a)))
+            continue;
+
+        var actions = controller.GetMethods(BindingFlags.Instance | 
+                                            BindingFlags.DeclaredOnly | 
+                                            BindingFlags.Public);
+        foreach (var action in actions)
+        {
+            // 3
+            // if the action has a defined authorization filter, it's covered
+            if (action.GetCustomAttributes().Any(a =&gt; IsMVCAttributeAuth(a)))
+                continue;
+
+            // no controller or action defined, add it to the list
+            actionsMissingAuth.Add(String.Format("{0}.{1}", controller.Name, action.Name));
+        }
+    }
+
+    // 4
+    if (actionsMissingAuth.Any())
+    {
+        Assert.Fail(String.Format("{0} action(s) do not have explicit authorization: {1}",
+        			  actionsMissingAuth.Count,
+        			  String.Join(",", actionsMissingAuth)));
+    }
+}</pre></div></div>
+
+<ul>
+<li>0: For readability in the tests, I moved the attribute check to an external variable</li>
+<li>1: We&#8217;re in a separate test assembly, so get the assembly for the HomeController and get all types that implement IController</li>
+<li>2: If any attributes on the controller match the attribute test, continue to the next controller (all of the actions are covered)</li>
+<li>3: If any attributes on each action match the test, skip to the next attribute</li>
+<li>4: After collecting a list of actions that are missing auth, we can now product a test failure message with the relevant information</li>
+</ul>
+<p>In my sample code I have an Action called &#8220;AccidentalOpenEndpoint&#8221; in my HomeController to show the test in action:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1">1 action(s) do not have explicit authorization: HomeController.AccidentalOpenEndpoint
+&nbsp; &nbsp;at NUnit.Framework.Assert.Fail(String message, Object[] args)
+&nbsp; &nbsp;at NUnit.Framework.Assert.Fail(String message)
+&nbsp; &nbsp;at CrossPlatformAppTests.AuthorizationSafetyNetTests.AllMvcActionsHaveExplicitAuthorizationDefined_UsingStandardReflection() in E:\programming\KnockoutPostBigApp\CrossPlatformApp\CrossPlatformAppTests\AuthorizationSafetyNetTests.cs:line 68</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">1 action(s) do not have explicit authorization: HomeController.AccidentalOpenEndpoint
+   at NUnit.Framework.Assert.Fail(String message, Object[] args)
+   at NUnit.Framework.Assert.Fail(String message)
+   at CrossPlatformAppTests.AuthorizationSafetyNetTests.AllMvcActionsHaveExplicitAuthorizationDefined_UsingStandardReflection() in E:\programming\KnockoutPostBigApp\CrossPlatformApp\CrossPlatformAppTests\AuthorizationSafetyNetTests.cs:line 68</pre></div></div>
+
+<p>This is good, but we can do better by taking advantage of the built in <a href="https://msdn.microsoft.com/en-us/library/system.web.mvc.reflectedcontrollerdescriptor%28v=vs.118%29.aspx" title="MSDN: ReflectedControllerDescriptor">ReflectedControllerDescriptor</a> class.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> AllMvcActionsHaveExplicitAuthorizationDefined<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// 1</span>
+&nbsp; &nbsp; <span class="kw1">var</span> controllers <span class="sy0">=</span> Assembly<span class="sy0">.</span><span class="me1">GetAssembly</span><span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>HomeController<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">GetTypes</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>t <span class="sy0">=&gt;</span> <span class="kw3">typeof</span><span class="br0">&#40;</span>IController<span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">IsAssignableFrom</span><span class="br0">&#40;</span>t<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Select</span><span class="br0">&#40;</span>c <span class="sy0">=&gt;</span> <span class="kw3">new</span> ReflectedControllerDescriptor<span class="br0">&#40;</span>c<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// 2</span>
+&nbsp; &nbsp; <span class="kw1">var</span> actionsMissingAuth <span class="sy0">=</span> controllers<span class="sy0">.</span><span class="me1">SelectMany</span><span class="br0">&#40;</span>c <span class="sy0">=&gt;</span> c<span class="sy0">.</span><span class="me1">GetCanonicalActions</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="co1">// 3</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>a <span class="sy0">=&gt;</span> <span class="sy0">!</span>a<span class="sy0">.</span><span class="me1">GetCustomAttributes</span><span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span>ca <span class="sy0">=&gt;</span> IsMVCAttributeAuth<span class="br0">&#40;</span>ca<span class="br0">&#41;</span><span class="br0">&#41;</span> <span class="sy0">&amp;&amp;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">!</span>a<span class="sy0">.</span><span class="me1">ControllerDescriptor</span><span class="sy0">.</span><span class="me1">ControllerType</span><span class="sy0">.</span><span class="me1">GetCustomAttributes</span><span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span>c <span class="sy0">=&gt;</span> IsMVCAttributeAuth<span class="br0">&#40;</span>c<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="co1">// 4</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>actionsMissingAuth<span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> errorStrings <span class="sy0">=</span> actionsMissingAuth<span class="sy0">.</span><span class="kw1">Select</span><span class="br0">&#40;</span>a <span class="sy0">=&gt;</span> <span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0}.{1}&quot;</span>, a<span class="sy0">.</span><span class="me1">ControllerDescriptor</span><span class="sy0">.</span><span class="me1">ControllerType</span><span class="sy0">.</span><span class="me1">Name</span>, a<span class="sy0">.</span><span class="me1">ActionName</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">Fail</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0} action(s) do not have explicit authorization: {1}&quot;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; errorStrings<span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">String</span><span class="sy0">.</span><span class="kw1">Join</span><span class="br0">&#40;</span><span class="st0">&quot;,&quot;</span>, errorStrings<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void AllMvcActionsHaveExplicitAuthorizationDefined()
+{
+    // 1
+    var controllers = Assembly.GetAssembly(typeof(HomeController)).GetTypes()
+                              .Where(t =&gt; typeof(IController).IsAssignableFrom(t))
+                              .Select(c =&gt; new ReflectedControllerDescriptor(c));
+
+    // 2
+    var actionsMissingAuth = controllers.SelectMany(c =&gt; c.GetCanonicalActions())
+    // 3
+                                        .Where(a =&gt; !a.GetCustomAttributes(true).Any(ca =&gt; IsMVCAttributeAuth(ca)) &amp;&amp;
+                                                    !a.ControllerDescriptor.ControllerType.GetCustomAttributes(true)
+                                                                                .Any(c =&gt; IsMVCAttributeAuth(c)));
+    // 4
+    if (actionsMissingAuth.Any())
+    {
+        var errorStrings = actionsMissingAuth.Select(a =&gt; String.Format("{0}.{1}", a.ControllerDescriptor.ControllerType.Name, a.ActionName));
+        Assert.Fail(String.Format("{0} action(s) do not have explicit authorization: {1}",
+                                  errorStrings.Count(),
+                                  String.Join(",", errorStrings)));
+    }
+}</pre></div></div>
+
+<ul>
+<li>1: Once again get all of the IController implementations in the assembly for HomeController, but this time wrap them in ReflectedControllerDescriptor&#8217;s</li>
+<li>2: Use the ReflectedController&#8217;s built in &#8220;GetCanonicalActions&#8221; method to get a collection of ActionDescriptors</li>
+<li>3: Get the attributes from the Action and it&#8217;s Controller and run them through the IsMVCAttributeAuth test</li>
+<li>4: Once again, output a test failure message for Actions that didn&#8217;t pass the test</li>
+</ul>
+<p>This version is a lot more concise and has the additional advantage that it is using the same black magic internally to find Actions that MVC is, as opposed to use putting together a Flag enum for the fetMethods reflection call.</p>
+<p>The output is the same:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1">1 action(s) do not have explicit authorization: HomeController.AccidentalOpenEndpoint
+&nbsp; &nbsp;at NUnit.Framework.Assert.Fail(String message, Object[] args)
+&nbsp; &nbsp;at NUnit.Framework.Assert.Fail(String message)
+&nbsp; &nbsp;at CrossPlatformAppTests.AuthorizationSafetyNetTests.AllMvcActionsHaveExplicitAuthorizationDefined() in E:\programming\KnockoutPostBigApp\CrossPlatformApp\CrossPlatformAppTests\AuthorizationSafetyNetTests.cs:line 34</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">1 action(s) do not have explicit authorization: HomeController.AccidentalOpenEndpoint
+   at NUnit.Framework.Assert.Fail(String message, Object[] args)
+   at NUnit.Framework.Assert.Fail(String message)
+   at CrossPlatformAppTests.AuthorizationSafetyNetTests.AllMvcActionsHaveExplicitAuthorizationDefined() in E:\programming\KnockoutPostBigApp\CrossPlatformApp\CrossPlatformAppTests\AuthorizationSafetyNetTests.cs:line 34</pre></div></div>
+
+<h2>Detecting Authentication Holes for WebAPI 2</h2>
+<p>While we could use a reflection method for WebAPI also, there is actually a much better option available. WebAPI includes an <a href="https://blogs.msdn.microsoft.com/yaohuang1/2012/05/13/asp-net-web-api-introducing-iapiexplorerapiexplorer/" title="MSDN Blogs: ASP.NET Web API: Introducing IApiExplorer/ApiExplorer">APIExplorer</a> object that provides programmatic access to your WebAPI actions. It was built with documentation in mind, but also gives us exactly what we need to build an authentication verification test.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+</pre></td><td class="de1"><pre class="de1"><span class="co1">// 0</span>
+Func<span class="sy0">&lt;</span><span class="kw4">object</span>, <span class="kw4">bool</span><span class="sy0">&gt;</span> IsAPIAttributeAuth <span class="sy0">=</span> <span class="br0">&#40;</span>o<span class="br0">&#41;</span> <span class="sy0">=&gt;</span> <span class="br0">&#40;</span>o <span class="kw3">is</span> <span class="kw5">System.<span class="me1">Web</span></span><span class="sy0">.</span><span class="me1">Http</span><span class="sy0">.</span><span class="me1">Filters</span><span class="sy0">.</span><span class="me1">IAuthorizationFilter</span> <span class="sy0">||</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; o <span class="kw3">is</span> <span class="kw5">System.<span class="me1">Web</span></span><span class="sy0">.</span><span class="me1">Http</span><span class="sy0">.</span><span class="me1">AllowAnonymousAttribute</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> AllApiActionsHaveExplicitAuthorizationDefined<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// 1</span>
+&nbsp; &nbsp; <span class="kw1">var</span> httpConfiguration <span class="sy0">=</span> <span class="kw3">new</span> HttpConfiguration<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; WebApiConfig<span class="sy0">.</span><span class="me1">Register</span><span class="br0">&#40;</span>httpConfiguration<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; httpConfiguration<span class="sy0">.</span><span class="me1">EnsureInitialized</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> explorer <span class="sy0">=</span> httpConfiguration<span class="sy0">.</span><span class="me1">Services</span><span class="sy0">.</span><span class="me1">GetApiExplorer</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// 2</span>
+&nbsp; &nbsp; <span class="kw1">var</span> actionsMissingAuth <span class="sy0">=</span> explorer<span class="sy0">.</span><span class="me1">ApiDescriptions</span><span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>a <span class="sy0">=&gt;</span> <span class="sy0">!</span>a<span class="sy0">.</span><span class="me1">ActionDescriptor</span><span class="sy0">.</span><span class="me1">GetCustomAttributes</span><span class="sy0">&lt;</span><span class="kw4">object</span><span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span>o <span class="sy0">=&gt;</span> IsAPIAttributeAuth<span class="br0">&#40;</span>o<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">&amp;&amp;</span> <span class="sy0">!</span>a<span class="sy0">.</span><span class="me1">ActionDescriptor</span><span class="sy0">.</span><span class="me1">ControllerDescriptor</span><span class="sy0">.</span><span class="me1">ControllerType</span><span class="sy0">.</span><span class="me1">GetCustomAttributes</span><span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span>o <span class="sy0">=&gt;</span> IsAPIAttributeAuth<span class="br0">&#40;</span>o<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// 3</span>
+&nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>actionsMissingAuth<span class="sy0">.</span><span class="me1">Any</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> errorStrings <span class="sy0">=</span> actionsMissingAuth<span class="sy0">.</span><span class="kw1">Select</span><span class="br0">&#40;</span>a <span class="sy0">=&gt;</span> <span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0}.{1}&quot;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; a<span class="sy0">.</span><span class="me1">ActionDescriptor</span><span class="sy0">.</span><span class="me1">ControllerDescriptor</span><span class="sy0">.</span><span class="me1">ControllerType</span><span class="sy0">.</span><span class="me1">Name</span>, &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; a<span class="sy0">.</span><span class="me1">ActionDescriptor</span><span class="sy0">.</span><span class="me1">ActionName</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">Fail</span><span class="br0">&#40;</span><span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0} action(s) do not have explicit authorization: {1}&quot;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; errorStrings<span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw4">String</span><span class="sy0">.</span><span class="kw1">Join</span><span class="br0">&#40;</span><span class="st0">&quot;,&quot;</span>, errorStrings<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">// 0
+Func&lt;object, bool&gt; IsAPIAttributeAuth = (o) =&gt; (o is System.Web.Http.Filters.IAuthorizationFilter || 
+                                                o is System.Web.Http.AllowAnonymousAttribute);
+
+[Test]
+public void AllApiActionsHaveExplicitAuthorizationDefined()
+{
+    // 1
+    var httpConfiguration = new HttpConfiguration();
+    WebApiConfig.Register(httpConfiguration);
+    httpConfiguration.EnsureInitialized();
+    var explorer = httpConfiguration.Services.GetApiExplorer();
+
+    // 2
+    var actionsMissingAuth = explorer.ApiDescriptions.Where(a =&gt; !a.ActionDescriptor.GetCustomAttributes&lt;object&gt;(true)
+                                                                                    .Any(o =&gt; IsAPIAttributeAuth(o))
+                                                              &amp;&amp; !a.ActionDescriptor.ControllerDescriptor.ControllerType.GetCustomAttributes(true)
+                                                                                     .Any(o =&gt; IsAPIAttributeAuth(o)));
+
+    // 3
+    if (actionsMissingAuth.Any())
+    {
+        var errorStrings = actionsMissingAuth.Select(a =&gt; String.Format("{0}.{1}",
+                                                                        a.ActionDescriptor.ControllerDescriptor.ControllerType.Name,                                                                                 
+                                                                        a.ActionDescriptor.ActionName));
+        Assert.Fail(String.Format("{0} action(s) do not have explicit authorization: {1}",
+                                  errorStrings.Count(),
+                                  String.Join(",", errorStrings)));
+    }
+}</pre></div></div>
+
+<p>Similar to the MVC test, we are looking for any actions that don&#8217;t have an attribute implementing IAuthorizationFilter or AllowAnonymous attribute.</p>
+<ul>
+<li>0: Once again, I extracted the attribute test out for readability</li>
+<li>1: Set up an HttpConfiguration object using the the same WebApiConfig we call during the global.asax and get an ApiExplorer instance</li>
+<li>2: Get all of the custom attributes for each action + action&#8217;s controller and find the ones that don&#8217;t have a match for the attribute test</li>
+<li>3: produce a test failure error mssage if any actions are uncovered</li>
+</ul>
+<p>If, like me, you use NCrunch locally, then you get this nice Red warning without any extra effort:</p>
+<a href="/wp-content/uploads/2016/03/ASPNetAuthTests.png"><img src="/wp-content/uploads/2016/03/ASPNetAuthTests.png" alt="NCrunch Test Output" class="size-full wp-image-4472" srcset="/wp-content/uploads/2016/03/ASPNetAuthTests.png 1014w, /wp-content/uploads/2016/03/ASPNetAuthTests-300x85.png 300w" sizes="(max-width: 1014px) 100vw, 1014px" /></a>
+<p>And there we go, a safety net against accidentally pushing an open endpoint that is built in to every single unit test run. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/asp-net-ensure-your-actions-arent-missing-authorization-with-unit-tests/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Using CodeDOM to Automate Technical Screening Evaluation</title>
+		<link>/index.php/itprofessionals/using-codedom-to-automate-technical-screening-evaluation/</link>
+		<comments>/index.php/itprofessionals/using-codedom-to-automate-technical-screening-evaluation/#respond</comments>
+		<pubDate>Wed, 27 May 2015 11:20:17 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[IT Professionals]]></category>
+		<category><![CDATA[CodeDom]]></category>
+		<category><![CDATA[reflection]]></category>
+
+		<guid isPermaLink="false">/?p=3353</guid>
+		<description><![CDATA[CodeDOM provides dynamic compilation of .Net code and is commonly used in places like template generation or compilation of emitted code. I recently needed a way to evaluate code submissions against a known set of test cases, so this post will walk through building a small program to do take source code as files, compile [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>CodeDOM provides dynamic compilation of .Net code and is commonly used in places like template generation or compilation of emitted code. I recently needed a way to evaluate code submissions against a known set of test cases, so this post will walk through building a small program to do take source code as files, compile it, and execute it against a series of known inputs and outputs to evaluate it.</p>
+<p>Sample Code: <a href="https://github.com/tarwn/Blog_CodeDom" title="tarwn/Blog_CodeDom on github">tarwn/Blog_CodeDom on github</a></p>
+<p>To download and run the code yourself, you will need git and VisualSudion 2013 or greater. Then execute:<br />
+<code>git clone git@github.com:tarwn/Blog_CodeDom.git</code></p>
+<p>The sample submissions for this post are intended to answer the following tech screening question:</p>
+<blockquote><p>Write a function that accepts an integer and outputs a string with: &#8220;Fizz&#8221; if it is divisible by 3, &#8220;Buzz&#8221; if it is divisible by 5, &#8220;FizzBuzz&#8221; if it is divisible by both, or the number if it is divisible by neither.</p></blockquote>
+<p>(this is not a real question from our tech screening)</p>
+<p>By the end of this post, we will take a random submission like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1">public static string FizzBuzz(int number){
+&nbsp; &nbsp; if(number % 3 == 0 &amp;&amp; number % 5 == 0){
+&nbsp; &nbsp; &nbsp; &nbsp; return &quot;FizzBuzz&quot;;
+&nbsp; &nbsp; }
+&nbsp; &nbsp; else if (number % 3 == 0){
+&nbsp; &nbsp; &nbsp; &nbsp; return &quot;Fizz&quot;;
+&nbsp; &nbsp; }
+&nbsp; &nbsp; else if(number % 5 == 0){
+&nbsp; &nbsp; &nbsp; &nbsp; return &quot;Buzz&quot;;
+&nbsp; &nbsp; }
+&nbsp; &nbsp; else{
+&nbsp; &nbsp; &nbsp; &nbsp; return number.ToString();
+&nbsp; &nbsp; }
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public static string FizzBuzz(int number){
+	if(number % 3 == 0 &amp;&amp; number % 5 == 0){
+		return "FizzBuzz";
+	}
+	else if (number % 3 == 0){
+		return "Fizz";
+	}
+	else if(number % 5 == 0){
+		return "Buzz";
+	}
+	else{
+		return number.ToString();
+	}
+}</pre></div></div>
+
+<p>and automatically produce results like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1">Evaluated File: SamplePassSubmission.txt
+Evaluation Time: 5/9/2015 12:54:41 PM
+Final Result: 7/7 tests passed.
+&nbsp;
+Individual Results:
+&nbsp; &nbsp; Pass&nbsp; &nbsp; - Standard number is returned as string
+&nbsp; &nbsp; Pass&nbsp; &nbsp; - 3 is returned as 'Fizz'
+&nbsp; &nbsp; Pass&nbsp; &nbsp; - 5 is returned as 'Buzz'
+&nbsp; &nbsp; Pass&nbsp; &nbsp; - 15 is returned as 'FizzBuzz'
+&nbsp; &nbsp; Pass&nbsp; &nbsp; - 9 is returned as 'Fizz'
+&nbsp; &nbsp; Pass&nbsp; &nbsp; - 20 is returned as 'Buzz'
+&nbsp; &nbsp; Pass&nbsp; &nbsp; - 30 is returned as 'FizzBuzz'
+&nbsp;
+...</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Evaluated File: SamplePassSubmission.txt
+Evaluation Time: 5/9/2015 12:54:41 PM
+Final Result: 7/7 tests passed.
+
+Individual Results:
+	Pass	- Standard number is returned as string
+	Pass	- 3 is returned as 'Fizz'
+	Pass	- 5 is returned as 'Buzz'
+	Pass	- 15 is returned as 'FizzBuzz'
+	Pass	- 9 is returned as 'Fizz'
+	Pass	- 20 is returned as 'Buzz'
+	Pass	- 30 is returned as 'FizzBuzz'
+
+...</pre></div></div>
+
+<h2>Background</h2>
+<p>Lately we been doing a lot of screening and interviewing as we grow the development team at <a href="http://precisionlender.com/about-us/?utm_source=nav&#038;utm_medium=topnav&#038;utm_campaign=website#team">PrecisionLender</a>. Part of our interview process requires candidates to answer a technical screening questionaire with several C# and SQL exercises. Which means that another part of our process is for someone to evaluate those answers. I have a set of unit tests for all of the C# problems, but that doesn&#8217;t solve the part where we have to copy/paste into the tests, modify method names, tweak static/non-static, correct name collisions, etc. </p>
+<p>CodeDOM has been on my list to play with for a while and seemed like the perfect answer.</p>
+<p>The easy part turns out to be the compilation, which we can do like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+</pre></td><td class="de1"><pre class="de1"><span class="co1">// assuming a variable with code in it named &quot;code&quot; and inputs as an object[] named inputParameters</span>
+&nbsp;
+<span class="co1">// 1</span>
+<span class="kw1">var</span> parameters <span class="sy0">=</span> <span class="kw3">new</span> CompilerParameters<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+parameters<span class="sy0">.</span><span class="me1">ReferencedAssemblies</span><span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;System.dll&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+parameters<span class="sy0">.</span><span class="me1">ReferencedAssemblies</span><span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;System.Core.dll&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+parameters<span class="sy0">.</span><span class="me1">ReferencedAssemblies</span><span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="st0">&quot;System.Data.dll&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+parameters<span class="sy0">.</span><span class="me1">GenerateInMemory</span> <span class="sy0">=</span> <span class="kw1">true</span><span class="sy0">;</span>
+&nbsp;
+<span class="co1">// 2</span>
+<span class="kw1">var</span> provider <span class="sy0">=</span> <span class="kw3">new</span> CSharpCodeProvider<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">var</span> results <span class="sy0">=</span> provider<span class="sy0">.</span><span class="me1">CompileAssemblyFromSource</span><span class="br0">&#40;</span>parameters, code<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">if</span> <span class="br0">&#40;</span>results<span class="sy0">.</span><span class="me1">Errors</span><span class="sy0">.</span><span class="me1">HasErrors</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// do something meaningful + return</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="co1">// 3</span>
+<span class="kw1">var</span> assembly <span class="sy0">=</span> results<span class="sy0">.</span><span class="me1">CompiledAssembly</span><span class="sy0">;</span>
+<span class="kw1">var</span> type <span class="sy0">=</span> assembly<span class="sy0">.</span><span class="me1">GetType</span><span class="br0">&#40;</span><span class="st0">&quot;NamespaceName.ClassName&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">var</span> method <span class="sy0">=</span> type<span class="sy0">.</span><span class="me1">GetMethods</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#91;</span><span class="nu0">0</span><span class="br0">&#93;</span><span class="sy0">;</span>
+<span class="kw1">var</span> testObject <span class="sy0">=</span> type<span class="sy0">.</span><span class="me1">GetConstructor</span><span class="br0">&#40;</span><span class="kw3">new</span> Type<span class="br0">&#91;</span><span class="br0">&#93;</span> <span class="br0">&#123;</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Invoke</span><span class="br0">&#40;</span><span class="kw1">null</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">var</span> output <span class="sy0">=</span> method<span class="sy0">.</span><span class="me1">Invoke</span><span class="br0">&#40;</span>testObject, inputParameters<span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">// assuming a variable with code in it named "code" and inputs as an object[] named inputParameters
+
+// 1
+var parameters = new CompilerParameters();
+parameters.ReferencedAssemblies.Add("System.dll");
+parameters.ReferencedAssemblies.Add("System.Core.dll");
+parameters.ReferencedAssemblies.Add("System.Data.dll");
+parameters.GenerateInMemory = true;
+
+// 2
+var provider = new CSharpCodeProvider();
+var results = provider.CompileAssemblyFromSource(parameters, code);
+if (results.Errors.HasErrors)
+{
+	// do something meaningful + return
+}
+
+// 3
+var assembly = results.CompiledAssembly;
+var type = assembly.GetType("NamespaceName.ClassName");
+var method = type.GetMethods()[0];
+var testObject = type.GetConstructor(new Type[] { }).Invoke(null);
+var output = method.Invoke(testObject, inputParameters);</pre></div></div>
+
+<p>In more detail:</p>
+<ol>
+<li>Define the <a href="https://msdn.microsoft.com/en-us/library/system.codedom.compiler.compilerparameters%28v=vs.110%29.aspx" title="See CompilerParameters on MSDN">compilation parameters</a>, including the referenced assemblies that are needed and that we want to compile the code in memory rather than generating an assembly.</li>
+<li>Compile the code and verify it built without errors</li>
+<li>Use reflection to get the object and method, instantiate the object, and invoke the method with the test inputs</li>
+</ol>
+<p>When we ask people to submit code exercise answers, there is no guarantee that it will or won&#8217;t have using statements, a namespace, a class name, or static keywords where I do or don&#8217;t expect them. Even if they are present, there is no guarantee they will have the naming I expect, such as the &#8220;namespaceName&#8221; and &#8220;ClassName&#8221; values I hardcoded above. </p>
+<p>Also, ignore the fact that I grab the first method and assume it&#8217;s the one I want. This works often enough that I don&#8217;t mind rearranging a bit in the one or two exceptional cases.</p>
+<h2>Normalizing the Code</h2>
+<p>To test consistently and automatically, we need to solve the following problems:</p>
+<ul>
+<li>Remove the &#8220;static&#8221; keyword from the method we intend to execute</li>
+<li>Add or rename the class name to an expected value</li>
+<li>Add or rename the namespace name to an expected value</li>
+<li>Add using statements if they are not present</li>
+</ul>
+<p>This expanded out into the following test cases (naming pattern: FunctionUnderTest_Scenario_ExpectedResult):<br />
+<b><a href="https://github.com/tarwn/Blog_CodeDom/blob/master/EvaluateFizzBuzzTests/EvaluatorTests.cs" title="EvaluateFizzBuzzTests/EvaluatorTests.cs on github">EvaluatorTests.cs</a></b></p>
+<ul>
+<li>NormalizeCode_MethodWithNoNamespaceOrClass_IsWrappedInBoth</li>
+<li>NormalizeCode_StaticClassWithNoNamespace_IsWrappedInNamespace</li>
+<li>NormalizeCode_StaticClassWithNoNamespace_ClassIsRenamed</li>
+<li>NormalizeCode_ClassWithNoNamespace_IsWrappedInNamespace</li>
+<li>NormalizeCode_ClassWithNoNamespace_ClassIsRenamed</li>
+<li>NormalizeCode_NamespacedCode_AddsUsingStatements</li>
+<li>NormalizeCode_NamespacedCode_RenamesNamespace</li>
+<li>NormalizeCode_RunOnCodeLine_ReplacesOriginalClassAndNamespace</li>
+<li>NormalizeCode_TwoClasses_OnlyFirstClassIsRenamed</li>
+<li>NormalizeCode_StaticMethod_IsConvertedToInstance</li>
+<li>NormalizeCode_MultipleStaticMethods_AllAreConvertedToInstance</li>
+</ul>
+<p>Breaking this down into pieces:<br />
+(full function at <a href="https://github.com/tarwn/Blog_CodeDom/blob/master/EvaluateFizzBuzz/Evaluation/Evaluator.cs" title="EvaluateFizzBuzz/Evaluation/Evaluator.cs, Line 34
+on github">EvaluateFizzBuzz/Evaluation/Evaluator.cs &#8211; NormalizeCode()</a>)</p>
+<p>We need to ensure the first method is an instance method rather than static:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="co1">// instance-ize functions</span>
+<span class="kw1">var</span> methodnameRegex <span class="sy0">=</span> <span class="kw3">new</span> Regex<span class="br0">&#40;</span><span class="st0">&quot;(public|private) static (?!class)([^{]+)+{&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">if</span> <span class="br0">&#40;</span>methodnameRegex<span class="sy0">.</span><span class="me1">IsMatch</span><span class="br0">&#40;</span>normalizedSource<span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; normalizedSource <span class="sy0">=</span> methodnameRegex<span class="sy0">.</span><span class="me1">Replace</span><span class="br0">&#40;</span>normalizedSource, <span class="st0">&quot;$1 $2<span class="es0">\n</span>{&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">// instance-ize functions
+var methodnameRegex = new Regex("(public|private) static (?!class)([^{]+)+{");
+if (methodnameRegex.IsMatch(normalizedSource))
+{
+	normalizedSource = methodnameRegex.Replace(normalizedSource, "$1 $2\n{");
+}</pre></div></div>
+
+<p>Add or Normalize the class name to an expected value (IntendedClassName):</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="co1">// normalize class name</span>
+<span class="kw1">var</span> classnameRegex <span class="sy0">=</span> <span class="kw3">new</span> Regex<span class="br0">&#40;</span><span class="st0">&quot;(public|private) (static )?class [^{]+{&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">if</span> <span class="br0">&#40;</span>classnameRegex<span class="sy0">.</span><span class="me1">IsMatch</span><span class="br0">&#40;</span>normalizedSource<span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; normalizedSource <span class="sy0">=</span> classnameRegex<span class="sy0">.</span><span class="me1">Replace</span><span class="br0">&#40;</span>normalizedSource, <span class="st0">&quot;public class &quot;</span> <span class="sy0">+</span> IntendedClassName <span class="sy0">+</span> <span class="st0">&quot;<span class="es0">\r</span><span class="es0">\n</span>{&quot;</span>, <span class="nu0">1</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+<span class="kw1">else</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; normalizedSource <span class="sy0">=</span> <span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;public class {0}<span class="es0">\r</span><span class="es0">\n</span>{{<span class="es0">\r</span><span class="es0">\n</span>{1}<span class="es0">\r</span><span class="es0">\n</span><span class="es0">\r</span><span class="es0">\n</span>}}&quot;</span>, IntendedClassName, normalizedSource<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">// normalize class name
+var classnameRegex = new Regex("(public|private) (static )?class [^{]+{");
+if (classnameRegex.IsMatch(normalizedSource))
+{
+	normalizedSource = classnameRegex.Replace(normalizedSource, "public class " + IntendedClassName + "\r\n{", 1);
+}
+else
+{
+	normalizedSource = String.Format("public class {0}\r\n{{\r\n{1}\r\n\r\n}}", IntendedClassName, normalizedSource);
+}</pre></div></div>
+
+<p>Add or Normalize the namespace name to an expected value (IntendedNamespace)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="co1">// normalize namespace</span>
+<span class="kw1">var</span> namespaceRegex <span class="sy0">=</span> <span class="kw3">new</span> Regex<span class="br0">&#40;</span><span class="st0">&quot;namespace [^<span class="es0">\\</span>n{ ]+[^{]+{&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">if</span> <span class="br0">&#40;</span>namespaceRegex<span class="sy0">.</span><span class="me1">IsMatch</span><span class="br0">&#40;</span>normalizedSource<span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; normalizedSource <span class="sy0">=</span> namespaceRegex<span class="sy0">.</span><span class="me1">Replace</span><span class="br0">&#40;</span>normalizedSource, <span class="st0">&quot;namespace &quot;</span> <span class="sy0">+</span> IntendedNamespace <span class="sy0">+</span> <span class="st0">&quot;<span class="es0">\r</span><span class="es0">\n</span>{&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+<span class="kw1">else</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; normalizedSource <span class="sy0">=</span> <span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0}<span class="es0">\r</span><span class="es0">\n</span><span class="es0">\n</span>namespace {1}<span class="es0">\r</span><span class="es0">\n</span>{{<span class="es0">\r</span><span class="es0">\n</span>{2}<span class="es0">\r</span><span class="es0">\n</span>}}&quot;</span>, USING_STATEMENTS, IntendedNamespace, normalizedSource<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">// normalize namespace
+var namespaceRegex = new Regex("namespace [^\\n{ ]+[^{]+{");
+if (namespaceRegex.IsMatch(normalizedSource))
+{
+	normalizedSource = namespaceRegex.Replace(normalizedSource, "namespace " + IntendedNamespace + "\r\n{");
+}
+else
+{
+	normalizedSource = String.Format("{0}\r\n\nnamespace {1}\r\n{{\r\n{2}\r\n}}", USING_STATEMENTS, IntendedNamespace, normalizedSource);
+}</pre></div></div>
+
+<p>And then add a standard set of using statements (USING_STATEMENTS constant) if they aren&#8217;t present yet:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="co1">// add using statements if not present</span>
+<span class="kw1">if</span> <span class="br0">&#40;</span><span class="sy0">!</span>normalizedSource<span class="sy0">.</span><span class="me1">Contains</span><span class="br0">&#40;</span><span class="st0">&quot;using System&quot;</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+normalizedSource <span class="sy0">=</span> USING_STATEMENTS <span class="sy0">+</span> <span class="st0">&quot;<span class="es0">\r</span><span class="es0">\n</span>&quot;</span> <span class="sy0">+</span> normalizedSource<span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">// add using statements if not present
+if (!normalizedSource.Contains("using System"))
+{
+normalizedSource = USING_STATEMENTS + "\r\n" + normalizedSource;
+}</pre></div></div>
+
+<p>This will convert a file like the <a href="https://github.com/tarwn/Blog_CodeDom/blob/master/EvaluateFizzBuzz/SampleFile/SamplePassSubmission.txt" title="EvaluateFizzBuzz/SampleFile/SamplePassSubmission.txt"> sample &#8220;Pass&#8221; submission file</a> like so:</p>
+<p>Before:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw1">static</span> <span class="kw4">string</span> FizzBuzz<span class="br0">&#40;</span><span class="kw4">int</span> number<span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span>number <span class="sy0">%</span> <span class="nu0">3</span> <span class="sy0">==</span> <span class="nu0">0</span> <span class="sy0">&amp;&amp;</span> number <span class="sy0">%</span> <span class="nu0">5</span> <span class="sy0">==</span> <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;FizzBuzz&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">else</span> <span class="kw1">if</span> <span class="br0">&#40;</span>number <span class="sy0">%</span> <span class="nu0">3</span> <span class="sy0">==</span> <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;Fizz&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">else</span> <span class="kw1">if</span><span class="br0">&#40;</span>number <span class="sy0">%</span> <span class="nu0">5</span> <span class="sy0">==</span> <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;Buzz&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">else</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> number<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public static string FizzBuzz(int number){
+	if(number % 3 == 0 &amp;&amp; number % 5 == 0){
+		return "FizzBuzz";
+	}
+	else if (number % 3 == 0){
+		return "Fizz";
+	}
+	else if(number % 5 == 0){
+		return "Buzz";
+	}
+	else{
+		return number.ToString();
+	}
+}</pre></div></div>
+
+<p>After:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Collections.Generic</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">System.Linq</span><span class="sy0">;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">namespace</span> FizzBuzzSample
+<span class="br0">&#123;</span>
+<span class="kw1">public</span> <span class="kw4">class</span> FizzBuzzClass
+<span class="br0">&#123;</span>
+&nbsp;
+&nbsp;
+<span class="kw1">public</span> <span class="kw4">string</span> FizzBuzz<span class="br0">&#40;</span><span class="kw4">int</span> number<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">if</span><span class="br0">&#40;</span>number <span class="sy0">%</span> <span class="nu0">3</span> <span class="sy0">==</span> <span class="nu0">0</span> <span class="sy0">&amp;&amp;</span> number <span class="sy0">%</span> <span class="nu0">5</span> <span class="sy0">==</span> <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;FizzBuzz&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">else</span> <span class="kw1">if</span> <span class="br0">&#40;</span>number <span class="sy0">%</span> <span class="nu0">3</span> <span class="sy0">==</span> <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;Fizz&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">else</span> <span class="kw1">if</span><span class="br0">&#40;</span>number <span class="sy0">%</span> <span class="nu0">5</span> <span class="sy0">==</span> <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="st0">&quot;Buzz&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">else</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> number<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System;
+using System.Collections.Generic;
+using System.Linq;
+
+
+namespace FizzBuzzSample
+{
+public class FizzBuzzClass
+{
+
+
+public string FizzBuzz(int number)
+{
+	if(number % 3 == 0 &amp;&amp; number % 5 == 0){
+		return "FizzBuzz";
+	}
+	else if (number % 3 == 0){
+		return "Fizz";
+	}
+	else if(number % 5 == 0){
+		return "Buzz";
+	}
+	else{
+		return number.ToString();
+	}
+}
+
+}
+}</pre></div></div>
+
+<p>So now we have consistent code, next up is evaluating the results.</p>
+<h2>Compiling and Evaluating Output</h2>
+<p>Earlier in the post I showed example code to compile and run some code. Now that we have normalized code, we know exactly what namespace and class name to expect and can run it through that code and, finally, evaluate the output.</p>
+<p>The Evaluator requires not just an IntendedNamespace and IntendedClassname, but also the list of TestDefinitions it will evaluate against:<br />
+<b><a href="" title="EvaluateFizzBuzz/Evaluation/TestDefinition.cs on github">EvaluateFizzBuzz/Evaluation/TestDefinition.cs</a></b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1">&nbsp;<span class="kw1">public</span> <span class="kw4">class</span> TestDefinition
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="sy0">...</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> TestDefinition<span class="br0">&#40;</span><span class="kw4">string</span> name, <span class="kw4">object</span><span class="br0">&#91;</span><span class="br0">&#93;</span> inputParameters, <span class="kw4">object</span> expectedOutput<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Name <span class="sy0">=</span> name<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; InputParameters <span class="sy0">=</span> inputParameters<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; DescriptionOfExpectation <span class="sy0">=</span> <span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span>expectedOutput<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; EvaluateResult <span class="sy0">=</span> <span class="br0">&#40;</span>o<span class="br0">&#41;</span> <span class="sy0">=&gt;</span> <span class="kw3">new</span> LocalEvaluationResult<span class="br0">&#40;</span>expectedOutput<span class="sy0">.</span><span class="me1">Equals</span><span class="br0">&#40;</span>o<span class="br0">&#41;</span>, o <span class="sy0">!=</span> <span class="kw1">null</span> <span class="sy0">?</span> o<span class="sy0">.</span><span class="me1">ToString</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">:</span> <span class="st0">&quot;&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="sy0">...</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"> public class TestDefinition
+{
+	...
+
+        public TestDefinition(string name, object[] inputParameters, object expectedOutput)
+        {
+            Name = name;
+            InputParameters = inputParameters;
+            DescriptionOfExpectation = String.Format(expectedOutput.ToString());
+            EvaluateResult = (o) =&gt; new LocalEvaluationResult(expectedOutput.Equals(o), o != null ? o.ToString() : "");
+        }
+
+	...
+}</pre></div></div>
+
+<p>Here are the TestDefinitions we will evaluate against for the sample problem:<br />
+<b><a href="https://github.com/tarwn/Blog_CodeDom/blob/master/EvaluateFizzBuzz/Program.cs" title="EvaluateFizzBuzz/Program.cs on github">EvaluateFizzBuzz/Program.cs</a></b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">new</span> List<span class="sy0">&lt;</span>TestDefinition<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw3">new</span> TestDefinition<span class="br0">&#40;</span><span class="st0">&quot;Standard number is returned as string&quot;</span>, <span class="kw3">new</span> <span class="kw4">object</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#123;</span> <span class="nu0">1</span> <span class="br0">&#125;</span>, <span class="st0">&quot;1&quot;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="kw3">new</span> TestDefinition<span class="br0">&#40;</span><span class="st0">&quot;3 is returned as 'Fizz'&quot;</span>, <span class="kw3">new</span> <span class="kw4">object</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#123;</span> <span class="nu0">3</span> <span class="br0">&#125;</span>, <span class="st0">&quot;Fizz&quot;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="kw3">new</span> TestDefinition<span class="br0">&#40;</span><span class="st0">&quot;5 is returned as 'Buzz'&quot;</span>, <span class="kw3">new</span> <span class="kw4">object</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#123;</span> <span class="nu0">5</span> <span class="br0">&#125;</span>, <span class="st0">&quot;Buzz&quot;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="kw3">new</span> TestDefinition<span class="br0">&#40;</span><span class="st0">&quot;15 is returned as 'FizzBuzz'&quot;</span>, <span class="kw3">new</span> <span class="kw4">object</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#123;</span> <span class="nu0">15</span> <span class="br0">&#125;</span>,<span class="st0">&quot;FizzBuzz&quot;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="kw3">new</span> TestDefinition<span class="br0">&#40;</span><span class="st0">&quot;9 is returned as 'Fizz'&quot;</span>, <span class="kw3">new</span> <span class="kw4">object</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#123;</span> <span class="nu0">9</span> <span class="br0">&#125;</span>, <span class="st0">&quot;Fizz&quot;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="kw3">new</span> TestDefinition<span class="br0">&#40;</span><span class="st0">&quot;20 is returned as 'Buzz'&quot;</span>, <span class="kw3">new</span> <span class="kw4">object</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#123;</span> <span class="nu0">20</span> <span class="br0">&#125;</span>, <span class="st0">&quot;Buzz&quot;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; <span class="kw3">new</span> TestDefinition<span class="br0">&#40;</span><span class="st0">&quot;30 is returned as 'FizzBuzz'&quot;</span>, <span class="kw3">new</span> <span class="kw4">object</span><span class="br0">&#91;</span><span class="br0">&#93;</span><span class="br0">&#123;</span> <span class="nu0">30</span> <span class="br0">&#125;</span>, <span class="st0">&quot;FizzBuzz&quot;</span><span class="br0">&#41;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">new List&lt;TestDefinition&gt;(){
+	new TestDefinition("Standard number is returned as string", new object[]{ 1 }, "1"),
+	new TestDefinition("3 is returned as 'Fizz'", new object[]{ 3 }, "Fizz"),
+	new TestDefinition("5 is returned as 'Buzz'", new object[]{ 5 }, "Buzz"),
+	new TestDefinition("15 is returned as 'FizzBuzz'", new object[]{ 15 },"FizzBuzz"),
+	new TestDefinition("9 is returned as 'Fizz'", new object[]{ 9 }, "Fizz"),
+	new TestDefinition("20 is returned as 'Buzz'", new object[]{ 20 }, "Buzz"),
+	new TestDefinition("30 is returned as 'FizzBuzz'", new object[]{ 30 }, "FizzBuzz")
+}</pre></div></div>
+
+<p>Now we can expand the compilation code above to compile and then invoke and evaluate against each of these TestDefinitions:<br />
+<b><a href="https://github.com/tarwn/Blog_CodeDom/blob/master/EvaluateFizzBuzz/Evaluation/Evaluator.cs" title="EvaluateFizzBuzz/Evaluation/Evaluator.cs on github">EvaluateFizzBuzz/Evaluation/Evaluator.cs</a></b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">var</span> parameters <span class="sy0">=</span> <span class="kw3">new</span> CompilerParameters<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="co1">// ... set up parameters ...</span>
+&nbsp;
+<span class="kw1">var</span> provider <span class="sy0">=</span> <span class="kw3">new</span> CSharpCodeProvider<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">var</span> results <span class="sy0">=</span> provider<span class="sy0">.</span><span class="me1">CompileAssemblyFromSource</span><span class="br0">&#40;</span>parameters, code<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">if</span> <span class="br0">&#40;</span>results<span class="sy0">.</span><span class="me1">Errors</span><span class="sy0">.</span><span class="me1">HasErrors</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// ... compile list of errors and return</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">var</span> assembly <span class="sy0">=</span> results<span class="sy0">.</span><span class="me1">CompiledAssembly</span><span class="sy0">;</span>
+<span class="kw1">var</span> type <span class="sy0">=</span> assembly<span class="sy0">.</span><span class="me1">GetType</span><span class="br0">&#40;</span>IntendedNamespace <span class="sy0">+</span> <span class="st0">&quot;.&quot;</span> <span class="sy0">+</span> IntendedClassName<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">var</span> method <span class="sy0">=</span> type<span class="sy0">.</span><span class="me1">GetMethods</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#91;</span><span class="nu0">0</span><span class="br0">&#93;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">var</span> result <span class="sy0">=</span> <span class="kw3">new</span> EvaluationResult<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> test <span class="kw1">in</span> Tests<span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> testObject <span class="sy0">=</span> type<span class="sy0">.</span><span class="me1">GetConstructor</span><span class="br0">&#40;</span><span class="kw3">new</span> Type<span class="br0">&#91;</span><span class="br0">&#93;</span> <span class="br0">&#123;</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Invoke</span><span class="br0">&#40;</span><span class="kw1">null</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> output <span class="sy0">=</span> method<span class="sy0">.</span><span class="me1">Invoke</span><span class="br0">&#40;</span>testObject, test<span class="sy0">.</span><span class="me1">InputParameters</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> evalResult <span class="sy0">=</span> test<span class="sy0">.</span><span class="me1">EvaluateResult</span><span class="br0">&#40;</span>output<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>evalResult<span class="sy0">.</span><span class="me1">IsPass</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; result<span class="sy0">.</span><span class="me1">Tests</span><span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="coMULTI">/* ... pass information ... */</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">else</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; result<span class="sy0">.</span><span class="me1">Tests</span><span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="coMULTI">/* ... fail information ... */</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">catch</span> <span class="br0">&#40;</span>TargetInvocationException exc<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; result<span class="sy0">.</span><span class="me1">Tests</span><span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span><span class="coMULTI">/* ... error information ... */</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">finally</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+result<span class="sy0">.</span><span class="me1">Summary</span> <span class="sy0">=</span> <span class="kw4">String</span><span class="sy0">.</span><span class="me1">Format</span><span class="br0">&#40;</span><span class="st0">&quot;{0}/{1} tests passed.&quot;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; result<span class="sy0">.</span><span class="me1">Tests</span><span class="sy0">.</span><span class="kw1">Where</span><span class="br0">&#40;</span>t <span class="sy0">=&gt;</span> t<span class="sy0">.</span><span class="me1">IsPass</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#40;</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; result<span class="sy0">.</span><span class="me1">Tests</span><span class="sy0">.</span><span class="me1">Count</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="co1">// ...</span>
+&nbsp;
+<span class="kw1">return</span> result<span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var parameters = new CompilerParameters();
+// ... set up parameters ...
+
+var provider = new CSharpCodeProvider();
+var results = provider.CompileAssemblyFromSource(parameters, code);
+
+if (results.Errors.HasErrors)
+{
+	// ... compile list of errors and return
+}
+
+var assembly = results.CompiledAssembly;
+var type = assembly.GetType(IntendedNamespace + "." + IntendedClassName);
+var method = type.GetMethods()[0];
+
+var result = new EvaluationResult();
+foreach (var test in Tests)
+{
+	var testObject = type.GetConstructor(new Type[] { }).Invoke(null);
+	try
+	{
+		// ...
+
+		var output = method.Invoke(testObject, test.InputParameters);
+		var evalResult = test.EvaluateResult(output);
+
+		if (evalResult.IsPass)
+		{
+			result.Tests.Add(/* ... pass information ... */);
+		}
+		else
+		{
+			result.Tests.Add(/* ... fail information ... */);
+		}
+	}
+	catch (TargetInvocationException exc)
+	{
+		result.Tests.Add(/* ... error information ... */);
+	}
+	finally
+	{
+	    // ...
+	}
+}
+
+result.Summary = String.Format("{0}/{1} tests passed.",
+			    result.Tests.Where(t =&gt; t.IsPass).Count(),
+			    result.Tests.Count);
+// ...
+
+return result;</pre></div></div>
+
+<p>And there we have it, we start with one randomly submitted code file and end with the results of automated evaluation.</p>
+<h2>But What About&#8230;?</h2>
+<p>This is only one small part of our interview process and, before anyone brings it up, we do also evaluate for things the computer can&#8217;t, such as readability of the code. While I have considered some options like incorporating NDepend evaluation, we&#8217;ll likely never be able to completely automate this. That being said, having this portion automated does reduce the amount of manual evaluation we do, so overall we still save quite a bit of effort. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/using-codedom-to-automate-technical-screening-evaluation/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

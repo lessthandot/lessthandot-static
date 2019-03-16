@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>RAKE &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/rake/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Automated Keyword Extraction &#8211; TF-IDF, RAKE, and TextRank</title>
+		<link>/index.php/artificial-intelligence/automated-keyword-extraction-tf-idf-rake-and-textrank/</link>
+		<comments>/index.php/artificial-intelligence/automated-keyword-extraction-tf-idf-rake-and-textrank/#respond</comments>
+		<pubDate>Mon, 21 Nov 2016 21:09:50 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Artificial Intelligence]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[RAKE]]></category>
+		<category><![CDATA[text summarization]]></category>
+		<category><![CDATA[TextRank]]></category>
+		<category><![CDATA[TF-IDF]]></category>
+
+		<guid isPermaLink="false">/?p=4819</guid>
+		<description><![CDATA[After initially playing around with text processing in my prior post, I added an additional algorithm and cleaned up the logic to make it easier to perform test runs and reuse later. I tweaked the RAKE algorithm implementation and added TextRank into the mix, with full sample code and links to sources available. I&#8217;m also [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>After initially playing around with text processing in <a href="/index.php/artificial-intelligence/to-build-automatic-bookmarking-unsupervised-text-classification/" title="To Build Automatic Bookmarking – Unsupervised Text Classification">my prior post</a>, I added an additional algorithm and cleaned up the logic to make it easier to perform test runs and reuse later. I tweaked the RAKE algorithm implementation and added TextRank into the mix, with full sample code and links to sources available. I&#8217;m also using a read-through cache of the unprocessed and processed files so I can see the content and tweak the cleanse logic. </p>
+<div style="margin: 1em 0; padding: 1em; background-color: #FFFFCC">
+Context: The ultimate goal is to build a script that could process through 6 years of my bookmarked reading and extract out keywords, so I could do some trend analysis on how my reading has changed over time and maybe later build a supervised model with that data to analyze new online posts and produce a &#8220;worth my time or not&#8221; score.
+</div>
+<p>The first step was to increase my hands-on knowledge of text processing and identify potential algorithms. I used Python as the programming language, 5 sample posts from my own website, and two algorithms: TF-IDF and RAKE. I learned how these algorithms work, that data cleansing is an incredibly important step, and that python package management has trailed significantly behind most of the other languages I use day-to-day.</p>
+<p>The code for this post is available here: <a href="https://github.com/tarwn/bookmark_analysis/tree/master/exploration/v2">https://github.com/tarwn/bookmark_analysis/tree/master/exploration/v2</a></p>
+<p>Let me start with the results, then I&#8217;ll jump into the algorithms and code.</p>
+<h2>Keyword Extract Results</h2>
+<p>These results are a subset of a larger set using TF-IDF, RAKE, and TextRank for the latest 50 posts I&#8217;ve written on LessThandot. I chose a larger sample because TF-IDF relies on frequency of words found in other documents as part of the score, so I wanted a large enough pool to help it shine (or not). </p>
+<p>Here are results for two recent posts:</p>
+<p>URL: <a href="http://tiernok.com/posts/continuous-javascript-test-execution-with-wallabyjs.html">http://tiernok.com/posts/continuous-javascript-test-execution-with-wallabyjs.html</a></p>
+<pre>RAKE:
+ * radiates test statuses directly
+ * test markers turn green/red
+ * continuous javascript test execution
+ * test marker turns red
+ * open visual studio code
+TF-IDF:
+ * wallaby
+ * karma
+ * runners
+ * visual
+ * studio
+TextRank:
+ * requirejs configuration
+ * wallaby-vscode wallaby
+ * install wallaby-vscode
+ * continuous javascript
+ * development feedback</pre>
+<p>URL: <a href="http://tiernok.com/posts/stop-manually-updating-your-jasmine-specrunner.html">http://tiernok.com/posts/stop-manually-updating-your-jasmine-specrunner.html</a></p>
+<pre>RAKE:
+ * greatly simplify future updates
+ * self-hosted web â updating assets
+ * stop manually updating
+ * normal debugging sessions
+ * tiny sample project
+TF-IDF:
+ * allspecs
+ * specrunner
+ * spec
+ * gulp
+ * file
+TextRank:
+ * self-hosted website
+ * vanilla bootloader
+ * jasmine specrunner
+ * custom bootloader
+ * similar approach</pre>
+<p>RAKE optimizes towards long keywords, which provides accurate phrases that aren&#8217;t terribly useful as keywords. TF-IDF has pulled out some viable keywords. TextRank seems to most frequently pull out the best candidate set of the 3 by landing somewhere between the twp.</p>
+<h2>Algorithms</h2>
+<p>If you read the prior post, you can skip past the first two to TextRank.</p>
+<h3>TF-IDF</h3>
+<p>TF-IDF stands for Text Frequency Inverse Document Frequency. At a high level, a TF-IDF score finds the words that have the highest ratio of occurring in the current document vs the frequency of occurring in the larger set of documents.</p>
+<p>The code for the TF-IDF implementation was based on <a href="http://stevenloria.com/finding-important-words-in-a-document-using-tf-idf/">this post by Steven Loria</a>.</p>
+<h3>RAKE Algorithm</h3>
+<p>The RAKE algorithm is described in the book Text Mining Applications and Theory by Michael W Berry (<a href="https://www.amazon.com/Text-Mining-Applications-Michael-Berry/dp/0470749822/">amazon</a>, <a href="http://onlinelibrary.wiley.com/book/10.1002/9780470689646">wiley.com</a>):</p>
+<p>1. Candidates are extracted from the text by finding strings of words that do not include phrase delimiters or stop words (a, the, of, etc). This produces the list of candidate keywords/phrases.</p>
+<p>2. A Co-occurrence graph is built to  identify the frequency that words are associated together in those phrases. Here is a good outline of how co-occurence graphs are built: <a href="https://marcobonzanini.com/2015/03/23/mining-twitter-data-with-python-part-4-rugby-and-term-co-occurrences/">Mining Twitter Data with Python (Part 4: Rugby and Term Co-occurrences)</a></p>
+<p>3. A score is calculated for each phrase that is the sum of the individual word&#8217;s scores from the co-occurrence graph. An individual word score is calculated as the degree (number of times it appears + number of additional words it appears with) of a word divided by it&#8217;s frequency (number of times it appears), which weights towards longer phrases.</p>
+<p>4. Adjoining keywords are included if they occur more than twice in the document and score high enough. An adjoining keyword is two keyword phrases with a stop word between them.</p>
+<p>5. The top T keywords are then extracted from the content, where T is 1/3rd of the number of words in the graph</p>
+<p>The implementation I used is based on <a href="https://pypi.python.org/pypi/python-rake/1.0.5">python-rake</a>, with some modifications for providing custom thresholds based on <a href="https://www.airpair.com/nlp/keyword-extraction-tutorial">this post</a>.</p>
+<h3>TextRank Algorithm</h3>
+<p>TextRank is described in the paper <a href="http://web.eecs.umich.edu/~mihalcea/papers/mihalcea.emnlp04.pdf">TextRank: Bringing Order into Texts</a> by Rada Mihalcea and Paul Tarau. </p>
+<p>In general, TextRank creates a graph of the words and relationships between them from a document, then identifies the most important vertices of the graph (words) based on importance scores calculated recursively from the entire graph.</p>
+<p>	1. Candidates are extracted from the text via sentence and then word parsing to produce a list of words to be evaluated. The words are annotated with part of speech tags (noun, verb, etc) to better differentiate syntactic use</p>
+<p>	2. Each word is then added to the graph and relationships are added between the word and others in a sliding window around the word</p>
+<p>	3. A ranking algorithm is run on each vertex for several iterations, updating all of the word scores based on the related word scores, until the scores stabilize &#8211; the research paper notes this is typically 20-30 iterations</p>
+<p>	4. The words are sorted and the top N are kept (N is typically 1/3rd of the words)</p>
+<p>	5. A post-processing step loops back through the initial candidate list and identifies words that appear next to one another and merges the two entries from the scored results into a single multi-word entry</p>
+<p>I used <a href="https://github.com/davidadamojr/TextRank">this TextRank implementation</a> as a base, modifying it to return the numeric score with the keywords so I could isolate the top 5 like I have for other algorithms. My solution for multi-word scores was simple addition, for no reason better than it was good enough for what I&#8217;m doing.</p>
+<h2>Making it all work</h2>
+<p>As I mentioned earlier, the initial cleansing of the data was a critical step. I wrote a small data loader that accepts a cache folder and a cleanse method and surfaces a call to load the text for a given URL. </p>
+<p><a href="https://github.com/tarwn/bookmark_analysis/tree/master/exploration/v2/contentloader">ContentLoader/contentloader.py</a></p>
+<p>When called, ContentLoader identifies whether HTML or processed Text content is already available, and if not, downloads and/or processes the HTML, caching the results if work was required, and returning just the text. This allows lots of fast repetition on the algorithm side when I am tweaking those, lets me see the raw html and text results of the cleanse function, and allows me to easily rerun part of thw cleanse by removing the text or HTML files.</p>
+<p>The barebones of my logic to download content and run it through the algorithms above is:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="python"><thead><tr><td colspan="2"  class="head">Python</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">def</span> execute<span class="br0">&#40;</span>cleanse_method<span class="sy0">,</span> pages<span class="br0">&#41;</span>:
+&nbsp; &nbsp; <span class="st0">&quot;&quot;&quot;Execute RAKE and TF-IDF algorithms on each page and output top scoring phrases&quot;&quot;&quot;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#1: Initialize a URL reader with local caching to be kind to the internet</span>
+&nbsp; &nbsp; reader <span class="sy0">=</span> contentloader.<span class="me1">CacheableReader</span><span class="br0">&#40;</span>CACHE_FOLDER<span class="sy0">,</span> cleanse_method<span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#2: Collect raw text for pages</span>
+&nbsp; &nbsp; processed_pages <span class="sy0">=</span> <span class="br0">&#91;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">for</span> page <span class="kw1">in</span> pages:
+&nbsp; &nbsp; &nbsp; &nbsp; page_text <span class="sy0">=</span> reader.<span class="me1">get_site_text</span><span class="br0">&#40;</span>page<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; processed_pages.<span class="me1">append</span><span class="br0">&#40;</span><span class="br0">&#123;</span><span class="st0">&quot;url&quot;</span>: page<span class="sy0">,</span> <span class="st0">&quot;text&quot;</span>: page_text<span class="br0">&#125;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#3: RAKE keywords for each page</span>
+&nbsp; &nbsp; rake <span class="sy0">=</span> RAKE.<span class="me1">Rake</span><span class="br0">&#40;</span>RAKE_STOPLIST<span class="sy0">,</span> min_char_length<span class="sy0">=</span><span class="nu0">2</span><span class="sy0">,</span> max_words_length<span class="sy0">=</span><span class="nu0">5</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">for</span> page <span class="kw1">in</span> processed_pages:
+&nbsp; &nbsp; &nbsp; &nbsp; page<span class="br0">&#91;</span><span class="st0">&quot;rake_results&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> rake.<span class="me1">run</span><span class="br0">&#40;</span>page<span class="br0">&#91;</span><span class="st0">&quot;text&quot;</span><span class="br0">&#93;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#4: TF-IDF keywords for processed text</span>
+&nbsp; &nbsp; document_frequencies <span class="sy0">=</span> <span class="br0">&#123;</span><span class="br0">&#125;</span>
+&nbsp; &nbsp; document_count <span class="sy0">=</span> <span class="kw2">len</span><span class="br0">&#40;</span>processed_pages<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">for</span> page <span class="kw1">in</span> processed_pages:
+&nbsp; &nbsp; &nbsp; &nbsp; page<span class="br0">&#91;</span><span class="st0">&quot;tfidf_frequencies&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> tfidf.<span class="me1">get_word_frequencies</span><span class="br0">&#40;</span>page<span class="br0">&#91;</span><span class="st0">&quot;text&quot;</span><span class="br0">&#93;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">for</span> word <span class="kw1">in</span> page<span class="br0">&#91;</span><span class="st0">&quot;tfidf_frequencies&quot;</span><span class="br0">&#93;</span>:
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; document_frequencies.<span class="me1">setdefault</span><span class="br0">&#40;</span>word<span class="sy0">,</span> <span class="nu0">0</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; document_frequencies<span class="br0">&#91;</span>word<span class="br0">&#93;</span> +<span class="sy0">=</span> <span class="nu0">1</span>
+&nbsp;
+&nbsp; &nbsp; sortby <span class="sy0">=</span> <span class="kw1">lambda</span> x: x<span class="br0">&#91;</span><span class="nu0">1</span><span class="br0">&#93;</span><span class="br0">&#91;</span><span class="st0">&quot;score&quot;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">for</span> page <span class="kw1">in</span> processed_pages:
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">for</span> word <span class="kw1">in</span> page<span class="br0">&#91;</span><span class="st0">&quot;tfidf_frequencies&quot;</span><span class="br0">&#93;</span>.<span class="me1">items</span><span class="br0">&#40;</span><span class="br0">&#41;</span>:
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; word_frequency <span class="sy0">=</span> word<span class="br0">&#91;</span><span class="nu0">1</span><span class="br0">&#93;</span><span class="br0">&#91;</span><span class="st0">&quot;frequency&quot;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; docs_with_word <span class="sy0">=</span> document_frequencies<span class="br0">&#91;</span>word<span class="br0">&#91;</span><span class="nu0">0</span><span class="br0">&#93;</span><span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; word<span class="br0">&#91;</span><span class="nu0">1</span><span class="br0">&#93;</span><span class="br0">&#91;</span><span class="st0">&quot;score&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> tfidf.<span class="me1">calculate</span><span class="br0">&#40;</span>word_frequency<span class="sy0">,</span> document_count<span class="sy0">,</span> docs_with_word<span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; page<span class="br0">&#91;</span><span class="st0">&quot;tfidf_results&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> <span class="kw2">sorted</span><span class="br0">&#40;</span>page<span class="br0">&#91;</span><span class="st0">&quot;tfidf_frequencies&quot;</span><span class="br0">&#93;</span>.<span class="me1">items</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">,</span> key<span class="sy0">=</span>sortby<span class="sy0">,</span> reverse<span class="sy0">=</span><span class="kw2">True</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#5. TextRank</span>
+&nbsp; &nbsp; <span class="kw1">for</span> page <span class="kw1">in</span> processed_pages:
+&nbsp; &nbsp; &nbsp; &nbsp; textrank_results <span class="sy0">=</span> textrank.<span class="me1">extractKeyphrases</span><span class="br0">&#40;</span>page<span class="br0">&#91;</span><span class="st0">&quot;text&quot;</span><span class="br0">&#93;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; page<span class="br0">&#91;</span><span class="st0">&quot;textrank_results&quot;</span><span class="br0">&#93;</span> <span class="sy0">=</span> <span class="kw2">sorted</span><span class="br0">&#40;</span>textrank_results.<span class="me1">items</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">,</span> key<span class="sy0">=</span><span class="kw1">lambda</span> x: x<span class="br0">&#91;</span><span class="nu0">1</span><span class="br0">&#93;</span><span class="sy0">,</span> reverse<span class="sy0">=</span><span class="kw2">True</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">#6. Results</span>
+&nbsp; &nbsp; <span class="kw1">for</span> page <span class="kw1">in</span> processed_pages:
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1"># print results output</span>
+&nbsp;
+<span class="kw1">def</span> cleanse_tiernok_html<span class="br0">&#40;</span>html<span class="br0">&#41;</span>:
+&nbsp; &nbsp; <span class="st0">&quot;&quot;&quot;Cleanse function for tiernok.com blog posts&quot;&quot;&quot;</span>
+&nbsp; &nbsp;<span class="co1"># ... BeautifulSoup Logic here ...</span>
+&nbsp;
+<span class="co1"># get links because I'm too lazy to copy/pasta</span>
+<span class="kw1">def</span> get_test_links<span class="br0">&#40;</span><span class="br0">&#41;</span>:
+&nbsp; &nbsp; <span class="co1"># ... Logic to scrap post archive links here ...</span>
+&nbsp;
+<span class="co1"># run algorithms with the cleanse method above for the gathered list of links</span>
+test_links <span class="sy0">=</span> get_test_links<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#91;</span>:<span class="nu0">50</span><span class="br0">&#93;</span>
+execute<span class="br0">&#40;</span>cleanse_tiernok_html<span class="sy0">,</span> test_links<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">def execute(cleanse_method, pages):
+    """Execute RAKE and TF-IDF algorithms on each page and output top scoring phrases"""
+
+    #1: Initialize a URL reader with local caching to be kind to the internet
+    reader = contentloader.CacheableReader(CACHE_FOLDER, cleanse_method)
+
+    #2: Collect raw text for pages
+    processed_pages = []
+    for page in pages:
+        page_text = reader.get_site_text(page)
+        processed_pages.append({"url": page, "text": page_text})
+
+    #3: RAKE keywords for each page
+    rake = RAKE.Rake(RAKE_STOPLIST, min_char_length=2, max_words_length=5)
+    for page in processed_pages:
+        page["rake_results"] = rake.run(page["text"])
+
+    #4: TF-IDF keywords for processed text
+    document_frequencies = {}
+    document_count = len(processed_pages)
+    for page in processed_pages:
+        page["tfidf_frequencies"] = tfidf.get_word_frequencies(page["text"])
+        for word in page["tfidf_frequencies"]:
+            document_frequencies.setdefault(word, 0)
+            document_frequencies[word] += 1
+
+    sortby = lambda x: x[1]["score"]
+    for page in processed_pages:
+        for word in page["tfidf_frequencies"].items():
+            word_frequency = word[1]["frequency"]
+            docs_with_word = document_frequencies[word[0]]
+            word[1]["score"] = tfidf.calculate(word_frequency, document_count, docs_with_word)
+
+        page["tfidf_results"] = sorted(page["tfidf_frequencies"].items(), key=sortby, reverse=True)
+
+    #5. TextRank
+    for page in processed_pages:
+        textrank_results = textrank.extractKeyphrases(page["text"])
+        page["textrank_results"] = sorted(textrank_results.items(), key=lambda x: x[1], reverse=True)
+
+    #6. Results
+    for page in processed_pages:
+        # print results output
+
+def cleanse_tiernok_html(html):
+    """Cleanse function for tiernok.com blog posts"""
+   # ... BeautifulSoup Logic here ...
+
+# get links because I'm too lazy to copy/pasta
+def get_test_links():
+    # ... Logic to scrap post archive links here ...
+
+# run algorithms with the cleanse method above for the gathered list of links
+test_links = get_test_links()[:50]
+execute(cleanse_tiernok_html, test_links)</pre></div></div>
+
+<p>Compared to my exploratory scripts in the prior version, now I have something easy to read and usable as the base for other projects. The cleanse method is provided as a function so the underlying contentloader isn&#8217;t tied directly to my site&#8217;s page layout and the links are gathered independently for the same reason.</p>
+<h2>Results</h2>
+<p>TextRank provided the best results for what I&#8217;m trying to do, but seemed the slowest by a lot. </p>
+<p><b>Time:</b> At 50 documents the RAKE and TF-IDF implementations took about 2 seconds each, while TextRank took over 6.5 <u>minutes</u>. This is a comparison of three implementations I downloaded from the internet, though, so I&#8217;m going to dig deeper or write my own implementation of TextRank to see if I can locate the bottleneck.</p>
+<p><b>Best fit for my goal:</b> For the purposes of identifying longer term trends (common subjects across all of my documents, &#8220;C#&#8221; or &#8220;JavaScript&#8221;), TextRank or RAKE is going to generally be the best choice, as TF-IDF will likely score common words across many documents lower (Inverse Document Frequency).</p>
+<p><b>Other Alternative:</b> I also evaluated the Text Analytics option for <a href="https://azure.microsoft.com/en-us/services/cognitive-services/">Azure Cognitive Services</a>. It was quick to get running and has a free tier that would be plenty for me (1000 calls/month). Unfortunately the <a href="https://westus.dev.cognitive.microsoft.com/docs/services/TextAnalytics.V2.0/operations/56f30ceeeda5650db055a3c6" title="Azure Machine Learning - Text Analytics API - Key Phrases">Key Phrases API</a> surfaces only the keywords (1/3rd of the phrases, at a guess) and not the associated scores, so it wouldn&#8217;t work for this use (which is unfortunate, parallel cloud execution would be nice to have for this project).</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/artificial-intelligence/automated-keyword-extraction-tf-idf-rake-and-textrank/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>To Build Automatic Bookmarking &#8211; Unsupervised Text Classification</title>
+		<link>/index.php/artificial-intelligence/to-build-automatic-bookmarking-unsupervised-text-classification/</link>
+		<comments>/index.php/artificial-intelligence/to-build-automatic-bookmarking-unsupervised-text-classification/#respond</comments>
+		<pubDate>Mon, 07 Nov 2016 13:39:02 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Artificial Intelligence]]></category>
+		<category><![CDATA[python]]></category>
+		<category><![CDATA[RAKE]]></category>
+		<category><![CDATA[text summarization]]></category>
+		<category><![CDATA[TF-IDF]]></category>
+
+		<guid isPermaLink="false">/?p=4769</guid>
+		<description><![CDATA[I&#8217;ve been bookmarking all of my online reading for the past 7 years and recently started thinking about using that dataset to dig into trends in my past reading and potentially build a model to start scoring content I haven&#8217;t read yet. Even though I have manual keywords for each entry, I decided to look [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;ve been bookmarking all of my online reading for the past 7 years and recently started thinking about using that dataset to dig into trends in my past reading and potentially build a model to start scoring content I haven&#8217;t read yet. Even though I have manual keywords for each entry, I decided to look into what I could get with unsupervised text classification techniques to balance out the fact that I had entered those labels over long periods of time.</p>
+<p>My first goal is to programmatically extract keywords from consistently formatted blog posts on static website pages.</p>
+<div style="margin: 1em 0; padding: 1em; background-color: #FFFFCC">
+<b>Warning:</b> This isn&#8217;t an expert post on text classification or natural language processing. It&#8217;s a mildly rambling journey of a developer making general progress and the code, libraries, and resources used along the way.</p>
+<p>For context, I am not an expert. Machine learning has been an interest since college, so I know some of the general terms at a high level and have written a number of smaller supervised systems, but haven&#8217;t actually played with text classification or natural language processing before.
+</p></div>
+<p>I learn best by doing, so on top of some of the high level knowledge I added a bunch of reading and hacking around in the evenings (I learn best by doing things). Here is the subset that helped the most:</p>
+<ul>
+<li><a href="http://bdewilde.github.io/blog/2014/09/23/intro-to-automatic-keyphrase-extraction/">Intro to Automatic Keyphrase Extraction</a></li>
+<li><a href="http://stevenloria.com/finding-important-words-in-a-document-using-tf-idf/">Tutorial: Finding Important Words in Text Using TF-IDF</a></li>
+<li><a href="https://www.airpair.com/nlp/keyword-extraction-tutorial">NLP keyword extraction tutorial with RAKE and Maui</a></li>
+</ul>
+<p>I also leaned on the <a href="http://docs.python-guide.org/en/latest/scenarios/scrape/">The Hitchhiker&#8217;s Guide to Python: HTML Scraping</a>, because I only dip into python about every 5 years and was pretty rusty.</p>
+<h2>Using TF-IDF</h2>
+<p>TF-IDF stands for Text Frequency Inverse Document Frequency. At a high level, a TF-IDF score finds the words that have the highest ratio of occurring in the current document vs frequency of occurring in larger set of documents.</p>
+<p>I used a series of 5 of my own blog posts to test with:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="python"><thead><tr><td colspan="2"  class="head">Python</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">pages <span class="sy0">=</span> <span class="br0">&#91;</span>
+&nbsp; &nbsp; <span class="st0">'http://tiernok.com/posts/continuous-javascript-test-execution-with-wallabyjs.html'</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="st0">'http://tiernok.com/posts/stop-manually-updating-your-jasmine-specrunner.html'</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="st0">'http://tiernok.com/posts/self-hosted-web-updating-assets-without-restarting-the-debugger.html'</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="st0">'http://tiernok.com/posts/asp-net-single-sign-on-against-office365-with-oauth2.html'</span><span class="sy0">,</span>
+&nbsp; &nbsp; <span class="st0">'http://tiernok.com/posts/improved-teamcity-net-build-warnings.html'</span>
+<span class="br0">&#93;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">pages = [
+    'http://tiernok.com/posts/continuous-javascript-test-execution-with-wallabyjs.html',
+    'http://tiernok.com/posts/stop-manually-updating-your-jasmine-specrunner.html',
+    'http://tiernok.com/posts/self-hosted-web-updating-assets-without-restarting-the-debugger.html',
+    'http://tiernok.com/posts/asp-net-single-sign-on-against-office365-with-oauth2.html',
+    'http://tiernok.com/posts/improved-teamcity-net-build-warnings.html'
+]</pre></div></div>
+
+<p>Starting with a set of my own posts meant the consistent would be in a consistent format, I would have some ideas on what I expected the keywords to be, and I could defer things like local content caching logic without running up someone else&#8217;s bill or messing up their page statistics.</p>
+<p><i>Please be kind to my site if you run these scripts yourself, btw</i></p>
+<p>I played around with several ways to extract the text, but ended up on the <a href="http://docs.python-requests.org/en/master/">requests</a> module for scraping, <a href="https://github.com/aaronsw/html2text">html2text</a> for extracting text, and <a href="https://textblob.readthedocs.io/en/dev/">TextBlob</a> for the analysis, basing the script on <a href="http://stevenloria.com/finding-important-words-in-a-document-using-tf-idf/" title="Tutorial: Finding Important Words in Text Using TF-IDF">Steven Loria&#8217;s post</a> and using his functions for the scoring.</p>
+<p>After a few iterations where I tried to resolve pluralization and grouping things by common word roots (lemmetizing), I ended up back at a simple implementation that doesn&#8217;t take forever to run:</p>
+<p><b><a href="https://github.com/tarwn/bookmark_analysis/blob/master/exploration/tfidf.py" title="tfidf.py in github/tarwn/bookmark_analysis">tfidf.py</a></b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="python"><thead><tr><td colspan="2"  class="head">Python</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+</pre></td><td class="de1"><pre class="de1"><span class="co1"># 1: Get content of site using requests and html2test</span>
+<span class="kw1">def</span> get_site_text<span class="br0">&#40;</span>url<span class="br0">&#41;</span>:
+&nbsp; &nbsp; resp <span class="sy0">=</span> requests.<span class="me1">get</span><span class="br0">&#40;</span>url<span class="br0">&#41;</span>
+&nbsp; &nbsp; resp.<span class="me1">raise_for_status</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; html <span class="sy0">=</span> resp.<span class="me1">text</span>
+&nbsp; &nbsp; <span class="kw1">return</span> html2text.<span class="me1">html2text</span><span class="br0">&#40;</span>html<span class="br0">&#41;</span>
+&nbsp;
+<span class="co1"># 2: Score each word for an individual page against the full set of pages</span>
+<span class="kw1">def</span> score_page<span class="br0">&#40;</span>blob<span class="sy0">,</span> blobs<span class="br0">&#41;</span>:
+&nbsp; &nbsp; scores <span class="sy0">=</span> <span class="br0">&#123;</span>word: tdidf<span class="br0">&#40;</span>word<span class="sy0">,</span> blob<span class="sy0">,</span> blobs<span class="br0">&#41;</span> <span class="kw1">for</span> word <span class="kw1">in</span> blob.<span class="me1">words</span> <span class="kw1">if</span> <span class="kw2">len</span><span class="br0">&#40;</span>word<span class="br0">&#41;</span> <span class="sy0">&gt;</span> <span class="nu0">2</span><span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="kw1">return</span> <span class="kw2">sorted</span><span class="br0">&#40;</span>scores.<span class="me1">items</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">,</span> key<span class="sy0">=</span><span class="kw1">lambda</span> x: x<span class="br0">&#91;</span><span class="nu0">1</span><span class="br0">&#93;</span><span class="sy0">,</span> reverse<span class="sy0">=</span><span class="kw2">True</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="co1"># 3: For each URL in the page list, get the text content and a TextBlob for the content</span>
+completed_pages <span class="sy0">=</span> <span class="br0">&#91;</span><span class="br0">&#93;</span>
+<span class="kw1">for</span> page <span class="kw1">in</span> pages:
+&nbsp; &nbsp; <span class="kw1">print</span><span class="br0">&#40;</span><span class="st0">'Processing %s'</span> % page<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">try</span>:
+&nbsp; &nbsp; &nbsp; &nbsp; raw <span class="sy0">=</span> get_site_text<span class="br0">&#40;</span>page<span class="br0">&#41;</span>.<span class="me1">lower</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; completed_pages.<span class="me1">append</span><span class="br0">&#40;</span><span class="br0">&#123;</span><span class="st0">&quot;page&quot;</span>: page<span class="sy0">,</span> <span class="st0">&quot;raw&quot;</span>: raw<span class="sy0">,</span> <span class="st0">&quot;blob&quot;</span>: tb<span class="br0">&#40;</span>raw<span class="br0">&#41;</span><span class="br0">&#125;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">except</span> <span class="kw2">Exception</span> <span class="kw1">as</span> exc:
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">print</span><span class="br0">&#40;</span><span class="st0">'Couldn<span class="es0">\'</span>t download %s, error: %s'</span> % <span class="br0">&#40;</span>page<span class="sy0">,</span> exc<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">continue</span>
+&nbsp;
+<span class="co1"># 4: For each page, calculate TD-IDF scores and output top 5 scoring words</span>
+<span class="kw1">for</span> page <span class="kw1">in</span> completed_pages:
+&nbsp; &nbsp; <span class="kw1">print</span><span class="br0">&#40;</span><span class="st0">'Scoring %s'</span> % page<span class="br0">&#91;</span><span class="st0">&quot;page&quot;</span><span class="br0">&#93;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; page_scores <span class="sy0">=</span> score_page<span class="br0">&#40;</span>page<span class="br0">&#91;</span><span class="st0">&quot;blob&quot;</span><span class="br0">&#93;</span><span class="sy0">,</span> <span class="br0">&#91;</span>page<span class="br0">&#91;</span><span class="st0">&quot;blob&quot;</span><span class="br0">&#93;</span> <span class="kw1">for</span> page <span class="kw1">in</span> completed_pages<span class="br0">&#93;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">for</span> word<span class="sy0">,</span> score <span class="kw1">in</span> page_scores<span class="br0">&#91;</span>:<span class="nu0">5</span><span class="br0">&#93;</span>:
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">print</span><span class="br0">&#40;</span><span class="st0">&quot;<span class="es0">\r</span>Word: {}, TF-IDF: {}&quot;</span>.<span class="me1">format</span><span class="br0">&#40;</span>word<span class="sy0">,</span> <span class="kw2">round</span><span class="br0">&#40;</span>score<span class="sy0">,</span> <span class="nu0">5</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"># 1: Get content of site using requests and html2test
+def get_site_text(url):
+    resp = requests.get(url)
+    resp.raise_for_status()
+    html = resp.text
+    return html2text.html2text(html)
+
+# 2: Score each word for an individual page against the full set of pages
+def score_page(blob, blobs):
+    scores = {word: tdidf(word, blob, blobs) for word in blob.words if len(word) &gt; 2}
+    return sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+# 3: For each URL in the page list, get the text content and a TextBlob for the content
+completed_pages = []
+for page in pages:
+    print('Processing %s' % page)
+    try:
+        raw = get_site_text(page).lower()
+        completed_pages.append({"page": page, "raw": raw, "blob": tb(raw)})
+    except Exception as exc:
+        print('Couldn\'t download %s, error: %s' % (page, exc))
+        continue
+
+# 4: For each page, calculate TD-IDF scores and output top 5 scoring words
+for page in completed_pages:
+    print('Scoring %s' % page["page"])
+    page_scores = score_page(page["blob"], [page["blob"] for page in completed_pages])
+    for word, score in page_scores[:5]:
+        print("\rWord: {}, TF-IDF: {}".format(word, round(score, 5)))</pre></div></div>
+
+<p>I love python for it&#8217;s readability, but documentation and figuring out which library one should be using for basic things like executing web requests ate up a bunch of my time (this is the 3rd web library, 4th HTML to text method, and 2nd library for analyzing content).</p>
+<p>This is the top words it gave me for the first entry, a post about a real-time JavaScript test runner using Microsoft&#8217;s VS Code IDE for samples:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1">Scoring http://tiernok.com/posts/continuous-javascript-test-execution-with-wallabyjs.html
+Word: wallaby, TF-IDF: 0.01319
+Word: baseurl, TF-IDF: 0.01116
+Word: tests, TF-IDF: 0.00962
+Word: false, TF-IDF: 0.00812
+Word: isusingwallaby, TF-IDF: 0.00609</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Scoring http://tiernok.com/posts/continuous-javascript-test-execution-with-wallabyjs.html
+Word: wallaby, TF-IDF: 0.01319
+Word: baseurl, TF-IDF: 0.01116
+Word: tests, TF-IDF: 0.00962
+Word: false, TF-IDF: 0.00812
+Word: isusingwallaby, TF-IDF: 0.00609</pre></div></div>
+
+<p>Apparently I didn&#8217;t use explicit &#8220;false&#8221; values frequently enough in the prior posts (or at least not as frequently as I used the word Javascript). </p>
+<p>This bring us to the reasons it won&#8217;t fit for what I&#8217;m doing:</p>
+<p>1. If I compare all of my content against my content, a lot of the real keywords are going to end up with high IDF values simply because I am going to use them in a lot of posts (or read about them a lot when I apply it to bookmarking other people&#8217;s content)</p>
+<p>2. It&#8217;s slow. Granted, I&#8217;m doing this the worst possible way right now, by analyzing the whole set of words in the whole set of documents for each page, so I could optimize a lot simply by building an overall hashtable of words and document frequencies and per-document hashtables of words and frequencies, but this is only going to optimize well because I use the same words a lot, which brings us back to #1.</p>
+<p>So, still a useful tool in the bag and could be interesting comparing a small number of documents to more general written works to not lose the industry specific terms, but not really the answer to what I&#8217;m looking for.</p>
+<h2>RAKE: Rapid Automatic Keyword Extraction</h2>
+<p>RAKE is an <a href="https://en.wikipedia.org/wiki/Unsupervised_learning">unsupervised</a> algorithm designed to quickly extract keywords from longer form text very efficiently and without comparison to a larger body of works.</p>
+<h3>How RAKE works</h3>
+<p>The RAKE algorithm is described in the book Text Mining Applications and Theory by Michael W Berry (<a href="https://www.amazon.com/Text-Mining-Applications-Michael-Berry/dp/0470749822/">amazon</a>, <a href="http://onlinelibrary.wiley.com/book/10.1002/9780470689646">wiley.com</a>):</p>
+<p>1. Candidates are extracted from the text by finding strings of words that do not include phrase delimiters or stop words (a, the, of, etc). This produces the list of candidate keywords/phrases.</p>
+<p>2. A Co-occurrence graph is built to  identify the frequency that words are associated together in those phrases. Here is a good outline of how co-occurence graphs are built: <a href="https://marcobonzanini.com/2015/03/23/mining-twitter-data-with-python-part-4-rugby-and-term-co-occurrences/">Mining Twitter Data with Python (Part 4: Rugby and Term Co-occurrences)</a></p>
+<p>3. A score is calculated for each phrase that is the sum of the individual word&#8217;s scores from the co-occurrence graph. An individual word score is calculated as the degree (number of times it appears + number of additional words it appears with) of a word divided by it&#8217;s frequency (number of times it appears), which weights towards longer phrases.</p>
+<p>4. Adjoining keywords are included if they occur more than twice in the document and score high enough. An adjoining keyword is two keyword phrases with a stop word between them.</p>
+<p>5. The top T keywords are then extracted from the content, where T is 1/3rd of the number of words in the graph</p>
+<p>Which sounds like it should resolve both the speed and watering down effects from TF-IDF.</p>
+<h3>Implementation using RAKE</h3>
+<p>Luckily, there are a few implementations for RAKE already for python. I&#8217;ll be using the highest google result, <a href="https://pypi.python.org/pypi/python-rake/1.0.5">python-rake</a>.</p>
+<p><b><a href="https://github.com/tarwn/bookmark_analysis/blob/master/exploration/rake.py" title="rake.py in github/tarwn/bookmark_analysis">rake.py</a></b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="python"><thead><tr><td colspan="2"  class="head">Python</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+</pre></td><td class="de1"><pre class="de1"><span class="co1"># 1: Method to get content of site using requests and html2test</span>
+<span class="kw1">def</span> get_site_text<span class="br0">&#40;</span>url<span class="br0">&#41;</span>:
+&nbsp; &nbsp; resp <span class="sy0">=</span> requests.<span class="me1">get</span><span class="br0">&#40;</span>url<span class="br0">&#41;</span>
+&nbsp; &nbsp; resp.<span class="me1">raise_for_status</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; html <span class="sy0">=</span> resp.<span class="me1">text</span>
+&nbsp; &nbsp; <span class="kw1">return</span> html2text.<span class="me1">html2text</span><span class="br0">&#40;</span>html<span class="br0">&#41;</span>
+&nbsp;
+<span class="co1">#2: Import stopwords from an external file</span>
+Rake <span class="sy0">=</span> RAKE.<span class="me1">Rake</span><span class="br0">&#40;</span><span class="st0">'stoplists/SmartStoplist.txt'</span><span class="br0">&#41;</span>
+&nbsp;
+<span class="co1">#3: Process each file and display top keywords</span>
+<span class="kw1">for</span> page <span class="kw1">in</span> pages:
+&nbsp; &nbsp; <span class="kw1">print</span><span class="br0">&#40;</span><span class="st0">'Processing %s'</span> % page<span class="br0">&#41;</span>
+&nbsp; &nbsp; page_text <span class="sy0">=</span> get_site_text<span class="br0">&#40;</span>page<span class="br0">&#41;</span>
+&nbsp; &nbsp; keywords <span class="sy0">=</span> Rake.<span class="me1">run</span><span class="br0">&#40;</span>page_text<span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">for</span> <span class="kw3">keyword</span><span class="sy0">,</span> score <span class="kw1">in</span> keywords<span class="br0">&#91;</span>:<span class="nu0">5</span><span class="br0">&#93;</span>:
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">print</span><span class="br0">&#40;</span><span class="st0">'Keyword: %s, score: %d'</span> % <span class="br0">&#40;</span><span class="kw3">keyword</span><span class="sy0">,</span> score<span class="br0">&#41;</span><span class="br0">&#41;</span>
+&nbsp;
+end_time <span class="sy0">=</span> <span class="kw3">time</span>.<span class="kw3">time</span><span class="br0">&#40;</span><span class="br0">&#41;</span> - start_time
+<span class="kw1">print</span><span class="br0">&#40;</span><span class="st0">'Done. Elapsed: %d'</span> % end_time<span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse"># 1: Method to get content of site using requests and html2test
+def get_site_text(url):
+    resp = requests.get(url)
+    resp.raise_for_status()
+    html = resp.text
+    return html2text.html2text(html)
+
+#2: Import stopwords from an external file
+Rake = RAKE.Rake('stoplists/SmartStoplist.txt')
+
+#3: Process each file and display top keywords
+for page in pages:
+    print('Processing %s' % page)
+    page_text = get_site_text(page)
+    keywords = Rake.run(page_text)
+    for keyword, score in keywords[:5]:
+        print('Keyword: %s, score: %d' % (keyword, score))
+
+end_time = time.time() - start_time
+print('Done. Elapsed: %d' % end_time)</pre></div></div>
+
+<p>And for the first entry in the list of pages, this nets us:</p>
+<pre type="text">
+Processing http://tiernok.com/posts/continuous-javascript-test-execution-with-wallabyjs.html
+Keyword: radiates test statuses directly, score: 14
+Keyword: test markers
+turn green/red, score: 13
+Keyword: # [continuous javascript test execution, score: 12
+Keyword: open visual studio code, score: 12
+Keyword: ext install\nwallaby-vscode\nwallaby
+</pre>
+<p>Well&#8230;that didn&#8217;t go as planned.</p>
+<p>Rake seemed to get closer to a good set of results and was twice as fast as the TF-IDF version (which, as written, will get progressively worse with every link we add to the pile). Unfortunately, we&#8217;re running into a Garbage-In Garbage-Out problem.</p>
+<h2>Better algorithms don&#8217;t give us cleaner input data</h2>
+<p>One of the biggest issues with AI/ML work is making sure you have a clean data set. In this case, there is no way for these two algorithms to know  to skip things like code entries and content from the header and footer of the site.</p>
+<p>Because I&#8217;m working with really consistent input, I can add some cleansing logic to extract just the blog posts from each page and throw away sections of code. </p>
+<h3>Cleaner Content using BeautifulSoup</h3>
+<p>Using the <a href="https://www.crummy.com/software/BeautifulSoup/bs4/doc/#">BeautifulSoup</a> module, I can grab just the article from each page and extract (remove) the code blocks from each entry before processing.</p>
+<p><b><a href="https://github.com/tarwn/bookmark_analysis/blob/master/exploration/betterData.py" title="betterData.py in github/tarwn/bookmark_analysis">betterData.py</a></b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="python"><thead><tr><td colspan="2"  class="head">Python</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">def</span> get_site_text<span class="br0">&#40;</span>url<span class="br0">&#41;</span>:
+&nbsp; &nbsp; resp <span class="sy0">=</span> requests.<span class="me1">get</span><span class="br0">&#40;</span>url<span class="br0">&#41;</span>
+&nbsp; &nbsp; resp.<span class="me1">raise_for_status</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; html <span class="sy0">=</span> resp.<span class="me1">text</span>
+&nbsp; &nbsp; soup <span class="sy0">=</span> BeautifulSoup<span class="br0">&#40;</span>html<span class="sy0">,</span> <span class="st0">&quot;html.parser&quot;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; content <span class="sy0">=</span> soup.<span class="me1">find</span><span class="br0">&#40;</span><span class="st0">'article'</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># remove code blocks</span>
+&nbsp; &nbsp; <span class="kw1">for</span> element <span class="kw1">in</span> content.<span class="me1">findAll</span><span class="br0">&#40;</span>class_<span class="sy0">=</span><span class="st0">&quot;bwp-syntax-block&quot;</span><span class="br0">&#41;</span>:
+&nbsp; &nbsp; &nbsp; &nbsp; element.<span class="me1">extract</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># remove comments filler at bottom and subtext under post title at top</span>
+&nbsp; &nbsp; <span class="kw1">for</span> element <span class="kw1">in</span> content.<span class="me1">findAll</span><span class="br0">&#40;</span>class_<span class="sy0">=</span><span class="st0">&quot;ep-post-comments&quot;</span><span class="br0">&#41;</span>:
+&nbsp; &nbsp; &nbsp; &nbsp; element.<span class="me1">extract</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="kw1">for</span> element <span class="kw1">in</span> content.<span class="me1">findAll</span><span class="br0">&#40;</span>class_<span class="sy0">=</span><span class="st0">&quot;ep-post-subtext&quot;</span><span class="br0">&#41;</span>:
+&nbsp; &nbsp; &nbsp; &nbsp; element.<span class="me1">extract</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># lower case for better matching</span>
+&nbsp; &nbsp; <span class="kw1">return</span> content.<span class="me1">get_text</span><span class="br0">&#40;</span><span class="br0">&#41;</span>.<span class="me1">lower</span><span class="br0">&#40;</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">def get_site_text(url):
+    resp = requests.get(url)
+    resp.raise_for_status()
+    html = resp.text
+    soup = BeautifulSoup(html, "html.parser")
+    content = soup.find('article')
+
+    # remove code blocks
+    for element in content.findAll(class_="bwp-syntax-block"):
+        element.extract()
+
+    # remove comments filler at bottom and subtext under post title at top
+    for element in content.findAll(class_="ep-post-comments"):
+        element.extract()
+    for element in content.findAll(class_="ep-post-subtext"):
+        element.extract()
+
+    # lower case for better matching
+    return content.get_text().lower()</pre></div></div>
+
+<p>After adding this little bit of cleanup and running it back through the same logic as above, the results are a lot better:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1">Page http://tiernok.com/posts/continuous-javascript-test-execution-with-wallabyjs.html
+&nbsp; &nbsp; TF-IDF Keywords:
+&nbsp; &nbsp; &nbsp; &nbsp; Word: wallaby, TF-IDF: 0.0133
+&nbsp; &nbsp; &nbsp; &nbsp; Word: test, TF-IDF: 0.00742
+&nbsp; &nbsp; &nbsp; &nbsp; Word: ncrunch, TF-IDF: 0.00665
+&nbsp; &nbsp; &nbsp; &nbsp; Word: tests, TF-IDF: 0.00649
+&nbsp; &nbsp; &nbsp; &nbsp; Word: karma, TF-IDF: 0.00556
+&nbsp; &nbsp; RAKE Keywords:
+&nbsp; &nbsp; &nbsp; &nbsp; Keyword: radiates test statuses directly, score: 15
+&nbsp; &nbsp; &nbsp; &nbsp; Keyword: test markers turn green/red, score: 14
+&nbsp; &nbsp; &nbsp; &nbsp; Keyword: continuous javascript test execution, score: 13
+&nbsp; &nbsp; &nbsp; &nbsp; Keyword: test marker turns red, score: 13
+&nbsp; &nbsp; &nbsp; &nbsp; Keyword: open visual studio code, score: 12</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Page http://tiernok.com/posts/continuous-javascript-test-execution-with-wallabyjs.html
+    TF-IDF Keywords:
+        Word: wallaby, TF-IDF: 0.0133
+        Word: test, TF-IDF: 0.00742
+        Word: ncrunch, TF-IDF: 0.00665
+        Word: tests, TF-IDF: 0.00649
+        Word: karma, TF-IDF: 0.00556
+    RAKE Keywords:
+        Keyword: radiates test statuses directly, score: 15
+        Keyword: test markers turn green/red, score: 14
+        Keyword: continuous javascript test execution, score: 13
+        Keyword: test marker turns red, score: 13
+        Keyword: open visual studio code, score: 12</pre></div></div>
+
+<p>Now with a cleaner content to work with, TF-IDF has pulled out a pretty good set of keywords. RAKE has pulled out a good set of phrases from the document, in terms of importance, but not really something I would use for keywords. Neither is knocking it out of the ballpark yet, so more work is needed.</p>
+<h2>And thus it goes…</h2>
+<p>This started as some scratch code to try and generate keywords for a consistent set of HTML pages, with the intent of applying what I built here to a diverse set (everything I&#8217;ve read and remembered to bookmark in the past 7 years). My next steps are going to be to try TextRank against the data to evaluate how it does and to modify the RAKE code to accept some constraints to see if, for instance, a limit of 2-3 word phrases nets a better set.</p>
+<p>Along the way, I also realized that LessThanDot has an awesome set of content available that would be interesting to analyze (over 1800 posts) and between tags, titles, and categories there is some labeling in place that might enable some supervised learning techniques.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/artificial-intelligence/to-build-automatic-bookmarking-unsupervised-text-classification/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

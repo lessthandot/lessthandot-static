@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>moq &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/moq/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Auto-Verifying Moqs</title>
+		<link>/index.php/enterprisedev/unittest/auto-verifying-moqs/</link>
+		<comments>/index.php/enterprisedev/unittest/auto-verifying-moqs/#respond</comments>
+		<pubDate>Thu, 20 Dec 2012 14:06:00 +0000</pubDate>
+		<dc:creator><![CDATA[Alex Ullrich]]></dc:creator>
+				<category><![CDATA[Unit Testing]]></category>
+		<category><![CDATA[c#]]></category>
+		<category><![CDATA[moq]]></category>
+		<category><![CDATA[tdd]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/auto-verifying-moqs/</guid>
+		<description><![CDATA[After years of only being familiar with Rhino mocks, I have been using Moq for the last 10 months or so.  For the most part, I like it better.  The syntax seems easier to get people up to speed on, and there are situations where it really cuts down on t&#8230;]]></description>
+				<content:encoded><![CDATA[<p>After years of only being familiar with Rhino mocks, I have been using Moq for the last 10 months or so.  For the most part, I like it better.  The syntax seems easier to get people up to speed on, and there are situations where it really cuts down on the amount of test code you have to write.  This is about one of the situations where it doesn&#8217;t.</p>
+<p>One of the things I always liked about Rhino Mocks was the idea of the mock repository, and the fact that when disposing of a mock repository all of your setups get verified automagically.  I have a lot of trouble remembering to add calls to VerifyAll when I&#8217;m adding functionality to existing tests because I got so used to this behavior in the past.  When I noticed some tests where I had unnecessary mocks setup today I decided to do something about it.  Its not really anything special but figued I&#8217;d share since I haven&#8217;t posted for a while.</p>
+<p>Basically I added a base test fixture to the project that provides a means to create tracked mocks (similar to the MockRepository concept in Rhino).  It provides a method for mock creation, and adds all created mocks to a list that is then verified in the teardown method.  Pretty simple stuff but I found it handy.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">using</span> <span class="co3">System.Collections.Generic</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">Moq</span><span class="sy0">;</span>
+<span class="kw1">using</span> <span class="co3">NUnit.Framework</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">namespace</span> Project<span class="sy0">.</span><span class="me1">Tests</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">abstract</span> <span class="kw4">class</span> MockVerifyingTest
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">readonly</span> List<span class="sy0">&lt;</span>Mock<span class="sy0">&gt;</span> _trackedMocks <span class="sy0">=</span> <span class="kw3">new</span> List<span class="sy0">&lt;</span>Mock<span class="sy0">&gt;</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">protected</span> Mock<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span> GenerateTrackedMock<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span><span class="br0">&#40;</span>MockBehavior mockBehavior <span class="sy0">=</span> MockBehavior<span class="sy0">.</span><span class="kw1">Default</span><span class="br0">&#41;</span> <span class="kw1">where</span> T <span class="sy0">:</span> <span class="kw4">class</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> mock <span class="sy0">=</span> <span class="kw3">new</span> Mock<span class="sy0">&lt;</span>T<span class="sy0">&gt;</span><span class="br0">&#40;</span>mockBehavior<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _trackedMocks<span class="sy0">.</span><span class="kw1">Add</span><span class="br0">&#40;</span>mock<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> mock<span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#91;</span>TearDown<span class="br0">&#93;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">virtual</span> <span class="kw4">void</span> TearDown<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">try</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">foreach</span> <span class="br0">&#40;</span><span class="kw1">var</span> mock <span class="kw1">in</span> _trackedMocks<span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; mock<span class="sy0">.</span><span class="me1">VerifyAll</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">finally</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; _trackedMocks<span class="sy0">.</span><span class="me1">Clear</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">using System.Collections.Generic;
+using Moq;
+using NUnit.Framework;
+
+namespace Project.Tests
+{
+    public abstract class MockVerifyingTest
+    {
+        readonly List&lt;Mock&gt; _trackedMocks = new List&lt;Mock&gt;();
+
+        protected Mock&lt;T&gt; GenerateTrackedMock&lt;T&gt;(MockBehavior mockBehavior = MockBehavior.Default) where T : class
+        {
+            var mock = new Mock&lt;T&gt;(mockBehavior);
+            _trackedMocks.Add(mock);
+            return mock;
+        }
+
+        [TearDown]
+        public virtual void TearDown()
+        {
+            try
+            {
+                foreach (var mock in _trackedMocks)
+                {
+                    mock.VerifyAll();
+                }
+            }
+            finally
+            {
+                _trackedMocks.Clear();
+            }
+        }
+    }
+}</pre></div></div>
+
+<p>So now instead of something like this:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> ATest<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> foo <span class="sy0">=</span> <span class="kw3">new</span> Mock<span class="sy0">&lt;</span>IFoo<span class="sy0">&gt;</span><span class="br0">&#40;</span>MockBehavior<span class="sy0">.</span><span class="me1">Strict</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; foo<span class="sy0">.</span><span class="me1">Setup</span><span class="br0">&#40;</span>f <span class="sy0">=&gt;</span> f<span class="sy0">.</span><span class="me1">GetSomething</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Returns</span><span class="br0">&#40;</span><span class="kw3">new</span> Something<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> bar <span class="sy0">=</span> <span class="kw3">new</span> Bar<span class="br0">&#40;</span>foo<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; bar<span class="sy0">.</span><span class="me1">CodeUnderTest</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; foo<span class="sy0">.</span><span class="me1">VerifyAll</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void ATest() 
+{
+    var foo = new Mock&lt;IFoo&gt;(MockBehavior.Strict);
+
+    foo.Setup(f =&gt; f.GetSomething()).Returns(new Something());
+
+    var bar = new Bar(foo);
+
+    bar.CodeUnderTest();
+
+    foo.VerifyAll();
+}</pre></div></div>
+
+<p>I can have my fixture inherit from MockVerifyingTest and write it like this:</p>
+<p><
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> ATest<span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> foo <span class="sy0">=</span> GenerateTrackedMock<span class="sy0">&lt;</span>IFoo<span class="sy0">&gt;</span><span class="br0">&#40;</span>MockBehavior<span class="sy0">.</span><span class="me1">Strict</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; foo<span class="sy0">.</span><span class="me1">Setup</span><span class="br0">&#40;</span>f <span class="sy0">=&gt;</span> f<span class="sy0">.</span><span class="me1">GetSomething</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="me1">Returns</span><span class="br0">&#40;</span><span class="kw3">new</span> Something<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">var</span> bar <span class="sy0">=</span> <span class="kw3">new</span> Bar<span class="br0">&#40;</span>foo<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; bar<span class="sy0">.</span><span class="me1">CodeUnderTest</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void ATest() 
+{
+    var foo = GenerateTrackedMock&lt;IFoo&gt;(MockBehavior.Strict);
+
+    foo.Setup(f =&gt; f.GetSomething()).Returns(new Something());
+
+    var bar = new Bar(foo);
+
+    bar.CodeUnderTest();
+}</pre></div></div>
+
+<p>It only saves one line of test code in this example, but it can add up when dealing with tests that have several mocks.  I realize having this many mocks in play for a test is just asking for trouble, but I am dealing with a legacy system without any test coverage, so working in test coverage without any sweeping refactorings is imperative at this point.  We can make those changes later once we&#8217;ve gotten through a release or two with the code that is now under test <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/enterprisedev/unittest/auto-verifying-moqs/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

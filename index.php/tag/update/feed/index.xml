@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>update &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/update/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Multidocument updates with MongoDB</title>
+		<link>/index.php/datamgmt/dbprogramming/multidocument-updates-with-mongodb/</link>
+		<comments>/index.php/datamgmt/dbprogramming/multidocument-updates-with-mongodb/#respond</comments>
+		<pubDate>Sun, 20 Jan 2013 15:16:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[bigdata]]></category>
+		<category><![CDATA[mongodb]]></category>
+		<category><![CDATA[nosql]]></category>
+		<category><![CDATA[update]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/01/multidocument-updates-with-mongodb/</guid>
+		<description><![CDATA[This is my fifth MongoDB posts, you can find all the MongoDB posts here /index.php/All/mongodb:
+
+Today we are going to look at update statements. We looked at it a little already in the Doing UPSERTs in MongoDB post, in thi&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This is my fifth MongoDB post, you can find all the MongoDB posts here /index.php/All/mongodb:</p>
+<p>Today we are going to look at update statements. We looked at it a little already in the <a href="/index.php/DataMgmt/DBProgramming/doing-upserts-in-mongodb">Doing UPSERTs in MongoDB</a> post, in this post I want to show you how updates are different from regular SQL.</p>
+<p>To get started insert this data</p>
+<pre>db.Indexing.insert( { name : "Denis", age : 10 } )
+db.Indexing.insert( { name : "Denis", age : 20 } )
+db.Indexing.insert( { name : "Denis", age : 30 } )
+db.Indexing.insert( { name : "Abe", age : 10 } )
+db.Indexing.insert( { name : "Abe", age : 20 } )
+db.Indexing.insert( { name : "Abe", age : 30 } )</pre>
+<p>Now let&#8217;s say I want to update the age for all documents that have the name Denis to 40. You would think it would be this</p>
+<pre>db.Indexing.update({name: "Denis"}, {age: 40})</pre>
+<p>Execute that and let&#8217;s bring back all the documents with the name Denis</p>
+<pre>db.Indexing.find({name: "Denis"})</pre>
+<p>Here are the results</p>
+<pre>{ "_id" : ObjectId("50fc234dfda7317c756fb846"), "name" : "Denis", "age" : 20 }
+{ "_id" : ObjectId("50fc234dfda7317c756fb847"), "name" : "Denis", "age" : 30 }</pre>
+<p>Where is the the document with the name Denis for which I changed the age to 40? Let&#8217;s bring back all documents in this collection to find out</p>
+<pre>db.Indexing.find()</pre>
+<pre>{ "_id" : ObjectId("50fc234dfda7317c756fb845"), "age" : 40 }
+{ "_id" : ObjectId("50fc234dfda7317c756fb846"), "name" : "Denis", "age" : 20 }
+{ "_id" : ObjectId("50fc234dfda7317c756fb847"), "name" : "Denis", "age" : 30 }
+{ "_id" : ObjectId("50fc234dfda7317c756fb848"), "name" : "Abe", "age" : 10 }
+{ "_id" : ObjectId("50fc234dfda7317c756fb849"), "name" : "Abe", "age" : 20 }
+{ "_id" : ObjectId("50fc234dfda7317c756fb84a"), "name" : "Abe", "age" : 30 }</pre>
+<p>Oops, see what happened, it replaced <code>"name" : "Denis", "age" : 20</code> to  <code>"age" : 40</code><br />
+Yikes, not what we wanted. So how do you do it then? We can use the $set operator to set a particular value</p>
+<p>The syntax looks like this</p>
+<pre>db.collection.update( { field: value1 }, { $set: { field1: value2 } } );</pre>
+<p>Let&#8217;s try again</p>
+<pre>db.Indexing.update({name: "Denis"}, {$set: {age: 40}})</pre>
+<p>Let&#8217;s bring back both of the documents where the name is Denis</p>
+<pre>db.Indexing.find({name: "Denis"})</pre>
+<p>Here are the results</p>
+<pre>{ "_id" : ObjectId("50fc234dfda7317c756fb846"), "name" : "Denis", "age" : 40 }
+{ "_id" : ObjectId("50fc234dfda7317c756fb847"), "name" : "Denis", "age" : 30 }</pre>
+<p>What happened? As you can see only 1 document got updated. The default behavior of the update() method updates a single document and would correspond to the SQL UPDATE statement with LIMIT 1 or TOP 1. With the multi option, update() method would correspond to the SQL UPDATE statement without the LIMIT or TOP clause.</p>
+<p>All we have to add is multi: true, here is how we would have to rewrite our update</p>
+<pre>db.Indexing.update({name: "Denis"}, {$set: {age: 42}},{ multi: true })</pre>
+<p>Let&#8217;s bring back both of the documents where the name is Denis again</p>
+<pre>db.Indexing.find({name: "Denis"})</pre>
+<p>Here are the results</p>
+<pre>{ "_id" : ObjectId("50fc234dfda7317c756fb846"), "name" : "Denis", "age" : 42 }
+{ "_id" : ObjectId("50fc234dfda7317c756fb847"), "name" : "Denis", "age" : 42 }</pre>
+<p>As you can see both have now 42 for age</p>
+<p>Be aware of these differences compared to traditional RDBMS systems when doing updates, you might be wrecking your data without realizing it immediately&#8230;&#8230;&#8230;  and when you do realize it, it might be too late <img src="https://s.w.org/images/core/emoji/2/72x72/1f641.png" alt="🙁" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/multidocument-updates-with-mongodb/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Dealing with The multi-part identifier &#8220;dbo.Table.Column&#8221; could not be bound. error in an update statement</title>
+		<link>/index.php/datamgmt/dbprogramming/dealing-with-the-multi-part-identifier-d/</link>
+		<comments>/index.php/datamgmt/dbprogramming/dealing-with-the-multi-part-identifier-d/#comments</comments>
+		<pubDate>Wed, 01 Sep 2010 22:33:18 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[error]]></category>
+		<category><![CDATA[gotcha]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[update]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/09/dealing-with-the-multi-part-identifier-d/</guid>
+		<description><![CDATA[One of the best ways to improve your skills is by helping other people in forums and newsgroups. I was doing just that tonight and I stumbled on this piece of code here: http://stackoverflow.com/questions/3622685/transfer-column-data-from-one-database-to-another T-SQL1 2 3 4 5 update &#91;DB1&#93;.&#91;dbo&#93;.&#91;Table1&#93; set &#91;DB1&#93;.&#91;dbo&#93;.&#91;Table1&#93;.&#91;Column1&#93; = &#91;DB2&#93;.&#91;dbo&#93;.&#91;Table1&#93;.&#91;Column1&#93; from &#91;DB1&#93;.&#91;dbo&#93;.&#91;Table1&#93; db1Alias, &#91;DB2&#93;.&#91;dbo&#93;.&#91;Table1&#93; db2Alias where db1Alias.TeamId = db2Alias.TeamId and [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>One of the best ways to improve your skills is by helping other people in forums and newsgroups. I was doing just that tonight and I stumbled on this piece of code here: http://stackoverflow.com/questions/3622685/transfer-column-data-from-one-database-to-another</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">update</span> <span class="br0">&#91;</span>DB1<span class="br0">&#93;</span>.<span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Table1<span class="br0">&#93;</span>
+<span class="kw1">set</span> <span class="br0">&#91;</span>DB1<span class="br0">&#93;</span>.<span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Table1<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Column1<span class="br0">&#93;</span> <span class="sy0">=</span> <span class="br0">&#91;</span>DB2<span class="br0">&#93;</span>.<span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Table1<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Column1<span class="br0">&#93;</span>
+<span class="kw1">from</span> <span class="br0">&#91;</span>DB1<span class="br0">&#93;</span>.<span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Table1<span class="br0">&#93;</span> db1Alias, <span class="br0">&#91;</span>DB2<span class="br0">&#93;</span>.<span class="br0">&#91;</span>dbo<span class="br0">&#93;</span>.<span class="br0">&#91;</span>Table1<span class="br0">&#93;</span> db2Alias
+<span class="kw1">where</span> db1Alias.<span class="me1">TeamId</span> <span class="sy0">=</span> db2Alias.<span class="me1">TeamId</span>
+and db1Alias.<span class="me1">IndividualId</span> <span class="sy0">=</span> db2Alias.<span class="me1">IndividualId</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">update [DB1].[dbo].[Table1]
+set [DB1].[dbo].[Table1].[Column1] = [DB2].[dbo].[Table1].[Column1]
+from [DB1].[dbo].[Table1] db1Alias, [DB2].[dbo].[Table1] db2Alias
+where db1Alias.TeamId = db2Alias.TeamId
+and db1Alias.IndividualId = db2Alias.IndividualId</pre></div></div>
+
+<p>Can you tell what is wrong with the code? If you try to run that you will get the following error</p>
+<div style="border:1px solid black;background-color:#444;color:white;margin:0 20px;padding:0 5px 0 5px;">Msg 4104, Level 16, State 1, Line 2<br />
+The multi-part identifier &#8220;DB2.dbo.Table1.Column1&#8221; could not be bound.</div>
+<p></p>
+<p>The problem is that aliases are defined for the tables but not used in the column part.</p>
+<p>Let&#8217;s take a closer look with some code that you can actually run. First create these two tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">use</span> tempdb
+go
+&nbsp;
+<span class="kw1">create</span> <span class="kw1">table</span> BlaTest<span class="br0">&#40;</span>id <span class="kw1">int</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> BlaTest <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+go
+&nbsp;
+<span class="kw1">create</span> <span class="kw1">table</span> BlaTest2<span class="br0">&#40;</span>id <span class="kw1">int</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> BlaTest2 <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+go</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">use tempdb
+go
+
+create table BlaTest(id int)
+insert BlaTest values(1)
+go
+
+create table BlaTest2(id int)
+insert BlaTest2 values(1)
+go</pre></div></div>
+
+<p>Now when you try to run this piece of code, which is the same as the code at the beginning of the post except for the object names, you will get an error.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">update</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest</span>
+<span class="kw1">set</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest</span>.<span class="me1">id</span> <span class="sy0">=</span>tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest2</span>.<span class="me1">id</span>
+<span class="kw1">from</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest</span> b
+<span class="sy0">JOIN</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest2</span> a <span class="kw1">on</span> b.<span class="me1">id</span> <span class="sy0">=</span>a.<span class="me1">id</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">update tempdb.dbo.BlaTest
+set tempdb.dbo.BlaTest.id =tempdb.dbo.BlaTest2.id
+from tempdb.dbo.BlaTest b
+JOIN tempdb.dbo.BlaTest2 a on b.id =a.id</pre></div></div>
+
+<p>Here is the error</p>
+<div style="border:1px solid black;background-color:#444;color:white;margin:0 20px;padding:0 5px 0 5px;">Msg 4104, Level 16, State 1, Line 2<br />
+The multi-part identifier &#8220;tempdb.dbo.BlaTest2.id&#8221; could not be bound.</div>
+<p></p>
+<p>So what can be done?</p>
+<p>Here is my preferred way of running this query, use the table aliases in the update and the columns</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">update</span> b
+<span class="kw1">set</span> b.<span class="me1">id</span> <span class="sy0">=</span>a.<span class="me1">id</span>
+<span class="kw1">from</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest</span> b
+<span class="sy0">JOIN</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest2</span> a <span class="kw1">on</span> b.<span class="me1">id</span> <span class="sy0">=</span>a.<span class="me1">id</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">update b
+set b.id =a.id
+from tempdb.dbo.BlaTest b
+JOIN tempdb.dbo.BlaTest2 a on b.id =a.id</pre></div></div>
+
+<p>But you can also write the query like this by using the alias only for the column that is not being updated.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">update</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest</span>
+<span class="kw1">set</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest</span>.<span class="me1">id</span> <span class="sy0">=</span>a.<span class="me1">id</span>
+<span class="kw1">from</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest</span> b
+<span class="sy0">JOIN</span> tempdb.<span class="me1">dbo</span>.<span class="me1">BlaTest2</span> a <span class="kw1">on</span> b.<span class="me1">id</span> <span class="sy0">=</span>a.<span class="me1">id</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">update tempdb.dbo.BlaTest
+set tempdb.dbo.BlaTest.id =a.id
+from tempdb.dbo.BlaTest b
+JOIN tempdb.dbo.BlaTest2 a on b.id =a.id</pre></div></div>
+
+<p>The important thing to remember is that you have to use the alias in the table that you are not updating, to be safe just use the alias all over, that way you don&#8217;t have to think whether to use the alias or not.</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/dealing-with-the-multi-part-identifier-d/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+	</channel>
+</rss>

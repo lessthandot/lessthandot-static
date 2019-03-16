@@ -1,0 +1,582 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>merge &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/merge/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>MERGE bug when Foreign Key constraint is created on non-clustered index (2008RTM)</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/merge-bug-when-foreign-key/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/merge-bug-when-foreign-key/#comments</comments>
+		<pubDate>Fri, 10 Feb 2012 12:21:00 +0000</pubDate>
+		<dc:creator><![CDATA[niikola]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[merge]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/02/merge-bug-when-foreign-key/</guid>
+		<description><![CDATA[Few days ago my colleague showed me strange behavior of SQL Server's 2008  RTM MERGE statement. Although this is corrected in SP1 1 or more probably in CU1 (there is bug solved in CU1 connected to this - imo), I do believe it's worth to be mentioned.
+I&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Few days ago my colleague showed me strange behavior of SQL Server&#8217;s 2008  RTM MERGE statement. Although this is corrected in SP1 1 or more probably in CU1 (there is <a href="http://support.microsoft.com/kb/956718">bug solved in CU1</a> connected to this &#8211; imo), I do believe its worth to be mentioned.</p>
+<p>If you try to update parent column (column referenced by foreign key) even with the same value it fails with message &#8220;<span style="font-family: courier new,courier;">The MERGE statement conflicted with the REFERENCE constraint</span>&#8221; when index used for FK relationship is NONCLUSTERED. It does not matter if this index is primary key, unique constraint or non-filtered unique key (those are options you can use for FK). Moreover, it does not matter  if there is (or there&#8217;s not) some other clustered index. It also does not matter if child table has  indexes, clustered or non-clustered.</p>
+<p>How to reproduce:</p>
+<ul>
+<li>Create parent table with nonclustered index (using either primary key, unique constraint or unique index syntax) over some column.</li>
+<li>Create child table referencing above mentioned column.</li>
+<li>Insert values in both tables. One row per table is enough (child table should have not null reverencing column)</li>
+<li>Execute Merge statement on parent table updating referenced column to the same value.</li>
+</ul>
+<p> </p>
+<p>Example:</p>
+<p><span style="color: #888888;">&#8212; Create tables</span><br /><code>&lt;strong&gt;Create Table&lt;/strong&gt; tparent ( cCode &lt;strong&gt;&lt;span style="color: #888888;"&gt;varchar(2) not null&lt;/span&gt;&lt;/strong&gt;);&lt;br /&gt;&lt;strong&gt;Create table&lt;/strong&gt; tchild  ( cCode &lt;span style="color: #888888;"&gt;&lt;strong&gt;varchar(2) not null&lt;/strong&gt;&lt;/span&gt;);  &lt;/p&gt;
+&lt;p&gt;</code><code>&lt;span style="color: #888888;"&gt;-- Create non-clustered PK on parent table&lt;br /&gt;&lt;/span&gt;</code><code>&lt;span&gt;&lt;strong&gt;Alter Table&lt;/strong&gt; tparent &lt;br /&gt; &lt;strong&gt;add Constraint&lt;/strong&gt; PK_tparent&lt;br /&gt; &lt;strong&gt;Primary Key NONCLUSTERED&lt;/strong&gt; (cCode &lt;strong&gt;&lt;span style="color: #888888;"&gt;asc&lt;/span&gt;&lt;/strong&gt;);  &lt;/p&gt;
+&lt;p&gt;-&lt;/span&gt;</code><code>&lt;span&gt;&lt;span style="color: #888888;"&gt;- Create Foreign key&lt;/span&gt;&lt;/span&gt;</code><br /><code>&lt;span&gt;&lt;strong&gt;Alter Table &lt;/strong&gt;tchild                    &lt;br /&gt;&lt;strong&gt; add Constraint&lt;/strong&gt; fk_tchild_tparent&lt;br /&gt; &lt;strong&gt;Foreign Key&lt;/strong&gt; (cCode) &lt;br /&gt; &lt;strong&gt;References&lt;/strong&gt; tparent(cCode);&lt;/p&gt;
+&lt;p&gt;&lt;/span&gt;</code><code>&lt;span&gt;-&lt;/span&gt;</code><code>&lt;span&gt;&lt;span style="color: #888888;"&gt;- Create Foreign key&lt;/span&gt;&lt;/span&gt;</code><br /><code>&lt;span&gt;&lt;strong&gt;Insert Into&lt;/strong&gt; tparent(cCode) &lt;strong&gt;values &lt;/strong&gt;('AA');&lt;br /&gt;&lt;strong&gt;Insert Into &lt;/strong&gt;tchild(cCode)  &lt;strong&gt;values &lt;/strong&gt;('AA');&lt;/p&gt;
+&lt;p&gt;&lt;span style="color: #888888;"&gt;-- MERGE&lt;/span&gt;&lt;br /&gt;&lt;strong&gt;Merge &lt;/strong&gt;tparent &lt;span style="color: #888888;"&gt;&lt;strong&gt;as&lt;/strong&gt;&lt;/span&gt; trg&lt;br /&gt;&lt;strong&gt;Using &lt;/strong&gt;(&lt;strong&gt;Select&lt;/strong&gt; 'AA') &lt;span style="color: #888888;"&gt;&lt;strong&gt;as&lt;/strong&gt;&lt;/span&gt; src(cCode)&lt;br /&gt; &lt;strong&gt;on&lt;/strong&gt; src.cCode=trg.cCode&lt;br /&gt;&lt;strong&gt; When&lt;/strong&gt; &lt;strong&gt;Matched &lt;/strong&gt;&lt;br /&gt; &lt;strong&gt;Then Update Set&lt;/strong&gt; cCode=trg.cCode;&lt;br /&gt; &lt;/span&gt;</code></p>
+<p><code>&lt;span&gt;&lt;span style="color: #888888;"&gt;-- RESULT&lt;/span&gt;&lt;/span&gt;</code><br /><code>Msg 547, Level 16, State 0, Line 21&lt;br /&gt;&lt;span class="MT_red"&gt;The MERGE statement conflicted with the REFERENCE constraint "fk_tchild_tparent". &lt;br /&gt;The conflict occurred in database "tempdb", table "dbo.tchild", column 'cCode'.&lt;/span&gt;&lt;br /&gt;The statement has been terminated.</code></p>
+<p>UPDATE:</p>
+<p>Simmilar issue was found by Alexander Kuznetsov in <a href="http://sqlblog.com/blogs/alexander_kuznetsov/archive/2011/10/17/trusted-foreign-keys-allow-orphans-reject-valid-child-rows.aspx">&#8220;Trusted&#8221; Foreign Keys Allow Orphans, Reject Valid Child Rows</a> for SQL Server 2008 R2.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/merge-bug-when-foreign-key/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Using T-SQL OUTPUT and MERGE To Link Old and New Keys</title>
+		<link>/index.php/datamgmt/datadesign/using-t-sql-output-and-merge/</link>
+		<comments>/index.php/datamgmt/datadesign/using-t-sql-output-and-merge/#comments</comments>
+		<pubDate>Tue, 13 Sep 2011 11:44:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[merge]]></category>
+		<category><![CDATA[output]]></category>
+		<category><![CDATA[t-sql]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/09/using-t-sql-output-and-merge/</guid>
+		<description><![CDATA[You don't catch me doing SQL posts that often, probably because I spend far more time working in a development world that seems to be moving further and further away from SQL. That being said, the database server is optimized towards handling large sets of data and data manipulations, so rather than second-guessing developers that know far more (and have far larger budgets), I like to take advantage of database-side solutions when I can. The time saved not dragging data back and forth on the network is an extra bonus.]]></description>
+				<content:encoded><![CDATA[<p>You don&#8217;t catch me doing SQL posts that often, probably because I spend far more time working in a development world that seems to be moving further and further away from SQL. That being said, the database server is optimized towards handling large sets of data and data manipulations, so rather than second-guessing developers that know far more (and have far larger budgets), I like to take advantage of database-side solutions when I can. The time saved not dragging data back and forth on the network is an extra bonus.</p>
+<p>Recently I needed the ability to transfer records (and control of the data) between two data structures on demand. The original data structure has grown up over the course of 10+ years as part of a larger system, while the newer, purpose-built data structures exist specifically to support this data and support newer capabilities. The tricky part is that the end user gets to pick and chose which records will be managed by the newer system and which will not, on demand.</p>
+<h2>Sample Table Schemas</h2>
+<p>To get us started, I&#8217;ve created some simplified, substitute table for the post. Using simpler tables that are far fewer in count will let us focus more on the problem at hand and less on my data definition skills.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">use</span> SampleStuff;
+Go
+&nbsp;
+<span class="co1">-- &quot;Original&quot; tables with columns for new keys</span>
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_User</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_User_Key &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Username&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_Work_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_Work_Phone_Key <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Orig_User_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; New_Phone_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_Home_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_Home_Phone_Key <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Orig_User_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; New_Phone_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>&nbsp; &nbsp; 
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="co1">-- And the &quot;New&quot; tables</span>
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">New_User</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Username&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">New_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; New_Phone_Key &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Is_Work &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">bit</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">use SampleStuff;
+Go
+
+-- "Original" tables with columns for new keys
+
+CREATE TABLE dbo.Orig_User(
+	Orig_User_Key	int IDENTITY(1,1) NOT NULL,
+	Username		varchar(20) NOT NULL,
+	New_User_Key	int NULL
+);
+
+CREATE TABLE dbo.Orig_Work_Phone(
+	Orig_Work_Phone_Key int IDENTITY(1,1) NOT NULL,
+	Orig_User_Key		int NOT NULL,
+	Phone				varchar(20),
+	New_Phone_Key		int NULL
+);
+
+CREATE TABLE dbo.Orig_Home_Phone(
+	Orig_Home_Phone_Key int IDENTITY(1,1) NOT NULL,
+	Orig_User_Key		int NOT NULL,
+	Phone				varchar(20),
+	New_Phone_Key		int NULL	
+);
+
+-- And the "New" tables
+CREATE TABLE dbo.New_User(
+	New_User_Key	int IDENTITY(1,1) NOT NULL,
+	Username		varchar(20) NOT NULL
+)
+
+CREATE TABLE dbo.New_Phone(
+	New_Phone_Key	int IDENTITY(1,1) NOT NULL,
+	New_User_Key	int NOT NULL,
+	Phone			varchar(20) NOT NULL,
+	Is_Work			bit NOT NULL
+);</pre></div></div>
+
+<p><i>Note: For the sake of shorter examples, I&#8217;m going to provide examples on the User tables. We don&#8217;t actually need anything fancier than SCOPE_IDENTITY() until we get to the step where we transfer Phone records since we are doing one user at a time, but that&#8217;s why examples are so much easier than the real world.</i></p>
+<p>The tricky part of this transform is the ownership of the data. Due to some internal restrictions, the original data structure is going to be the master. This means the original record is responsible for holding both its own key and the key in the newer system. The transform needs to get the record from the original system, push it into the newer system (generating the new key), then update the new key back into the original record.</p>
+<p>If this was a one-shot ETL load, I would probably add a temporary column to the target tables to track the source keys, then update the new keys back into the source table and drop the temporary column. As you can imagine, this is an even less graceful solution when we put control into the users hands and operate at the individual record level (c&#8217;mon, it&#8217;s only a few hundred thousand table locks during peak hours).</p>
+<h2>The OUTPUT Statement</h2>
+<p>Added in SQL Server 2005 (6 years ago already?), OUTPUT can be used to return data from inside INSERT, UPDATE, DELETE, and MERGE statements. This solves the first part, giving us access to the new key when it&#8217;s generated. Well, almost.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #ID_Transfer<span class="br0">&#40;</span>new_key <span class="kw1">int</span>, old_key <span class="kw1">int</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">New_User</span><span class="br0">&#40;</span>Username<span class="br0">&#41;</span>
+<span class="kw1">OUTPUT</span> Inserted.<span class="me1">New_User_Key</span>, ??? <span class="kw1">INTO</span> #ID_Transfer
+<span class="kw1">SELECT</span> OU.<span class="me1">Username</span> <span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> OU
+<span class="kw1">WHERE</span> OU.<span class="me1">Orig_User_Key</span> <span class="sy0">=</span> @TargetUserKey;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #ID_Transfer(new_key int, old_key int);
+
+INSERT INTO dbo.New_User(Username)
+OUTPUT Inserted.New_User_Key, ??? INTO #ID_Transfer
+SELECT OU.Username FROM dbo.Orig_User OU
+WHERE OU.Orig_User_Key = @TargetUserKey;</pre></div></div>
+
+<p>While we can easily create a temporary table to capture the resulting New_User_Key that is generated on insert, we don&#8217;t have access to the table the data is coming from, so we don&#8217;t have the original key to populate next to that new key.</p>
+<p>Which brings us to MERGE.</p>
+<h2>The MERGE Statement</h2>
+<p>MERGE was added in SQL 2008 and allows us to define a source dataset, target data set, and rules to insert or update data from that source to the target. While we don&#8217;t really need the rules and update capability, what it also provides is simultaneous access to both datasets AND support for OUTPUT. Aha, I hear you saying.</p>
+<p>By forcing the merge to always perform an INSERT, we will satisfy our needs for inserting the data into the &#8220;New&#8221; tables as well as have the capability to capture both the original and new key in a single OUTPUT statement.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #ID_Transfer<span class="br0">&#40;</span>new_key <span class="kw1">int</span>, old_key <span class="kw1">int</span><span class="br0">&#41;</span>;
+&nbsp;
+MERGE <span class="kw1">INTO</span> dbo.<span class="me1">New_User</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>Target<span class="br0">&#93;</span>
+<span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> OU.<span class="me1">Orig_User_Key</span>, OU.<span class="me1">Username</span> <span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> OU <span class="kw1">WHERE</span> OU.<span class="me1">Orig_User_Key</span> <span class="sy0">=</span> @TargetUserKey<span class="br0">&#41;</span> <span class="kw1">AS</span> Source
+<span class="kw1">ON</span> <span class="nu0">1</span> <span class="sy0">=</span> <span class="nu0">0</span>
+<span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span>
+<span class="kw1">INSERT</span> <span class="br0">&#40;</span>Username<span class="br0">&#41;</span>
+<span class="kw1">VALUES</span><span class="br0">&#40;</span>source.<span class="me1">Username</span><span class="br0">&#41;</span>
+<span class="kw1">OUTPUT</span> <span class="sy0">IN</span>SERTED.<span class="me1">New_User_Key</span>, source.<span class="me1">Orig_USer_Key</span> <span class="kw1">INTO</span> #ID_Transfer;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #ID_Transfer(new_key int, old_key int);
+
+MERGE INTO dbo.New_User AS [Target]
+USING (SELECT OU.Orig_User_Key, OU.Username FROM dbo.Orig_User OU WHERE OU.Orig_User_Key = @TargetUserKey) AS Source
+ON 1 = 0
+WHEN NOT MATCHED THEN
+INSERT (Username)
+VALUES(source.Username)
+OUTPUT INSERTED.New_User_Key, source.Orig_USer_Key INTO #ID_Transfer;</pre></div></div>
+
+<p></p>
+<h2>Full Roundtrip</h2>
+<p>With the critical pieces out of the way, it&#8217;s easy now to create the full round-trip update.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> #ID_Transfer<span class="br0">&#40;</span>new_key <span class="kw1">int</span>, old_key <span class="kw1">int</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">DECLARE</span> @TargetUserKey <span class="kw1">int</span>;
+<span class="kw1">SELECT</span> @TargetUserKey <span class="sy0">=</span> <span class="nu0">1</span>;
+&nbsp;
+MERGE <span class="kw1">INTO</span> dbo.<span class="me1">New_User</span> <span class="kw1">AS</span> <span class="br0">&#91;</span>Target<span class="br0">&#93;</span>
+<span class="kw1">USING</span> <span class="br0">&#40;</span><span class="kw1">SELECT</span> OU.<span class="me1">Orig_User_Key</span>, OU.<span class="me1">Username</span> <span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> OU <span class="kw1">WHERE</span> OU.<span class="me1">Orig_User_Key</span> <span class="sy0">=</span> @TargetUserKey<span class="br0">&#41;</span> <span class="kw1">AS</span> Source
+<span class="kw1">ON</span> <span class="nu0">1</span> <span class="sy0">=</span> <span class="nu0">0</span>
+<span class="kw1">WHEN</span> <span class="sy0">NOT</span> MATCHED <span class="kw1">THEN</span>
+<span class="kw1">INSERT</span> <span class="br0">&#40;</span>Username<span class="br0">&#41;</span>
+<span class="kw1">VALUES</span><span class="br0">&#40;</span>source.<span class="me1">Username</span><span class="br0">&#41;</span>
+<span class="kw1">OUTPUT</span> <span class="sy0">IN</span>SERTED.<span class="me1">New_User_Key</span>, source.<span class="me1">Orig_USer_Key</span> <span class="kw1">INTO</span> #ID_Transfer;
+&nbsp;
+<span class="co1">-- and back-update original record with new key</span>
+<span class="kw1">UPDATE</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">SET</span> New_User_Key <span class="sy0">=</span> IT.<span class="me1">new_key</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> OU
+&nbsp; &nbsp; <span class="kw1">INNER</span> <span class="sy0">JOIN</span> #ID_Transfer IT <span class="kw1">ON</span> IT.<span class="me1">old_key</span> <span class="sy0">=</span> OU.<span class="me1">Orig_User_Key</span>;
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> #ID_Transfer;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE #ID_Transfer(new_key int, old_key int);
+
+DECLARE @TargetUserKey int;
+SELECT @TargetUserKey = 1;
+
+MERGE INTO dbo.New_User AS [Target]
+USING (SELECT OU.Orig_User_Key, OU.Username FROM dbo.Orig_User OU WHERE OU.Orig_User_Key = @TargetUserKey) AS Source
+ON 1 = 0
+WHEN NOT MATCHED THEN
+INSERT (Username)
+VALUES(source.Username)
+OUTPUT INSERTED.New_User_Key, source.Orig_USer_Key INTO #ID_Transfer;
+
+-- and back-update original record with new key
+UPDATE dbo.Orig_User
+SET New_User_Key = IT.new_key
+FROM dbo.Orig_User OU
+	INNER JOIN #ID_Transfer IT ON IT.old_key = OU.Orig_User_Key;
+
+DROP TABLE #ID_Transfer;</pre></div></div>
+
+<p>And we can see the updated values like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">20</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span> O
+<span class="kw1">LEFT</span> <span class="sy0">JOIN</span> dbo.<span class="me1">New_User</span> N <span class="kw1">ON</span> N.<span class="me1">New_User_Key</span> <span class="sy0">=</span> O.<span class="me1">New_User_Key</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT TOP 20 *
+FROM dbo.Orig_User O
+LEFT JOIN dbo.New_User N ON N.New_User_Key = O.New_User_Key</pre></div></div>
+
+<p>So that was the first step, next is the phone numbers.</p>
+<h2>Homework/Practice</h2>
+<p>Given the sample tables above, it would now be fairly straightforward to apply this idea to the phone number tables, populating the data from the original two into the single new table and back-populating the new keys back into the original records. Rather than give you the final script, I&#8217;ll instead give you the pieces needed to get this far. </p>
+<p>Setup script:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">use</span> SampleStuff;
+Go
+&nbsp;
+<span class="coMULTI">/*</span>
+<span class="coMULTI">DROP TABLE dbo.New_Phone;</span>
+<span class="coMULTI">DROP TABLE dbo.New_User;</span>
+<span class="coMULTI">DROP TABLE dbo.Orig_Home_Phone;</span>
+<span class="coMULTI">DROP TABLE dbo.Orig_Work_Phone;</span>
+<span class="coMULTI">DROP TABLE dbo.Orig_User;</span>
+<span class="coMULTI">DROP TABLE dbo.Number;</span>
+<span class="coMULTI">*/</span>
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_User</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_User_Key &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Username&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_Work_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_Work_Phone_Key <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Orig_User_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; New_Phone_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Orig_Home_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; Orig_Home_Phone_Key <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Orig_User_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span>,
+&nbsp; &nbsp; New_Phone_Key &nbsp; &nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NULL</span>&nbsp; &nbsp; 
+<span class="br0">&#41;</span>;
+&nbsp;
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">New_User</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Username&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">New_Phone</span><span class="br0">&#40;</span>
+&nbsp; &nbsp; New_Phone_Key &nbsp; <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; New_User_Key&nbsp; &nbsp; <span class="kw1">int</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Phone &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">20</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>,
+&nbsp; &nbsp; Is_Work &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">bit</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span>
+<span class="br0">&#41;</span>;
+Go
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> dbo.<span class="me1">Number</span><span class="br0">&#40;</span>num <span class="kw1">int</span> <span class="kw1">IDENTITY</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="nu0">1</span><span class="br0">&#41;</span> <span class="sy0">NOT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>;
+GO
+&nbsp;
+<span class="kw1">SET</span> <span class="kw1">NOCOUNT</span> <span class="kw1">ON</span>;
+&nbsp;
+<span class="kw1">INSERT</span> dbo.<span class="me1">Number</span> <span class="kw1">DEFAULT</span> <span class="kw1">VALUES</span> ;
+<span class="kw1">WHILE</span> <span class="kw2">SCOPE_IDENTITY</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">&lt;</span> <span class="nu0">500</span>
+&nbsp; &nbsp; <span class="kw1">INSERT</span> dbo.<span class="me1">Number</span> <span class="kw1">DEFAULT</span> <span class="kw1">VALUES</span> ;
+&nbsp; &nbsp; 
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_User</span><span class="br0">&#40;</span>Username<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> <span class="st0">'User #'</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>num <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Number</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_Work_Phone</span><span class="br0">&#40;</span>Orig_User_Key, Phone<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> Orig_User_Key, <span class="st0">'Phone '</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>Orig_User_Key <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">WHERE</span> Orig_User_Key <span class="sy0">%</span> <span class="nu0">2</span> <span class="sy0">=</span> <span class="nu0">0</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_Work_Phone</span><span class="br0">&#40;</span>Orig_User_Key, Phone<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> Orig_User_Key, <span class="st0">'Phone '</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>Orig_User_Key <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">WHERE</span> Orig_User_Key <span class="sy0">%</span> <span class="nu0">3</span> <span class="sy0">=</span> <span class="nu0">0</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_Home_Phone</span><span class="br0">&#40;</span>Orig_User_Key, Phone<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> Orig_User_Key, <span class="st0">'Phone '</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>Orig_User_Key <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">WHERE</span> Orig_User_Key <span class="sy0">%</span> <span class="nu0">3</span> <span class="sy0">=</span> <span class="nu0">0</span>;
+&nbsp;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> dbo.<span class="me1">Orig_Home_Phone</span><span class="br0">&#40;</span>Orig_User_Key, Phone<span class="br0">&#41;</span>
+<span class="kw1">SELECT</span> Orig_User_Key, <span class="st0">'Phone '</span> <span class="sy0">+</span> <span class="kw1">CAST</span><span class="br0">&#40;</span>Orig_User_Key <span class="kw1">as</span> <span class="kw1">varchar</span><span class="br0">&#41;</span>
+<span class="kw1">FROM</span> dbo.<span class="me1">Orig_User</span>
+<span class="kw1">WHERE</span> Orig_User_Key <span class="sy0">%</span> <span class="nu0">4</span> <span class="sy0">=</span> <span class="nu0">0</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">use SampleStuff;
+Go
+
+/*
+DROP TABLE dbo.New_Phone;
+DROP TABLE dbo.New_User;
+DROP TABLE dbo.Orig_Home_Phone;
+DROP TABLE dbo.Orig_Work_Phone;
+DROP TABLE dbo.Orig_User;
+DROP TABLE dbo.Number;
+*/
+
+CREATE TABLE dbo.Orig_User(
+	Orig_User_Key	int IDENTITY(1,1) NOT NULL,
+	Username		varchar(20) NOT NULL,
+	New_User_Key	int NULL
+);
+
+CREATE TABLE dbo.Orig_Work_Phone(
+	Orig_Work_Phone_Key int IDENTITY(1,1) NOT NULL,
+	Orig_User_Key		int NOT NULL,
+	Phone				varchar(20),
+	New_Phone_Key		int NULL
+);
+
+CREATE TABLE dbo.Orig_Home_Phone(
+	Orig_Home_Phone_Key int IDENTITY(1,1) NOT NULL,
+	Orig_User_Key		int NOT NULL,
+	Phone				varchar(20),
+	New_Phone_Key		int NULL	
+);
+
+
+CREATE TABLE dbo.New_User(
+	New_User_Key	int IDENTITY(1,1) NOT NULL,
+	Username		varchar(20) NOT NULL
+)
+
+CREATE TABLE dbo.New_Phone(
+	New_Phone_Key	int IDENTITY(1,1) NOT NULL,
+	New_User_Key	int NOT NULL,
+	Phone			varchar(20) NOT NULL,
+	Is_Work			bit NOT NULL
+);
+Go
+
+CREATE TABLE dbo.Number(num int IDENTITY(1,1) NOT NULL);
+GO
+
+SET NOCOUNT ON;
+
+INSERT dbo.Number DEFAULT VALUES ;
+WHILE SCOPE_IDENTITY() &lt; 500
+    INSERT dbo.Number DEFAULT VALUES ;
+    
+INSERT INTO dbo.Orig_User(Username)
+SELECT 'User #' + CAST(num as varchar)
+FROM dbo.Number;
+
+INSERT INTO dbo.Orig_Work_Phone(Orig_User_Key, Phone)
+SELECT Orig_User_Key, 'Phone ' + CAST(Orig_User_Key as varchar)
+FROM dbo.Orig_User
+WHERE Orig_User_Key % 2 = 0;
+
+INSERT INTO dbo.Orig_Work_Phone(Orig_User_Key, Phone)
+SELECT Orig_User_Key, 'Phone ' + CAST(Orig_User_Key as varchar)
+FROM dbo.Orig_User
+WHERE Orig_User_Key % 3 = 0;
+
+INSERT INTO dbo.Orig_Home_Phone(Orig_User_Key, Phone)
+SELECT Orig_User_Key, 'Phone ' + CAST(Orig_User_Key as varchar)
+FROM dbo.Orig_User
+WHERE Orig_User_Key % 3 = 0;
+
+INSERT INTO dbo.Orig_Home_Phone(Orig_User_Key, Phone)
+SELECT Orig_User_Key, 'Phone ' + CAST(Orig_User_Key as varchar)
+FROM dbo.Orig_User
+WHERE Orig_User_Key % 4 = 0;</pre></div></div>
+
+<p>Given those pieces above and some additional scripts, finishing the script should only take 5-10 minutes. Consider it a free practice problem <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/using-t-sql-output-and-merge/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+	</channel>
+</rss>

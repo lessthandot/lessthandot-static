@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>tempdb &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/tempdb/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2012 Day 1: Sizing database files</title>
+		<link>/index.php/datamgmt/dbprogramming/sizing-database-files/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sizing-database-files/#comments</comments>
+		<pubDate>Sat, 01 Dec 2012 08:42:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Business Intelligence]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[filegroups]]></category>
+		<category><![CDATA[files]]></category>
+		<category><![CDATA[log]]></category>
+		<category><![CDATA[sql advent 2012]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[sql server 2008 r2]]></category>
+		<category><![CDATA[sql server 2012]]></category>
+		<category><![CDATA[tempdb]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/sizing-database-files/</guid>
+		<description><![CDATA[This post shows how having a database that is not correctly sized will impact performance]]></description>
+				<content:encoded><![CDATA[<p>This post will demonstrate that there is a difference in performance if you don&#8217;t size your database file accordingly. It is a good practice to have your database sized correctly for the next 6 to 12 months, you don&#8217;t want your server wasting cycles with growing files all the time. Figure out how big your files are now, figure out how much they will grow in the next year and size your files accordingly, check back every month or so to see if your estimates were correct. </p>
+<p>By default SQL Server will create databases wilt very small files when you create a database and you don&#8217;t specify the sizes. If you have people creating databases on your servers, consider adding a DDL trigger to notify you when a new DB is added so that you can talk to the database creator and size the files. You also can change the defaults on the server so that you don&#8217;t have the 10% growth either.</p>
+<p>First let&#8217;s see what the difference is when we have a database where the files will have to grow versus one where the files are big enough for the data that will be inserted.</p>
+<p>Here we are creating two databases, one with much bigger files than the other one</p>
+<p>This DB is correctly sized for the data that will be inserted</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestBigger<span class="br0">&#93;</span>
+&nbsp;<span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestBigger'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'f:TempTestBigger.mdf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 509600KB , FILEGROWTH <span class="sy0">=</span> 1024KB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestBigger_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'f:TempTestBigger_log.ldf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 502400KB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">10</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE [TestBigger]
+ ON  PRIMARY 
+( NAME = N'TestBigger', FILENAME = N'f:TempTestBigger.mdf' , 
+SIZE = 509600KB , FILEGROWTH = 1024KB )
+ LOG ON 
+( NAME = N'TestBigger_log', FILENAME = N'f:TempTestBigger_log.ldf' , 
+SIZE = 502400KB , FILEGROWTH = 10%)
+GO</pre></div></div>
+
+<p>This database is very small and will have to be expanded many times to accommodate all the data I will be inserting later on</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">DATABASE</span> <span class="br0">&#91;</span>TestSmaller<span class="br0">&#93;</span>
+&nbsp;<span class="kw1">ON</span> &nbsp;<span class="kw1">PRIMARY</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmaller'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'f:TempTestSmaller.mdf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 1280KB , FILEGROWTH <span class="sy0">=</span> 1024KB <span class="br0">&#41;</span>
+&nbsp;<span class="kw2">LOG</span> <span class="kw1">ON</span> 
+<span class="br0">&#40;</span> NAME <span class="sy0">=</span> N<span class="st0">'TestSmaller_log'</span>, FILENAME <span class="sy0">=</span> N<span class="st0">'f:TempTestSmaller_log.ldf'</span> , 
+<span class="kw1">SIZE</span> <span class="sy0">=</span> 504KB , FILEGROWTH <span class="sy0">=</span> <span class="nu0">10</span><span class="sy0">%</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE DATABASE [TestSmaller]
+ ON  PRIMARY 
+( NAME = N'TestSmaller', FILENAME = N'f:TempTestSmaller.mdf' , 
+SIZE = 1280KB , FILEGROWTH = 1024KB )
+ LOG ON 
+( NAME = N'TestSmaller_log', FILENAME = N'f:TempTestSmaller_log.ldf' , 
+SIZE = 504KB , FILEGROWTH = 10%)
+GO</pre></div></div>
+
+<p>[edit]<br />
+<em>On sql server 2012, you might need to make the size of the &#8216;TestSmaller file larger</p>
+<p>If you get an error like the following</p>
+<p>Msg 1803, Level 16, State 1, Line 1<br />
+The CREATE DATABASE statement failed. The primary file must be at least 4 MB to accommodate a copy of the model database.</p>
+<p>Make the size of the primary file bigger, change the bold part from 1280KB to  5280KB or bigger if you still get the error</p>
+<p> NAME = N&#8217;TestSmaller&#8217;, FILENAME = N&#8217;f:TempTestSmaller.mdf&#8217; ,<br />
+SIZE = <strong>1280KB</strong> , FILEGROWTH = 1024KB</em></p>
+<p>[/edit]<br />
+These two stored proc calls are just to verify that the files match with what we specified, you can use sp_helpdb to check the size of a database that you created when you don&#8217;t specify the file sizes</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_helpdb</span> <span class="st0">'TestBigger'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_helpdb 'TestBigger'</pre></div></div>
+
+<pre>name	        filename	            filegroup	SIZE
+TestBigger	f:TempTestBigger.mdf	     PRIMARY	509632 KB
+TestBigger_log	f:TempTestBigger_log.ldf	NULL	502400 KB</pre>
+<p></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">EXEC</span> <span class="kw3">sp_helpdb</span> <span class="st0">'TestSmaller'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">EXEC sp_helpdb 'TestSmaller'</pre></div></div>
+
+<pre>name	        filename	             filegroup	SIZE
+TestSmaller	f:TempTestSmaller.mdf	     PRIMARY	1280 KB
+TestSmaller_log	f:TempTestSmaller_log.ldf	NULL	 512 KB</pre>
+<p>
+Next, we are creating two identical tables, one in each database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> TestSmaller
+GO
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> test <span class="br0">&#40;</span>SomeName <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, SomeID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">36</span><span class="br0">&#41;</span>, SomeOtherID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, SomeDate <span class="kw1">DATETIME</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE TestSmaller
+GO
+CREATE TABLE test (SomeName VARCHAR(100), SomeID VARCHAR(36), SomeOtherID VARCHAR(100), SomeDate DATETIME)</pre></div></div>
+
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> TestBigger
+GO
+<span class="kw1">CREATE</span> <span class="kw1">TABLE</span> test <span class="br0">&#40;</span>SomeName <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, SomeID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">36</span><span class="br0">&#41;</span>, SomeOtherID <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">100</span><span class="br0">&#41;</span>, SomeDate <span class="kw1">DATETIME</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE TestBigger
+GO
+CREATE TABLE test (SomeName VARCHAR(100), SomeID VARCHAR(36), SomeOtherID VARCHAR(100), SomeDate DATETIME)</pre></div></div>
+
+<p>This query is just used so that the data is cached for the two inserts later on, this way the data doesn&#8217;t have to be fatched from disk for either inserts, you can discard the results after the query is done</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> master
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1000000</span> c1.<span class="me1">name</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span> c1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c4</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE master
+GO
+
+
+SELECT TOP 1000000 c1.name,NEWID(),NEWID(),GETDATE() 
+FROM sys.sysobjects c1
+CROSS JOIN sys.sysobjects c2
+CROSS JOIN sys.sysobjects c3
+CROSS JOIN sys.sysobjects c4</pre></div></div>
+
+<p>Here is the first insert into the bigger database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestBigger.<span class="me1">dbo</span>.<span class="me1">test</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1000000</span> c1.<span class="me1">name</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span> c1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c4</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestBigger.dbo.test
+SELECT TOP 1000000 c1.name,NEWID(),NEWID(),GETDATE() 
+FROM sys.sysobjects c1
+CROSS JOIN sys.sysobjects c2
+CROSS JOIN sys.sysobjects c3
+CROSS JOIN sys.sysobjects c4</pre></div></div>
+
+<p>Here is the second insert into the smaller database</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> TestSmaller.<span class="me1">dbo</span>.<span class="me1">test</span>
+<span class="kw1">SELECT</span> <span class="kw1">TOP</span> <span class="nu0">1000000</span> c1.<span class="me1">name</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,NEWID<span class="br0">&#40;</span><span class="br0">&#41;</span>,<span class="kw2">GETDATE</span><span class="br0">&#40;</span><span class="br0">&#41;</span> 
+<span class="kw1">FROM</span> sys.<span class="me1">sysobjects</span> c1
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c2
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c3
+<span class="sy0">CROSS</span> <span class="sy0">JOIN</span> sys.<span class="me1">sysobjects</span> c4</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT TestSmaller.dbo.test
+SELECT TOP 1000000 c1.name,NEWID(),NEWID(),GETDATE() 
+FROM sys.sysobjects c1
+CROSS JOIN sys.sysobjects c2
+CROSS JOIN sys.sysobjects c3
+CROSS JOIN sys.sysobjects c4</pre></div></div>
+
+<p>On several machines I tested on, it takes half the time or less to insert the data in the bigger database compared to the smaller database. How about on your machine, do you see that the insert into the bigger database takes less than half the time it takes to insert into the smaller database?</p>
+<p>Check the sizes of the databases again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">exec</span> <span class="kw3">sp_helpdb</span> <span class="st0">'TestBigger'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">exec sp_helpdb 'TestBigger'</pre></div></div>
+
+<pre>name	        filename	           filegroup	size
+TestBigger	f:TempTestBigger.mdf	     PRIMARY	509632 KB
+TestBigger_log	f:TempTestBigger_log.ldf	NULL	502400 KB</pre>
+<p></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">exec</span> <span class="kw3">sp_helpdb</span> <span class="st0">'TestSmaller'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">exec sp_helpdb 'TestSmaller'</pre></div></div>
+
+<pre>name	        filename	             filegroup	size
+TestSmaller	f:TempTestSmaller.mdf	     PRIMARY	215296 KB
+TestSmaller_log	f:TempTestSmaller_log.ldf	NULL	427392 KB</pre>
+<p>
+As you can see, the bigger database did not expand, the smaller database expanded a lot.</p>
+<p><strong>Autogrow</strong><br />
+If you do use autogrow, then make sure you don&#8217;t use the default 10%, take a look at this message</p>
+<blockquote><p>Date		11/30/2012 12:57:56 PM<br />
+Log		SQL Server (Current &#8211; 11/25/2012 5:00:00 AM)</p>
+<p>Source		spid62</p>
+<p>Message<br />
+Autogrow of file &#8216;MyDB_Log&#8217; in database &#8216;MyDB&#8217; took 104381 milliseconds.  Consider using ALTER DATABASE to set a smaller FILEGROWTH for this file.</p></blockquote>
+<p>See that, it took a long time, you don&#8217;t want to grow a one terabyte file by ten percent, that would be one hundred gigabytes, that is huge. Use something smaller and don&#8217;t use percent, the bigger the file gets the longer it will take to expand the file.</p>
+<p><strong>File placement</strong><br />
+Separate the log files from the data files by placing them on separate hard drives. Placing the files on separate drives allows I/O activity to occur at the same time for both the data and log files. Instead of having huge files consider having smaller files in separate filegroups. Put different tables used in the same join queries in different filegroups as well. This will improve performance, because of parallel disk I/O searching for joined data.</p>
+<p>Put heavily accessed tables and the nonclustered indexes that belong to those tables on different filegroups. This will improve performance, because of parallel I/O if the files are located on different physical disks. Just remember that you can&#8217;t separate the clustered indexes from the base table, you can only do this for non clustered indexes. Of course people can get very creative, I have worked with a database once where each table was placed in its own filegroups, there were hundreds of files&#8230;.what a mess</p>
+<p><strong>Tempdb</strong><br />
+There are all kinds of recommendations about how many data files you should have for tempdb. Start with 4 files and add more files if you see contention. Paul Randal, has a detailed post here: <a href="http://www.sqlskills.com/blogs/paul/post/A-SQL-Server-DBA-myth-a-day-(1230)-tempdb-should-always-have-one-data-file-per-processor-core.aspx">A SQL Server DBA myth a day: (12/30) tempdb should always have one data file per processor core</a>.<br />
+If you can, place tempdb on its own physical drive as well, separated from the user databases.</p>
+<p><strong>Test, test, test</strong><br />
+Never ever blindly follow what you read on the internet, make sure that you test it out first on a QA server before promoting the changes to production!!</p>
+<p>That is all for day one of the SQL Advent 2012 series, come back tomorrow for the next one, you can also check out all the posts from last year here: <a href="/index.php/DataMgmt/DataDesign/sql-advent-2011-recap">SQL Advent 2011 Recap</a></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sizing-database-files/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>Contained Databases, Temporary Tables and Collations</title>
+		<link>/index.php/datamgmt/dbprogramming/mssqlserver/contained-databases-temptables-and-their/</link>
+		<comments>/index.php/datamgmt/dbprogramming/mssqlserver/contained-databases-temptables-and-their/#respond</comments>
+		<pubDate>Tue, 27 Mar 2012 11:54:00 +0000</pubDate>
+		<dc:creator><![CDATA[Axel Achten (axel8s)]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[collation]]></category>
+		<category><![CDATA[contained database]]></category>
+		<category><![CDATA[tempdb]]></category>
+		<category><![CDATA[temporary table]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/03/contained-databases-temptables-and-their/</guid>
+		<description><![CDATA[In SQL Server 2012 we now can have Contained Databases. To be precise we now can have partially Contained Databases. The complete definition is found in the MSDN Database. In short a Contained Database holds it's configuration and security information s&#8230;]]></description>
+				<content:encoded><![CDATA[<p>In SQL Server 2012 we now can have Contained Databases. To be precise we now can have partially Contained Databases. The complete definition is found in the <a href="http://msdn.microsoft.com/en-us/library/ff929071(v=sql.110).aspx">MSDN Database</a>. In short a Contained Database holds it&#8217;s configuration and security information so you should be able to move these databases easily between different SQL Servers without having to create users or other configuration items. But as we all know Collations can cause serious problems, certainly if there is a difference between the Collation of the database itself and tempdb. So what happens if we create a Contained Database with a different Collation on a server? And does a Contained Database uses tempdb for it&#8217;s Temporary Tables? Let&#8217;s find out what happens with a normal database and after that wath happens with a Contained Databases.<br />
+First things first, check the Collation settings of the server and tempdb:</p>
+<pre>SELECT SERVERPROPERTY('collation'), DATABASEPROPERTYEX('tempdb','collation')
+GO</pre>
+<p>In my case the server en tempdb Collation are the same, Case-Insensitive and Accent-Sensitive:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB1.png?mtime=1332856134"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB1.png?mtime=1332856134" width="394" height="64" /></a></div>
+<p>To start I create a database with a different Collation than the server default, in my case Case-Sensitive:</p>
+<pre>CREATE DATABASE NotContainedDB
+	COLLATE SQL_Latin1_General_CP1_CS_AS
+GO</pre>
+<p>From within the new database I create a regular and a Temporary Table and insert a value in it:</p>
+<pre>USE NotContainedDB
+GO
+
+CREATE TABLE NotContaintedData (
+	NCDID int IDENTITY (1,1),
+	NCDValue varchar (25)
+	)
+GO
+
+INSERT INTO NotContaintedData
+	VALUES ('CapitalData')
+
+CREATE TABLE #NotContaintedTempData (
+	NCTDID int IDENTITY (1,1),
+	NCTDValue varchar (25)
+	)
+GO
+
+INSERT INTO #NotContaintedTempData
+	VALUES ('CapitalData')
+GO</pre>
+<p>Now if we just write a little query to compare the values in both tables:</p>
+<pre>SELECT * FROM 
+	NotContaintedData NCD
+	INNER JOIN #NotContaintedTempData NCTD
+	ON NCD.NCDValue = NCTD.NCTDValue
+GO</pre>
+<p>We see that SQL Server is unable to compare the Case-Sensitive and Case-Insensitive data:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB2.png?mtime=1332856142"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB2.png?mtime=1332856142" width="996" height="64" /></a></div>
+<p>This behaviour is expected. So will it be the same with a Contained Database? To be able to test it we first have to enable the usage of Contained Databases:</p>
+<pre>SP_CONFIGURE 'contained database authentication', 1
+GO
+RECONFIGURE WITH OVERRIDE
+GO</pre>
+<p>Now we can create a Contained Database, note that we can only use PARTIAL and the database is created with a different Collation than the server default:</p>
+<pre>CREATE DATABASE ContainedDB
+	CONTAINMENT = PARTIAL
+	COLLATE SQL_Latin1_General_CP1_CS_AS
+GO</pre>
+<p>Now I create simular tables to the ones in the noncontained database:</p>
+<pre>USE ContainedDB
+GO
+
+CREATE TABLE ContaintedData (
+	CDID int IDENTITY (1,1),
+	CDValue varchar (25)
+	)
+GO
+
+INSERT INTO ContaintedData
+	VALUES ('CapitalData')
+
+CREATE TABLE #ContaintedTempData (
+	CTDID int IDENTITY (1,1),
+	CTDValue varchar (25)
+	)
+GO
+
+INSERT INTO #ContaintedTempData
+	VALUES ('CapitalData')
+GO</pre>
+<p>If we now run the query where both values are compared:</p>
+<pre>SELECT * FROM 
+	ContaintedData CD
+	INNER JOIN #ContaintedTempData CTD
+	ON CD.CDValue = CTD.CTDValue
+GO</pre>
+<p>We get a resultset:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB3.png?mtime=1332856155"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB3.png?mtime=1332856155" width="274" height="64" /></a></div>
+<p>So what does this means? Is the Temporary Table created in the Contained Database itself or is it stored in tempdb with the Collation of the Contained Database? When you execute the following query in both databases you&#8217;ll find the answer:</p>
+<pre>SP_HELP #ContaintedTempData
+GO</pre>
+<p>The query only works when executed from tempdb. So the Temporary Table is created in tempdb and in the results of the query you can see that the table is created with the Collation of the Contained Database:</p>
+<div class="image_block"><a href="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB4.png?mtime=1332856165"><img alt="" src="/wp-content/uploads/blogs/DataMgmt/Axel8s/ContDB4.png?mtime=1332856165" width="832" height="277" /></a></div>
+<p>So we can conclude that Temporary Tables in a Contained Database are still created in tempdb. But in contrast to the behaviour of a regular database the Temporary Table of a Contained Database keep the Collation of the Contained Database.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/mssqlserver/contained-databases-temptables-and-their/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Dealing with the could not allocate new page for database &#8216;TEMPDB&#8217;. There are no more pages available in filegroup DEFAULT error message</title>
+		<link>/index.php/datamgmt/datadesign/could-not-allocate-new-page-for-database/</link>
+		<comments>/index.php/datamgmt/datadesign/could-not-allocate-new-page-for-database/#respond</comments>
+		<pubDate>Tue, 21 Jul 2009 18:01:51 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[database]]></category>
+		<category><![CDATA[error]]></category>
+		<category><![CDATA[fix]]></category>
+		<category><![CDATA[gotcha]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[tempdb]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/07/could-not-allocate-new-page-for-database/</guid>
+		<description><![CDATA[Someone was writing some queries that brought back a lot of data (and I mean a LOT!!) and after a while he got the following message Connectivity error: [Microsoft][ODBC SQL Server Driver][SQL Server]Could not allocate new page for database &#8216;TEMPDB&#8217;. There are no more pages available in filegroup DEFAULT. Space can be created by dropping [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Someone was writing some queries that brought back a lot of data (and I mean a LOT!!) and after a while he got the following message</p>
+<blockquote><p>Connectivity error: [Microsoft][ODBC SQL Server Driver][SQL Server]Could not allocate new page for database &#8216;TEMPDB&#8217;. There are no more pages available in filegroup DEFAULT. Space can be created by dropping objects, adding additional files, or or allowing file growth</p></blockquote>
+<p>That is not good, fortunately this wasn&#8217;t one of our production machines but a dev/test box.</p>
+<p>So what causes this? You might think that tempdb is only used for temporary(#temp or ##temp) tables but that is not true, tempdb is used for a lot of thing and since SQL server 2005 it is used more than ever. Here are some things that tempdb is used for:</p>
+<ul>
+<li>If you do any ordering on a query and this needs more memory than you have available in RAM it will also go to tempdb</li>
+<li>If you have resultsets that are large and you use unions, group by, outer joins, cursors etc</li>
+<li>If you use temporary tables</li>
+<li>Uncommited transaction that have not been rolled back</li>
+<li>DBCC CHECKDB will use the tempdb, the larger your database the more space DBCC CHECKDB will need from tempdb
+<p>If you are creating or rebuilding indexes with the SORT_IN_TEMPDB = ON option</p>
+<p>Here is some sample code that demonstrates that</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">USE</span> AdventureWorks;
+GO
+<span class="kw1">ALTER</span> <span class="kw1">INDEX</span> <span class="sy0">ALL</span> <span class="kw1">ON</span> Production.<span class="me1">Product</span>
+REBUILD <span class="kw1">WITH</span> <span class="br0">&#40;</span><span class="kw1">FILLFACTOR</span> <span class="sy0">=</span> <span class="nu0">80</span>, S<span class="sy0">OR</span>T_<span class="sy0">IN</span>_TEMPDB <span class="sy0">=</span> <span class="kw1">ON</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; STATISTICS_N<span class="sy0">OR</span>ECOMPUTE <span class="sy0">=</span> <span class="kw1">ON</span><span class="br0">&#41;</span>;
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">USE AdventureWorks;
+GO
+ALTER INDEX ALL ON Production.Product
+REBUILD WITH (FILLFACTOR = 80, SORT_IN_TEMPDB = ON,
+              STATISTICS_NORECOMPUTE = ON);
+GO</pre></div></div>
+
+<p>See also <a href="http://msdn.microsoft.com/en-us/library/ms188281.aspx">tempdb and Index Creation</a> in Books On Line<br />
+Here is an excerpt</p>
+<blockquote><p>If the SORT_IN_TEMPDB option is set to ON and tempdb is on a separate set of disks from the destination filegroup, during the first phase, the reads of the data pages occur on a different disk from the writes to the sort work area in tempdb. This means the disk reads of the data keys generally continue more serially across the disk, and the writes to the tempdb disk also are generally serial, as do the writes to build the final index. Even if other users are using the database and accessing separate disk addresses, the overall pattern of reads and writes are more efficient when SORT_IN_TEMPDB is specified than when it is not.</p></blockquote>
+</li>
+</ul>
+<p><strong>How can you fix this problem? </strong><br />
+Here are a couple of ways</p>
+<ol>
+<li>Restart the SQL Server service, this will recreate the tempdb database</li>
+<li>Add another file on another disk with more space</li>
+<li>Shrink the log file of tempdb</li>
+</ol>
+<p>Now most likely you want to put in place some long term solutions after you did a quick fix. First of all, you should make sure that autogrow is not turned off. If you run the query below you don&#8217;t want to see a value of 0 in the growth column</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> growth,<span class="sy0">*</span> <span class="kw1">from</span> master..<span class="me1">sysaltfiles</span>
+<span class="kw1">where</span> dbid <span class="sy0">=</span> <span class="kw2">db_id</span><span class="br0">&#40;</span><span class="st0">'tempdb'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select growth,* from master..sysaltfiles
+where dbid = db_id('tempdb')</pre></div></div>
+
+<p>This query below is another way of getting the growth value for tempdb</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">use</span> tempdb
+go
+&nbsp;
+<span class="kw1">EXEC</span> <span class="kw3">sp_helpfile</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">use tempdb
+go
+
+EXEC sp_helpfile</pre></div></div>
+
+<p>You also want to make sure that tempdb is in simple recovery mode and not in full, this query will return the recovery mode for tempdb</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">DATABASEPROPERTYEX</span><span class="br0">&#40;</span><span class="st0">'tempdb'</span>,<span class="st0">'recovery'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT DATABASEPROPERTYEX('tempdb','recovery')</pre></div></div>
+
+<p>Ideally you want tempdb on its own drive, doing this will also improve performance. If you can&#8217;t have tempdb on its own drive then make sure you have plenty of space on that drive and if not then add one or more files on another drive.</p>
+<p>Make sure that your queries have covering indexes, George wrote an article that explains how to create covering indexes here: <a href="/index.php/DataMgmt/DataDesign/sql-server-covering-indexes">SQL Server covering indexes</a></p>
+<p>Most likely you don&#8217;t really want to return multi million rows in 1 big chunk, try doing it in batches that are smaller. The same applies for delete statements, try to do those in chunks, this will also perform much better. </p>
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/could-not-allocate-new-page-for-database/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

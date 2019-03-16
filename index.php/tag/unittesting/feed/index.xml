@@ -1,0 +1,520 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>UnitTesting &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/unittesting/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Using Selenium for View testing with knockout and RequireJS</title>
+		<link>/index.php/webdev/using-selenium-for-view-testing-with-knockout-and-requirejs/</link>
+		<comments>/index.php/webdev/using-selenium-for-view-testing-with-knockout-and-requirejs/#respond</comments>
+		<pubDate>Mon, 01 Dec 2014 14:20:41 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Web Developer]]></category>
+		<category><![CDATA[knockout]]></category>
+		<category><![CDATA[nancy]]></category>
+		<category><![CDATA[selenium]]></category>
+		<category><![CDATA[UnitTesting]]></category>
+		<category><![CDATA[webdriver]]></category>
+
+		<guid isPermaLink="false">/?p=3089</guid>
+		<description><![CDATA[I&#8217;ve written about using Selenium/WebDriver for automated testing in a C# environment in the past. Some of these posts may be dated, but I&#8217;ve covered everything from using the Selenium IDE, to using WebDriver and the PageObject pattern, to using SpecFlow to drive Selenium UI testing. But in this age of MVVM/MVC frameworks and libraries, [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I&#8217;ve written about using Selenium/WebDriver for automated testing in a C# environment in the past. Some of these posts may be dated, but I&#8217;ve covered everything from <a href="/index.php/webdev/uidevelopment/automated-web-testing-with-selenium/" title="Automated testing with Selenium IDE">using the Selenium IDE</a>, to <a href="/index.php/webdev/uidevelopment/automated-web-testing-with-selenium-2/" title="Automated testing with Selenium WebDriver">using WebDriver and the PageObject pattern</a>, to <a href="/index.php/enterprisedev/application-lifecycle-management/using-specflow-to/" title="Using SpecFlow to drive Selenium WebDriver Tests">using SpecFlow to drive Selenium UI testing</a>. But in this age of <a href="/index.php/webdev/uidevelopment/angularjs-vs-knockout-introduction-1/" title="AngularJS vs Knockout - Introduction (1 of 8)">MVVM/MVC frameworks and libraries</a>, do we really need every single test to hit the database?</p>
+<h1>The Integration Testing Tax</h1>
+<p>UI testing is widely accepted as slow and fragile. We can use patterns like the <a href="http://docs.seleniumhq.org/docs/06_test_design_considerations.jsp#page-object-design-pattern" title="Selenium: Page Object Design Pattern">Page Object design pattern</a> to reduce the fragility of how we interact with elements on the page, but that doesn&#8217;t speed things up any. We can merge tests to reduce repetitive actions, but that just adds a bunch of mess to the fragility side of the equation again.</p>
+<p>So what to do?</p>
+<p>Something I have been considering lately is to use Selenium to test just the View bindings, without the overhead of doing full integration testing. If I keep the logic out of the View (one of the reasons I love MVVM), then I can write some very extensive behavioral unit tests very close to the user and have fast, thorough behavior coverage. My main test concern then becomes how I ensure my bindings stay wired together over time, since I know the behavior under them is working properly. Tightening the focus provides a smaller subsurface to test against then trying to test all of the intricacies all of the way down and reduces the performance drags of anything behind the UI (like network, disk, subsystems, etc), so I could potentially test far more things in less time.</p>
+<h1>UI Testing without the Backend</h1>
+<p>To try this out, I needed a sample application. I wrote a simple application using <a href="http://knockoutjs.com/">knockout</a> and <a href="http://requirejs.org/">RequireJS</a>. There is a basic search screen that allows you to &#8220;search&#8221; against a slow WebApi endpoint, get further details about a product from that endpoint, and add items to a local cart. </p>
+<p>Note: The WebApi actions are slow to reflect performance from larger, more complex applications that have to worry about things like authentication, databases, accessing network stores, logging, contention and retry policies, business logic, etc. </p>
+<h2>The Fake Application + Test Cases</h2>
+<p>All of the code for the fake application and tests is on github at <a href="https://github.com/tarwn/Blog_RequireJSandSelenium" title="tarwn/Blog_RequireJSandSelenium on github">tarwn/Blog_RequireJSandSelenium</a>.</p>
+<p>The fake application looks like this:</p>
+<p><a href="/wp-content/uploads/2014/11/SeleniumKnockoutSampleApp.png"><img src="/wp-content/uploads/2014/11/SeleniumKnockoutSampleApp.png" alt="SeleniumKnockoutSampleApp" width="639" height="864" class="aligncenter size-full wp-image-3090" srcset="/wp-content/uploads/2014/11/SeleniumKnockoutSampleApp.png 639w, /wp-content/uploads/2014/11/SeleniumKnockoutSampleApp-221x300.png 221w" sizes="(max-width: 639px) 100vw, 639px" /></a></p>
+<p>The ViewModel behind this view contains all of the properties necessary to display the screen and it&#8217;s actions:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="javascript"><thead><tr><td colspan="2"  class="head">Javascript</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+</pre></td><td class="de1"><pre class="de1">define<span class="br0">&#40;</span><span class="br0">&#91;</span><span class="st0">&quot;knockout&quot;</span><span class="sy0">,</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;lodash&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/services/itemService&quot;</span><span class="sy0">,</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/models/itemSummary&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/models/itemFull&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/models/itemCart&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="st0">&quot;app/models/cart&quot;</span>
+<span class="br0">&#93;</span><span class="sy0">,</span>
+<span class="kw1">function</span> <span class="br0">&#40;</span>ko<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ItemService<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ItemSummary<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ItemFull<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; ItemCart<span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Cart<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp;
+&nbsp; &nbsp; <span class="kw1">function</span> IndexViewModel<span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> itemService <span class="sy0">=</span> <span class="kw1">new</span> ItemService<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> self <span class="sy0">=</span> <span class="kw1">this</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">searchText</span> <span class="sy0">=</span> ko.<span class="me1">observable</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">isSearching</span> <span class="sy0">=</span> ko.<span class="me1">observable</span><span class="br0">&#40;</span><span class="kw2">false</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">searchResults</span> <span class="sy0">=</span> ko.<span class="me1">observableArray</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">executeSearch</span> <span class="sy0">=</span> <span class="kw1">function</span> <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="coMULTI">/* Search logic with self.itemService.getItems */</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">selectedItem</span> <span class="sy0">=</span> ko.<span class="me1">observable</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">isLoadingSelectedItem</span> <span class="sy0">=</span> ko.<span class="me1">observable</span><span class="br0">&#40;</span><span class="kw2">false</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">selectItem</span> <span class="sy0">=</span> <span class="kw1">function</span> <span class="br0">&#40;</span>item<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="coMULTI">/* Selection logic with self.itemService.getItem(item.id) */</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">cart</span> <span class="sy0">=</span> <span class="kw1">new</span> Cart<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">this</span>.<span class="me1">addToCart</span> <span class="sy0">=</span> <span class="kw1">function</span> <span class="br0">&#40;</span>itemToAdd<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="coMULTI">/* Add item to cart */</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">return</span> IndexViewModel<span class="sy0">;</span>
+&nbsp;
+<span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">define(["knockout", 
+        "lodash",
+        "app/services/itemService", 
+        "app/models/itemSummary",
+        "app/models/itemFull",
+        "app/models/itemCart",
+        "app/models/cart"
+],
+function (ko,
+        _,
+        ItemService,
+        ItemSummary,
+        ItemFull,
+        ItemCart,
+        Cart) {
+   
+    function IndexViewModel() {
+        var itemService = new ItemService();
+        var self = this;
+
+        this.searchText = ko.observable();
+        this.isSearching = ko.observable(false);
+        this.searchResults = ko.observableArray();
+        this.executeSearch = function () {
+                /* Search logic with self.itemService.getItems */
+        };
+        
+        this.selectedItem = ko.observable();
+        this.isLoadingSelectedItem = ko.observable(false);
+        this.selectItem = function (item) {
+                /* Selection logic with self.itemService.getItem(item.id) */
+        };
+
+        this.cart = new Cart();
+        this.addToCart = function (itemToAdd) {
+                /* Add item to cart */
+        };
+    }
+
+    return IndexViewModel;
+
+});</pre></div></div>
+
+<p>All of the code for the site is located here: <a href="https://github.com/tarwn/Blog_RequireJSandSelenium/tree/master/SampleWebSite" title="SampleWebSite on github">github: tarwn/Blog_RequireJSandSelenium &#8211; /SampleWebSite</a></p>
+<div style="background-color: #FFFFBB; padding: 1em; margin: .25em 1em">If you have not used <a href="http://requirejs.org/" title="RequireJS">RequireJS</a>, the top part of the javascript file may look confusing. define() is used to define all the dependencies I need for the script and a method that accepts those dependencies for us in the scope of that script. When someone in turn asks for an IndexViewModel (or more appropriately: /app/indexViewModel), they will get back this constructor, fully wired with all of it&#8217;s dependencies. RequireJS ensures dependencies are loaded in the right order, keeps the global window scope clean, and allows us to mock out those dependencies using tools like <a href="https://github.com/iammerrick/Squire.js/" title="Squire.js on github">Squire.js</a>.</div>
+<p>Let&#8217;s get testing!</p>
+<h2>Testing with Selenium &#8211; times 8!</h2>
+<p>While playing with this, I looked at 4 different methods of testing with Selenium across Chrome and Phantom. </p>
+<p>The 4 methods are:</p>
+<ul>
+<li><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/IndexTests.FullIntegration.cs">IndexTests.FullIntegration</a> &#8211; launch the site locally and run my UI tests against it, with the &#8220;real&#8221; WebAPI service</li>
+<li><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/IndexTests.ClientSideInjection.cs">IndexTests.ClientSideInjection</a> &#8211; Execute a script to stub the itemService.js logic to run locally</li>
+<li><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/IndexTests.NancyServer.cs">IndexTests.NancyServer</a> &#8211; Self-host a Nancy server with fake versions of the server-side API</li>
+<li><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/IndexTests.NancyServerWithScriptInjection.cs">IndexTests.NancyServer</a> &#8211; Self-host a Nancy server that serves a stubbed itemService.js file</li>
+</ul>
+<p>These tests only cover the case where the HTML page is already a static file. If my page had instead been server-side generated from something like ASP.Net MVC or Web Pages, there would be additional work involved.</p>
+<p>My goal was to keep the tests consistent across methods. This is a sample test:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>Test<span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">void</span> WhenUserSearchesForItemsAndSelectsOne_ThenDetailsAreDisplayedForTheSelectedProduct<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> indexPage <span class="sy0">=</span> <span class="kw3">new</span> IndexPage<span class="br0">&#40;</span>_webDriver, _url, <span class="st0">&quot;Sample App&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; indexPage<span class="sy0">.</span><span class="me1">SearchButton</span><span class="sy0">.</span><span class="me1">Click</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Utility<span class="sy0">.</span><span class="me1">WaitUpTo</span><span class="br0">&#40;</span><span class="nu0">5000</span>, <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">=&gt;</span> Utility<span class="sy0">.</span><span class="me1">IsElementPresent</span><span class="br0">&#40;</span>indexPage<span class="sy0">.</span><span class="me1">SearchResultsTable</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">&amp;&amp;</span> indexPage<span class="sy0">.</span><span class="me1">SearchResultsTable</span><span class="sy0">.</span><span class="me1">Displayed</span>, <span class="st0">&quot;Search results&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreNotEqual</span><span class="br0">&#40;</span><span class="nu0">0</span>, indexPage<span class="sy0">.</span><span class="me1">GetNumberOfSearchResults</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; indexPage<span class="sy0">.</span><span class="me1">ClickSearchResults</span><span class="br0">&#40;</span><span class="nu0">0</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Utility<span class="sy0">.</span><span class="me1">WaitUpTo</span><span class="br0">&#40;</span><span class="nu0">5000</span>, <span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">=&gt;</span> Utility<span class="sy0">.</span><span class="me1">IsElementPresent</span><span class="br0">&#40;</span>indexPage<span class="sy0">.</span><span class="me1">ItemDetails</span><span class="br0">&#41;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="sy0">&amp;&amp;</span> indexPage<span class="sy0">.</span><span class="me1">ItemDetails</span><span class="sy0">.</span><span class="me1">Displayed</span>, <span class="st0">&quot;Item Details&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; Assert<span class="sy0">.</span><span class="me1">AreEqual</span><span class="br0">&#40;</span>indexPage<span class="sy0">.</span><span class="me1">GetSelectedRowItemName</span><span class="br0">&#40;</span><span class="br0">&#41;</span>, indexPage<span class="sy0">.</span><span class="me1">ItemDetailsName</span><span class="sy0">.</span><span class="me1">Text</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void WhenUserSearchesForItemsAndSelectsOne_ThenDetailsAreDisplayedForTheSelectedProduct()
+{
+    var indexPage = new IndexPage(_webDriver, _url, "Sample App");
+
+    indexPage.SearchButton.Click();
+    Utility.WaitUpTo(5000, () =&gt; Utility.IsElementPresent(indexPage.SearchResultsTable) 
+				  &amp;&amp; indexPage.SearchResultsTable.Displayed, "Search results");
+    Assert.AreNotEqual(0, indexPage.GetNumberOfSearchResults());
+
+    indexPage.ClickSearchResults(0);
+    Utility.WaitUpTo(5000, () =&gt; Utility.IsElementPresent(indexPage.ItemDetails) 
+				  &amp;&amp; indexPage.ItemDetails.Displayed, "Item Details");
+
+    Assert.AreEqual(indexPage.GetSelectedRowItemName(), indexPage.ItemDetailsName.Text);
+}</pre></div></div>
+
+<p>Translated into English:</p>
+<ul>
+<li>Open the Index Page</li>
+<li>Click the Search button</li>
+<li>Wait up to 5 seconds for the search results table to be displayed</li>
+<li>Verify there are more than 0 results displayed</li>
+<li>Click the 0th search result (to select it)</li>
+<li>Wait up to 5 seconds for the selected Item to load in the Item Details section</li>
+<li>Verify the name from the selected row matches the name in the details</li>
+</ul>
+<div style="background-color: #FFFFBB; padding: 1em; margin: 1em 1em .25em 1em">
+Note: I used the PageObject pattern very lightly to try and keep the tests readable and easily repeatable for each test method, but did not spend a lot of time following good patterns to create maintainable logic, as this is just experimental code.
+</div>
+<p>Rather than go through all of the cases, I&#8217;ll touch on just the basic FullIntegration case and one of the Nancy cases. The ClientSide injection case felt really hacky and fragile and I don&#8217;t think it&#8217;s a good choice.</p>
+<h3>IndexTests.FullIntegration</h3>
+<p>This method is really slow and you have to have a working web server. The setup is quick and easy though:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>TestFixture<span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>ChromeDriver<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="br0">&#91;</span>TestFixture<span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>PhantomJSDriver<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">class</span> IndexTests_FullIntegration<span class="sy0">&lt;</span>TDriver<span class="sy0">&gt;</span>
+<span class="kw1">where</span> TDriver <span class="sy0">:</span> IWebDriver, <span class="kw3">new</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">private</span> IWebDriver _webDriver<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">private</span> <span class="kw4">string</span> _url <span class="sy0">=</span> <span class="st0">&quot;http://localhost:63431/&quot;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestFixtureSetUp<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> TestFixtureSetup<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webDriver <span class="sy0">=</span> <span class="kw3">new</span> TDriver<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestFixtureTearDown<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> TestFixtureTearDown<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webDriver<span class="sy0">.</span><span class="me1">Quit</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// ... tests here ...</span>
+&nbsp;
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[TestFixture(typeof(ChromeDriver))]
+[TestFixture(typeof(PhantomJSDriver))]
+public class IndexTests_FullIntegration&lt;TDriver&gt;
+where TDriver : IWebDriver, new()
+{
+
+	private IWebDriver _webDriver;
+	private string _url = "http://localhost:63431/";
+
+	[TestFixtureSetUp]
+	public void TestFixtureSetup()
+	{
+	    _webDriver = new TDriver();
+	}
+
+	[TestFixtureTearDown]
+	public void TestFixtureTearDown()
+	{
+	    _webDriver.Quit();
+	}
+
+	// ... tests here ...
+
+}</pre></div></div>
+
+<p>Besides the performance, the other downside of this method is the hosting. In the <a href="/index.php/enterprisedev/application-lifecycle-management/using-specflow-to/" title="Using SpecFlow to drive Selenium WebDriver Tests">Using SpecFlow to drive Selenium UI Testing</a> post, I already had the steps necessary to deploy a staging site to test against, but this equates to more overhead and could drive where in your build process you perform the tests as well as make it harder to run them locally.</p>
+<h3>IndexTests.Nancy</h3>
+<p>In this case, I created a self-hosting Nancy site that copies all of the static content from my Sample site and exposes fake versions of the API. The downsides of the two Nancy methods are the restriction to static content (no MVC pages) and that you&#8217;re reimplementing a fake API for the system. </p>
+<p>This second issue actually bothers me a bit, as it means you are creating a fake set of data that all of your tests are going to rely on. Typically when you have one big shared pool of test data, it makes your systems harder to maintain, as that test data turns into a bog of magic values, some of which have to be set just so for tests to succeed. Allowing the tests to define the values that would be returned when they have specific needs would make this a lot more maintainable and help surface those critical data assumptions in the tests.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+</pre></td><td class="de1"><pre class="de1"><span class="br0">&#91;</span>TestFixture<span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>ChromeDriver<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="br0">&#91;</span>TestFixture<span class="br0">&#40;</span><span class="kw3">typeof</span><span class="br0">&#40;</span>PhantomJSDriver<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#93;</span>
+<span class="kw1">public</span> <span class="kw4">class</span> IndexTests_NancyServer<span class="sy0">&lt;</span>TDriver<span class="sy0">&gt;</span>
+<span class="kw1">where</span> TDriver <span class="sy0">:</span> IWebDriver, <span class="kw3">new</span><span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">private</span> <span class="kw4">string</span> _baseUrl <span class="sy0">=</span> <span class="st0">&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">private</span> NancyHost _webServer<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">private</span> IWebDriver _webDriver<span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestFixtureSetUp<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> TestFixtureSetup<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webServer <span class="sy0">=</span> SetupServer<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webDriver <span class="sy0">=</span> <span class="kw3">new</span> TDriver<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">private</span> NancyHost SetupServer<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> dnfo <span class="sy0">=</span> <span class="kw3">new</span> DirectoryInfo<span class="br0">&#40;</span><span class="st0">&quot;TestSampleWebSite&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">if</span> <span class="br0">&#40;</span>dnfo<span class="sy0">.</span><span class="me1">Exists</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; dnfo<span class="sy0">.</span><span class="me1">Delete</span><span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> proc <span class="sy0">=</span> <span class="kw3">new</span> Process<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">StartInfo</span><span class="sy0">.</span><span class="me1">UseShellExecute</span> <span class="sy0">=</span> <span class="kw1">true</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">StartInfo</span><span class="sy0">.</span><span class="me1">FileName</span> <span class="sy0">=</span> <span class="st_h">@&quot;C:\WINDOWS\system32\xcopy.exe&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">StartInfo</span><span class="sy0">.</span><span class="me1">Arguments</span> <span class="sy0">=</span> <span class="st0">&quot;<span class="es0">\&quot;</span>../../../SampleWebSite<span class="es0">\&quot;</span> TestSampleWebSite /E /I&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">Start</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; proc<span class="sy0">.</span><span class="me1">WaitForExit</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> config <span class="sy0">=</span> <span class="kw3">new</span> HostConfiguration<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; UrlReservations <span class="sy0">=</span> <span class="kw3">new</span> UrlReservations<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; User <span class="sy0">=</span> <span class="st0">&quot;Everyone&quot;</span>,
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; CreateAutomatically <span class="sy0">=</span> <span class="kw1">true</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">var</span> host <span class="sy0">=</span> <span class="kw3">new</span> NancyHost<span class="br0">&#40;</span><span class="kw3">new</span> LocalServerBootstrapper<span class="br0">&#40;</span>dnfo<span class="sy0">.</span><span class="me1">FullName</span><span class="br0">&#41;</span>, config, <span class="kw3">new</span> Uri<span class="br0">&#40;</span>_baseUrl<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; host<span class="sy0">.</span><span class="me1">Start</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> host<span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="br0">&#91;</span>TestFixtureTearDown<span class="br0">&#93;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw4">void</span> TestFixtureTearDown<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webDriver<span class="sy0">.</span><span class="me1">Quit</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; _webServer<span class="sy0">.</span><span class="me1">Stop</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1">// ... tests ...</span>
+&nbsp;
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[TestFixture(typeof(ChromeDriver))]
+[TestFixture(typeof(PhantomJSDriver))]
+public class IndexTests_NancyServer&lt;TDriver&gt;
+where TDriver : IWebDriver, new()
+{
+
+	private string _baseUrl = "http://localhost:5000/";
+	private NancyHost _webServer;
+	private IWebDriver _webDriver;
+
+	[TestFixtureSetUp]
+	public void TestFixtureSetup()
+	{
+	    _webServer = SetupServer();
+	    _webDriver = new TDriver();
+	}
+
+	private NancyHost SetupServer()
+	{
+	    var dnfo = new DirectoryInfo("TestSampleWebSite");
+	    if (dnfo.Exists)
+		dnfo.Delete(true);
+
+	    var proc = new Process();
+	    proc.StartInfo.UseShellExecute = true;
+	    proc.StartInfo.FileName = @"C:\WINDOWS\system32\xcopy.exe";
+	    proc.StartInfo.Arguments = "\"../../../SampleWebSite\" TestSampleWebSite /E /I";
+	    proc.Start();
+	    proc.WaitForExit();
+
+	    var config = new HostConfiguration()
+	    {
+		UrlReservations = new UrlReservations()
+		{
+		    User = "Everyone",
+		    CreateAutomatically = true
+		}
+	    };
+
+	    var host = new NancyHost(new LocalServerBootstrapper(dnfo.FullName), config, new Uri(_baseUrl));
+	    host.Start();
+	    return host;
+	}
+
+	[TestFixtureTearDown]
+	public void TestFixtureTearDown()
+	{
+	    _webDriver.Quit();
+	    _webServer.Stop();
+	}
+
+	// ... tests ...
+
+}</pre></div></div>
+
+<p><a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/NancyServer/LocalServerBootstrapper.cs" title="/SampleWebSite.UITests/NancyServer/LocalServerBootstrapper.cs on github">LocalServerBootstrapper</a> defines the static content folders (in this case, /styles, /Scripts, and the /index.html file). There is a single Module, <a href="https://github.com/tarwn/Blog_RequireJSandSelenium/blob/master/SampleWebSite.UITests/NancyServer/LocalServer.cs" title="/SampleWebSite.UITests/NancyServer/LocalServer.cs on github">LocalServer</a>, that serves up the 2 item API endpoints.</p>
+<p>In a larger test suite, I would move this test code to a single startup method for the whole assembly.</p>
+<h3>The Performance Results</h3>
+<p>Running the same 3 tests for each of the 4 methods across two different browsers helped see the difference between startup and ongoing performance costs.</p>
+<p><a href="/wp-content/uploads/2014/11/SeleniumRequireJsResults.png"><img src="/wp-content/uploads/2014/11/SeleniumRequireJsResults.png" alt="SeleniumRequireJsResults" width="584" height="645" class="aligncenter size-full wp-image-3098" srcset="/wp-content/uploads/2014/11/SeleniumRequireJsResults.png 584w, /wp-content/uploads/2014/11/SeleniumRequireJsResults-271x300.png 271w" sizes="(max-width: 584px) 100vw, 584px" /></a></p>
+<p>We pick up quite a bit of performance when we remove the backend server from the tests. one other thing to note is that the startup time for Phantom is quite a bit faster, but there is a slightly higher ongoing cost.</p>
+<h2>Conclusions</h2>
+<p>This turned out to be a pretty nice little experiment. I wouldn&#8217;t use any of these methods for a production test suite as they are now, but they definitely have promise and I&#8217;ll certainly be trying out some more things with that Nancy setup. </p>
+<p>Switching from a full integration focus to more of a View focus did make things faster, but not to the degree I had hoped. I intend to spend some further thought on how to turn the dial up further without making this really painful to maintain. </p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/using-selenium-for-view-testing-with-knockout-and-requirejs/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

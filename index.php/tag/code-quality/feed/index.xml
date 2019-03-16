@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>code quality &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/code-quality/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Create HTML from output of Perl::Critic</title>
+		<link>/index.php/webdev/perl/create-html-from-output-of/</link>
+		<comments>/index.php/webdev/perl/create-html-from-output-of/#comments</comments>
+		<pubDate>Sat, 22 Sep 2012 07:46:00 +0000</pubDate>
+		<dc:creator><![CDATA[Rob Earl]]></dc:creator>
+				<category><![CDATA[Perl]]></category>
+		<category><![CDATA[code quality]]></category>
+		<category><![CDATA[critic]]></category>
+		<category><![CDATA[html]]></category>
+		<category><![CDATA[perl]]></category>
+		<category><![CDATA[perlcritic]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/09/create-html-from-output-of/</guid>
+		<description><![CDATA[Perl::Critic is great. If you haven't tried it, you should. It has helped me improve the quality of my code no end.
+
+I wrote this script to make it easier to view the feedback in the context of the code itself. When run in a directory containing Perl&#8230;]]></description>
+				<content:encoded><![CDATA[<p><a href="http://search.cpan.org/~thaljef/Perl-Critic-1.118/lib/Perl/Critic.pm">Perl::Critic</a> is great. If you haven&#8217;t tried it, you should. It can help you improve the quality of your code no end.</p>
+<p>I wrote this script to make it easier to view the feedback in the context of the code itself. When run in a directory containing Perl code it&#8217;ll create a critic_html directory containing index.html summarizing the results:</p>
+<p><img src="/wp-content/uploads/blogs/WebDev/CriticHtml/critic-html-index.jpg" alt="critic_html/index.html" title="" /></p>
+<p>Clicking through to any of the files will give you all the violations found by Perl::Critic, inline with the code:</p>
+<p><img src="/wp-content/uploads/blogs/WebDev/CriticHtml/critic-html-code.jpg" alt="" title="" /></p>
+<p>In addition to Perl::Critic, the script uses Template::Toolkit to format the output. The code below and templates can be found in the attached <a href="/wp-content/uploads/blogs/WebDev/CriticHtml/critic_html.zip">critic_html.zip</a></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="perl"><thead><tr><td colspan="2"  class="head">Perl</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+</pre></td><td class="de1"><pre class="de1"><span class="co1">#!/usr/bin/perl</span>
+&nbsp;
+<span class="kw2">use</span> strict<span class="sy0">;</span>
+<span class="kw2">use</span> warnings<span class="sy0">;</span>
+&nbsp;
+<span class="kw2">use</span> Perl<span class="sy0">::</span><span class="me2">Critic</span><span class="sy0">;</span>
+<span class="kw2">use</span> Perl<span class="sy0">::</span><span class="me2">Critic</span><span class="sy0">::</span><span class="me2">Utils</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw2">use</span> Template<span class="sy0">;</span>
+<span class="kw2">use</span> Cwd <span class="kw3">qw</span><span class="br0">&#40;</span>abs_path<span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="kw2">use</span> File<span class="sy0">::</span><span class="me2">Basename</span><span class="sy0">;</span>
+<span class="kw2">use</span> English <span class="kw3">qw</span><span class="br0">&#40;</span><span class="sy0">-</span>no_match_vars<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw2">use</span> constant SEVERITY &nbsp;<span class="sy0">=&gt;</span> <span class="nu0">1</span><span class="sy0">;</span> <span class="co1"># Include all violations.</span>
+<span class="kw2">use</span> constant SKIP_GOOD <span class="sy0">=&gt;</span> <span class="nu0">0</span><span class="sy0">;</span> <span class="co1"># Skip files with no violations?</span>
+&nbsp;
+<span class="kw3">mkdir</span> <span class="st_h">'critic_html'</span><span class="sy0">;</span>
+<span class="kw3">mkdir</span> <span class="st_h">'critic_html/src'</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw2">use</span> autodie<span class="sy0">;</span>
+&nbsp;
+<span class="co1"># Analyse all perl files below the current directory.</span>
+<span class="kw1">my</span> <span class="re0">@files</span> <span class="sy0">=</span> Perl<span class="sy0">::</span><span class="me2">Critic</span><span class="sy0">::</span><span class="me2">Utils</span><span class="sy0">::</span><span class="me2">all_perl_files</span><span class="br0">&#40;</span><span class="kw3">q</span><span class="br0">&#123;</span><span class="sy0">.</span><span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw1">my</span> <span class="re0">@summary</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span> <span class="co1"># Store statistics on each file processed.</span>
+&nbsp;
+<span class="kw1">foreach</span> <span class="kw1">my</span> <span class="re0">$file</span> <span class="br0">&#40;</span><span class="re0">@files</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1"># Create a new Critic for per file statistics.</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">$critic</span> <span class="sy0">=</span> Perl<span class="sy0">::</span><span class="me2">Critic</span><span class="sy0">-&gt;</span><span class="kw2">new</span><span class="br0">&#40;</span> <span class="st_h">'-severity'</span> <span class="sy0">=&gt;</span> SEVERITY <span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">$file_safe</span> <span class="sy0">=</span> <span class="re0">$file</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="re0">$file_safe</span> <span class="sy0">=~</span> <span class="co2">s/[W]/_/g</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">@violations</span> <span class="sy0">=</span> <span class="re0">$critic</span><span class="sy0">-&gt;</span><span class="me1">critique</span><span class="br0">&#40;</span><span class="re0">$file</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">next</span> <span class="kw1">if</span> <span class="br0">&#40;</span><span class="sy0">!</span><span class="re0">@violations</span> <span class="sy0">&amp;&amp;</span> SKIP_GOOD<span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">push</span> <span class="re0">@summary</span><span class="sy0">,</span> <span class="br0">&#123;</span> <span class="st_h">'filename'</span> <span class="sy0">=&gt;</span> <span class="re0">$file</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="st_h">'link'</span> &nbsp; &nbsp; <span class="sy0">=&gt;</span> <span class="st0">&quot;src/$file_safe.html&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="st_h">'stats'</span> &nbsp; &nbsp;<span class="sy0">=&gt;</span> <span class="re0">$critic</span><span class="sy0">-&gt;</span><span class="me1">statistics</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">open</span> <span class="kw1">my</span> <span class="re0">$FH</span><span class="sy0">,</span> <span class="st_h">'&lt;'</span><span class="sy0">,</span> <span class="re0">$file</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">@lines</span> <span class="sy0">=</span> <span class="sy0">&lt;</span><span class="re0">$FH</span><span class="sy0">&gt;;</span>
+&nbsp; &nbsp; <span class="kw3">close</span> <span class="re0">$FH</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># Attach all violations to the line they were found on.</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">@violations_by_line</span> <span class="sy0">=</span> <span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">$line_number</span> <span class="sy0">=</span> <span class="nu0">1</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">foreach</span> <span class="kw1">my</span> <span class="re0">$line</span> <span class="br0">&#40;</span><span class="re0">@lines</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1"># Get all the violations for the current line.</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">@line_violations</span> <span class="sy0">=</span> <span class="kw3">grep</span> <span class="br0">&#123;</span> <span class="co5">$_</span><span class="sy0">-&gt;</span><span class="me1">line_number</span><span class="br0">&#40;</span><span class="br0">&#41;</span> <span class="sy0">==</span> <span class="re0">$line_number</span><span class="br0">&#125;</span> <span class="re0">@violations</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw3">push</span> <span class="re0">@violations_by_line</span><span class="sy0">,</span> <span class="br0">&#123;</span> <span class="st_h">'number'</span> &nbsp;<span class="sy0">=&gt;</span> <span class="re0">$line_number</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st_h">'content'</span> <span class="sy0">=&gt;</span> <span class="re0">$line</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st_h">'violations'</span> <span class="sy0">=&gt;</span> <span class="re0">@line_violations</span> <span class="br0">&#125;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="re0">$line_number</span><span class="sy0">++;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; write_html<span class="br0">&#40;</span><span class="st0">&quot;critic_html/src/$file_safe.html&quot;</span><span class="sy0">,</span> <span class="st_h">'codefile'</span><span class="sy0">,</span> <span class="br0">&#123;</span> <span class="st_h">'title'</span> <span class="sy0">=&gt;</span> <span class="st0">&quot;Critic Analysis of $file&quot;</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st_h">'lines'</span> <span class="sy0">=&gt;</span> <span class="re0">@violations_by_line</span> <span class="br0">&#125;</span> <span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+write_html<span class="br0">&#40;</span><span class="st_h">'critic_html/index.html'</span><span class="sy0">,</span> <span class="st_h">'index'</span><span class="sy0">,</span> <span class="br0">&#123;</span> <span class="st_h">'title'</span> <span class="sy0">=&gt;</span> <span class="st_h">'Perl::Critic::HTML Summary'</span><span class="sy0">,</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="st_h">'files'</span> <span class="sy0">=&gt;</span> <span class="re0">@summary</span> <span class="br0">&#125;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+<span class="kw2">sub</span> write_html <span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="br0">&#40;</span><span class="re0">$filename</span><span class="sy0">,</span> <span class="re0">$template</span><span class="sy0">,</span> <span class="re0">$data</span><span class="br0">&#41;</span> <span class="sy0">=</span> <span class="co5">@_</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="co1"># Include templates from the install directory.</span>
+&nbsp; &nbsp; <span class="kw1">my</span> <span class="re0">$tt</span> <span class="sy0">=</span> Template<span class="sy0">-&gt;</span><span class="kw2">new</span><span class="br0">&#40;</span><span class="br0">&#123;</span> <span class="st_h">'INCLUDE_PATH'</span> <span class="sy0">=&gt;</span> dirname<span class="br0">&#40;</span>abs_path<span class="br0">&#40;</span><span class="re0">$PROGRAM_NAME</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">.</span><span class="st_h">'/templates'</span> <span class="br0">&#125;</span> <span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw3">print</span> <span class="st0">&quot;Writing $filenamen&quot;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw3">open</span> <span class="kw1">my</span> <span class="re0">$FILE</span><span class="sy0">,</span> <span class="st_h">'&gt;'</span><span class="sy0">,</span> <span class="re0">$filename</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="re0">$tt</span><span class="sy0">-&gt;</span><span class="me1">process</span><span class="br0">&#40;</span><span class="re0">$template</span><span class="sy0">,</span> <span class="re0">$data</span><span class="sy0">,</span> <span class="re0">$FILE</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw3">close</span> <span class="re0">$FILE</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">return</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Perl::Critic;
+use Perl::Critic::Utils;
+
+use Template;
+use Cwd qw(abs_path);
+use File::Basename;
+use English qw(-no_match_vars);
+
+use constant SEVERITY  =&gt; 1; # Include all violations.
+use constant SKIP_GOOD =&gt; 0; # Skip files with no violations?
+
+mkdir 'critic_html';
+mkdir 'critic_html/src';
+
+use autodie;
+
+# Analyse all perl files below the current directory.
+my @files = Perl::Critic::Utils::all_perl_files(q{.});
+
+my @summary = (); # Store statistics on each file processed.
+
+foreach my $file (@files) {
+    # Create a new Critic for per file statistics.
+    my $critic = Perl::Critic-&gt;new( '-severity' =&gt; SEVERITY );
+
+    my $file_safe = $file;
+    $file_safe =~ s/[W]/_/g;
+
+    my @violations = $critic-&gt;critique($file);
+    next if (!@violations &amp;&amp; SKIP_GOOD);
+
+    push @summary, { 'filename' =&gt; $file,
+                     'link'     =&gt; "src/$file_safe.html",
+                     'stats'    =&gt; $critic-&gt;statistics() };
+
+    open my $FH, '&lt;', $file;
+    my @lines = &lt;$FH&gt;;
+    close $FH;
+
+    # Attach all violations to the line they were found on.
+    my @violations_by_line = ();
+    my $line_number = 1;
+    foreach my $line (@lines) {
+        # Get all the violations for the current line.
+        my @line_violations = grep { $_-&gt;line_number() == $line_number} @violations;
+        push @violations_by_line, { 'number'  =&gt; $line_number,
+                                    'content' =&gt; $line,
+                                    'violations' =&gt; @line_violations };
+        $line_number++;
+    }
+
+    write_html("critic_html/src/$file_safe.html", 'codefile', { 'title' =&gt; "Critic Analysis of $file",
+                                                                'lines' =&gt; @violations_by_line } );
+}
+
+write_html('critic_html/index.html', 'index', { 'title' =&gt; 'Perl::Critic::HTML Summary',
+                                                'files' =&gt; @summary });
+
+sub write_html {
+    my ($filename, $template, $data) = @_;
+
+    # Include templates from the install directory.
+    my $tt = Template-&gt;new({ 'INCLUDE_PATH' =&gt; dirname(abs_path($PROGRAM_NAME)).'/templates' } );
+    print "Writing $filenamen";
+    open my $FILE, '&gt;', $filename;
+    $tt-&gt;process($template, $data, $FILE);
+    close $FILE;
+
+    return;
+}</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/perl/create-html-from-output-of/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>mocking &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/mocking/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Testing the Not-So-Testable HttpWebResponse</title>
+		<link>/index.php/desktopdev/mstech/testing-httpwebresponse/</link>
+		<comments>/index.php/desktopdev/mstech/testing-httpwebresponse/#comments</comments>
+		<pubDate>Mon, 10 Dec 2012 14:56:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[C#]]></category>
+		<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[mocking]]></category>
+		<category><![CDATA[unit testing]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/12/testing-httpwebresponse/</guid>
+		<description><![CDATA[Recently I was working on a library to consume a REST API without exposing any of the specifics to the rest of the application. Implementing a common interface and set of custom exceptions was easy enough, but exercising the internal logic was going to be tough.]]></description>
+				<content:encoded><![CDATA[<p>Recently I was working on a library to consume a REST API without exposing any of the specifics to the rest of the application. Implementing a common interface and set of custom exceptions was easy enough, but exercising the internal logic was going to be tough. </p>
+<p>While I could use the live REST API to verify the general logic worked, I had limited options when it came to the full range of HTTP responses and communication failures. Add in the impact those live API calls would have on my build process performance, the occasional failures of my build due the imperfections of talking to a live service, and the overhead of maintaining separation between my test and live data in that service&#8230;what I really had on my hands was the beginning of years of random, painful maintenance.</p>
+<p>If only I could mock WebRequest and have it return carefully crafted responses to test my code with, all without ever touching the real network.</p>
+<blockquote><p><a href="http://msdn.microsoft.com/en-us/library/system.net.httpwebresponse.aspx" title="HttpWebResponse on MSDN">MSDN</a>: You should never directly create an instance of the HttpWebResponse class.</p></blockquote>
+<p>Hmm, ok, maybe not.</p>
+<p>Despite having done this search before, this time around I uncovered a couple posts that helped me find a solution to this whole mess. Although not before I left some helpful feedback on the MSDN page about the difference between opinion and documentation.</p>
+<p>Yep, making friends.</p>
+<p><i>The source code for this post is located on github, with the sample service implementation and test projects: <a href="https://github.com/tarwn/TestableHttpWebResponse" title="tarwn/TestableHttpWebResponse on github">tarwn/TestableHttpWebResponse</a></i></p>
+<h2>Let&#8217;s Start with the Tests</h2>
+<p>I&#8217;ve created a sample service implementation with two API call implementations. Each one builds a WebRequest, executes it, and analyzes the response. A retry policy wraps around the request execution, evaluating exceptions to determine whether to retry or map them to a local exception type to be rethrown.</p>
+<p>Here is an example of one of those calls and the synchronous method it uses internally:</p>
+<p><b>TestableHttpWebResponse.Sample/SampleService.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+</pre></td><td class="de1"><pre class="de1">public class SampleService
+{
+&nbsp; &nbsp; // ...
+&nbsp;
+&nbsp; &nbsp; public ServiceResponse ListRemoteStuff(string operation)
+&nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; var uri = new Uri(_baseUri, operation);
+&nbsp; &nbsp; &nbsp; &nbsp; var request = WebRequest.Create(uri);
+&nbsp; &nbsp; &nbsp; &nbsp; request.Headers.Add(&quot;version&quot;, &quot;123-awesome&quot;);
+&nbsp; &nbsp; &nbsp; &nbsp; return SendRequest(request);
+&nbsp; &nbsp; }
+&nbsp; &nbsp; 
+&nbsp; &nbsp; // ...
+&nbsp;
+&nbsp; &nbsp; private ServiceResponse SendRequest(WebRequest request)
+&nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; return _retryPolicy.ExecuteAction&lt;ServiceResponse&gt;(() =&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var response = (HttpWebResponse)request.GetResponse();
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var reader = new StreamReader(response.GetResponseStream());
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var message = reader.ReadToEnd();
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return new ServiceResponse() { IsSuccess = true, Message = message };
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; catch (WebException we)
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; throw MappedException(we);
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; &nbsp; &nbsp; });
+&nbsp; &nbsp; }
+&nbsp;
+&nbsp; &nbsp; // ...
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class SampleService
+{
+	// ...
+
+	public ServiceResponse ListRemoteStuff(string operation)
+	{
+		var uri = new Uri(_baseUri, operation);
+		var request = WebRequest.Create(uri);
+		request.Headers.Add("version", "123-awesome");
+		return SendRequest(request);
+	}
+	
+	// ...
+
+	private ServiceResponse SendRequest(WebRequest request)
+	{
+		return _retryPolicy.ExecuteAction&lt;ServiceResponse&gt;(() =&gt;
+		{
+			try
+			{
+				var response = (HttpWebResponse)request.GetResponse();
+				var reader = new StreamReader(response.GetResponseStream());
+				var message = reader.ReadToEnd();
+				return new ServiceResponse() { IsSuccess = true, Message = message };
+			}
+			catch (WebException we)
+			{
+				throw MappedException(we);
+			}
+		});
+	}
+
+	// ...
+}</pre></div></div>
+
+<p>Testing a method like this typically requires an integration test against the live service. With the provided TestableHttpWebResponse and TestableWebRequest, however, we can set up an expected request and response and verify the service reacts appropriately.</p>
+<p><b>1: Register the TestableWebRequestCreateFactory</b><br />
+WebRequest.Create(<i>uri</i>) uses a factory to produce the relevant WebRequest instance of a Uri, based on the prefix. So first things first, lets register a new prefix and a factory to serve up requests:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1">[TestFixtureSetUp]
+public void TestFixtureSetup()
+{
+&nbsp; &nbsp; WebRequest.RegisterPrefix(&quot;test&quot;, TestableWebRequestCreateFactory.GetFactory());
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[TestFixtureSetUp]
+public void TestFixtureSetup()
+{
+	WebRequest.RegisterPrefix("test", TestableWebRequestCreateFactory.GetFactory());
+}</pre></div></div>
+
+<p>TestableWebRequestCreateFactory.GetFactory() exposes a singleton that can be referenced from any of the tests in this class. When the WebRequest object receives a Uri starting with &#8220;test://&#8221;, it will call the associated factory, giving us the opportunity to respond with a Request object of our choosing.</p>
+<p>A common base URI will prove helpful as we write the tests:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">public Uri BaseUri { get { return new Uri(&quot;test://mydomain.com/api/&quot;); } }</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public Uri BaseUri { get { return new Uri("test://mydomain.com/api/"); } }</pre></div></div>
+
+<p><b>2: Building a Test</b></p>
+<p>The easiest test to start with is one that will test the &#8220;happy path&#8221; where our API call receives a 200 Success response. </p>
+<p>First we need to set up the request:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1">var operation = &quot;ListOfStuff&quot;;
+var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">var operation = "ListOfStuff";
+var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));</pre></div></div>
+
+<p>Next we need to set up the response the request will return when it is executed:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">expectedRequest.EnqueueResponse(HttpStatusCode.OK, &quot;Success&quot;, &quot;Even More Success&quot;, false);</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">expectedRequest.EnqueueResponse(HttpStatusCode.OK, "Success", "Even More Success", false);</pre></div></div>
+
+<p>And then add it to the Factory so it will be available when WebRequest calls it:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);</pre></div></div>
+
+<p>Put all of this together and we have:</p>
+<p><b>TestableHttpWebResponse.Sample.Tests/SampleServiceTests.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre></td><td class="de1"><pre class="de1">[Test]
+public void ListRemoteStuff_ValidRequest_ReturnsSuccessfulResponse()
+{
+&nbsp; &nbsp; var operation = &quot;ListOfStuff&quot;;
+&nbsp; &nbsp; var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));
+&nbsp; &nbsp; expectedRequest.EnqueueResponse(HttpStatusCode.OK, &quot;Success&quot;, &quot;Even More Success&quot;, false);
+&nbsp; &nbsp; TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);
+&nbsp; &nbsp; var service = new SampleService(BaseUri);
+&nbsp;
+&nbsp; &nbsp; var response = service.ListRemoteStuff(operation);
+&nbsp;
+&nbsp; &nbsp; Assert.IsTrue(response.IsSuccess);
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void ListRemoteStuff_ValidRequest_ReturnsSuccessfulResponse()
+{
+	var operation = "ListOfStuff";
+	var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));
+	expectedRequest.EnqueueResponse(HttpStatusCode.OK, "Success", "Even More Success", false);
+	TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);
+	var service = new SampleService(BaseUri);
+
+	var response = service.ListRemoteStuff(operation);
+
+	Assert.IsTrue(response.IsSuccess);
+}</pre></div></div>
+
+<p>This exercises the entire successful path of the operation without any additional abstractions in our API code or reliance on external communications and services.</p>
+<h2>Testing Http Status Codes</h2>
+<p>Another tricky part of testing a service is figuring out how to test HTTP codes other then the success case. </p>
+<p>The sample service maps received Protocol Errors (401, 404, etc) to a local exception so the code consuming this library doesn&#8217;t have to know how to parse WebExceptions. </p>
+<p><b>TestableHttpWebResponse.Sample/SampleService.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+</pre></td><td class="de1"><pre class="de1">private Exception MappedException(WebException we)
+{
+&nbsp; &nbsp; // map to custom exceptions
+&nbsp; &nbsp; if (we.Status == WebExceptionStatus.ProtocolError)
+&nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; var reader = new StreamReader(we.Response.GetResponseStream());
+&nbsp; &nbsp; &nbsp; &nbsp; var message = reader.ReadToEnd();
+&nbsp; &nbsp; &nbsp; &nbsp; var httpResponse = (HttpWebResponse)we.Response;
+&nbsp; &nbsp; &nbsp; &nbsp; switch (httpResponse.StatusCode)
+&nbsp; &nbsp; &nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; case HttpStatusCode.NotFound:
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (httpResponse.StatusDescription.Contains(&quot;Dohicky&quot;))
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return new DohickyNotFoundException(message, we);
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; else
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return new GenericNotFoundException(message, we);
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; default:
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return new ExampleOfAnotherUsefulException(message, we);
+&nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; }
+&nbsp; &nbsp; else
+&nbsp; &nbsp; &nbsp; &nbsp; return new SampleServiceOutageException(we);
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">private Exception MappedException(WebException we)
+{
+	// map to custom exceptions
+	if (we.Status == WebExceptionStatus.ProtocolError)
+	{
+		var reader = new StreamReader(we.Response.GetResponseStream());
+		var message = reader.ReadToEnd();
+		var httpResponse = (HttpWebResponse)we.Response;
+		switch (httpResponse.StatusCode)
+		{
+			case HttpStatusCode.NotFound:
+				if (httpResponse.StatusDescription.Contains("Dohicky"))
+					return new DohickyNotFoundException(message, we);
+				else
+					return new GenericNotFoundException(message, we);
+			default:
+				return new ExampleOfAnotherUsefulException(message, we);
+		}
+	}
+	else
+		return new SampleServiceOutageException(we);
+}</pre></div></div>
+
+<p>Exercising the mapping logic is going to require the WebRequest to receive a WebException. Let&#8217;s make that happen.</p>
+<p><i>Yes, I know a HEAD request will break this, that&#8217;s why it&#8217;s called &#8220;sample&#8221; code <img src="https://s.w.org/images/core/emoji/2/72x72/1f642.png" alt="🙂" class="wp-smiley" style="height: 1em; max-height: 1em;" /></i></p>
+<p>In the first test, we used the EnqueueResponse method of the TestableWebRequest to set up a 200 Success response. It&#8217;s just as simple to return a 404 Http code with the expected message and request body:</p>
+<p><b>TestableHttpWebResponse.Sample.Tests/SampleServiceTests.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">expectedRequest.EnqueueResponse(HttpStatusCode.NotFound, &quot;Dohicky not found&quot;, &quot;I couldn't find your dohicky because I don't like you&quot;, true);</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">expectedRequest.EnqueueResponse(HttpStatusCode.NotFound, "Dohicky not found", "I couldn't find your dohicky because I don't like you", true);</pre></div></div>
+
+<p>Which allows us to create the ExpectedException test:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1">[Test]
+[ExpectedException(typeof(DohickyNotFoundException))]
+public void ListRemoteStuff_404DohickeyNotFound_ThrowsDohickeyNotFoundException()
+{
+&nbsp; &nbsp; var operation = &quot;ListOfStuff&quot;;
+&nbsp; &nbsp; var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));
+&nbsp; &nbsp; expectedRequest.EnqueueResponse(HttpStatusCode.NotFound, &quot;Dohicky not found&quot;, &quot;I couldn't find your dohicky because I don't like you&quot;, true);
+&nbsp; &nbsp; TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);
+&nbsp; &nbsp; var service = new SampleService(BaseUri);
+&nbsp;
+&nbsp; &nbsp; var response = service.ListRemoteStuff(operation);
+&nbsp;
+&nbsp; &nbsp; // expect exception
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+[ExpectedException(typeof(DohickyNotFoundException))]
+public void ListRemoteStuff_404DohickeyNotFound_ThrowsDohickeyNotFoundException()
+{
+	var operation = "ListOfStuff";
+	var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));
+	expectedRequest.EnqueueResponse(HttpStatusCode.NotFound, "Dohicky not found", "I couldn't find your dohicky because I don't like you", true);
+	TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);
+	var service = new SampleService(BaseUri);
+
+	var response = service.ListRemoteStuff(operation);
+
+	// expect exception
+}</pre></div></div>
+
+<h2>Testing Other WebExceptions</h2>
+<p>What about connection failures? Well there is another version of the EnqueueResponse method that allows us to queue up an exception to be returned from the Request, like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">expectedRequest.EnqueueResponse(new WebException(&quot;I'm broke!&quot;, WebExceptionStatus.ConnectFailure));</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">expectedRequest.EnqueueResponse(new WebException("I'm broke!", WebExceptionStatus.ConnectFailure));</pre></div></div>
+
+<p>Just like the previous test, we can use that response to put together a full test</p>
+<p><b>TestableHttpWebResponse.Sample.Tests/SampleServiceTests.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1">[Test]
+[ExpectedException(typeof(SampleServiceOutageException))]
+public void ListRemoteStuff_ServiceOutage_ThrowsSampleServiceOutage()
+{
+&nbsp; &nbsp; var operation = &quot;ListOfStuff&quot;;
+&nbsp; &nbsp; var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));
+&nbsp; &nbsp; expectedRequest.EnqueueResponse(new WebException(&quot;I'm broke!&quot;, WebExceptionStatus.ConnectFailure));
+&nbsp; &nbsp; TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);
+&nbsp; &nbsp; var service = new SampleService(BaseUri);
+&nbsp;
+&nbsp; &nbsp; var response = service.ListRemoteStuff(operation);
+&nbsp;
+&nbsp; &nbsp; // expect exception
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+[ExpectedException(typeof(SampleServiceOutageException))]
+public void ListRemoteStuff_ServiceOutage_ThrowsSampleServiceOutage()
+{
+	var operation = "ListOfStuff";
+	var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));
+	expectedRequest.EnqueueResponse(new WebException("I'm broke!", WebExceptionStatus.ConnectFailure));
+	TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);
+	var service = new SampleService(BaseUri);
+
+	var response = service.ListRemoteStuff(operation);
+
+	// expect exception
+}</pre></div></div>
+
+<h2>Testing the Retry Policy</h2>
+<p>Retry policies are trickier, in that they need to be able to execute a Request multiple times and receive new responses. By enqueueing (sp?) multiple responses on the request, we can exercise the retry policy:</p>
+<p><b>TestableHttpWebResponse.Sample.Tests/SampleServiceTests.cs</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+</pre></td><td class="de1"><pre class="de1">[Test]
+public void ListRemoteStuff_TimeoutOccurs_TruesASecondTime()
+{
+&nbsp; &nbsp; var operation = &quot;ListOfStuff&quot;;
+&nbsp; &nbsp; var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));
+&nbsp; &nbsp; expectedRequest.EnqueueResponse(new TimeoutException(&quot;took too long, so sorry&quot;))
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;.EnqueueResponse(HttpStatusCode.OK, &quot;All Good&quot;, &quot;Nothing to see, please move along&quot;, false);
+&nbsp; &nbsp; TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);
+&nbsp; &nbsp; var service = new SampleService(BaseUri);
+&nbsp;
+&nbsp; &nbsp; var response = service.ListRemoteStuff(operation);
+&nbsp;
+&nbsp; &nbsp; Assert.AreEqual(&quot;Nothing to see, please move along&quot;, response.Message);
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">[Test]
+public void ListRemoteStuff_TimeoutOccurs_TruesASecondTime()
+{
+	var operation = "ListOfStuff";
+	var expectedRequest = new TestableWebRequest(new Uri(BaseUri, operation));
+	expectedRequest.EnqueueResponse(new TimeoutException("took too long, so sorry"))
+				   .EnqueueResponse(HttpStatusCode.OK, "All Good", "Nothing to see, please move along", false);
+	TestableWebRequestCreateFactory.GetFactory().AddRequest(expectedRequest);
+	var service = new SampleService(BaseUri);
+
+	var response = service.ListRemoteStuff(operation);
+
+	Assert.AreEqual("Nothing to see, please move along", response.Message);
+}</pre></div></div>
+
+<p>And there we have it, all the various flavors of an HttpWebRequest.</p>
+<h2>The Testable Classes</h2>
+<p>The Testable classes are still under construction. At the time of this post they support the functionality above as well as the ability to set and verify Request Headers and write and verify the Request stream contents (upload). Currently the asynchronous methods (BeginGetResponse/EndGetResponse) are not implemented, but I&#8217;ll be adding those soon along with SampleService calls that exercise those via TPL and async/await logic. I&#8217;ll also be looking through WebRequest for other properties or methods I haven&#8217;t imlpemented yet to see what&#8217;s useful.</p>
+<p>Hopefully others will find this useful as well.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/testing-httpwebresponse/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+	</channel>
+</rss>

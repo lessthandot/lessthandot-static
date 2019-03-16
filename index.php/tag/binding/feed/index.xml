@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>binding &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/binding/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Silverlight, RIA, Datagrids, and Joins</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/silverlight-ria-datagrids-and-joins/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/silverlight-ria-datagrids-and-joins/#respond</comments>
+		<pubDate>Tue, 03 Aug 2010 13:16:43 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[binding]]></category>
+		<category><![CDATA[entity framework]]></category>
+		<category><![CDATA[ria]]></category>
+		<category><![CDATA[silverlight]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/08/silverlight-ria-datagrids-and-joins/</guid>
+		<description><![CDATA[Lately we&#8217;ve been playing around with RIA services for Silverlight. Using them we lose the use of our stack, but the speed of development with them is quite impressive. Watch and Learn If you are unfamiliar with RIA in Silverlight, I would recommend this video: http://www.silverlight.net/learn/videos/all/net-ria-services-intro/. It is a complete walk through of creating a [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Lately we&#8217;ve been playing around with RIA services for Silverlight. Using them we lose the use of our stack, but the speed of development with them is quite impressive. </p>
+<h2>Watch and Learn</h2>
+<p>If you are unfamiliar with RIA in Silverlight, I would recommend this video: <a href="http://www.silverlight.net/learn/videos/all/net-ria-services-intro/">http://www.silverlight.net/learn/videos/all/net-ria-services-intro/</a>. It is a complete walk through of creating a demo from the &#8216;Business Application&#8217; template in Visual Studio for SL 3. If you are working in SL4, be sure to check the comments in the video for the breaking changes.</p>
+<h2>What&#8217;s the Skinny?</h2>
+<p>It&#8217;s pretty fancy stuff. You make an Entity Framework model, based on your database. Then when you compile, the template generates a whole bunch of code for you. First, on the server it generates a Service and a Metadata class to expose your data entities and basic CRUD functionality to the client. Then in the client, another class is generated that handles the serialization and exposing of those server classes client side. One of the most impressive things about this interaction though, is that the return objects from the server are IQueriable, not arrays. Which gives you the ability to perform LINQ and deferred execution from the client!</p>
+<h2>So Why the Fuss?</h2>
+<p>Watch the video, play around with it. I&#8217;m not going to go through the whole thing here, but I will show you something I ran into.</p>
+<p>I have a relational database, in this case I am looking at the <em>League</em> and <em>Player</em> tables. <em>League</em> has an OwnerPlayer_ID field that links to the <em>Player</em> table. The problem though, by using the RIA services and bindings out of the box, is that while the League class has a .Player property, it will never be populated. And showing people that a League is owned by Player #5237 isn&#8217;t nearly as helpful as showing them the Player&#8217;s name. We have to make 2 changes to get this to work correctly.</p>
+<h2>Reprimanding that Lazy EF</h2>
+<p>On the server side, find your service class. It should be called something like &#8216;MyApplicationDomainService1&#8217; and be in the &#8216;Services&#8217; folder by default. In that class look for a method called &#8216;GetMyObjects&#8217; where MyObjects is the collection you are binding to on the client side. It should contain something like &#8216;Return (Me.ObjectContext.MyObjects)&#8217;. Change it to:<br />
+<code =VB>Return (Me.ObjectContext.MyObjects.Include("MyChildObject")</code><br />
+In my case this was the &#8216;GetLeagues&#8217; method and it contains: &#8216;Return (Me.ObjectContext.Leagues.Include(&#8220;Player&#8221;))&#8217;</p>
+<p>This will tell the Entity Framework model that it should Eager Load the .Player property. But before we rejoice and rebuild, wait, there&#8217;s more!</p>
+<h2>Getting RIA up off the Couch</h2>
+<p>Next up, right next to the DomainService1 file should be a file called MyApplicationDomainService1.metadata. In this file we need to find the class that represents what we are querying (The &#8220;MyObject&#8221; from the previous step). In that class you should see the property you want to load (The &#8220;MyChildObject&#8221; from above). On this property, you want to prepend the &lt;Include()&gt; attribute. This will tell the RIA services that it should include this property in the serialization and transmission of the query results. </p>
+<p>In my case of League and Owner Player, it looks like this:</p>
+<pre>    Friend NotInheritable Class LeagueMetadata
+             
+        '...
+
+        &lt;Include()&gt;
+        &lt;Display(AutoGenerateField:=False)&gt;
+        Public Property Player As Player
+        '...
+    End Class</pre>
+<h2>And the Grid?</h2>
+<p>Now that the EF is loading the data we want, and the RIA services are returning the data we want, all we have to do is bind it! And this is the easiest part. It is just like they show in the video, with one minor change. Instead of just binding on the primary object&#8217;s property, we use dot notation to get at the child object&#8217;s property. Shown here as the &#8220;Player.Name&#8221; binding</p>
+<pre>&lt;sdk:DataGrid x:Name="grdLeagues" Margin="4,20,4,4" Grid.Row="1" ItemsSource="{Binding ElementName=LeagueDomainDataSource, Path=Data}" AutoGenerateColumns="False"&gt;
+    &lt;sdk:DataGrid.Columns&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=Name}" Header="Name" /&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=Player.Name, Mode=OneWay}" Header="Organizer" /&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=Province}" Header="State" /&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=City}" Header="City" /&gt;
+        &lt;sdk:DataGridTextColumn Binding="{Binding Path=LGS}" Header="Game Store" /&gt;
+    &lt;/sdk:DataGrid.Columns&gt;
+&lt;/sdk:DataGrid&gt;</pre>
+<p>-Rick</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/silverlight-ria-datagrids-and-joins/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Detecting Property Changes in an Observable Collection</title>
+		<link>/index.php/webdev/webdesigngraphicsstyling/detecting-property-changes-in-an-observa/</link>
+		<comments>/index.php/webdev/webdesigngraphicsstyling/detecting-property-changes-in-an-observa/#comments</comments>
+		<pubDate>Wed, 07 Apr 2010 19:16:01 +0000</pubDate>
+		<dc:creator><![CDATA[ThatRickGuy]]></dc:creator>
+				<category><![CDATA[Web Design, Graphics and Styling]]></category>
+		<category><![CDATA[binding]]></category>
+		<category><![CDATA[silverlight]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/04/detecting-property-changes-in-an-observa/</guid>
+		<description><![CDATA[A quick and simple demo on how to set up a custom ObservableCollection to raise PropertyChanged events from the items it contains.]]></description>
+				<content:encoded><![CDATA[<h3>Work, Work, Work</h3>
+<p>I was working on a new interface this week for a rather complex item selection system. It deals with hierarchies and mandatory selections, multi-selects and single-selects. In order to make it easier for users to see what items were already selected, there was also a list of just the selected items.</p>
+<h3>Oh ObservableCollection, I See You!</h3>
+<p>I toyed around with a few different options, and debated some of them out with Adam, and finally decided to run with binding and an Observable Collection.</p>
+<h3>Everything is better with LINQ</h3>
+<p>One of the great things about observable collections is that you can pass them around like candy, make a change to it from any number of locations, and it will update all of the controls bound to it. Mix in a little LINQ and you&#8217;ve got some awesome functionality with very little code.</p>
+<h3>What Do You Mean CollectionChanged Doesn&#8217;t Fire?</h3>
+<p>One of the things I needed to do though, was to detect when the user selected an item from the collection. When the IsChecked flag was flipped, I needed to go to the server to get any child items. But the Observable Collection does not expose property changed events, which started me down this path. </p>
+<h3>The User Interface</h3>
+<p>For this demo app, the UI is pretty simple. I just have two list boxes. Each list box has a DataTemplate with a CheckBox in it. The CheckBox has its Content bound to the &#8220;Text&#8221; member and IsChecked is bound to a like named member. The IsChecked property is also set to TwoWay mode. This means that when the user changes its checked state, it will update the underlying collection.</p>
+<pre>        &lt;ListBox x:Name="lst1" Grid.Column="0" &gt;
+            &lt;ListBox.ItemTemplate &gt;
+                &lt;DataTemplate&gt;
+                    &lt;CheckBox Content="{Binding Text}" IsChecked="{Binding IsChecked, Mode=TwoWay}" /&gt;
+                &lt;/DataTemplate&gt;
+            &lt;/ListBox.ItemTemplate&gt;
+        &lt;/ListBox&gt;</pre>
+<h3>On to the Items</h3>
+<p>For the most part the Item class just contains our properties, but we have to beef it up just a bit. First, it needs <code class="codespan">Implements System.ComponentModel.INotifyPropertyChanged</code>. INotifyPropertyChanged will create a public event called &#8220;PropertyChanged&#8221;. In order to save ourselves a bit of repeating code, we can make a method called <em>onPropertyChanged</em> that raises that event for us:</p>
+<pre>        Private Sub onPropertyChanged(ByVal PropertyName As String)
+            RaiseEvent PropertyChanged(Me, New System.ComponentModel.PropertyChangedEventArgs(PropertyName))
+        End Sub</pre>
+<p> Also in the item class we need to tweak the properties a bit. For instance:</p>
+<pre>        Private _IsChecked As Boolean
+        Public Property IsChecked() As Boolean
+            Get
+                Return _IsChecked
+            End Get
+            Set(ByVal value As Boolean)
+                If value &lt;&gt; _IsChecked Then
+                    _IsChecked = value
+                    onPropertyChanged("IsChecked")
+                End If
+            End Set
+        End Property</pre>
+<p>Note that we are only calling the onPropertyChanged event when the value has indeed changed. Also, ensure that the underlying value has changed BEFORE you call the onPropertyChanged, otherwise you&#8217;ll wind up with some really interesting behavior.</p>
+<h3>The Collection</h3>
+<p>The Observable collection doesn&#8217;t expose the PropertyChanged event by default, so we have to bubble it up ourselves. That means we need to make a new class that inherits from ObservableCollection. In order to get a handler on the Items PropertyChanged events, we need to override the InsertItem and RemoveItem methods. Inside them we Add and Remove an event handler for the Property Changed event. And in the procedure that handles that event, all we need to do is to raise our new public event.</p>
+<h3>Back to the MainPage</h3>
+<p>In the code of the main page, we need an instance of the collection, using the WithEvents keyword will make it exceptionally easy to attach to our events. In the constructor, we can set the ItemSource of both of our list boxes to that collection. And if you check the objects/events drop downs, you should see that our collection now exposes both a CollectionChanged and ItemPropertyChanged event. Put a message box or break point in each and fire up the app.</p>
+<h3>Running</h3>
+<p>When you run it, you should see a number of identical items in each list box. When you click on the check boxes of either list, you should see the ItemPropertyChanged event fire, after which both list boxes should reflect the new value in the collection.</p>
+<h3>Show me the Demo</h3>
+<p>
+        <object data="data:application/x-silverlight-2," type="application/x-silverlight-2" width="100%" height="150px"><param name="source" value="http://ringdev.com.web10.reliabledomainspace.com/code/bindingdemo/trainingdemo2.xap" /><param name="onError" value="onSilverlightError" /><param name="background" value="white" /><param name="minRuntimeVersion" value="3.0.40624.0" /><param name="autoUpgrade" value="true" /><a href="http://go.microsoft.com/fwlink/?LinkID=149156&amp;v=3.0.40624.0" style="text-decoration:none"><br />
+ 			  <img src="http://go.microsoft.com/fwlink/?LinkId=108181" alt="Get Microsoft Silverlight" style="border-style:none" /><br />
+		  </a></object></p>
+<h3>Show Me the Code</h3>
+<p>Working VS 2008 solution can be downloaded from <a href="http://ringdev.com.web10.reliabledomainspace.com/code/bindingdemo/trainingdemo2.zip">here</a>.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/webdev/webdesigngraphicsstyling/detecting-property-changes-in-an-observa/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+	</channel>
+</rss>

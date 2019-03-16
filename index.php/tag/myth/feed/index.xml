@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>myth &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/myth/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Misconceptions about unicode in SQL Server</title>
+		<link>/index.php/datamgmt/datadesign/misconceptions-about-unicode-in-sql-serv/</link>
+		<comments>/index.php/datamgmt/datadesign/misconceptions-about-unicode-in-sql-serv/#comments</comments>
+		<pubDate>Sat, 07 Aug 2010 16:17:37 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[datalength]]></category>
+		<category><![CDATA[len]]></category>
+		<category><![CDATA[myth]]></category>
+		<category><![CDATA[nvarchar]]></category>
+		<category><![CDATA[sql server]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[unicode]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/08/misconceptions-about-unicode-in-sql-serv/</guid>
+		<description><![CDATA[I was browsing around last night on the internet and a person wanted to know what data type to use to store a course name. Here is an answer he got: I would recommend nvarchar or varchar for the name. Use nvarchar if you anticipate there ever being a point in the future that you [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>I was browsing around last night on the internet and a person wanted to know what data type to use to store a course name. Here is an answer he got:</p>
+<blockquote><p>I would recommend nvarchar or varchar for the name. Use nvarchar if you anticipate there ever being a point in the future that you will need to support foreign languages that might contain unicode characters that are not supported by varchar.<strong> I would look at the longest name I anticipate needing, double it&#8217;s length and then round up to the nearest 50. So if &#8220;Introduction to Partial Differential Equations&#8221; at 48 then I would make it varchar(100)</strong></p></blockquote>
+<p>Okay so that part in bold is completely wrong, Nvarchar uses 2 bytes per character for storage but you do not specify that. So if you want to store the character &#25991; you need nchar(1) not nchar(2).</p>
+<p>Run this and you will see the character &#25991; in the output<br />
+<strong>
+<pre>declare @n nchar(1)
+set @n = N'文' 
+
+select @n</pre>
+<p></strong></p>
+<p><em>And no, there is no mistake, the reason I didn&#8217;t use the codeblock that I use for the rest of this post is that the &#25991; character gets changed to <code>&amp;#25991 so the SQL would be incorrect</code></em></p>
+<p>Also be aware that you need to have the N in front of the string, this tells SQL Server that it has to treat it as unicode. If you do this &#8216;&#25991;&#8217; instead of N&#8217;&#25991;&#8217; you will get a question mark in the output.</p>
+<p>What if you wanted to store over 4000 characters in a nvarchar? Varchar goes up to 8000 characters but nvarchar only goes up to 4000 characters, take a look and run the statement below.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @n <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="nu0">4001</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @n NVARCHAR(4001)</pre></div></div>
+
+<p>Below is the error that you will get.<br />
+<em>Msg 2717, Level 16, State 2, Line 1<br />
+The size (4001) given to the parameter &#8216;@n&#8217; exceeds the maximum allowed (4000).</em></p>
+<p>But there is hope, you can use NVARCHAR(max) to store up to 2GB of data, so about a billion characters or so</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DECLARE</span> @n <span class="kw1">NVARCHAR</span><span class="br0">&#40;</span><span class="kw2">max</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DECLARE @n NVARCHAR(max)</pre></div></div>
+
+<p>One more thing to be aware of when using unicode is that LEN will give you the number of characters but DATALENGTH will give you the storage required to store the character(s)</p>
+<p>Run this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">LEN</span><span class="br0">&#40;</span>N<span class="st0">'1'</span><span class="br0">&#41;</span>,DATALENGTH<span class="br0">&#40;</span>N<span class="st0">'1'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT LEN(N'1'),DATALENGTH(N'1')</pre></div></div>
+
+<p>LEN returns 1 and DATALENGTH returns 2. To learn more about LEN and DATALENGTH, take a look at the <a href="/index.php/DataMgmt/DBProgramming/the-differences-between-len-and-dataleng">The differences between LEN and DATALENGTH in SQL Server</a> post I wrote a while back.</p>
+<p>That is all for this short weekend post.</p>
+<p>*** <strong>Remember, if you have a SQL related question, try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/misconceptions-about-unicode-in-sql-serv/feed/</wfw:commentRss>
+		<slash:comments>2</slash:comments>
+		</item>
+		<item>
+		<title>The SQL Server Memory Leak Confusion</title>
+		<link>/index.php/datamgmt/datadesign/the-sql-server-memory-leak-confusion/</link>
+		<comments>/index.php/datamgmt/datadesign/the-sql-server-memory-leak-confusion/#comments</comments>
+		<pubDate>Wed, 07 Jan 2009 12:47:46 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[myth]]></category>
+		<category><![CDATA[performance tuning]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/01/the-sql-server-memory-leak-confusion/</guid>
+		<description><![CDATA[Not too many moons ago when I started out with SQL Server I was convinced that there was a memory leak inside SQL Server. I ran it locally and the RAM usage just keep growing and growing until my computer was so slow that I had to restart SQL Server. This fixed things for a [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Not too many moons ago when I started out with SQL Server I was convinced that there was a memory leak inside SQL Server. I ran it locally and the RAM usage just keep growing and growing until my computer was so slow that I had to restart SQL Server. This fixed things for a while but after I ran some poorly written queries it would spike up again and stay high.</p>
+<p>There are question about this in forums/fora/newgroups all the time, people think that the sqlserver.exe process has a gigantic memory leak. This is just not true, the reason SQL Server will use as much memory as it can possible grab is that it is much more expensive to read from disk than from RAM. This is also the reason that you want as much RAM as you can afford to make SQL Server happy (and your customers). If your database is not gigantic it is possible that all your data could be in RAM.</p>
+<p>How do you know you need more RAM?<br />
+Take a look at your Buffer Cache Hit Ratio, ideally you want to be at 95% plus.<br />
+Mine right now is 99.927 which is very good. To look at the Buffer Cache Hit Ratio you need to open up Performance in Control Panel&#8211;>Administrative Tools. Click on the + to add a new counter, from the Performance object select <em>SQL Server: Buffer Manager</em>, from the Select counters from list select <em>buffer cache hit ratio</em><br />
+Take a look at the screen shot below if the text is too confusing</p>
+<p><a href="http://www.flickr.com/photos/denisgobo/3177172358/" title="Buffer Cache Hit Ratio by Denis Gobo, on Flickr"><img src="http://farm4.static.flickr.com/3460/3177172358_88e1952570_o.jpg" width="381" height="377" alt="Buffer Cache Hit Ratio" /></a></p>
+<p>So in the end there is no memory leak, because RAM is so much faster than disk SQL Server will use all it can grab. Solid State Disks might change that in the future but for now these Solid State Disks are not large enough<br />
+</p>
+<p>If you are running SQL Server on your local machine make sure that you cap the memory it can use to something like 500MB or 25% less than the total memory on the machine. This will prevent it from slowing down your machine.</p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/the-sql-server-memory-leak-confusion/feed/</wfw:commentRss>
+		<slash:comments>8</slash:comments>
+		</item>
+	</channel>
+</rss>

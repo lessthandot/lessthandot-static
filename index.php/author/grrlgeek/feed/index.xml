@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>Jes Borland &#8211; LessthanDot</title>
+	<atom:link href="/index.php/author/grrlgeek/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Replacing Trace Flags 1204 and 1222 with the Extended Events system_health Session</title>
+		<link>/index.php/datamgmt/dbprogramming/replacing-trace-flags-1204-and-1222-with-the-extended-events-system_health-session/</link>
+		<comments>/index.php/datamgmt/dbprogramming/replacing-trace-flags-1204-and-1222-with-the-extended-events-system_health-session/#respond</comments>
+		<pubDate>Tue, 24 Apr 2018 16:51:47 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=9226</guid>
+		<description><![CDATA[Deadlocks in a SQL Server instance are problematic. They can cause application errors, slow performance, and unhappy users. As a DBA or developer, it’s very helpful to be able to find deadlocks, review what caused them, and fix it permanently, if possible. How do you find deadlocks? Over the years, there have been various methods, [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Deadlocks in a SQL Server instance are problematic. They can cause application errors, slow performance, and unhappy users. As a DBA or developer, it’s very helpful to be able to find deadlocks, review what caused them, and fix it permanently, if possible.</p>
+<p>How do you find deadlocks? Over the years, there have been various methods, depending on what tools were available in SQL Server. Many of us used to run a Profiler or server trace to capture the Deadlock Graph event – useful if we knew when they were occurring (or they occurred all the time). We could also enable trace flags 1204 and/or 1222 to write the information to the event log – better if we knew there were issues, but they weren’t predictable.</p>
+<p>However, I don’t like a messy event log. I like it neat and clean, so I can see errors easily. For example, I enable TF 3226 to suppress “Log was backed up” messages. With SQL Server 2012+, I also prefer to use the Extended Events default system_health session to view deadlock graphs – with no extra work required!</p>
+<p>Let me walk through what a deadlock looks like with TF 1222 and compare that to the XE session.</p>
+<p>In my instance, I have TF 1222 enabled.</p>
+<p><a href="/wp-content/uploads/2018/04/config-mgr.png"><img class="aligncenter size-full wp-image-9227" src="/wp-content/uploads/2018/04/config-mgr.png" alt="config-mgr" width="414" height="496" srcset="/wp-content/uploads/2018/04/config-mgr.png 414w, /wp-content/uploads/2018/04/config-mgr-250x300.png 250w" sizes="(max-width: 414px) 100vw, 414px" /></a></p>
+<p>I have simple code to create a deadlock. You can use this as an example in a test environment to replicate it.</p>
+<pre style="padding-left: 30px">/* Create deadlock - query 1 */
+
+USE tempdb;
+GO
+
+CREATE TABLE tbl1 (id INT NOT NULL PRIMARY KEY CLUSTERED,
+       col INT)
+CREATE TABLE tbl2 (id INT NOT NULL PRIMARY KEY CLUSTERED,
+       col INT REFERENCES tbl1(id))
+
+BEGIN TRANSACTION
+INSERT INTO tbl1 VALUES (2, 999);
+
+/* Now, open a second query and paste this */
+USE tempdb;
+GO
+BEGIN TRAN
+INSERT INTO tbl2 VALUES (111, 2); 
+
+/* Come back here and execute this */
+INSERT INTO tbl2 VALUES (111, 555);
+COMMIT TRAN</pre>
+<p>When I run the last statement, I receive an error that one of the processes was the deadlock victim.</p>
+<p><a href="/wp-content/uploads/2018/04/deadlock-error.png"><img class="aligncenter size-full wp-image-9228" src="/wp-content/uploads/2018/04/deadlock-error.png" alt="deadlock-error" width="609" height="100" srcset="/wp-content/uploads/2018/04/deadlock-error.png 609w, /wp-content/uploads/2018/04/deadlock-error-300x49.png 300w, /wp-content/uploads/2018/04/deadlock-error-600x99.png 600w" sizes="(max-width: 609px) 100vw, 609px" /></a></p>
+<p>If I open the error log, I can see the details of the deadlock. Every bit of information is on a separate line.</p>
+<p><a href="/wp-content/uploads/2018/04/deadlock-error-log.png"><img class="aligncenter size-full wp-image-9229" src="/wp-content/uploads/2018/04/deadlock-error-log.png" alt="deadlock-error-log" width="726" height="636" srcset="/wp-content/uploads/2018/04/deadlock-error-log.png 726w, /wp-content/uploads/2018/04/deadlock-error-log-300x263.png 300w, /wp-content/uploads/2018/04/deadlock-error-log-600x526.png 600w, /wp-content/uploads/2018/04/deadlock-error-log-342x300.png 342w" sizes="(max-width: 726px) 100vw, 726px" /></a></p>
+<p>This one isn’t bad, but imagine a multi-statement deadlock, or a server with several deadlocks in an hour – how do you easily see if there were other errors on the server at the same time?</p>
+<p>With SQL Server 2012+, we have a better tool to see when deadlocks occur – and the deadlock graphs are saved by default, so we don’t have to read the text version to figure it out, or run a separate trace to capture them.</p>
+<p>In SSMS, open Object Explorer and navigate to Extended Events &gt; Sessions &gt; system_health &gt; package0.event_file. Double-click to view the data.</p>
+<p><a href="/wp-content/uploads/2018/04/xe-sessions.png"><img class="aligncenter size-full wp-image-9230" src="/wp-content/uploads/2018/04/xe-sessions.png" alt="xe-sessions" width="239" height="129" /></a></p>
+<p>I go right to Filters to find the xml_deadlock_report events.</p>
+<p><a href="/wp-content/uploads/2018/04/xe-filter.png"><img class="aligncenter size-full wp-image-9231" src="/wp-content/uploads/2018/04/xe-filter.png" alt="xe-filter" width="627" height="236" srcset="/wp-content/uploads/2018/04/xe-filter.png 627w, /wp-content/uploads/2018/04/xe-filter-300x113.png 300w, /wp-content/uploads/2018/04/xe-filter-600x226.png 600w" sizes="(max-width: 627px) 100vw, 627px" /></a></p>
+<p><a href="/wp-content/uploads/2018/04/xe-filter-screen.png"><img class="aligncenter size-full wp-image-9232" src="/wp-content/uploads/2018/04/xe-filter-screen.png" alt="xe-filter-screen" width="637" height="411" srcset="/wp-content/uploads/2018/04/xe-filter-screen.png 637w, /wp-content/uploads/2018/04/xe-filter-screen-300x194.png 300w, /wp-content/uploads/2018/04/xe-filter-screen-600x387.png 600w, /wp-content/uploads/2018/04/xe-filter-screen-465x300.png 465w" sizes="(max-width: 637px) 100vw, 637px" /></a></p>
+<p>Here you’ll see deadlocks that have occurred. The Value field will show the XML values that you also see in the log. You can double-click on the Value field to bring up the XML.</p>
+<p><a href="/wp-content/uploads/2018/04/details.png"><img class="aligncenter size-full wp-image-9233" src="/wp-content/uploads/2018/04/details.png" alt="details" width="515" height="238" srcset="/wp-content/uploads/2018/04/details.png 515w, /wp-content/uploads/2018/04/details-300x139.png 300w" sizes="(max-width: 515px) 100vw, 515px" /></a></p>
+<p>Don’t ignore that sneaky “Deadlock” tab, however – that’s where you’ll find the easier-to-read deadlock graph!</p>
+<p><a href="/wp-content/uploads/2018/04/deadlock.png"><img class="aligncenter size-large wp-image-9234" src="/wp-content/uploads/2018/04/deadlock-1024x433.png" alt="deadlock" width="1024" height="433" srcset="/wp-content/uploads/2018/04/deadlock-1024x433.png 1024w, /wp-content/uploads/2018/04/deadlock-300x127.png 300w, /wp-content/uploads/2018/04/deadlock-768x324.png 768w, /wp-content/uploads/2018/04/deadlock-600x253.png 600w, /wp-content/uploads/2018/04/deadlock-710x300.png 710w, /wp-content/uploads/2018/04/deadlock.png 1044w" sizes="(max-width: 1024px) 100vw, 1024px" /></a></p>
+<p>A good description of deadlock graphs, and how to interpret them, can be found at <a href="https://www.sqlshack.com/understanding-graphical-representation-sql-server-deadlock-graph/">https://www.sqlshack.com/understanding-graphical-representation-sql-server-deadlock-graph/</a>.</p>
+<p>As you modernize your data platform, you should update your troubleshooting methods and tools as well. This is an easy example of taking advantage of Extended Events to solve an old problem!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/replacing-trace-flags-1204-and-1222-with-the-extended-events-system_health-session/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>&#8220;North to Alaska&#8221;</title>
+		<link>/index.php/uncategorized/north-to-alaska/</link>
+		<comments>/index.php/uncategorized/north-to-alaska/#respond</comments>
+		<pubDate>Thu, 01 Mar 2018 18:36:25 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=9033</guid>
+		<description><![CDATA[I&#8217;m excited and privileged to announce that I&#8217;ll be a Technical Lead on Tech Outbound Alaska this August! Tim and Amy Ford have been putting together high-quality SQL Cruise events since 2010. I&#8217;ve attended three, and each one has been better than the last. (Make sure to read about my experiences on SQL Cruise Caribbean 2015 [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><a href="http://www.techoutbound.com/"><img class="alignleft size-full wp-image-9036" style="float: left;margin: 1em 1em .5em 1em" src="/wp-content/uploads/2018/03/tech-outbound-logo.jpg" alt="tech-outbound-logo" width="200" height="200" srcset="/wp-content/uploads/2018/03/tech-outbound-logo.jpg 400w, /wp-content/uploads/2018/03/tech-outbound-logo-200x200.jpg 200w, /wp-content/uploads/2018/03/tech-outbound-logo-300x300.jpg 300w" sizes="(max-width: 200px) 100vw, 200px" /></a><br />
+I&#8217;m excited and privileged to announce that I&#8217;ll be a Technical Lead on <a href="http://www.techoutbound.com/">Tech Outbound Alaska</a> this August! Tim and Amy Ford have been putting together high-quality SQL Cruise events since 2010. I&#8217;ve attended three, and each one has been better than the last. (Make sure to read about my experiences on <a href="/index.php/uncategorized/sql-cruise-caribbean-2015-more-than-a-cruise-with-classes-much-more/">SQL Cruise Caribbean 2015</a> and <a href="/index.php/uncategorized/what-i-learned-on-sql-cruise-2016/">SQL Cruise Caribbean 2016</a>!)</p>
+<p>At the core of Tech Outbound is technical training. I&#8217;ll be leading discussions on three main topics this year &#8211; SQL Server enhancements, Azure Managed Instances, and Azure Cosmos DB. Yes, I&#8217;m expanding beyond SQL Server, because we are more than SQL Server professionals &#8211; we are data professionals.<br />
+Here is a preview of my topics:</p>
+<p style="padding-left: 30px"><strong>Cosmos DB: The Future of Data… Now!</strong><br />
+The opportunity for getting in on the ground floor of new technologies happens once in a blue moon. In 2017, Microsoft introduced Cosmos DB, a &#8220;globally distributed, multi-model database service&#8221;. It offers multiple APIs, multiple consistency models, automatic indexing, and guaranteed performance. This revolutionary database system is changing how developers store and work with their data. I&#8217;ll cover the features, use cases, and case studies for Cosmos DB. Gain a competitive edge by learning about this emerging technology… now!</p>
+<p style="padding-left: 30px"><strong>Advantages of Azure Managed Instances for You and Your Company</strong><br />
+SQL Server Database Administrators have been told for years that their jobs are changing and the biggest contributor may be the newly announced Azure Managed Instances. Azure SQL Database provides for automatic backups, built-in high availability, and easy scaling. SQL Server on-premises is your current option for native backup and restore, cross-database queries and transactions, SQL Server Agent, and more. With Azure Managed Instances, you get both! In this class, you&#8217;ll learn what this Azure PaaS offering supports; how to migrate existing instances and databases; and how to tune, scale, and troubleshoot them. Maintain your technical advantage by attending this session aboard Tech Outbound SQL Cruise.</p>
+<p style="padding-left: 30px"><strong>SQL Server: The Intelligent Database</strong><br />
+You need a data platform that can accelerate the decisions for your business to maintain advantages over the competition. Microsoft is developing many new features, and improving existing capabilities within SQL Server, to create an intelligent database. Automatic tuning, adaptive query processing, and operational analytics are transforming the relational database you know, while new features are continually introduced into Azure SQL Database. Join me to gain an insider’s perspective on investments being made to make your SQL Server databases smarter: enabling your company gain an intelligent edge.</p>
+<p>In addition, you&#8217;ll also get to hear from other fantastic speakers &#8211; Buck Woody, also of Microsoft; Tim Ford, organizing and teaching; Jason Hall of Sentry One (who previously gave one of my all-time favorite SQL Cruise sessions on tempdb); Itzik Ben-Gan, which has me geeked out; and Kevin Kline of Sentry One, who has always been one of my favorite instructors.</p>
+<p>Why should you consider this conference on a ship?</p>
+<p>My favorite part of Tech Outbound training is how in-depth the classes are. Sessions can last two or more hours, with discussion continuing after formal classroom time over a drink, dinner, or an excursion. Office Hours are set up a few times during the week to have conversations in a more casual setting &#8211; and this is where I&#8217;ve had some of my best conversations.</p>
+<p>You don&#8217;t merely have topic experts speaking at you, you have discussions with them and your fellow attendees all week. Everyone learns from everyone else.</p>
+<p>In addition, the networking is fantastic &#8211; I&#8217;ve made dear friends on these cruises. I&#8217;ve also had delightful vacation fun &#8211; hiking to glaciers, taking rum distillery tours, ziplining in tropical canopies overlooking the ocean, and great dinners.</p>
+<p><strong>Join us!</strong></p>
+<p>Tech Outbound Alaska runs from August 4 to August 11, 2018. The cruise departs from and returns to Seattle, Washington. We&#8217;ll be sailing on Norwegian Cruise Line’s brand new Alaskan flagship, the NCL Bliss. Alaskan stops are in Ketchikan, Juneau, and Skagway. Enjoy training as we pass glaciers and remote mountain peaks. A glacier tour, two days at sea through the majestic Inside Passage, and a final stop in Victoria on Vancouver Island also are on tap.</p>
+<p>To get started, go to <a href="http://www.techoutbound.com/register-for-event.html">http://www.techoutbound.com/register-for-event.html</a> and follow instructions &#8211; the process is really easy! Please post on Twitter using #TechOutbound and tag @TechOutbound &#8211; and me @grrl_geek!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/north-to-alaska/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Use ostress to load test a SQL database</title>
+		<link>/index.php/datamgmt/dbprogramming/use-ostress-to-load-test-a-sql-database/</link>
+		<comments>/index.php/datamgmt/dbprogramming/use-ostress-to-load-test-a-sql-database/#comments</comments>
+		<pubDate>Thu, 26 Oct 2017 14:49:36 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=8831</guid>
+		<description><![CDATA[Have you ever wondered how you could take one or more .sql files you captured as a workload and run them against a SQL Server or Azure SQL Database to test performance or impact? Microsoft has a free tool to do just that &#8211; ostress. Ostress.exe is part of the RML utilities. The first step [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Have you ever wondered how you could take one or more .sql files you captured as a workload and run them against a SQL Server or Azure SQL Database to test performance or impact? Microsoft has a free tool to do just that &#8211; ostress.</p>
+<p>Ostress.exe is part of the RML utilities. The first step is to download it from <a href="https://www.microsoft.com/en-us/download/details.aspx?id=4511">https://www.microsoft.com/en-us/download/details.aspx?id=4511</a>. Along with the command-line tools, there is also a helpful help document!</p>
+<p>Ostress allows you to specify one file, or a folder that contains multiple files, to run. You can also specify a number of connections to be made to the database, to simulate multiple users or applications running the same query. Each connection can then run the file one or more times.</p>
+<p>The next thing you’ll need is one or more .sql files that the tool will run.</p>
+<p>To run a load test, you’ll open RML cmd prompt and enter your command. A few common parameters, which you’ll be using:</p>
+<p style="padding-left: 30px">-S – server name &#8211; this works for a SQL Server or an Azure SQL Database.<br />
+-E – Windows authentication. The other option is -U and -P for SQL authentication.<br />
+-d – database name.<br />
+-i – Path to batch file(s), such as C:\ostress\ostress_batch_file.sql.<br />
+-n – Number of connections to create.<br />
+-r – Number of iterations through the file each connection will make.<br />
+-q – Quiet mode – no result display.<br />
+-o – Output file directory.</p>
+<p>A sample command which will take one file I created (ostress_batch_file.sql), create 5 connections, and run it twice on each:<br />
+ostress -SJesSb -E -dAdventureWorks2016 -iC:\ostress\ostress_batch_file.sql -n5 -r2 -oC:\ostress</p>
+<p>In the cmd window:</p>
+<p><a href="/wp-content/uploads/2017/10/ostress-cmd.png"><img class="aligncenter size-full wp-image-8832" src="/wp-content/uploads/2017/10/ostress-cmd.png" alt="ostress-cmd" width="793" height="434" srcset="/wp-content/uploads/2017/10/ostress-cmd.png 793w, /wp-content/uploads/2017/10/ostress-cmd-300x164.png 300w, /wp-content/uploads/2017/10/ostress-cmd-768x420.png 768w" sizes="(max-width: 793px) 100vw, 793px" /></a><br />
+The output folder contains one log file, and one output file for each connection.</p>
+<p><a href="/wp-content/uploads/2017/10/ostress-output.png"><img class="aligncenter size-full wp-image-8833" src="/wp-content/uploads/2017/10/ostress-output.png" alt="ostress-output" width="487" height="199" srcset="/wp-content/uploads/2017/10/ostress-output.png 487w, /wp-content/uploads/2017/10/ostress-output-300x123.png 300w" sizes="(max-width: 487px) 100vw, 487px" /></a></p>
+<p>One question I&#8217;ve been asked was how to build delays into the batch. My suggestion is to edit the T-SQL script, using WAITFOR DELAY, to accomplish that.</p>
+<p>Give ostress a try when you want a simple load testing tool for SQL Server!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/use-ostress-to-load-test-a-sql-database/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Catch my keynote at Chicago Code Camp 2017!</title>
+		<link>/index.php/itprofessionals/professionaldevelopment/catch-my-keynote-at-chicago-code-camp-2017/</link>
+		<comments>/index.php/itprofessionals/professionaldevelopment/catch-my-keynote-at-chicago-code-camp-2017/#comments</comments>
+		<pubDate>Tue, 28 Mar 2017 20:37:55 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Professional Development]]></category>
+
+		<guid isPermaLink="false">/?p=8628</guid>
+		<description><![CDATA[I have a notebook for my Ideas, and Dreams, and Goals. Here&#8217;s one of my Ideas. I watched a very inspiring keynote at That Conference, and I decided I wanted to be the person at the front of the room, giving a keynote, inspiring the audience. Achievement unlocked: on Saturday, April 29, 2017, I&#8217;ll be [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><a href="/wp-content/uploads/2017/03/Notebook.jpg"><img class="aligncenter size-medium wp-image-8631" src="/wp-content/uploads/2017/03/Notebook-225x300.jpg" alt="notebook" width="225" height="300" srcset="/wp-content/uploads/2017/03/Notebook-225x300.jpg 225w, /wp-content/uploads/2017/03/Notebook-768x1024.jpg 768w, /wp-content/uploads/2017/03/Notebook.jpg 1512w" sizes="(max-width: 225px) 100vw, 225px" /></a></p>
+<p>I have a notebook for my Ideas, and Dreams, and Goals.</p>
+<p>Here&#8217;s one of my Ideas.</p>
+<p><a href="/wp-content/uploads/2017/03/Goal.jpg"><img class="aligncenter size-medium wp-image-8632" src="/wp-content/uploads/2017/03/Goal-225x300.jpg" alt="goal" width="225" height="300" srcset="/wp-content/uploads/2017/03/Goal-225x300.jpg 225w, /wp-content/uploads/2017/03/Goal-768x1024.jpg 768w, /wp-content/uploads/2017/03/Goal.jpg 1512w" sizes="(max-width: 225px) 100vw, 225px" /></a></p>
+<p>I watched a very inspiring keynote at <a href="https://www.thatconference.com/">That Conference</a>, and I decided I wanted to be the person at the front of the room, giving a keynote, inspiring the audience.</p>
+<p>Achievement unlocked: on Saturday, April 29, 2017, I&#8217;ll be the keynote speaker at <a href="https://www.chicagocodecamp.com/">Chicago Code Camp 2017</a>! This event, in its ninth year, is a free, volunteer-run, day-long conference in downtown Chicago. There&#8217;s a huge list of technical sessions, ranging from React to Machine Learning to Docker.</p>
+<p>My keynote is &#8220;Busy is a Four Letter Word&#8221;. I&#8217;m tired of asking people, &#8220;How are you?&#8221; only to hear, &#8220;I&#8217;m so busy.&#8221; What I want to hear is, &#8220;I&#8217;m learning a new skill or language&#8221;, or &#8220;I recently had this great adventure&#8221;, or &#8220;I&#8217;m content with my life.&#8221; How do we, as over-worked, over-scheduled, over-tired people get to that state? I&#8217;m going to share what I&#8217;ve learned about how to be less busy &#8211; how to say no, how to set a priority, and how to enjoy being bored again!</p>
+<p>Register today to attend this free event and get a great day of technical training!</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/professionaldevelopment/catch-my-keynote-at-chicago-code-camp-2017/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>You Are Responsible for Telling Your Story</title>
+		<link>/index.php/itprofessionals/you-are-responsible-for-telling-your-story/</link>
+		<comments>/index.php/itprofessionals/you-are-responsible-for-telling-your-story/#comments</comments>
+		<pubDate>Fri, 27 Jan 2017 13:00:17 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[IT Professionals]]></category>
+		<category><![CDATA[Professional Development]]></category>
+
+		<guid isPermaLink="false">/?p=5006</guid>
+		<description><![CDATA[As I’m writing this, it’s January, and I see a steady stream of “working on my annual review” tweets. You want something. (We all do.) It could be a raise or a promotion at your current job, a new job, or a board position at a non-profit you love. How do you get that something? [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>As I’m writing this, it’s January, and I see a steady stream of “working on my annual review” tweets.</p>
+<p>You want something. (We all do.) It could be a raise or a promotion at your current job, a new job, or a board position at a non-profit you love. How do you get that something? You tell people what you’ve already accomplished, and why you deserve more.</p>
+<h3>Why <em>you</em> need to be the one to tell your story</h3>
+<p>What you need to keep in mind, always, is that you are the only one that knows what you have done. Projects you’ve completed, milestones you’ve reached, and goals you’ve conquered haven’t been noticed by everyone. Your manager can’t know everything (and probably doesn’t write down everything she does know). Your team members are too busy taking care of their own work to notice. Your customers are happy you’ve done the work, but don’t know what went into it. No one else is keeping a list of your accomplishments.</p>
+<p>You are in charge of telling your story.</p>
+<h3>How do I tell my story?</h3>
+<p>The first step is to make a list of what you’ve accomplished. <strong>Be specific</strong>. Write down as many details as you can remember. Dig through emails to find more information. Look through notes you kept about a project. Read documentation you wrote.</p>
+<p>Now, pull out the main points.</p>
+<p>Then, tell the story.</p>
+<p>Let’s travel back to middle school English class. Every story has five parts: exposition, rising action, climax, falling action, resolution.  Your story should have the same.</p>
+<p>Exposition is where you set the stage. What is the background of the project or task you were working on? Was it an internal or external request? Was it something you’d done before and were optimizing, or a new task you had to learn?</p>
+<p>Rising action is where you can list what went into planning and executing the project. What resources did you need to gather, and how did you do so? What new skills did you learn?</p>
+<p>At the climax, you’ve accomplished the goal. Brag about it. Did you meet deadlines, stay within budget, surpass expectations? List these things! This can be hard. It takes a lot of effort to put yourself front and center. Remember your end goal, what it is you want. Without talking about what you’ve done, you can’t get to that goal.</p>
+<p>Falling action is also very important – after the main part of the project, what impact did it have? Have you gotten compliments on the work? Add those. If you can add specific impact, such as hours or money saved by a process, do so!</p>
+<p>Resolution is where you let people know why it’s important to you. Did you learn something fascinating? Did you accomplish a major goal? Did you free up time to be able to do something else?</p>
+<p>Segue this into what you want. You’re clearly making the case for something – that raise, promotion, or new position. Another thing to remember, which could be a blog post of its own, is that you don’t get what you don’t ask for. This is why we tell our story – so we can get what we want <em>and</em> need.</p>
+<h3>When to tell your story</h3>
+<p>Writing your story about your accomplishments isn’t something you should be doing just once a year, in January, when your annual review is due. It should be a regular part of your professional development process.</p>
+<p>If you haven’t put together a list of your accomplishments for six months or more, open up a document and start writing, right now.</p>
+<p>Today is also a great day to start keeping notes for your future story. It can be in a format as simple as a notebook where you take notes every day or week. I love using OneNote. You could use a Word document. Use whatever format works for you.</p>
+<p>Don’t wait until the end of the year to update it. If you have to, put an appointment on your calendar or a task on your list at least every month to update this.</p>
+<p>In order to get what you want, you have to prove why you deserve it. Write your story so you can get it.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/you-are-responsible-for-telling-your-story/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>Transactional Replication from Availability Groups to Azure SQL Database: Part 5 &#8211; Testing</title>
+		<link>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-5-testing/</link>
+		<comments>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-5-testing/#respond</comments>
+		<pubDate>Fri, 30 Dec 2016 15:00:30 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4960</guid>
+		<description><![CDATA[This is part 5 of a 5-part series. Part 1 &#8211; Planning Part 2 &#8211; The Distributor Part 3 &#8211; The Publisher Part 4 &#8211; The Subscriber Part 5 &#8211; Testing &#160; Scenario Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest Distributor: stand-alone server, SQL2014demo Subscriber: Azure SQL Database &#8211; server jessqldb2, database ReplicationTest Time to [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>This is part 5 of a 5-part series.</p>
+<ul>
+<li><a href="/?p=4896" target="_blank">Part 1 &#8211; Planning</a></li>
+<li><a href="/?p=4906" target="_blank">Part 2 &#8211; The Distributor</a></li>
+<li><a href="/?p=4923" target="_blank">Part 3 &#8211; The Publisher</a></li>
+<li><a href="/?p=4945" target="_blank">Part 4 &#8211; The Subscriber</a></li>
+<li><a href="/?p=4960" target="_blank">Part 5 &#8211; Testing</a></li>
+</ul>
+<p>&nbsp;</p>
+<h3>Scenario</h3>
+<p>Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest</p>
+<p>Distributor: stand-alone server, SQL2014demo</p>
+<p>Subscriber: Azure SQL Database &#8211; server jessqldb2, database ReplicationTest</p>
+<h3>Time to test!</h3>
+<p>Congratulations, you&#8217;ve configured a remote distributor, configured all of your AG replicas as publishers, and configured your SQL Database as a subscriber! Now you want to ensure that transactions are replicating to the database, and that they continue to do so if there is a failover in the AG.</p>
+<h3>Testing that replication works</h3>
+<p>This is easiest to do in a development database, where you can add data.</p>
+<p>Connect to the AG primary, which is the publisher &#8211; run a query against a table and note results.</p>
+<p>Connect to the subscriber, run the same query, and verify the results are the same.</p>
+<p>Connect to the publisher. If you have the ability, enter a new value into a table. If not, find a table this is frequently updated, and note a new value that has been entered.</p>
+<p>Go to the subscriber. Query for the new or changed value.</p>
+<h3>Testing that on AG failover, replication continues to work</h3>
+<p>Perform a manual failover from your primary replica to a secondary replica.</p>
+<p>Connect to the AG primary, which is the publisher &#8211; run a query against a table and note results.</p>
+<p>Connect to the subscriber, run the same query, and verify the results are the same.</p>
+<p>Connect to the publisher. If you have the ability, enter a new value into a table. If not, find a table this is frequently updated, and note a new value that has been entered.</p>
+<p>Go to the subscriber. Query for the new or changed value.</p>
+<h3>Troubleshooting</h3>
+<p>Troubleshooting replication is outside the scope of this blog series. If you find that things aren&#8217;t working as expected, read the article <a href="https://www.simple-talk.com/sql/database-administration/monitoring-transactional-replication-in-sql-server/" target="_blank">Monitoring Transactional Replication in SQL Server</a>, and review the <a href="http://www.sqlservercentral.com/stairway/72401/" target="_blank">SQLServerCentral.com Stairway to Replication </a>article <a href="http://www.sqlservercentral.com/articles/Stairway+Series/72452/" target="_blank">Level 10: Troubleshooting</a>.</p>
+<p>Troubleshooting Availability Groups is also outside the scope of this blog series. If you need help, start with <a href="https://msdn.microsoft.com/en-us/library/dn135328(v=sql.110).aspx" target="_blank">AlwaysOn Availability Groups Troubleshooting and Monitoring Guide</a>.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-5-testing/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Transactional Replication from Availability Groups to Azure SQL Database: Part 4 &#8211; The Subscriber</title>
+		<link>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-4-the-subscriber/</link>
+		<comments>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-4-the-subscriber/#respond</comments>
+		<pubDate>Thu, 29 Dec 2016 15:00:14 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4945</guid>
+		<description><![CDATA[This is part 4 of a 5-part series. Part 1 &#8211; Planning Part 2 &#8211; The Distributor Part 3 &#8211; The Publisher Part 4 &#8211; The Subscriber Part 5 &#8211; Testing &#160; Scenario Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest Distributor: stand-alone server, SQL2014demo Subscriber: Azure SQL Database &#8211; server jessqldb2, database ReplicationTest Setting up [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>This is part 4 of a 5-part series.</p>
+<ul>
+<li><a href="/?p=4896" target="_blank">Part 1 &#8211; Planning</a></li>
+<li><a href="/?p=4906" target="_blank">Part 2 &#8211; The Distributor</a></li>
+<li><a href="/?p=4923" target="_blank">Part 3 &#8211; The Publisher</a></li>
+<li><a href="/?p=4945" target="_blank">Part 4 &#8211; The Subscriber</a></li>
+<li><a href="/?p=4960" target="_blank">Part 5 &#8211; Testing</a></li>
+</ul>
+<p>&nbsp;</p>
+<h3>Scenario</h3>
+<p>Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest</p>
+<p>Distributor: stand-alone server, SQL2014demo</p>
+<p>Subscriber: Azure SQL Database &#8211; server jessqldb2, database ReplicationTest</p>
+<h3>Setting up the replication subscription</h3>
+<p>This subscription is going to use an Azure SQL Database.</p>
+<p>Go to the AG primary replica. (In this demo, this is SQL2014AG2.)</p>
+<p>Expand Replication. Expand Local Publications. Right-click the publication and select New Subscription.</p>
+<p>Publication – select the publication and click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-1.png"><img class="aligncenter size-full wp-image-4947" src="/wp-content/uploads/2016/12/subscription-1.png" alt="subscription 1" width="573" height="460" srcset="/wp-content/uploads/2016/12/subscription-1.png 573w, /wp-content/uploads/2016/12/subscription-1-300x240.png 300w" sizes="(max-width: 573px) 100vw, 573px" /></a></p>
+<p>Distribution Agent Location – select Run all agents at the Distributor (push subscriptions). Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-2.png"><img class="aligncenter size-full wp-image-4948" src="/wp-content/uploads/2016/12/subscription-2.png" alt="subscription 2" width="576" height="456" srcset="/wp-content/uploads/2016/12/subscription-2.png 576w, /wp-content/uploads/2016/12/subscription-2-300x237.png 300w" sizes="(max-width: 576px) 100vw, 576px" /></a></p>
+<p>Subscribers – here we will add the SQL DB. Click Add Subscriber &gt; Add SQL Server Subscriber.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-3.png"><img class="aligncenter size-full wp-image-4949" src="/wp-content/uploads/2016/12/subscription-3.png" alt="subscription 3" width="569" height="455" srcset="/wp-content/uploads/2016/12/subscription-3.png 569w, /wp-content/uploads/2016/12/subscription-3-300x239.png 300w" sizes="(max-width: 569px) 100vw, 569px" /></a></p>
+<p>Enter the Azure SQL Server name, the login, and the password. Click Options. Go to Connection Properties. Enter the database. Click Connect.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-4.png"><img class="aligncenter size-full wp-image-4950" src="/wp-content/uploads/2016/12/subscription-4.png" alt="subscription 4" width="493" height="525" srcset="/wp-content/uploads/2016/12/subscription-4.png 493w, /wp-content/uploads/2016/12/subscription-4-281x300.png 281w" sizes="(max-width: 493px) 100vw, 493px" /></a></p>
+<p>Make sure there is a checkmark next to the subscriber name. Use the drop-down to select a Subscription Database. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-5.png"><img class="aligncenter size-full wp-image-4951" src="/wp-content/uploads/2016/12/subscription-5.png" alt="subscription 5" width="575" height="454" srcset="/wp-content/uploads/2016/12/subscription-5.png 575w, /wp-content/uploads/2016/12/subscription-5-300x236.png 300w" sizes="(max-width: 575px) 100vw, 575px" /></a></p>
+<p>Distribution Agent Security – click the ellipses on the right side.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-6.png"><img class="aligncenter size-full wp-image-4952" src="/wp-content/uploads/2016/12/subscription-6.png" alt="subscription 6" width="569" height="459" srcset="/wp-content/uploads/2016/12/subscription-6.png 569w, /wp-content/uploads/2016/12/subscription-6-300x242.png 300w" sizes="(max-width: 569px) 100vw, 569px" /></a><a href="/wp-content/uploads/2016/12/subscription-7.png"><br />
+</a></p>
+<p>Distribution Agent Security – three pieces. First select an account to run the distribution agent process to sync the sub. Ideally, this is a specific domain user.</p>
+<p>Second, select the account to connect to the distributor.</p>
+<p>Third, select an account to connect to the subscriber. If this is a SQL DB, this <strong>must</strong> be a SQL login that is a member of the db_owner role in the database.</p>
+<p>Click OK.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-7.png"><img class="aligncenter size-full wp-image-4953" src="/wp-content/uploads/2016/12/subscription-7.png" alt="subscription 7" width="553" height="677" srcset="/wp-content/uploads/2016/12/subscription-7.png 553w, /wp-content/uploads/2016/12/subscription-7-245x300.png 245w" sizes="(max-width: 553px) 100vw, 553px" /></a></p>
+<p>Click Next.</p>
+<p>Synchronization Schedule – choose Run continuously. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-8.png"><img class="aligncenter size-full wp-image-4954" src="/wp-content/uploads/2016/12/subscription-8.png" alt="subscription 8" width="572" height="453" srcset="/wp-content/uploads/2016/12/subscription-8.png 572w, /wp-content/uploads/2016/12/subscription-8-300x237.png 300w" sizes="(max-width: 572px) 100vw, 572px" /></a></p>
+<p>Initialize Subscriptions – make sure Initialize is checked, choose Immediately. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-9.png"><img class="aligncenter size-full wp-image-4955" src="/wp-content/uploads/2016/12/subscription-9.png" alt="subscription 9" width="576" height="451" srcset="/wp-content/uploads/2016/12/subscription-9.png 576w, /wp-content/uploads/2016/12/subscription-9-300x234.png 300w" sizes="(max-width: 576px) 100vw, 576px" /></a></p>
+<p>Wizard Actions – select both options. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-10.png"><img class="aligncenter size-full wp-image-4956" src="/wp-content/uploads/2016/12/subscription-10.png" alt="subscription 10" width="573" height="454" srcset="/wp-content/uploads/2016/12/subscription-10.png 573w, /wp-content/uploads/2016/12/subscription-10-300x237.png 300w" sizes="(max-width: 573px) 100vw, 573px" /></a></p>
+<p>Script File Properties – give the file a name. Review the other options. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-11.png"><img class="aligncenter size-full wp-image-4957" src="/wp-content/uploads/2016/12/subscription-11.png" alt="subscription 11" width="579" height="451" srcset="/wp-content/uploads/2016/12/subscription-11.png 579w, /wp-content/uploads/2016/12/subscription-11-300x233.png 300w" sizes="(max-width: 579px) 100vw, 579px" /></a></p>
+<p>Click Finish. All steps should have a green checkmark next to them.</p>
+<p><a href="/wp-content/uploads/2016/12/subscription-12.png"><img class="aligncenter size-full wp-image-4958" src="/wp-content/uploads/2016/12/subscription-12.png" alt="subscription 12" width="573" height="456" srcset="/wp-content/uploads/2016/12/subscription-12.png 573w, /wp-content/uploads/2016/12/subscription-12-300x238.png 300w" sizes="(max-width: 573px) 100vw, 573px" /></a></p>
+<p>To verify it&#8217;s working, expand Replication &gt; Local Publications &gt; Publication Name, and you should see your subscription. Right-click and select View Synchronization Status to confirm it&#8217;s applying the snapshot.</p>
+<p>Your replication subscriber is now set up. The next step is to verify that all the pieces work by testing both replication and AG failover.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-4-the-subscriber/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Transactional Replication from Availability Groups to Azure SQL Database: Part 3 &#8211; The Publisher</title>
+		<link>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-3-the-publisher/</link>
+		<comments>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-3-the-publisher/#comments</comments>
+		<pubDate>Wed, 28 Dec 2016 15:00:18 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4923</guid>
+		<description><![CDATA[This is part 3 of a 5-part series. Part 1 &#8211; Planning Part 2 &#8211; The Distributor Part 3 &#8211; The Publisher Part 4 &#8211; The Subscriber Part 5 &#8211; Testing &#160; Scenario Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest Distributor: stand-alone server, SQL2014demo Subscriber: Azure SQL Database &#8211; server jessqldb2, database ReplicationTest Setting up [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>This is part 3 of a 5-part series.</p>
+<ul>
+<li><a href="/?p=4896" target="_blank">Part 1 &#8211; Planning</a></li>
+<li><a href="/?p=4906" target="_blank">Part 2 &#8211; The Distributor</a></li>
+<li><a href="/?p=4923" target="_blank">Part 3 &#8211; The Publisher</a></li>
+<li><a href="/?p=4945" target="_blank">Part 4 &#8211; The Subscriber</a></li>
+<li><a href="/?p=4960" target="_blank">Part 5 &#8211; Testing</a></li>
+</ul>
+<p>&nbsp;</p>
+<h3>Scenario</h3>
+<p>Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest</p>
+<p>Distributor: stand-alone server, SQL2014demo</p>
+<p>Subscriber: Azure SQL Database &#8211; server jessqldb2, database ReplicationTest</p>
+<h3>Setting up the replication publisher</h3>
+<p>You&#8217;ll need to start by configuring the AG current primary as Publisher. (In this demo, this is SQL2014AG2.) Then, you&#8217;ll need to configure the distributor that we set up in step 2 to use the AG listener name, rather than the server name.</p>
+<p>Log into the primary &#8211; SQL2014AG2.</p>
+<p>Expand Replication, right-click Local Publications, select New Publication.</p>
+<p>Click Next on Welcome.</p>
+<p>Distributor – select Use the following server and click Add. Connect to the distributor you configured in the previous step. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-1.png"><img class="aligncenter size-full wp-image-4925" src="/wp-content/uploads/2016/12/publisher-1.png" alt="publisher 1" width="503" height="453" srcset="/wp-content/uploads/2016/12/publisher-1.png 503w, /wp-content/uploads/2016/12/publisher-1-300x270.png 300w" sizes="(max-width: 503px) 100vw, 503px" /></a></p>
+<p>Administrative Password – enter the distributor admin password you created in the previous step. Click Next. (If you add multiple publications from one server, you only do this the first time.)</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-2.png"><img class="aligncenter size-full wp-image-4926" src="/wp-content/uploads/2016/12/publisher-2.png" alt="publisher 2" width="506" height="457" srcset="/wp-content/uploads/2016/12/publisher-2.png 506w, /wp-content/uploads/2016/12/publisher-2-300x270.png 300w" sizes="(max-width: 506px) 100vw, 506px" /></a></p>
+<p>Publication database – choose your database. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-3.png"><img class="aligncenter size-full wp-image-4927" src="/wp-content/uploads/2016/12/publisher-3.png" alt="publisher 3" width="506" height="454" srcset="/wp-content/uploads/2016/12/publisher-3.png 506w, /wp-content/uploads/2016/12/publisher-3-300x269.png 300w" sizes="(max-width: 506px) 100vw, 506px" /></a></p>
+<p>Publication type – because this is going to Azure SQL DB, it must be Transactional. Select your option. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-4.png"><img class="aligncenter size-full wp-image-4928" src="/wp-content/uploads/2016/12/publisher-4.png" alt="publisher 4" width="502" height="451" srcset="/wp-content/uploads/2016/12/publisher-4.png 502w, /wp-content/uploads/2016/12/publisher-4-300x269.png 300w" sizes="(max-width: 502px) 100vw, 502px" /></a></p>
+<p>Articles – choose which database objects you want to replicate. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-5.png"><img class="aligncenter size-full wp-image-4929" src="/wp-content/uploads/2016/12/publisher-5.png" alt="publisher 5" width="505" height="457" srcset="/wp-content/uploads/2016/12/publisher-5.png 505w, /wp-content/uploads/2016/12/publisher-5-300x271.png 300w" sizes="(max-width: 505px) 100vw, 505px" /></a></p>
+<p>Filter Table Rows – if you need to filter, click Add. Otherwise, click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-6.png"><img class="aligncenter size-full wp-image-4930" src="/wp-content/uploads/2016/12/publisher-6.png" alt="publisher 6" width="507" height="454" srcset="/wp-content/uploads/2016/12/publisher-6.png 507w, /wp-content/uploads/2016/12/publisher-6-300x268.png 300w" sizes="(max-width: 507px) 100vw, 507px" /></a></p>
+<p>Snapshot Agent – choose to create a snapshot immediately. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-7.png"><img class="aligncenter size-full wp-image-4931" src="/wp-content/uploads/2016/12/publisher-7.png" alt="publisher 7" width="509" height="453" srcset="/wp-content/uploads/2016/12/publisher-7.png 509w, /wp-content/uploads/2016/12/publisher-7-300x266.png 300w" sizes="(max-width: 509px) 100vw, 509px" /></a></p>
+<p>Agent Security – click Security Settings to choose what account the snapshot and log reader agents will run under. Click OK. Click Next.</p>
+<p>(I could write an entire blog post about this, but that is better left to people more well-versed in replication than myself. I know that I don&#8217;t want to use the SQL Server Agent service account &#8211; I want to create an AD account that has been granted the permissions needed as described in  <a href="https://msdn.microsoft.com/en-us/library/ms151227.aspx" target="_blank">Replication Agent Security Model</a>.)</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-8.png"><img class="aligncenter size-full wp-image-4932" src="/wp-content/uploads/2016/12/publisher-8.png" alt="publisher 8" width="553" height="474" srcset="/wp-content/uploads/2016/12/publisher-8.png 553w, /wp-content/uploads/2016/12/publisher-8-300x257.png 300w" sizes="(max-width: 553px) 100vw, 553px" /></a></p>
+<p>&nbsp;</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-9.png"><img class="aligncenter size-full wp-image-4933" src="/wp-content/uploads/2016/12/publisher-9.png" alt="publisher 9" width="508" height="454" srcset="/wp-content/uploads/2016/12/publisher-9.png 508w, /wp-content/uploads/2016/12/publisher-9-300x268.png 300w" sizes="(max-width: 508px) 100vw, 508px" /></a></p>
+<p>Wizard Actions – choose both options. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-10.png"><img class="aligncenter size-full wp-image-4934" src="/wp-content/uploads/2016/12/publisher-10.png" alt="publisher 10" width="504" height="452" srcset="/wp-content/uploads/2016/12/publisher-10.png 504w, /wp-content/uploads/2016/12/publisher-10-300x269.png 300w" sizes="(max-width: 504px) 100vw, 504px" /></a></p>
+<p>Script File Properties – choose a location to save the script. Review the other options. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-11.png"><img class="aligncenter size-full wp-image-4935" src="/wp-content/uploads/2016/12/publisher-11.png" alt="publisher 11" width="503" height="452" srcset="/wp-content/uploads/2016/12/publisher-11.png 503w, /wp-content/uploads/2016/12/publisher-11-300x269.png 300w" sizes="(max-width: 503px) 100vw, 503px" /></a></p>
+<p>Complete the wizard – enter a Publication name. Click Finish.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-12.png"><img class="aligncenter size-full wp-image-4936" src="/wp-content/uploads/2016/12/publisher-12.png" alt="publisher 12" width="502" height="453" srcset="/wp-content/uploads/2016/12/publisher-12.png 502w, /wp-content/uploads/2016/12/publisher-12-300x270.png 300w" sizes="(max-width: 502px) 100vw, 502px" /></a></p>
+<p>All options should have green checkmarks.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-13.png"><img class="aligncenter size-full wp-image-4937" src="/wp-content/uploads/2016/12/publisher-13.png" alt="publisher 13" width="506" height="453" srcset="/wp-content/uploads/2016/12/publisher-13.png 506w, /wp-content/uploads/2016/12/publisher-13-300x268.png 300w" sizes="(max-width: 506px) 100vw, 506px" /></a></p>
+<p>After initializing, check the Snapshot Agent and Log Reader Agent for success. (To do so, go to Replication, right-click the publication name, and select Snapshot Agent Status and Log Reader Agent Status.) I ran into problems with the Snapshot account not having high enough permissions in the databases (it needs db_owner), and then not having enough permissions on the snapshot folder (it needs Full). (This forum post, answered by Hilary Cotter, helped: <a href="https://social.msdn.microsoft.com/Forums/sqlserver/en-US/899857db-e38e-4026-a34c-2a8c2628c6fc/access-denied-to-sql-replication-snapshot-folder?forum=sqlreplication">https://social.msdn.microsoft.com/Forums/sqlserver/en-US/899857db-e38e-4026-a34c-2a8c2628c6fc/access-denied-to-sql-replication-snapshot-folder?forum=sqlreplication</a>.)</p>
+<h3>Configure distribution on all other publishers</h3>
+<p>Because my database is in an AG, I need to make sure that the distributor is configured on all the replicas in the AG. Note: you only have to do this step for the first publication &#8211; not each subsequent publication.</p>
+<p>In this example, I&#8217;ll need to configure SQL2014AG1, the other replica.</p>
+<p>Connect to SQL2014AG1. Right-click Replication and select Configure Distribution.</p>
+<p>Welcome – click Next.</p>
+<p>Distributor – select Use the following server. Click Add. Connect to the previously-created distributor. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-14.png"><img class="aligncenter size-full wp-image-4938" src="/wp-content/uploads/2016/12/publisher-14.png" alt="publisher 14" width="573" height="452" srcset="/wp-content/uploads/2016/12/publisher-14.png 573w, /wp-content/uploads/2016/12/publisher-14-300x236.png 300w" sizes="(max-width: 573px) 100vw, 573px" /></a></p>
+<p>Administrative password – enter the distribution admin password. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-15.png"><img class="aligncenter size-full wp-image-4939" src="/wp-content/uploads/2016/12/publisher-15.png" alt="publisher 15" width="571" height="455" srcset="/wp-content/uploads/2016/12/publisher-15.png 571w, /wp-content/uploads/2016/12/publisher-15-300x239.png 300w" sizes="(max-width: 571px) 100vw, 571px" /></a></p>
+<p>Wizard Actions – check both boxes, click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-16.png"><img class="aligncenter size-full wp-image-4940" src="/wp-content/uploads/2016/12/publisher-16.png" alt="publisher 16" width="573" height="454" srcset="/wp-content/uploads/2016/12/publisher-16.png 573w, /wp-content/uploads/2016/12/publisher-16-300x237.png 300w" sizes="(max-width: 573px) 100vw, 573px" /></a><a href="/wp-content/uploads/2016/12/publisher-17.png"><br />
+</a></p>
+<p>Script File Properties – choose a file location and name. Review other options. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-17.png"><img class="aligncenter size-full wp-image-4941" src="/wp-content/uploads/2016/12/publisher-17.png" alt="publisher 17" width="572" height="457" srcset="/wp-content/uploads/2016/12/publisher-17.png 572w, /wp-content/uploads/2016/12/publisher-17-300x239.png 300w" sizes="(max-width: 572px) 100vw, 572px" /></a></p>
+<p>Complete the wizard – click Finish. All options should have green checkmarks.</p>
+<p><a href="/wp-content/uploads/2016/12/publisher-18.png"><img class="aligncenter size-full wp-image-4942" src="/wp-content/uploads/2016/12/publisher-18.png" alt="publisher 18" width="579" height="459" srcset="/wp-content/uploads/2016/12/publisher-18.png 579w, /wp-content/uploads/2016/12/publisher-18-300x237.png 300w" sizes="(max-width: 579px) 100vw, 579px" /></a></p>
+<h3>Create linked server from each replica to distribution server</h3>
+<p>This step also needs to be done only once, for the first publication.</p>
+<p>Connect to each replica. Run this script.</p>
+<pre style="padding-left: 30px">USE master;
+GO</pre>
+<pre style="padding-left: 30px">EXEC sys.sp_addlinkedserver @server = 'DistributorServerName';
+GO</pre>
+<p>After doing that, in Object Explorer, expand Server Objects &gt; Linked Servers. Right-click the linked server and select Test Connection. Make sure that is successful.</p>
+<h3>Redirect the original publisher name to the listener name</h3>
+<p>This needs to be done for every publication you set up where the database is in an AG.</p>
+<p>This step also needs to be done from the distributor server &#8211; you can&#8217;t do this from SSMS on another server or your workstation. You must RDP to the distributor and run these commands &#8211; in SSMS or even SQL CMD.</p>
+<p>Connect to the distributor.</p>
+<p>Run the following command.</p>
+<pre style="padding-left: 30px">USE distribution;
+GO</pre>
+<pre style="padding-left: 30px">EXEC sys.sp_redirect_publisher @original_publisher = 'SQL2014AG2', @publisher_db = 'AGTest', @redirected_publisher = 'JesTestAGListen';
+GO</pre>
+<p>Expected output is “Commands completed successfully.”</p>
+<p>Then, you want to confirm this worked. To do so, run the following command.</p>
+<pre style="padding-left: 30px">DECLARE @redirected_publisher sysname;</pre>
+<pre style="padding-left: 30px">EXEC sys.sp_validate_replica_hosts_as_publishers @original_publisher = 'SQL2014AG2', @publisher_db = 'AGTest', @redirected_publisher = 'JesTestAGListen';
+GO</pre>
+<p>Expected output is “Commands completed successfully.”</p>
+<p>After following all of these steps, your publication is ready. You can now set up the subscriber(s).</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-3-the-publisher/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+		<item>
+		<title>Transactional Replication from Availability Groups to Azure SQL Database: Part 2 &#8211; The Distributor</title>
+		<link>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-2-the-distributor/</link>
+		<comments>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-2-the-distributor/#respond</comments>
+		<pubDate>Tue, 27 Dec 2016 15:00:42 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+
+		<guid isPermaLink="false">/?p=4906</guid>
+		<description><![CDATA[This is part 2 of a 5-part series. Part 1 &#8211; Planning Part 2 &#8211; The Distributor Part 3 &#8211; The Publisher Part 4 &#8211; The Subscriber Part 5 &#8211; Testing &#160; Scenario Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest Distributor: stand-alone server, SQL2014demo Subscriber: Azure SQL Database &#8211; server jessqldb2, database ReplicationTest Setting up [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>This is part 2 of a 5-part series.</p>
+<ul>
+<li><a href="/?p=4896" target="_blank">Part 1 &#8211; Planning</a></li>
+<li><a href="/?p=4906" target="_blank">Part 2 &#8211; The Distributor</a></li>
+<li><a href="/?p=4923" target="_blank">Part 3 &#8211; The Publisher</a></li>
+<li><a href="/?p=4945" target="_blank">Part 4 &#8211; The Subscriber</a></li>
+<li><a href="/?p=4960" target="_blank">Part 5 &#8211; Testing</a></li>
+</ul>
+<p>&nbsp;</p>
+<h3>Scenario</h3>
+<p>Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest</p>
+<p>Distributor: stand-alone server, SQL2014demo</p>
+<p>Subscriber: Azure SQL Database &#8211; server jessqldb2, database ReplicationTest</p>
+<h3>Setting up the replication distributor</h3>
+<p>The first step in this process is to set up the remote distributor. As I mentioned in the first blog, you do not want your distribution database on one of the AG replicas. You need to set this up on a server that is not part of the AG.</p>
+<p>Start by logging on to the distributor server &#8211; in this demo, SQL2014demo.</p>
+<p>Right-click Replication and select Configure Distribution.</p>
+<p>Click Next on Welcome</p>
+<p>Distributor – select ‘Server’ will act as its own Distributor. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/distribution-1.png"><img class="aligncenter wp-image-4912 size-full" src="/wp-content/uploads/2016/12/distribution-1.png" alt="distribution 1" width="503" height="456" srcset="/wp-content/uploads/2016/12/distribution-1.png 503w, /wp-content/uploads/2016/12/distribution-1-300x271.png 300w" sizes="(max-width: 503px) 100vw, 503px" /></a></p>
+<p>Snapshot folder – enter a network path that <em>all</em> the service accounts that run SQL Server engine and Agent on all the servers in this configuration have full rights to. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/distribution-2.png"><img class="aligncenter size-full wp-image-4913" src="/wp-content/uploads/2016/12/distribution-2.png" alt="distribution 2" width="501" height="455" srcset="/wp-content/uploads/2016/12/distribution-2.png 501w, /wp-content/uploads/2016/12/distribution-2-300x272.png 300w" sizes="(max-width: 501px) 100vw, 501px" /></a></p>
+<p>Distribution Database – enter database name and file location. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/distribution-3.png"><img class="aligncenter size-full wp-image-4914" src="/wp-content/uploads/2016/12/distribution-3.png" alt="distribution 3" width="503" height="451" srcset="/wp-content/uploads/2016/12/distribution-3.png 503w, /wp-content/uploads/2016/12/distribution-3-300x268.png 300w" sizes="(max-width: 503px) 100vw, 503px" /></a></p>
+<p>Publishers – use the Add button to connect to <strong>each</strong> of the servers that will be a publisher. If this is an AG configuration, it must be <strong>every</strong> replica in the AG. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/distribution-4.png"><img class="aligncenter size-full wp-image-4915" src="/wp-content/uploads/2016/12/distribution-4.png" alt="distribution 4" width="509" height="455" srcset="/wp-content/uploads/2016/12/distribution-4.png 509w, /wp-content/uploads/2016/12/distribution-4-300x268.png 300w" sizes="(max-width: 509px) 100vw, 509px" /></a></p>
+<p>Distributor password – enter a secure administrative password. <strong>Save it in a password vault</strong>! Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/distribution-5.png"><img class="aligncenter size-full wp-image-4916" src="/wp-content/uploads/2016/12/distribution-5.png" alt="distribution 5" width="503" height="456" srcset="/wp-content/uploads/2016/12/distribution-5.png 503w, /wp-content/uploads/2016/12/distribution-5-300x271.png 300w" sizes="(max-width: 503px) 100vw, 503px" /></a></p>
+<p>Wizard Actions – check both boxes. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/distribution-6.png"><img class="aligncenter size-full wp-image-4917" src="/wp-content/uploads/2016/12/distribution-6.png" alt="distribution 6" width="506" height="453" srcset="/wp-content/uploads/2016/12/distribution-6.png 506w, /wp-content/uploads/2016/12/distribution-6-300x268.png 300w" sizes="(max-width: 506px) 100vw, 506px" /></a></p>
+<p>Script file properties – choose a location to save the script. Review other options. Click Next.</p>
+<p><a href="/wp-content/uploads/2016/12/distribution-7.png"><img class="aligncenter size-full wp-image-4918" src="/wp-content/uploads/2016/12/distribution-7.png" alt="distribution 7" width="501" height="453" srcset="/wp-content/uploads/2016/12/distribution-7.png 501w, /wp-content/uploads/2016/12/distribution-7-300x271.png 300w" sizes="(max-width: 501px) 100vw, 501px" /></a></p>
+<p>Complete the wizard – click Finish. All options should have green checkmarks.</p>
+<p><a href="/wp-content/uploads/2016/12/distribution-8.png"><img class="aligncenter size-full wp-image-4919" src="/wp-content/uploads/2016/12/distribution-8.png" alt="distribution 8" width="500" height="453" srcset="/wp-content/uploads/2016/12/distribution-8.png 500w, /wp-content/uploads/2016/12/distribution-8-300x271.png 300w" sizes="(max-width: 500px) 100vw, 500px" /></a></p>
+<p>&nbsp;</p>
+<p>Your remote distributor is now configured. You&#8217;ll need the server name, database name, and admin password as you set up publishers and subscribers. Next, you&#8217;ll configure your publishers.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/transactional-replication-from-availability-groups-to-azure-sql-database-part-2-the-distributor/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>Transactional Replication from Availability Groups to Azure SQL Database: Part 1 &#8211; Planning</title>
+		<link>/index.php/datamgmt/dbadmin/mssqlserveradmin/transactional-replication-in-availability-groups-to-azure-sql-database-part-1-planning/</link>
+		<comments>/index.php/datamgmt/dbadmin/mssqlserveradmin/transactional-replication-in-availability-groups-to-azure-sql-database-part-1-planning/#respond</comments>
+		<pubDate>Mon, 26 Dec 2016 15:00:35 +0000</pubDate>
+		<dc:creator><![CDATA[Jes Borland]]></dc:creator>
+				<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/?p=4896</guid>
+		<description><![CDATA[Throughout the last few years, I&#8217;ve worked with SQL Server Availability Groups, Transactional Replication, and Azure SQL Databases. Recently, I had the challenge and opportunity to work on a project that involved all three at the same time. The goal was to take six databases that were in a SQL Server 2012 Availability Group and [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Throughout the last few years, I&#8217;ve worked with SQL Server Availability Groups, Transactional Replication, and Azure SQL Databases. Recently, I had the challenge and opportunity to work on a project that involved all three at the same time. The goal was to take six databases that were in a SQL Server 2012 Availability Group and replicate them to Azure SQL Databases.</p>
+<p>Both replication of a database in an AG and replication from SQL Server to SQL Database come with several caveats, limitations, and challenges. In this five-post blog series, I hope to share with you the lessons I&#8217;ve learned so you can do this correctly from the beginning.</p>
+<ul>
+<li><a href="/?p=4896" target="_blank">Part 1 &#8211; Planning</a></li>
+<li><a href="/?p=4906" target="_blank">Part 2 &#8211; The Distributor</a></li>
+<li><a href="/?p=4923" target="_blank">Part 3 &#8211; The Publisher</a></li>
+<li><a href="/?p=4945" target="_blank">Part 4 &#8211; The Subscriber</a></li>
+<li><a href="/?p=4960" target="_blank">Part 5 &#8211; Testing</a></li>
+</ul>
+<p>&nbsp;</p>
+<h3>Getting Started</h3>
+<p>Determine what you need to accomplish and if there is a simpler way to do it. This is a complicated solution with a lot of moving parts. Many things can go wrong or break. In this situation, we needed to have on-premises data in Azure to be consumed by other Azure services and for analytics. It also had to stay on-premises for transactional applications. The other option for moving the data on a regular basis was <a href="https://docs.microsoft.com/en-us/azure/sql-database/sql-database-get-started-sql-data-sync" target="_blank">Azure SQL Data Sync</a>, which has been in preview for five (long) years &#8211; I didn&#8217;t want to use a preview technology, especially one that&#8217;s been in preview mode for so long.</p>
+<p>You should have some familiarity with each of these features before combining them. Write up an architecture document ahead of time that will include all the relevant information you need as you&#8217;re setting this up &#8211; replica names, publication properties, distributor properties, subscriber information, SQL DB information. Download my <a href="/?p=4899" target="_blank">Replication Setup Checklist</a> to be prepared.</p>
+<p>Read through this series, and these other blog posts, to be prepared. I&#8217;ve referenced these blogs many time:</p>
+<ul>
+<li><a href="https://msdn.microsoft.com/en-us/library/hh710046.aspx" target="_blank">Configure Replication for Always On Availability Groups</a> (MSDN)</li>
+<li><a href="https://blogs.msdn.microsoft.com/alwaysonpro/2014/01/30/setting-up-replication-on-a-database-that-is-part-of-an-alwayson-availability-group/" target="_blank">Setting up Replication on a database that is part of an AlwaysOn Availability Group</a> (AlwaysOn Support Team)</li>
+<li><a href="https://msdn.microsoft.com/en-us/library/mt589530.aspx" target="_blank">Replication to SQL Database</a> (MSDN)</li>
+<li><a href="http://johnsterrett.com/2016/07/26/azure-sql-database-live-migrations/" target="_blank">Azure SQL Database Live Migrations</a> (John Sterrett)</li>
+</ul>
+<p>Lastly, reach out for help if needed. The SQL Server community helped me many, many times while I set this up. Special thanks to Kendal Van Dyke (<a href="http://www.kendalvandyke.com/" target="_blank">blog </a>| <a href="https://twitter.com/SQLDBA" target="_blank">Twitter</a>), Drew Furgiuele (<a href="http://port1433.com/" target="_blank">blog </a>| <a href="https://twitter.com/Pittfurg" target="_blank">Twitter</a>), and Andy Mallon (<a href="https://www.am2.co/" target="_blank">blog </a>| <a href="https://twitter.com/AMtwo" target="_blank">Twitter</a>) for their help.</p>
+<h3>Prep Work</h3>
+<p>There are tasks you&#8217;ll need to take care of in SQL Server, the AG, and the SQL DB before you can begin.</p>
+<p>This blog series assumes you already have an AG set up &#8211; it won&#8217;t go through the setup of that. It also assumes you have an Azure SQL server and a SQL Database created &#8211; it won&#8217;t go through that setup either.</p>
+<p>Ideally, the publishers, distributor, and subscribers will all be the same version and edition of SQL Server. If not, you have to configure from the highest-version server, or you will get errors.</p>
+<p>There are minimum version and service pack requirements for replicating to a SQL DB, as noted in the article <a href="https://msdn.microsoft.com/en-us/library/mt589530.aspx" target="_blank">Replication to SQL Database</a>. Make sure all SQL Servers are patched to the correct version.</p>
+<p>Make sure replication components are installed on all SQL Server instances before beginning. You can verify by running this query. The desired result is 1.</p>
+<pre style="padding-left: 30px">USE master;
+GO</pre>
+<pre style="padding-left: 30px">DECLARE @installed int;
+EXEC @installed = sys.sp_MS_replication_installed;
+SELECT @installed;</pre>
+<p>In the AG, all the replicas must be readable. If they aren’t, the distributor can’t read them, and the setup won’t work.</p>
+<p>The distribution database should not be on a replica server. If that server is lost and the HA of the AG kicks in, you’ve lost a huge part of your replication strategy. Your distribution database needs to reside on a SQL Server that is outside of your AG.</p>
+<p>The service accounts for the engine and Agent on all publishers, distributor, and subscribers must be Windows accounts. Don’t do this with NT Service accounts. Also, make sure the accounts have minimum permissions or you may get SSPI errors. (Described at <a href="https://cmatskas.com/fixing-error-cannot-generate-sspi-context-after-changing-sql-service-account/">https://cmatskas.com/fixing-error-cannot-generate-sspi-context-after-changing-sql-service-account/</a>.)</p>
+<p>The service account of the Log Reader Agent must be a db_owner in the publication database. As a matter of fact, there are a whole lot of rules about service accounts and permissions. Read <a href="https://msdn.microsoft.com/en-us/library/ms151227.aspx" target="_blank">Replication Agent Security Model</a> and apply all these rules. Do not just automatically make accounts sysadmin and local admins. It will be hard and frustrating &#8211; but your setup needs to be secure.</p>
+<p>On SQL Servers, make sure port 1433 is open on firewalls.</p>
+<p>When replicating to an Azure SQL Database:</p>
+<p>You must have a user set up in that database that is member of the db_owner role.</p>
+<p>Make sure the IP address of every publisher and distributor is allowed through the firewall.</p>
+<p>Using SSMS, verify you can connect from each publisher and distributor to the SQL DB. Resolve any errors before continuing.</p>
+<p>Use the “Deploy Database to Microsoft Azure SQL Database” wizard to find any incompatibilities within the database. If there are stored procedures that cross-reference another database, for example, that isn’t supported in SQL Database and those objects can’t be replicated.</p>
+<p>With all those pieces in place, let&#8217;s get started!</p>
+<h3>Scenario</h3>
+<p>Publishers: servers SQL2014AG1 and SQL2014AG2, database AGTest</p>
+<p>Distributor: stand-alone server, SQL2014demo</p>
+<p>Subscriber: Azure SQL Database, server jessqldb2, database ReplicationTest</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/mssqlserveradmin/transactional-replication-in-availability-groups-to-azure-sql-database-part-1-planning/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

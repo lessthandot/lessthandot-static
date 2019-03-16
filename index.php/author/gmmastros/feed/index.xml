@@ -1,0 +1,917 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>George Mastros (gmmastros) &#8211; LessthanDot</title>
+	<atom:link href="/index.php/author/gmmastros/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Finding Exact Duplicate Indexes</title>
+		<link>/index.php/datamgmt/datadesign/finding-exact-duplicate-indexes/</link>
+		<comments>/index.php/datamgmt/datadesign/finding-exact-duplicate-indexes/#comments</comments>
+		<pubDate>Thu, 12 Apr 2012 17:14:00 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/04/finding-exact-duplicate-indexes/</guid>
+		<description><![CDATA[This blog is not meant to be a comprehensive explanation of indexes.  It is meant to help you determine if there are duplicate indexes within your database.  There appears to be some debate regarding what is a duplicate index.  This article defines an “&#8230;]]></description>
+				<content:encoded><![CDATA[<p>This blog is not meant to be a comprehensive explanation of indexes.  It is meant to help you determine if there are duplicate indexes within your database.  There appears to be some debate regarding what is a duplicate index.  This article defines an “Exact Duplicate Index” where there are multiple non-clustered indexes with exactly the same keys and include columns.</p>
+<p><strong>This query will ignore clustered indexes.</strong><br />
+It is possible to create a non-clustered index with keys that match a clustered index.  Sometimes, this could be considered a duplicate index, and sometimes it should not be considered a duplicate.  For example, suppose you have a wide table so that there is only one row per data page.  Also suppose you have a query that only needs to use the key columns.  It will be faster to use a non-clustered index for the query instead of the clustered index because the non-clustered index would only include the key columns, and you will get more columns per data page.  The non-clustered index would require less file I/O, and therefore increased performance.</p>
+<p>If you have a wide table with many rows, a non-clustered index that matches the key columns of the clustered index will improve performance.</p>
+<p><strong>This query will ignore partial duplicates with similar keys.</strong><br />
+It is possible to create indexes with similar keys, and sometimes it is beneficial to do so.  For example, suppose you had an index with key columns (Col1, Col2) and another with (Col1, Col2, Col3).  You probably don’t need the first index because the second index will suffice.  However, there are cases where Col3 could be wide and using it would cause extra I/O compared to the first index.  It is probably rare that you would see any difference in performance between these indexes.  I will be writing another article that explains this in depth and provides a query that will return these possible duplicates.</p>
+<p><strong>This query will ignore partial duplicates with the same keys and similar includes.</strong><br />
+Column ordering for include columns does not matter, but which columns are included can make a big difference in the performance of a query.  There could be similar indexes that have the same key columns but different include columns.  This can affect the size of the index and cause more I/O.  There will be another blog that explains this in depth and provides a query to identify duplicate indexes with similar includes.</p>
+<p><strong>The query to identify exact duplicates:</strong></p>
+<pre>; With IndexColumns As
+(
+	select	I.object_id,
+			I.index_id,
+			SubString(
+				(
+					select	',' + Convert(VarChar(10), Column_id)
+					from	sys.index_columns as k
+					where	k.object_id = i.object_id
+							and k.index_id = i.index_id
+							and is_included_column = 0
+					Order By key_ordinal
+					for xml path('')
+				), 2, 1000) As KeyColumns,
+			SubString(Coalesce(
+				(
+					select	',' + Convert(VarChar(10), Column_id)
+					from	sys.index_columns as k
+					where	k.object_id = i.object_id
+							and k.index_id = i.index_id
+							and is_included_column = 1
+					Order By column_id
+					for xml path('')
+				), ''), 2, 1000) As IncludeColumns
+	From	sys.indexes As I
+			Inner Join sys.Tables As T
+				On I.object_id = T.object_id
+	Where	I.type_desc &lt;&gt; 'Clustered'
+			And T.is_ms_shipped = 0
+)
+Select  Object_Name(AIndex.object_id) As TableName,
+        AIndex.name As Index1,
+        bIndex.Name As Index2,
+        'Drop Index [' + bIndex.Name + '] On [' + Object_Name(AIndex.object_id) + ']' As DropCode
+From	IndexColumns As A
+		Inner Join IndexColumns  As B
+			On A.object_id = B.object_id
+			And A.index_id &lt; B.index_id
+			And A.KeyColumns = B.KeyColumns
+			And A.IncludeColumns = B.IncludeColumns
+		Inner Join sys.indexes As AIndex
+			On A.object_id = AIndex.object_id
+			And A.index_id = AIndex.index_id
+		Inner Join sys.indexes As BIndex
+			On B.object_id = BIndex.object_id
+			And B.index_id = BIndex.index_id </pre>
+<p>When you run this query, you will see two columns in the output showing you the duplicates.  Since these are exact duplicates, you can drop one of them.  Which one you drop is up to you.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/finding-exact-duplicate-indexes/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Do not use reserved keywords for your column names</title>
+		<link>/index.php/datamgmt/datadesign/do-not-use-reserved-keywords/</link>
+		<comments>/index.php/datamgmt/datadesign/do-not-use-reserved-keywords/#comments</comments>
+		<pubDate>Mon, 19 Mar 2012 16:16:00 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[column names]]></category>
+		<category><![CDATA[sql server]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/03/do-not-use-reserved-keywords/</guid>
+		<description><![CDATA[Column names and table names should not use reserved keywords in your database. You can use reserved keywords because SQL Server will allow it.  However, this should not be done because it makes writing and reading queries more difficult. When you use a&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Column names and table names should not use reserved keywords in your database. You can use reserved keywords because SQL Server will allow it.  However, this should not be done because it makes writing and reading queries more difficult. When you use a reserved keyword for a column or table name, you need to use [square brackets] around the name.</p>
+<p>The following query compares your column names against a list of <a href="http://msdn.microsoft.com/en-us/library/aa238507(v=sql.80).aspx">identified keywords</a>. Some of the keywords are SQL Server reserved words, some are ODBC reserved words, and the rest are future reserved words.</p>
+<p><strong>How to detect this problem:</strong></p>
+<pre>Declare @Temp Table(Data VarChar(50))
+Insert Into @Temp Values('ABSOLUTE')
+Insert Into @Temp Values('ACTION')
+Insert Into @Temp Values('ADA')
+Insert Into @Temp Values('ADD')
+Insert Into @Temp Values('ADMIN')
+Insert Into @Temp Values('AFTER')
+Insert Into @Temp Values('AGGREGATE')
+Insert Into @Temp Values('ALIAS')
+Insert Into @Temp Values('ALL')
+Insert Into @Temp Values('ALLOCATE')
+Insert Into @Temp Values('ALTER')
+Insert Into @Temp Values('AND')
+Insert Into @Temp Values('ANY')
+Insert Into @Temp Values('ARE')
+Insert Into @Temp Values('ARRAY')
+Insert Into @Temp Values('AS')
+Insert Into @Temp Values('ASC')
+Insert Into @Temp Values('ASSERTION')
+Insert Into @Temp Values('AT')
+Insert Into @Temp Values('AUTHORIZATION')
+Insert Into @Temp Values('AVG')
+Insert Into @Temp Values('BACKUP')
+Insert Into @Temp Values('BEFORE')
+Insert Into @Temp Values('BEGIN')
+Insert Into @Temp Values('BETWEEN')
+Insert Into @Temp Values('BINARY')
+Insert Into @Temp Values('BIT')
+Insert Into @Temp Values('BIT_LENGTH')
+Insert Into @Temp Values('BLOB')
+Insert Into @Temp Values('BOOLEAN')
+Insert Into @Temp Values('BOTH')
+Insert Into @Temp Values('BREADTH')
+Insert Into @Temp Values('BREAK')
+Insert Into @Temp Values('BROWSE')
+Insert Into @Temp Values('BULK')
+Insert Into @Temp Values('BY')
+Insert Into @Temp Values('CALL')
+Insert Into @Temp Values('CASCADE')
+Insert Into @Temp Values('CASCADED')
+Insert Into @Temp Values('CASE')
+Insert Into @Temp Values('CAST')
+Insert Into @Temp Values('CATALOG')
+Insert Into @Temp Values('CHAR')
+Insert Into @Temp Values('CHAR_LENGTH')
+Insert Into @Temp Values('CHARACTER')
+Insert Into @Temp Values('CHARACTER_LENGTH')
+Insert Into @Temp Values('CHECK')
+Insert Into @Temp Values('CHECKPOINT')
+Insert Into @Temp Values('CLASS')
+Insert Into @Temp Values('CLOB')
+Insert Into @Temp Values('CLOSE')
+Insert Into @Temp Values('CLUSTERED')
+Insert Into @Temp Values('COALESCE')
+Insert Into @Temp Values('COLLATE')
+Insert Into @Temp Values('COLLATION')
+Insert Into @Temp Values('COLUMN')
+Insert Into @Temp Values('COMMIT')
+Insert Into @Temp Values('COMPLETION')
+Insert Into @Temp Values('COMPUTE')
+Insert Into @Temp Values('CONNECT')
+Insert Into @Temp Values('CONNECTION')
+Insert Into @Temp Values('CONSTRAINT')
+Insert Into @Temp Values('CONSTRAINTS')
+Insert Into @Temp Values('CONSTRUCTOR')
+Insert Into @Temp Values('CONTAINS')
+Insert Into @Temp Values('CONTAINSTABLE')
+Insert Into @Temp Values('CONTINUE')
+Insert Into @Temp Values('CONVERT')
+Insert Into @Temp Values('CORRESPONDING')
+Insert Into @Temp Values('COUNT')
+Insert Into @Temp Values('CREATE')
+Insert Into @Temp Values('CROSS')
+Insert Into @Temp Values('CUBE')
+Insert Into @Temp Values('CURRENT')
+Insert Into @Temp Values('CURRENT_DATE')
+Insert Into @Temp Values('CURRENT_PATH')
+Insert Into @Temp Values('CURRENT_ROLE')
+Insert Into @Temp Values('CURRENT_TIME')
+Insert Into @Temp Values('CURRENT_TIMESTAMP')
+Insert Into @Temp Values('CURRENT_USER')
+Insert Into @Temp Values('CURSOR')
+Insert Into @Temp Values('CYCLE')
+Insert Into @Temp Values('DATA')
+Insert Into @Temp Values('DATABASE')
+Insert Into @Temp Values('DATE')
+Insert Into @Temp Values('DAY')
+Insert Into @Temp Values('DBCC')
+Insert Into @Temp Values('DEALLOCATE')
+Insert Into @Temp Values('DEC')
+Insert Into @Temp Values('DECIMAL')
+Insert Into @Temp Values('DECLARE')
+Insert Into @Temp Values('DEFAULT')
+Insert Into @Temp Values('DEFERRABLE')
+Insert Into @Temp Values('DEFERRED')
+Insert Into @Temp Values('DELETE')
+Insert Into @Temp Values('DENY')
+Insert Into @Temp Values('DEPTH')
+Insert Into @Temp Values('DEREF')
+Insert Into @Temp Values('DESC')
+Insert Into @Temp Values('DESCRIBE')
+Insert Into @Temp Values('DESCRIPTOR')
+Insert Into @Temp Values('DESTROY')
+Insert Into @Temp Values('DESTRUCTOR')
+Insert Into @Temp Values('DETERMINISTIC')
+Insert Into @Temp Values('DIAGNOSTICS')
+Insert Into @Temp Values('DICTIONARY')
+Insert Into @Temp Values('DISCONNECT')
+Insert Into @Temp Values('DISK')
+Insert Into @Temp Values('DISTINCT')
+Insert Into @Temp Values('DISTRIBUTED')
+Insert Into @Temp Values('DOMAIN')
+Insert Into @Temp Values('DOUBLE')
+Insert Into @Temp Values('DROP')
+Insert Into @Temp Values('DUMMY')
+Insert Into @Temp Values('DUMP')
+Insert Into @Temp Values('DYNAMIC')
+Insert Into @Temp Values('EACH')
+Insert Into @Temp Values('ELSE')
+Insert Into @Temp Values('END')
+Insert Into @Temp Values('END-EXEC')
+Insert Into @Temp Values('EQUALS')
+Insert Into @Temp Values('ERRLVL')
+Insert Into @Temp Values('ESCAPE')
+Insert Into @Temp Values('EVERY')
+Insert Into @Temp Values('EXCEPT')
+Insert Into @Temp Values('EXCEPTION')
+Insert Into @Temp Values('EXEC')
+Insert Into @Temp Values('EXECUTE')
+Insert Into @Temp Values('EXISTS')
+Insert Into @Temp Values('EXIT')
+Insert Into @Temp Values('EXTERNAL')
+Insert Into @Temp Values('EXTRACT')
+Insert Into @Temp Values('FALSE')
+Insert Into @Temp Values('FETCH')
+Insert Into @Temp Values('FILE')
+Insert Into @Temp Values('FILLFACTOR')
+Insert Into @Temp Values('FIRST')
+Insert Into @Temp Values('FLOAT')
+Insert Into @Temp Values('FOR')
+Insert Into @Temp Values('FOREIGN')
+Insert Into @Temp Values('FORTRAN')
+Insert Into @Temp Values('FOUND')
+Insert Into @Temp Values('FREE')
+Insert Into @Temp Values('FREETEXT')
+Insert Into @Temp Values('FREETEXTTABLE')
+Insert Into @Temp Values('FROM')
+Insert Into @Temp Values('FULL')
+Insert Into @Temp Values('FUNCTION')
+Insert Into @Temp Values('GENERAL')
+Insert Into @Temp Values('GET')
+Insert Into @Temp Values('GLOBAL')
+Insert Into @Temp Values('GO')
+Insert Into @Temp Values('GOTO')
+Insert Into @Temp Values('GRANT')
+Insert Into @Temp Values('GROUP')
+Insert Into @Temp Values('GROUPING')
+Insert Into @Temp Values('HAVING')
+Insert Into @Temp Values('HOLDLOCK')
+Insert Into @Temp Values('HOST')
+Insert Into @Temp Values('HOUR')
+Insert Into @Temp Values('IDENTITY')
+Insert Into @Temp Values('IDENTITY_INSERT')
+Insert Into @Temp Values('IDENTITYCOL')
+Insert Into @Temp Values('IF')
+Insert Into @Temp Values('IGNORE')
+Insert Into @Temp Values('IMMEDIATE')
+Insert Into @Temp Values('IN')
+Insert Into @Temp Values('INCLUDE')
+Insert Into @Temp Values('INDEX')
+Insert Into @Temp Values('INDICATOR')
+Insert Into @Temp Values('INITIALIZE')
+Insert Into @Temp Values('INITIALLY')
+Insert Into @Temp Values('INNER')
+Insert Into @Temp Values('INOUT')
+Insert Into @Temp Values('INPUT')
+Insert Into @Temp Values('INSENSITIVE')
+Insert Into @Temp Values('INSERT')
+Insert Into @Temp Values('INT')
+Insert Into @Temp Values('INTEGER')
+Insert Into @Temp Values('INTERSECT')
+Insert Into @Temp Values('INTERVAL')
+Insert Into @Temp Values('INTO')
+Insert Into @Temp Values('IS')
+Insert Into @Temp Values('ISOLATION')
+Insert Into @Temp Values('ITERATE')
+Insert Into @Temp Values('JOIN')
+Insert Into @Temp Values('KEY')
+Insert Into @Temp Values('KILL')
+Insert Into @Temp Values('LANGUAGE')
+Insert Into @Temp Values('LARGE')
+Insert Into @Temp Values('LAST')
+Insert Into @Temp Values('LATERAL')
+Insert Into @Temp Values('LEADING')
+Insert Into @Temp Values('LEFT')
+Insert Into @Temp Values('LESS')
+Insert Into @Temp Values('LEVEL')
+Insert Into @Temp Values('LIKE')
+Insert Into @Temp Values('LIMIT')
+Insert Into @Temp Values('LINENO')
+Insert Into @Temp Values('LOAD')
+Insert Into @Temp Values('LOCAL')
+Insert Into @Temp Values('LOCALTIME')
+Insert Into @Temp Values('LOCALTIMESTAMP')
+Insert Into @Temp Values('LOCATOR')
+Insert Into @Temp Values('LOWER')
+Insert Into @Temp Values('MAP')
+Insert Into @Temp Values('MATCH')
+Insert Into @Temp Values('MAX')
+Insert Into @Temp Values('MIN')
+Insert Into @Temp Values('MINUTE')
+Insert Into @Temp Values('MODIFIES')
+Insert Into @Temp Values('MODIFY')
+Insert Into @Temp Values('MODULE')
+Insert Into @Temp Values('MONTH')
+Insert Into @Temp Values('NAMES')
+Insert Into @Temp Values('NATIONAL')
+Insert Into @Temp Values('NATURAL')
+Insert Into @Temp Values('NCHAR')
+Insert Into @Temp Values('NCLOB')
+Insert Into @Temp Values('NEW')
+Insert Into @Temp Values('NEXT')
+Insert Into @Temp Values('NO')
+Insert Into @Temp Values('NOCHECK')
+Insert Into @Temp Values('NONCLUSTERED')
+Insert Into @Temp Values('NONE')
+Insert Into @Temp Values('NOT')
+Insert Into @Temp Values('NULL')
+Insert Into @Temp Values('NULLIF')
+Insert Into @Temp Values('NUMERIC')
+Insert Into @Temp Values('OBJECT')
+Insert Into @Temp Values('OCTET_LENGTH')
+Insert Into @Temp Values('OF')
+Insert Into @Temp Values('OFF')
+Insert Into @Temp Values('OFFSETS')
+Insert Into @Temp Values('OLD')
+Insert Into @Temp Values('ON')
+Insert Into @Temp Values('ONLY')
+Insert Into @Temp Values('OPEN')
+Insert Into @Temp Values('OPENDATASOURCE')
+Insert Into @Temp Values('OPENQUERY')
+Insert Into @Temp Values('OPENROWSET')
+Insert Into @Temp Values('OPENXML')
+Insert Into @Temp Values('OPERATION')
+Insert Into @Temp Values('OPTION')
+Insert Into @Temp Values('OR')
+Insert Into @Temp Values('ORDER')
+Insert Into @Temp Values('ORDINALITY')
+Insert Into @Temp Values('OUT')
+Insert Into @Temp Values('OUTER')
+Insert Into @Temp Values('OUTPUT')
+Insert Into @Temp Values('OVER')
+Insert Into @Temp Values('OVERLAPS')
+Insert Into @Temp Values('PAD')
+Insert Into @Temp Values('PARAMETER')
+Insert Into @Temp Values('PARAMETERS')
+Insert Into @Temp Values('PARTIAL')
+Insert Into @Temp Values('PASCAL')
+Insert Into @Temp Values('PATH')
+Insert Into @Temp Values('PERCENT')
+Insert Into @Temp Values('PLAN')
+Insert Into @Temp Values('POSITION')
+Insert Into @Temp Values('POSTFIX')
+Insert Into @Temp Values('PRECISION')
+Insert Into @Temp Values('PREFIX')
+Insert Into @Temp Values('PREORDER')
+Insert Into @Temp Values('PREPARE')
+Insert Into @Temp Values('PRESERVE')
+Insert Into @Temp Values('PRIMARY')
+Insert Into @Temp Values('PRINT')
+Insert Into @Temp Values('PRIOR')
+Insert Into @Temp Values('PRIVILEGES')
+Insert Into @Temp Values('PROC')
+Insert Into @Temp Values('PROCEDURE')
+Insert Into @Temp Values('PUBLIC')
+Insert Into @Temp Values('RAISERROR')
+Insert Into @Temp Values('READ')
+Insert Into @Temp Values('READS')
+Insert Into @Temp Values('READTEXT')
+Insert Into @Temp Values('REAL')
+Insert Into @Temp Values('RECONFIGURE')
+Insert Into @Temp Values('RECURSIVE')
+Insert Into @Temp Values('REF')
+Insert Into @Temp Values('REFERENCES')
+Insert Into @Temp Values('REFERENCING')
+Insert Into @Temp Values('RELATIVE')
+Insert Into @Temp Values('REPLICATION')
+Insert Into @Temp Values('RESTORE')
+Insert Into @Temp Values('RESTRICT')
+Insert Into @Temp Values('RESULT')
+Insert Into @Temp Values('RETURN')
+Insert Into @Temp Values('RETURNS')
+Insert Into @Temp Values('REVOKE')
+Insert Into @Temp Values('RIGHT')
+Insert Into @Temp Values('ROLE')
+Insert Into @Temp Values('ROLLBACK')
+Insert Into @Temp Values('ROLLUP')
+Insert Into @Temp Values('ROUTINE')
+Insert Into @Temp Values('ROW')
+Insert Into @Temp Values('ROWCOUNT')
+Insert Into @Temp Values('ROWGUIDCOL')
+Insert Into @Temp Values('ROWS')
+Insert Into @Temp Values('RULE')
+Insert Into @Temp Values('SAVE')
+Insert Into @Temp Values('SAVEPOINT')
+Insert Into @Temp Values('SCHEMA')
+Insert Into @Temp Values('SCOPE')
+Insert Into @Temp Values('SCROLL')
+Insert Into @Temp Values('SEARCH')
+Insert Into @Temp Values('SECOND')
+Insert Into @Temp Values('SECTION')
+Insert Into @Temp Values('SELECT')
+Insert Into @Temp Values('SEQUENCE')
+Insert Into @Temp Values('SESSION')
+Insert Into @Temp Values('SESSION_USER')
+Insert Into @Temp Values('SET')
+Insert Into @Temp Values('SETS')
+Insert Into @Temp Values('SETUSER')
+Insert Into @Temp Values('SHUTDOWN')
+Insert Into @Temp Values('SIZE')
+Insert Into @Temp Values('SMALLINT')
+Insert Into @Temp Values('SOME')
+Insert Into @Temp Values('SPACE')
+Insert Into @Temp Values('SPECIFIC')
+Insert Into @Temp Values('SPECIFICTYPE')
+Insert Into @Temp Values('SQL')
+Insert Into @Temp Values('SQLCA')
+Insert Into @Temp Values('SQLCODE')
+Insert Into @Temp Values('SQLERROR')
+Insert Into @Temp Values('SQLEXCEPTION')
+Insert Into @Temp Values('SQLSTATE')
+Insert Into @Temp Values('SQLWARNING')
+Insert Into @Temp Values('START')
+Insert Into @Temp Values('STATE')
+Insert Into @Temp Values('STATEMENT')
+Insert Into @Temp Values('STATIC')
+Insert Into @Temp Values('STATISTICS')
+Insert Into @Temp Values('STRUCTURE')
+Insert Into @Temp Values('SUBSTRING')
+Insert Into @Temp Values('SUM')
+Insert Into @Temp Values('SYSTEM_USER')
+Insert Into @Temp Values('TABLE')
+Insert Into @Temp Values('TEMPORARY')
+Insert Into @Temp Values('TERMINATE')
+Insert Into @Temp Values('TEXTSIZE')
+Insert Into @Temp Values('THAN')
+Insert Into @Temp Values('THEN')
+Insert Into @Temp Values('TIME')
+Insert Into @Temp Values('TIMESTAMP')
+Insert Into @Temp Values('TIMEZONE_HOUR')
+Insert Into @Temp Values('TIMEZONE_MINUTE')
+Insert Into @Temp Values('TO')
+Insert Into @Temp Values('TOP')
+Insert Into @Temp Values('TRAILING')
+Insert Into @Temp Values('TRAN')
+Insert Into @Temp Values('TRANSACTION')
+Insert Into @Temp Values('TRANSLATE')
+Insert Into @Temp Values('TRANSLATION')
+Insert Into @Temp Values('TREAT')
+Insert Into @Temp Values('TRIGGER')
+Insert Into @Temp Values('TRIM')
+Insert Into @Temp Values('TRUE')
+Insert Into @Temp Values('TRUNCATE')
+Insert Into @Temp Values('TSEQUAL')
+Insert Into @Temp Values('UNDER')
+Insert Into @Temp Values('UNION')
+Insert Into @Temp Values('UNIQUE')
+Insert Into @Temp Values('UNKNOWN')
+Insert Into @Temp Values('UNNEST')
+Insert Into @Temp Values('UPDATE')
+Insert Into @Temp Values('UPDATETEXT')
+Insert Into @Temp Values('UPPER')
+Insert Into @Temp Values('USAGE')
+Insert Into @Temp Values('USE')
+Insert Into @Temp Values('USER')
+Insert Into @Temp Values('USING')
+Insert Into @Temp Values('VALUE')
+Insert Into @Temp Values('VALUES')
+Insert Into @Temp Values('VARCHAR')
+Insert Into @Temp Values('VARIABLE')
+Insert Into @Temp Values('VARYING')
+Insert Into @Temp Values('VIEW')
+Insert Into @Temp Values('WAITFOR')
+Insert Into @Temp Values('WHEN')
+Insert Into @Temp Values('WHENEVER')
+Insert Into @Temp Values('WHERE')
+Insert Into @Temp Values('WHILE')
+Insert Into @Temp Values('WITH')
+Insert Into @Temp Values('WITHOUT')
+Insert Into @Temp Values('WORK')
+Insert Into @Temp Values('WRITE')
+Insert Into @Temp Values('WRITETEXT')
+Insert Into @Temp Values('YEAR')
+Insert Into @Temp Values('ZONE')
+
+Select	object_name(C.object_id), C.Name
+From	sys.columns As C
+		Inner Join sys.objects As O
+			On C.object_id = O.object_id
+		Inner Join @Temp T
+			On C.Name = Data
+Where	is_ms_shipped = 0
+Order By object_name(C.object_id), C.Name</pre>
+<p><strong>How to correct it:</strong><br />
+Correcting for this type of problem can be challenging because you cannot just willy nilly go around changing column names.  You are likely to have code that uses the column with the original name and this code will need to change to accommodate the changed column name.  To make matters more difficult, you could have systems outside of the database that are sending dynamic SQL making it more difficult to find all of the occurrences in code.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/do-not-use-reserved-keywords/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+		<item>
+		<title>Friday SQL Nugget #1</title>
+		<link>/index.php/itprofessionals/ethicsit/friday-sql-nugget-3/</link>
+		<comments>/index.php/itprofessionals/ethicsit/friday-sql-nugget-3/#respond</comments>
+		<pubDate>Fri, 13 Jan 2012 17:28:00 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Ethics and IT]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/01/friday-sql-nugget-3/</guid>
+		<description><![CDATA[Ted Krueger tagged me "Deciding I need to delete it all and start over again".
+
+What can I say, during the process of writing this post, I expect to delete it all and start over again at least once!
+
+I suspect that most people would think that "star&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Ted Krueger tagged me <a href="/index.php/ITProfessionals/ProfessionalDevelopment/friday-sql-nugget-1">&#8220;Deciding I need to delete it all and start over again&#8221;</a>.</p>
+<p>What can I say, during the process of writing this post, I expect to delete it all and start over again at least once!</p>
+<p>I suspect that most people would think that &#8220;starting over&#8221; is generally bad.  I couldn&#8217;t disagree more.  Every time I have started over, I always end up with code that is easier to read, more efficient and ultimately has less bugs.</p>
+<p>My wife and I own a software company named <a href="http://orbitsoftware.net/">Orbit Software</a>. We have a product that <a href="http://busboss.com/">optimizes school bus routes</a>. I started writing this product 14 years ago, and I am constantly amazed that there continues to be more features that ultimately enhance this product.  During the 14 years, we have released 10 versions of this product.  Each version has many more features than the previous version.  What&#8217;s interesting to me is that each version has shown an increase in performance, and that increase is NOT due to better hardware.</p>
+<p><strong>How did I accomplish this?  By starting over!</strong></p>
+<p>I&#8217;m not suggesting that each version was completely re-written.  That would be insane.  However, each version has large portions of it that have been re-written.  There is a constant struggle between writing &#8220;perfect code&#8221; and actually delivering a product that is useful to your customers.  If we had waited until the code was perfect, we would still be working on version 1.</p>
+<p>My approach to software development has always been, &#8220;Make it work, then make it fast&#8221;.  Sometimes there isn&#8217;t enough time for the second part, so it has to wait for another version. I don&#8217;t think there is a single line of code in the most recent version that existed in the first. </p>
+<p>Every developer has a different tipping point where they decide that starting over is the best course of action.  I encourage everyone to give some thought about their own tipping point. Starting over with a block of code is something that should be encouraged, not avoided.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itprofessionals/ethicsit/friday-sql-nugget-3/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>SQLCop integration with Red Gate&#8217;s SQL Test</title>
+		<link>/index.php/datamgmt/datadesign/sqlcop-integration-with-red-gate/</link>
+		<comments>/index.php/datamgmt/datadesign/sqlcop-integration-with-red-gate/#comments</comments>
+		<pubDate>Wed, 04 Jan 2012 18:52:00 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql test]]></category>
+		<category><![CDATA[sqlcop]]></category>
+		<category><![CDATA[tsqlt]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/01/sqlcop-integration-with-red-gate/</guid>
+		<description><![CDATA[Approximately a year and a half ago, friends of mine and I created SQLCop.  Our motivation was to provide a tool that users can download and run against their database.  This tool is very effective at detecting common problems with database configuratio&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Approximately a year and a half ago, friends of mine and I created SQLCop.  Our motivation was to provide a tool that users can download and run against their database.  This tool is very effective at detecting common problems with database configurations and TSQL code.  Not every issue highlighted by SQLCop requires a fix, but you are very likely to discover potential problems that you didn&#8217;t even know you had.</p>
+<p>About a year ago, I met Dennis Lloyd, Jr. and Sebastian Meine at a presentation they were giving for tSQLt (<a href="http://tSQLt.org/">a unit testing framework for SQL Server</a>) that they were working on.  I was intrigued because I had always wanted to write unit tests for my tSQL code but hadn’t been able to implement anything because of time constraints on my end.  The tSQLt framework allowed me to forget about the mechanics of implementing and running the tests and allowed me to focus on writing the tests.</p>
+<p>Several weeks ago, I was approached by Justin Caldicott at Red Gate Software.  He informed that they had recently released SQL Test which is a SSMS add-in that makes writing and executing tSQLt tests easier.  </p>
+<p>Justin was interested in including SQLCop tests within SQL Test.  I downloaded and installed SQLTest.  I was surprised to see that it recognized all of the tests that I had written manually.  I also like how easy it is to run tests and create new ones.  This tool has already saved me time.</p>
+<p>I spent a relatively short amount of time re-writing a couple of the SQLCop tests to run within the tSQLt framework.  At this point, there are several tests already written and included with SQL Test (Preview 2).  </p>
+<p>If you haven&#8217;t done so already, I encourage you to download and install <a href="http://sqlcop.lessthandot.com/">SQLCop</a>.  I would be extremely surprised if you didn’t find something useful with it.</p>
+<p>I also encourage everyone to download and install <a href="http://www.red-gate.com/products/sql-development/sql-test/">SQL Test</a> so that you can see for yourself how easy it is to run unit tests on your database.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sqlcop-integration-with-red-gate/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Zero-One-Some Testing</title>
+		<link>/index.php/datamgmt/datadesign/zero-one-some-testing/</link>
+		<comments>/index.php/datamgmt/datadesign/zero-one-some-testing/#comments</comments>
+		<pubDate>Tue, 13 Dec 2011 11:33:00 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[tsqlt]]></category>
+		<category><![CDATA[unit testing]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/zero-one-some-testing/</guid>
+		<description><![CDATA[I met Denis and Sebastian over a year ago when I attended their session on test driven database development.  Since then, I have been using tSQLt to add unit tests to my database.  The following post was written by Denis Lloyd Jr.
+
+
+About the Series&#8230;]]></description>
+				<content:encoded><![CDATA[<p><em>I met Denis and Sebastian over a year ago when I attended their session on test driven database development.  Since then, I have been using tSQLt to add unit tests to my database.  The following post was written by Denis Lloyd Jr.</em></p>
+<h2>About the Series</h2>
+<p>Test case heuristics are patterns used to help decide the next test to write and ensure test coverage of requirements. This is the second post on a series of test case heuristics pertaining to database testing.</p>
+<p>I&#8217;m trying out a new way of delivering series to a wider audience &#8211; post sharing! The series home is at: http://testdrivendatabases.com/test-heuristics where you can find links to all articles in the series. The posts will be scattered over a variety of websites and blogs.</p>
+<h2>Definition:</h2>
+<p>Zero-One-Some says that if multiple instances of a value are allowed, then there should be a test for zero of them; one of them; and some of them. Zero-One-Some is sometimes referred to as Zero-One-Many and is often related to cardinality in the database.</p>
+<p>For example, a view may return multiple records. When testing the view, a test should be written where we expect zero records returned; another test for exactly one record returned; and another test for several rows returned.</p>
+<div class="image_block"><a href="/media/blogs/DataMgmt/ZeroOneZomeTesting.png?mtime=1323782210"><img src="/wp-content/uploads/blogs/DataMgmt/ZeroOneZomeTesting.png?mtime=1323782210" alt="" width="898" height="240" /></a></div>
+<p>Zero-One-Some may be considered both on the input (e.g. a loop that may process multiple values) or the output (e.g. a query that returns multiple rows).</p>
+<h2>Purpose:</h2>
+<p>Zero-One-Some testing helps:</p>
+<ul>
+<li>Focus on correct behavior when there are multiple inputs or outputs</li>
+<li>Clarify the requirements when zero records should be processed; a common source of database defects.</li>
+<li>Prevent mistakes when using grouping in queries</li>
+</ul>
+<h2>Example:</h2>
+<p>The business would like a report of the number of orders and the total revenue from those orders for each of the last 3 months. The report may look like this:</p>
+<pre>Month             Number of Orders              Revenue from Orders
+Nov 2011          52                            $3582.00
+Oct 2011          70                            $12399.50
+Sep 2011          30                            $899.55</pre>
+<p>It is clear from this requirement that multiple orders must be processed. By applying zero-one-some, we are forced to ask the following questions:</p>
+<ul>
+<li>If there are no orders in the past 3 months, what should the report display? Should it list each month with 0 orders and $0?</li>
+<li>If there are no orders for any particular month, should that month still be listed in the report?</li>
+<li>Aggregations are always interesting spots to test. If there is a null value for an order amount, how should that be treated in the sum? If it’s not included in the revenue, should it also not be included in the count?</li>
+</ul>
+<h2>Notes:</h2>
+<p>Tests for zero records seem to uncover missing requirements or defects in code involving aggregations or in places where programmers assume that there will simply be data (perhaps because their test database already has data in it).</p>
+<p>Whereas tests for one and some records seem to uncover more problems in loops when a specific exit condition is needed.</p>
+<p>Tests for multiple (&#8220;some&#8221;) records may also be useful when data can be duplicated. Often we assume that data being processed is unique, but asking the question, &#8220;what if there are multiple instances of the same record?&#8221; can be illuminating.</p>
+<h2>Special Cases:</h2>
+<p><strong>Joins</strong>: When multiple tables are joined together in a query, we must often consider the cardinality of the relationship between the tables. Is there a one-to-one relationship between the tables (and is that relationship enforced)? How about a one-to-many or a many-to-many relationship? These impact what tests are needed.</p>
+<p>The join type (e.g. inner, left or right outer, full) must also be considered. These are a few of the possibilities:</p>
+<ul>
+<li>A record exists in the left table, but there are no matches in the right table.</li>
+<li>A record exists in the left table and there is exactly one match in the right table.</li>
+<li>A record exists in the left table and has multiple matches in the right table.</li>
+<li>A record exists in the right table, but has no matches in the left table.</li>
+<li>And so on&#8230;</li>
+</ul>
+<p><strong>Filters</strong>: Zero-one-some is also particularly useful in filters, such as WHERE clauses. Consider the following sub-query, for example:</p>
+<pre>SELECT Name   
+FROM OrderMgmt.Customer  
+WHERE CustomerId =        
+    (SELECT CustomerId          
+       FROM OrderMgmt.Order         
+      WHERE OrderId = @OrderId)  </pre>
+<p>While this is a simplistic case, the programmer is likely expecting exactly one record to be returned from the sub-query. If the sub-query returns zero or multiple records though, the actual behavior of this query may not be so pleasant.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/zero-one-some-testing/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>tSQLt Unit Testing</title>
+		<link>/index.php/datamgmt/datadesign/tsqlt-unit-testing/</link>
+		<comments>/index.php/datamgmt/datadesign/tsqlt-unit-testing/#comments</comments>
+		<pubDate>Wed, 20 Jul 2011 15:25:00 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/07/tsqlt-unit-testing/</guid>
+		<description><![CDATA[Yesterday, I attended a training class at Microsoft’s facility in Malvern, Pennsylvania.  This training class was led by Sebastian Meine (sqlity.net) and Dennis Lloyd (curiouslycorrect.com). 
+
+The class was from 9:00 am to 5:00 pm with a short break f&#8230;]]></description>
+				<content:encoded><![CDATA[<p>Yesterday, I attended a training class at Microsoft’s facility in Malvern, Pennsylvania.  This training class was led by Sebastian Meine (<a href="http://sqlity.net/">sqlity.net</a>) and Dennis Lloyd (<a href="http://curiouslycorrect.com/">curiouslycorrect.com</a>). </p>
+<p>The class was from 9:00 am to 5:00 pm with a short break for lunch.  During the class, Dennis and Sebastian explained how to use tSQLt (<a href="http://tSQLt.org/">http://tSQLt.org/</a>) to write unit tests for your database code.  tSQLt is a frame work that can be freely downloaded and applied to your database, allowing you to quickly and easily write unit tests.  After learning about the framework and working through the exercises during the class, it is immediately obvious to me how this framework and the techniques explained during the class will benefit my organization.</p>
+<p>Specifically, writing unit tests for the database will allow me to re-factor the code in a safe way, making sure that the code doesn’t break because I can easily run all of the unit tests for the database, or just the unit tests associated with the code I am in the process of changing.</p>
+<p>Since I already have dozens of views, hundreds of functions and thousands of stored procedures, I cannot take the time to write all the unit tests required for the existing stuff, but I will create unit tests for the new code I write and also unit tests for any bug fixes with the existing code.  Over time I will have a set of unit tests for my database code that will undoubtedly allow me to spend less time fixing defects and more time writing new functionality.<br />
+With my application, most of the bugs discovered by the end user are data related. The tSQLt unit testing framework will allow me to write tests for those bugs and then have confidence that the bug will not return (in the released version of the software).</p>
+<p>Thank you Dennis and Sebastian for teaching this class and showing me this framework. I certainly appreciate it and will be sure to start using it.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/tsqlt-unit-testing/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>Understanding SQL Server 2000 Pivot with Aggregates</title>
+		<link>/index.php/datamgmt/datadesign/understanding-sql-server-2000-pivot/</link>
+		<comments>/index.php/datamgmt/datadesign/understanding-sql-server-2000-pivot/#comments</comments>
+		<pubDate>Tue, 08 Mar 2011 13:45:00 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/03/understanding-sql-server-2000-pivot/</guid>
+		<description><![CDATA[This month's T-SQL Tuesday is being hosted by our very own, Jes Borland (Twitter &#124; Blog).  Not only is she hosting this month but she is making it possible for LessThanDot's first T-SQL Tuesday event.  The topic that is brought to us is to discuss with&#8230;]]></description>
+				<content:encoded><![CDATA[<p><a href="/index.php/DataMgmt/DBProgramming/come-one-come-all-to"><img src="/wp-content/uploads/blogs/DataMgmt/olap_1.gif" align="left" /></a><br />
+This month&#8217;s T-SQL Tuesday is being hosted by our very own, Jes Borland (<a href="http://twitter.com/grrl_geek">Twitter</a> | <a href="/index.php/All/?disp=authdir&amp;author=420">Blog</a>).  Not only is she hosting this month but she is making it possible for LessThanDot&#8217;s first T-SQL Tuesday event.  The topic that is brought to us is to discuss with everyone how we solved business problems with aggregate functions.  I thought this would be a good time to explain how you can write a pivot query in SQL 2000 using aggregate functions.  Writing a query is one thing, understanding how it works is another.  The goal of this blog post is to explain HOW it works so that it can be applied to other interesting problems.</p>
+<p>Why?  This database engine is 11 years old, why bother?  We are sometimes stuck dealing with an older database engine.   Understanding the concept behind this pivot will also allow you to use the technique in other interesting ways.  Personally, I think that by understanding how this works is another step in the process of “thinking in sets”.</p>
+<p>When we think of pivoting data, we usually want to see several rows of data displayed as additional columns.  Often times this is for reporting purposes or GUI displays within an application.</p>
+<p>This blog is meant to explain the process of pivoting the data.  Sure, many people know how to write a pivot query using aggregate functions, but how many people actually understand it from a set based perspective.  Understanding what the code is doing will help us to apply the principals to other queries.</p>
+<p>To explain this process, I will use a set of dummy data to aide in visualizing the data.  I will also build up to the final query, but examining each step along the way.</p>
+<p>The data:</p>
+<pre>Id          Name                 Value
+----------- -------------------- --------------------
+1           Name                 George
+1           ShoeSize             9.5
+
+2           Name                 Bill
+2           ShoeSize             10.5
+
+3           Name                 John
+3           ShoeSize             9
+
+4           Name                 Greg
+4           ShoeSize             9</pre>
+<p>The data is relatively simple, but is meant to demonstrate the concept.  The goal of this blog is to explain how we can pivot the data shown above in to the following output.</p>
+<pre>Id          Name                 ShoeSize
+----------- -------------------- --------------------
+1           George               9.5
+2           Bill                 10.5
+3           John                 9
+4           Greg                 9</pre>
+<p>As you can see, the original data had the name and shoe size for each person on separate rows.  The output has just a single row per person but with additional columns for the data.</p>
+<p>Setting up the code&#8230;.</p>
+<pre>Create Table #Temp(Id Int, Name VarChar(20), Value VarChar(20))
+
+Insert Into #Temp Values(1, 'Name','George')
+Insert Into #Temp Values(1, 'ShoeSize','9.5')
+
+Insert Into #Temp Values(2, 'Name','Bill')
+Insert Into #Temp Values(2, 'ShoeSize','10.5')
+
+Insert Into #Temp Values(3, 'Name','John')
+Insert Into #Temp Values(3, 'ShoeSize','9')
+
+Insert Into #Temp Values(4, 'Name','Greg')
+Insert Into #Temp Values(4, 'ShoeSize','9')</pre>
+<p>Our first query will simply show the data.</p>
+<pre>Select *
+From   #Temp</pre>
+<p>Simple.  We see all the data in the table.  For our next step, let&#8217;s set up the output structure.  We know we want to see the ID column and the Value column twice, once for the person&#8217;s name and again for the shoe size. </p>
+<pre>Select Id,
+       Value,
+       Value
+From   #Temp</pre>
+<pre>Id          Value                Value
+----------- -------------------- --------------------
+1           George               George
+1           9.5                  9.5
+2           Bill                 Bill
+2           10.5                 10.5
+3           John                 John
+3           9                    9
+4           Greg                 Greg
+4           9                    9</pre>
+<p>This query is simply duplicating the data in two columns.  Ultimately, we will want the second column to show the person&#8217;s name, and the third column to show the shoe size.  For the next step, let&#8217;s show just the name in the second column and the shoe size in the third.  We will do this using a case expression:</p>
+<pre>Select Id,
+       Case When Name = 'Name' Then Value End,
+       Case When Name = 'ShoeSize' Then Value End
+From   #Temp</pre>
+<pre>Id                               
+----------- -------------------- --------------------
+1           George               NULL
+1           NULL                 9.5
+2           Bill                 NULL
+2           NULL                 10.5
+3           John                 NULL
+3           NULL                 9
+4           Greg                 NULL
+4           NULL                 9</pre>
+<p>Take a look at the case expression.  Notice that there is no ELSE clause.  Without an ELSE, the CASE expression will return NULL.  This is extremely important for our end result.  However, it&#8217;s important to realize that the second column has the person&#8217;s name and NULL, and the third column has shoe size and null.  Next we will introduce column aliases.</p>
+<pre>Select Id,
+       Case When Name = 'Name' Then Value End As Name,
+       Case When Name = 'ShoeSize' Then Value End As ShoeSize
+From   #Temp</pre>
+<pre>Id          Name                 ShoeSize
+----------- -------------------- --------------------
+1           George               NULL
+1           NULL                 9.5
+2           Bill                 NULL
+2           NULL                 10.5
+3           John                 NULL
+3           NULL                 9
+4           Greg                 NULL
+4           NULL                 9</pre>
+<p>Nothing fancy here.  Just the column names.  We still have NULL&#8217;s in our data that we will want to eliminate.  Which leads us to our next step, and the most important part, too.  When we use aggregates, it&#8217;s important to realize that they ignore NULL&#8217;s in the data.  For example, if we have 2 rows with &#8220;George&#8221; in one row and NULL in the other row, Max(Column) will ignore the NULL and return George.  We can use that to our advantage here.</p>
+<pre>Select Id,
+       Min(Case When Name = 'Name' Then Value End) As Name,
+       Min(Case When Name = 'ShoeSize' Then Value End) As ShoeSize
+From   #Temp
+Group By Id</pre>
+<pre>Id          Name                 ShoeSize
+----------- -------------------- --------------------
+1           George               9.5
+2           Bill                 10.5
+3           John                 9
+4           Greg                 9</pre>
+<p>As you can see, we finally got the results we wanted, effectively pivoting the data using code that will comfortably run in SQL2000 (and many other databases, too).</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/understanding-sql-server-2000-pivot/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+		<item>
+		<title>T-SQL Tuesday #13: Is that what you really want?</title>
+		<link>/index.php/datamgmt/datadesign/t-sql-tuesday-13-is-that-what-you-really/</link>
+		<comments>/index.php/datamgmt/datadesign/t-sql-tuesday-13-is-that-what-you-really/#comments</comments>
+		<pubDate>Tue, 14 Dec 2010 14:30:23 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/12/t-sql-tuesday-13-is-that-what-you-really/</guid>
+		<description><![CDATA[Steve Jones (Twitter &#124; Blog), The Voice of the DBA, is hosting the T-SQL Tuesday blogging fest over on SQLServerCentral.com this month.  This months topic involves businesses and what they really want.
+
+As many of you know, I am the owner of a small s&#8230;]]></description>
+				<content:encoded><![CDATA[<p><a href="http://www.sqlservercentral.com/blogs/steve_jones/archive/2010/12/07/t_2D00_sql-tuesday-_2300_13-_2D00_-what-the-business-says-is-not-what-the-business-wants.aspx">
+<div class="image_block"><img src="/wp-content/uploads/blogs/DataMgmt/olap_1.gif" alt="" title="" width="154" height="154" align="left" /></div>
+<p></a></p>
+<p>Steve Jones (<a href="http://twitter.com/way0utwest">Twitter</a> | <a href="http://www.sqlservercentral.com/blogs/steve_jones/default.aspx">Blog</a>), The Voice of the DBA, is hosting the T-SQL Tuesday blogging fest over on <a href="http://www.sqlservercentral.com/blogs/steve_jones/archive/2010/12/07/t_2D00_sql-tuesday-_2300_13-_2D00_-what-the-business-says-is-not-what-the-business-wants.aspx">SQLServerCentral.com</a> this month.  This months topic involves businesses and what they really want.</p>
+<p>As many of you know, I am the owner of a small software company that satisfies a niche market.  I&#8217;ve been in business for 13 years now, and am still working on the same core application.  I constantly find new features and functionality to offer in the app, continually improving it for the benefit of my customers.  I think it&#8217;s safe to say that I understand the technical challenge that my software accommodates, as well as the business implications involved.  I also have a very good appreciation for the logistics involved in the business process, and the most efficient ways to accomplish the business goals.</p>
+<p>Occasionally, we will come across a customer that thinks their method of accomplishing the business&#8217;s goals is the only correct one, even though my experience clearly indicates there is a better (more efficient) way.  I was talking to Ted/onpnt (<a href="http://twitter.com/onpnt">Twitter</a> | <a href="/index.php/All/?disp=authdir&amp;author=68">Blog</a>) yesterday about this very same topic.  The conversation went something like this:</p>
+<p><strong>George:</strong> You should see the frickin hoops I gotta jump through for this one customer. I feel like a whipping boy.<br />
+<strong>Ted:</strong> what did they have you doing??<br />
+<strong>George:</strong> They refuse to use (software) they way it was intended. They want a &#8220;Blah Blah Report&#8221; where each&#8230;.. This report is not accurate because (software) wasn&#8217;t designed this way. Instead, each&#8230; then a report showing&#8230; should be used instead.<br />
+<strong>Ted:</strong> so they want you to write a report that doesn&#8217;t even reflect the way the system works.<br />
+<strong>George:</strong> It&#8217;s like&#8230;. well&#8230;. trying to use Excel to manage a sql database.<br />
+<strong>Ted:</strong> LOL<br />
+<strong>George:</strong> Yeah. Write a report that magically gets info, never makes a mistake, and base it all on completely unrelated information.<br />
+<strong>Ted:</strong> LOL<br />
+<strong>George:</strong> oh&#8230;. and I&#8217;m supposed to make it faster, too.<br />
+<strong>Ted:</strong> ROFL but of course!</p>
+<p>Whenever I run in to a problem with a customer, I try to use the following steps.</p>
+<p>1. Manage expectations at the beginning.  This allows you to prevent possible complications in the future by expressing what the customer should reasonably expect from the software.</p>
+<p>2. Effectively train the customer in the proper operation of the software.  Part of the training process should be the &#8220;big picture&#8221; because it allows them to see and appreciate your methods for handling the business problems in an efficient manner.</p>
+<p>3. When a customer has unrealistic expectations, it&#8217;s important to explain (at a high level) why they are unrealistic.  Explain the benefits of the currently implemented method and the draw backs with their proposed method.</p>
+<p>4. When they insist on new/different functionality, you should attempt to work out a compromise that allows your existing functionality to satisfy their requirements.  Often times, a small tweak to current functionality will satisfy their requirements.</p>
+<p>5. When all else fails, the customer is always right.  If you refuse to implement the functionality they want, you run the risk of losing their business, and potentially word-of-mouth business as well.</p>
+<p>As developers, we have a responsibility to provide software that makes our customers job easier and more efficient.  We also have a responsibility to advise them of alternative methods (new to them) that would improve their efficiency.  If all else fails, be prepared to give the customer what they want.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/t-sql-tuesday-13-is-that-what-you-really/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+		<item>
+		<title>Picking a science fair project</title>
+		<link>/index.php/itstudents/assignments/picking-a-science-fair-project/</link>
+		<comments>/index.php/itstudents/assignments/picking-a-science-fair-project/#comments</comments>
+		<pubDate>Wed, 03 Nov 2010 10:02:58 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Assignments]]></category>
+		<category><![CDATA[How to Learn and Get Answers]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/11/picking-a-science-fair-project/</guid>
+		<description><![CDATA[When school started this year, my 7th grade daughter was informed that she is expected to complete a science fair project.  I plan on convincing her to post her final report as a blog on this site, but it’s not scheduled to be completed for a couple mor&#8230;]]></description>
+				<content:encoded><![CDATA[<p>When school started this year, my 7th grade daughter was informed that she is expected to complete a science fair project.  I plan on convincing her to post her final report as a blog on this site, but it’s not scheduled to be completed for a couple more months.  I plan on writing a series of blogs outlining the steps involved from a parents&#8217; perspective.  </p>
+<div class="image_block"><img src="/wp-content/uploads/blogs/ITStudents/albert_einstein_256515.jpg" alt="" title="" width="256" height="500" /></div>
+<p><strong>Step 1: Picking the project.</strong></p>
+<p>During dinner one night, my daughter informed us that she needed to present 6 science fair project ideas to her teacher the next day, but she couldn’t think of anything.  Several ideas were presented but none were acceptable. After the meal was over and the plates were clean, we turned to google for some help.  I was expecting google to present some interesting ideas, but was surprised at how many there are.  Our first google search was &#8220;7th grade science fair project ideas&#8221;.  There were so many ideas to choose from.</p>
+<p>When helping your child present ideas to the teacher, it’s important that each idea is acceptable to you, the parent.  I’m reminded of Sunday morning breakfasts when my daughter was younger.  I didn’t ask &#8220;What would you like for breakfast?&#8221;  Instead, I would ask, &#8220;Would you like pancakes, eggs, or oatmeal?&#8221; By restricting the choices to those that I think are appropriate, I was guaranteed to get an acceptable answer.  The science fair project is no exception.</p>
+<p><strong>Safety</strong></p>
+<p>I&#8217;m glad that my daughter was expected to present ideas to the teacher.  This is an important safety measure that shouldn&#8217;t be overlooked because it is easy for a seemingly interesting &amp; safe project idea to become dangerous or malicious.  The teacher is the filter, the guardian, the safety net.  Any project involving an animal is immediately rejected, don&#8217;t even bother presenting it.  If your project involves dangerous chemicals, it is likely to be rejected also.  Trust the teachers decision.</p>
+<p><strong>Fun and interesting</strong></p>
+<p>The project idea is the single most important decision made.  The teacher will help make sure the project is safe, but it&#8217;s your job to make sure the project is fun, interesting, and appropriate for your child.  As your child is making this decision, you should constantly be asking, is this interesting to you?  Is this something you&#8217;ll enjoy doing.  Most science fair projects require a lot of time.  If your child is going to be miserable during this time, so will you.  </p>
+<p><strong>Cost</strong></p>
+<p>Another consideration when picking a science fair project is cost.  Some projects can be done without incurring any costs, some are low cost, and others can be expensive.  As a parent, you should have a clear understanding about the costs you are willing incur.  Some projects may initially seems like there is a low cost associated with it, only to find hidden expenses once you get in to a later phase of the project.  For example, if the science fair project is about the freshness of bread stored various ways, all you may need is a single loaf of sliced bread and perhaps a Ziploc bag, cellophane wrapping, etc… These are materials you probably already have in your home, and the expense is likely to be quite small and reasonable.  Other projects have hidden costs that may surprise you.  For example, &#8220;Does the bounciness of a golf ball relate to its ability to be hit a long distance?&#8221;  For this project, you will need to purchase a variety of golf balls and measure it bounciness.  More importantly, you’ll need a method to consistently hit each ball so that it is exactly the same strength and angle.  Building such a device may include hidden expenses.</p>
+<p><strong>Time</strong></p>
+<p>Lastly, you should consider the amount of time and level of effort that will be involved in your child’s project.  Some projects will be easy to prepare for and conduct.  For example, &#8220;testing the effect of music volume on your ability to remember&#8221;.  All you’ll really need for this is to prepare a test and get a music source, preferably with head phones.  Other projects may require more preparation time.  Also realize that it&#8217;s not just preparation time that could be significant.  It may take a long time to conduct the experiment too.  For example, &#8220;Fish growth as a result of tank size&#8221;.  This experiment may take several months to complete.</p>
+<p><strong>Summary</strong></p>
+<p>At first glance, picking a science fair project may seem simple, but it&#8217;s not.  It may be the most important decision you can make.  Guiding your child is important in order to assure an acceptable project is picked.  Remember these factors when picking a science fair project: safety, fun, cost, and time commitments.  Determine what is acceptable for you and your family and then let your child pick from several acceptable ideas.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/itstudents/assignments/picking-a-science-fair-project/feed/</wfw:commentRss>
+		<slash:comments>5</slash:comments>
+		</item>
+		<item>
+		<title>SQLCop update Version 1.1</title>
+		<link>/index.php/datamgmt/dbprogramming/sqlcop-update-version-1-1/</link>
+		<comments>/index.php/datamgmt/dbprogramming/sqlcop-update-version-1-1/#comments</comments>
+		<pubDate>Mon, 23 Aug 2010 12:51:00 +0000</pubDate>
+		<dc:creator><![CDATA[George Mastros (gmmastros)]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/08/sqlcop-update-version-1-1/</guid>
+		<description><![CDATA[This version of SQLCop contains several bug fixes as well as some new features. Many of the items changed in this version were based on feedback received by you, our users. We encourage people to post comments so that we can improve the application. If you previously downloaded the original version of SQLCop, you should [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>This version of <a href="http://sqlcop.lessthandot.com/">SQLCop</a> contains several bug fixes as well as some new features.  Many of the items changed in this version were based on feedback received by you, our users.  We encourage people to post comments so that we can improve the application.</p>
+<p>If you previously downloaded the original version of SQLCop, you should manually download and install this new version: http://sqlcop.lessthandot.com/</p>
+<p><strong>Fixes:</strong><br />
+1. This version of SQL Cop works with databases that have a binary collation.</p>
+<p>2. There was a &#8220;load nodes&#8221; problem that occurred when your firewall was blocking your connection to our site.  This version of the application does require an internet connection the first time it is run so that an XML file can be downloaded.  After this first download, you no longer need an internet connection.  Without a connection to the internet, you will not see the blog or wiki article that explains the problems, but you will still be able to list the occurrences of the problem in your database.</p>
+<p>3. A database connection parameter was changed which will allow SQL Cop to run quicker.</p>
+<p>4. Some people were seeing &#8220;stub&#8221; instead of &#8220;No Problems Found&#8221;.  This item has been corrected.</p>
+<p><strong>Updates</strong><br />
+SQL Cop now checks a very small XML file on startup that is located on our server.  If the connection to the server fails, the local version of the issues XML file is used.  If SQL Cop can download the configuration xml file, we compare versions of the application and versions of the issues xml.  If there is a new application, the user is notified and prompted to download the newer version.  If there is a newer version of the issues xml file, it is downloaded and stored automatically.</p>
+<p><strong>Checks</strong><br />
+We added new checks for:<br />
+Code</p>
+<ul>
+<li>Procedures with dynamic sql</li>
+<li>Procedures using dynamic sql without sp_executesql</li>
+</ul>
+<p>Table/View</p>
+<ul>
+<li>Unnamed Constraints</li>
+</ul>
+<p>Indexes</p>
+<ul>
+<li>Forwarded Records</li>
+</ul>
+<p>Configuration</p>
+<ul>
+<li>Ad Hoc Distributed Queries</li>
+<li>CLR</li>
+<li>Database and log files on the same physical disk</li>
+<li>Database Mail</li>
+<li>Deprecated Features</li>
+<li>Instant File Initialization</li>
+<li>Max Degree of Parallelism</li>
+<li>OLE Automation Procedures</li>
+<li>Service Account</li>
+<li>SMO and DMO</li>
+<li>SQL Server Agent Service</li>
+<li>xp cmdshell</li>
+</ul>
+<p>A new category was added for Health with the following checks.</p>
+<ul>
+<li>Buffer cache hit ratio</li>
+<li>Page life expectancy</li>
+</ul>
+<p>This brings the total number of issues checked to 50 for SQL 2008 and 49 for SQL 2005.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbprogramming/sqlcop-update-version-1-1/feed/</wfw:commentRss>
+		<slash:comments>1</slash:comments>
+		</item>
+	</channel>
+</rss>

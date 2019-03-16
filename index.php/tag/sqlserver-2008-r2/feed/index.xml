@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>sqlserver 2008 r2 &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/sqlserver-2008-r2/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Virtual Lab: Setting up Database Mail on SQL Server 2008 R2</title>
+		<link>/index.php/datamgmt/datadesign/virtual-lab-setting-up-database-mail-on/</link>
+		<comments>/index.php/datamgmt/datadesign/virtual-lab-setting-up-database-mail-on/#comments</comments>
+		<pubDate>Tue, 06 Jul 2010 10:02:26 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[databasemail]]></category>
+		<category><![CDATA[sqlserver 2008 r2]]></category>
+		<category><![CDATA[virtual lab]]></category>
+
+		<guid isPermaLink="false">/index.php/2010/07/virtual-lab-setting-up-database-mail-on/</guid>
+		<description><![CDATA[After our installation of SQL Server 2008 R2 a few weeks ago, we mentioned that we still had some additional setup tasks before we could consider the server to be done. This article covers setting up DatabaseMail, the internal mail client that will allow us to use built-in alerts (among other things).]]></description>
+				<content:encoded><![CDATA[<div class="acc_header">
+After our installation of SQL Server 2008 R2 <a href="/index.php/DataMgmt/DBAdmin/MSSQLServerAdmin/virtual-lab-creating-a-basic-sql-2008-r2" alt="Click here to catch up on that article if you missed it" target="_blank">a few weeks ago</a>, I mentioned that we still had some additional setup tasks before we could consider the server to be done. This article covers setting up DatabaseMail, the internal mail client/management system that will allow us to use built-in alerts (among other things).<br />
+<br />
+<label>Technical Area:</label> Accidental Database Administrator<br />
+<label class="diff">Level of Difficulty: </label><img src="http://tiernok.com/LTDBlog/dr_basic.png" alt="Basic Difficulty" /><br />
+<label>Additional Articles:</label><a href="http://wiki.lessthandot.com/index.php/Virtual_Lab" title="View the wiki entry">Virtual Lab entry on the LTD Wiki</a>
+</div>
+<p>Database Mail is a subsystem that acts like a <a href="http://en.wikipedia.org/wiki/Simple_Mail_Transfer_Protocol" title="Simple Mail Transport Protocol">SMTP</a> client, allowing us to send emails from SQL Server processes and scripts. It replaces SQL Mail and doesn&#8217;t require a local installation of additional software (like Outlook, the quick fix) to function. </p>
+<h2>Account, Profile, Service Broker, what?</h2>
+<p>Database Mail expands on the concept of sending mail to include all of the features we wanted in SQLMail. This grown up version of mail uses SMTP to communicate with mail servers, no longer requiring a MAPI component to communicate messages (the reason we used to install products like Outlook to make SQLMail work). Behind the scenes, Database Mail uses Service Broker to manage email in queues, rather than trying an immediate send. Profiles allow us to define a chain of fail-over accounts to send from, so that messages are never left undelivered due to a primary email server being unavailable. And accounts are exactly what they sound like, individual, unique accounts that we can setup to use a variety of authentication and SMTP options.</p>
+<h2>From the GUI</h2>
+<p>Database Mail is something we want to setup immediately on creating a new server. When we are working with a relatively small number of servers, the GUI is not a bad option for setting up some accounts.</p>
+<p>We&#8217;ll start by setting up an administrator profile with then intent to send critical notifications and alerts to this profile.</p>
+<p>In SSMS we can right click the Database Mail entry under Management to begin the wizard.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/01_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/01_config.png" alt="SSMS DatabaseMail" /></a><br />
+	DatabaseMail Menu Item in SSMS
+</div>
+<p>The Intro screen is fairly boring, so lets press &#8220;Next&#8221; and head to the main configuration page. This being the first time we are configuring DatabaseMail on our new server, we want to leave the first option selected and continue.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/02_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/02_config.png" alt="SSMS DatabaseMail Wizard" /></a><br />
+	DatabaseMail Wizard in SSMS
+</div>
+<p>A quick check by the wizard and it determines that components for Database Mail aren&#8217;t available on the server yet, so it asks us if we want to go ahead and install them (yes).</p>
+<div class="hint">
+How did the server know Database Mail wasn&#8217;t configured, and what did it do when we pressed &#8216;Yes&#8217;? <br />
+There is an advanced option in the system configurations called &#8216;Database Mail XPs&#8217;. When the option is set to &#8216;0&#8217; (which is the default), then the Database Mail process doesn&#8217;t run. So the dialog simply checked the current value and, when we selected &#8216;Yes&#8217;, updated the configuration to a value of &#8216;1&#8217;.
+</div>
+<p>Profiles are used to represent a set of email addresses which allows us to represent a single person (or system) with multiple fail-over accounts. If an error occurs when the system is attempting to send mail from the first account in a profile, it fails to the next and retries, continuing until it either runs out of accounts or successfully sends it&#8217;s message.</p>
+<p>Lets enter a Profile Name of &#8220;The Accidental Admin&#8221;.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/03_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/02_config.png" alt="SSMS DatabaseMail Wizard" /></a><br />
+	DatabaseMail Wizard in SSMS
+</div>
+<p>Now we&#8217;ll add the first two accounts to this profile, each on a different network. Many admins will choose a non-local account with an external provider as their primary to reduce the chances that emails will not get through when other issues are happening. As many of you know, when a server room overheats the exchange server is always the first to go, so we will start with an external provider and fail-over to an internal one. Keep in mind that these are the accounts the database will send emails <i>from</i> when using the specified profile, not to.</p>
+<p>Creating an account is fairly straightforward, simply enter the details for where you would like the email to be sent and any authentication options that are necessary. In this case we want to create a minimum of two accounts so the failover can work properly.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/04_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/04_config.png" alt="SSMS DatabaseMail Wizard" /></a><br />
+	DatabaseMail Wizard in SSMS &#8211; Account Entry
+</div>
+<p>Now that we have two accounts, we can move on.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/05_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/05_config.png" alt="SSMS DatabaseMail Wizard" /></a><br />
+	DatabaseMail Wizard in SSMS &#8211; Account View
+</div>
+<p>The next step is to decide whether our profile is going to be public or private. A public profile will be accessible to other people working on the system, whereas a private one will not. In this case we will make the profile public but be aware that this means anyone will be able to us the database server to send mail from this particular profile.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/06_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/06_config.png" alt="SSMS DatabaseMail Wizard" /></a><br />
+	DatabaseMail Wizard in SSMS &#8211; Profile Security
+</div>
+<p>The last interactive step is to confirm or modify some additional system parameters. This step is not specific to configuring an email profile and accounts, it is displayed as the final step of setting up DatabaseMail (when setting up for the first time). I suggest reviewing the settings to ensure your comfortable with each of them.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/07_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/07_config.png" alt="SSMS DatabaseMail Wizard" /></a><br />
+	DatabaseMail Wizard in SSMS &#8211; System Parameters
+</div>
+<p>After a final review screen, press the &#8216;Finish&#8217; button to implement the changes.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/08_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/08_config.png" alt="SSMS DatabaseMail Wizard" /></a><br />
+	DatabaseMail Wizard in SSMS &#8211; Finished
+</div>
+<p>The last step is to test our new setup. Right-click the Database Mail menu option in SSMS and select &#8220;Send Test Email&#8230;&#8221;.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/09_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/09_config.png" alt="SSMS DatabaseMail - Test Email" /></a><br />
+	SSMS Menu &#8211; Sending a Test Email
+</div>
+<p>After entering an email address for our test message, we can hit the &#8220;Send&#8221; button and wait for confirmation of our ability to hit &#8220;Next, Next, Finish&#8221;.</p>
+<div class="screenshot">
+	<a href="http://tiernok.com/LTDBlog/DatabaseMail/orig/10_config.png" title="View Fullsize" target="_blank"><img src="http://tiernok.com/LTDBlog/DatabaseMail/10_config.png" alt="SSMS DatabaseMail - Test Email Dialog" /></a><br />
+	SSMS DatabaseMail &#8211; Test Email Dialog
+</div>
+<h2>or From a Script</h2>
+<p>Doing this on one server is pretty quick. Banging through the dialog on 20 (or with multiple profiles) is not only going to be a bit slower but probably guarantees at least one bad entry along the way. Luckily there is nothing magical about what SSMS is doing to configure these accounts and profiles, just a wizard driving system procedures behind the scenes. We can follow the same process programmatically and create a setup script. Once we have a setup script, of course, we can then use it against multiple systems and if we save it then we not only can set up future servers the same way, but we have detailed documentation on exactly how our servers were setup when we need it 3 years later.</p>
+<p>Here are the commands we will be using:</p>
+<dl>
+<dt><a href="http://msdn.microsoft.com/en-us/library/ms189631.aspx" onclick="_blank" title="Read more at MSDN">sp_configure</a></dt>
+<dd>This procedure is used to change SQL Server configurations</dd>
+<dt><a href="http://msdn.microsoft.com/en-us/library/ms188058.aspx" onclick="_blank" title="Read more at MSDN">sysmail_add_profile_sp</a></dt>
+<dd>Used to create a Database Mail Profile</dd>
+<dt><a href="http://msdn.microsoft.com/en-us/library/ms182804.aspx" onclick="_blank" title="Read more at MSDN">sysmail_add_account_sp</a></dt>
+<dd>Used to create a Database Mail Account</dd>
+<dt><a href="http://msdn.microsoft.com/en-us/library/ms186258.aspx" onclick="_blank" title="Read more at MSDN">sysmail_add_profileaccount_sp</a></dt>
+<dd>Used to tie a Database Mail Account to a Profile (Tab A in Slot B)</dd>
+<dt><a href="http://msdn.microsoft.com/en-us/library/ms187911.aspx" onclick="_blank" title="Read more at MSDN">sysmail_add_principalprofile_sp</a></dt>
+<dd>Assign access rights to a Database Mail profile</dd>
+<dt><a href="http://msdn.microsoft.com/en-us/library/ms190307.aspx" onclick="_blank" title="Read more at MSDN">sp_send_dbmail</a></dt>
+<dd>And sending an email, of course</dd>
+</dl>
+<p>And if we put it all together then we can duplicate the wizardy approach above like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+</pre></td><td class="de1"><pre class="de1"><span class="co1">---- Enable the XPs for Database Mail</span>
+<span class="kw1">EXECUTE</span> <span class="kw3">sp_configure</span> <span class="st0">'show advanced'</span>, <span class="nu0">1</span>;
+<span class="kw1">RECONFIGURE</span>;
+<span class="kw1">EXECUTE</span> <span class="kw3">sp_configure</span> <span class="st0">'Database Mail XPs'</span>,<span class="nu0">1</span>;
+<span class="kw1">RECONFIGURE</span>;
+<span class="kw1">EXECUTE</span> <span class="kw3">sp_configure</span> <span class="st0">'show advanced'</span>, <span class="nu0">0</span>;
+<span class="kw1">RECONFIGURE</span>;
+GO
+&nbsp;
+<span class="co1">---- Create our Default Profile</span>
+<span class="kw1">DECLARE</span> @newProfileId <span class="kw1">int</span>;
+<span class="kw1">EXECUTE</span> msdb.<span class="me1">dbo</span>.<span class="me1">sysmail_add_profile_sp</span>
+&nbsp; &nbsp; @profile_name <span class="sy0">=</span> <span class="st0">'The Accidental Admin v2'</span>,
+&nbsp; &nbsp; @description <span class="sy0">=</span> <span class="st0">'A second version of the DB Admin email profile'</span>,
+&nbsp; &nbsp; @profile_id <span class="sy0">=</span> @newProfileId <span class="kw1">OUTPUT</span>;
+<span class="kw1">print</span> <span class="st0">'Profile Created'</span>;
+&nbsp;
+<span class="co1">---- Create our accounts (You did plan on a minimum of two, right?)</span>
+<span class="kw1">DECLARE</span> @newPriAccountId <span class="kw1">int</span>,
+&nbsp; &nbsp; @newSecAccountId <span class="kw1">int</span>;
+<span class="kw1">DECLARE</span> @sender <span class="kw1">varchar</span><span class="br0">&#40;</span><span class="nu0">50</span><span class="br0">&#41;</span>;
+<span class="kw1">SELECT</span> @sender <span class="sy0">=</span> <span class="st0">'DB SERVER - '</span> <span class="sy0">+</span> <span class="kw2">@@SERVERNAME</span>;
+&nbsp;
+<span class="co1">-- External account using username/password</span>
+<span class="kw1">EXECUTE</span> msdb.<span class="me1">dbo</span>.<span class="me1">sysmail_add_account_sp</span> &nbsp;
+&nbsp; &nbsp; @account_name <span class="sy0">=</span> <span class="st0">'External DBAdmin'</span>,
+&nbsp; &nbsp; @email_address <span class="sy0">=</span> <span class="st0">'AnAccount@ExternalService.com'</span>,
+&nbsp; &nbsp; @display_name <span class="sy0">=</span> @sender,
+&nbsp; &nbsp; @description <span class="sy0">=</span> <span class="st0">'Primary account for DB Admin profile'</span>,
+&nbsp; &nbsp; @mailserver_name <span class="sy0">=</span> <span class="st0">'mail.ExternalService.com'</span>,
+&nbsp; &nbsp; @username <span class="sy0">=</span> <span class="st0">'username'</span>,
+&nbsp; &nbsp; @password <span class="sy0">=</span> <span class="st0">'password'</span>,
+&nbsp; &nbsp; @account_id <span class="sy0">=</span> @newPriAccountId <span class="kw1">OUTPUT</span>;
+&nbsp;
+<span class="co1">-- Internal account using credentials from the account DB server is running under</span>
+<span class="kw1">EXECUTE</span> msdb.<span class="me1">dbo</span>.<span class="me1">sysmail_add_account_sp</span> &nbsp;
+&nbsp; &nbsp; @account_name <span class="sy0">=</span> <span class="st0">'Internal DBAdmin'</span>,
+&nbsp; &nbsp; @email_address <span class="sy0">=</span> <span class="st0">'YourAccount@YourDomain.com'</span>,
+&nbsp; &nbsp; @display_name <span class="sy0">=</span> @sender,
+&nbsp; &nbsp; @description <span class="sy0">=</span> <span class="st0">'Secondary account for DB Admin profile'</span>,
+&nbsp; &nbsp; @mailserver_name <span class="sy0">=</span> <span class="st0">'mail.YourDomain.com'</span>,
+&nbsp; &nbsp; @use_default_credentials <span class="sy0">=</span> <span class="nu0">1</span>,
+&nbsp; &nbsp; @account_id <span class="sy0">=</span> @newSecAccountId <span class="kw1">OUTPUT</span>;
+&nbsp;
+<span class="kw1">print</span> <span class="st0">'Accounts Created: '</span> <span class="sy0">+</span> @sender;
+&nbsp;
+&nbsp; &nbsp; 
+<span class="co1">---- Add Accounts to Profile</span>
+<span class="kw1">EXECUTE</span> msdb.<span class="me1">dbo</span>.<span class="me1">sysmail_add_profileaccount_sp</span>
+&nbsp; &nbsp; @profile_id <span class="sy0">=</span> @newProfileId,
+&nbsp; &nbsp; @account_id <span class="sy0">=</span> @newPriAccountId,
+&nbsp; &nbsp; @sequence_number <span class="sy0">=</span> <span class="nu0">1</span>;
+&nbsp;
+<span class="kw1">EXECUTE</span> msdb.<span class="me1">dbo</span>.<span class="me1">sysmail_add_profileaccount_sp</span>
+&nbsp; &nbsp; @profile_id <span class="sy0">=</span> @newProfileId,
+&nbsp; &nbsp; @account_id <span class="sy0">=</span> @newSecAccountId,
+&nbsp; &nbsp; @sequence_number <span class="sy0">=</span> <span class="nu0">2</span>;
+&nbsp;
+<span class="kw1">print</span> <span class="st0">'Accounts assigned to Profile'</span>;
+&nbsp;
+Go
+&nbsp;
+<span class="co1">---- And Then We Test</span>
+<span class="co1">-- Make sure you update the profile name with the value from above</span>
+<span class="kw1">EXECUTE</span> msdb.<span class="me1">dbo</span>.<span class="me1">sp_send_dbmail</span>
+&nbsp; &nbsp; @profile_name <span class="sy0">=</span> <span class="st0">'The Accidental Admin v2'</span>,
+&nbsp; &nbsp; @subject <span class="sy0">=</span> <span class="st0">'Test Database Mail Message'</span>,
+&nbsp; &nbsp; @recipients <span class="sy0">=</span> <span class="st0">'You@YourDomain.Com'</span>,
+&nbsp; &nbsp; @body <span class="sy0">=</span> <span class="st0">'Test Message'</span>;
+<span class="kw1">print</span> <span class="st0">'Test Email Away!'</span>;
+&nbsp;
+GO&nbsp; </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">---- Enable the XPs for Database Mail
+EXECUTE sp_configure 'show advanced', 1;
+RECONFIGURE;
+EXECUTE sp_configure 'Database Mail XPs',1;
+RECONFIGURE;
+EXECUTE sp_configure 'show advanced', 0;
+RECONFIGURE;
+GO
+
+---- Create our Default Profile
+DECLARE @newProfileId int;
+EXECUTE msdb.dbo.sysmail_add_profile_sp
+	@profile_name = 'The Accidental Admin v2',
+	@description = 'A second version of the DB Admin email profile',
+	@profile_id = @newProfileId OUTPUT;
+print 'Profile Created';
+
+---- Create our accounts (You did plan on a minimum of two, right?)
+DECLARE @newPriAccountId int,
+	@newSecAccountId int;
+DECLARE @sender varchar(50);
+SELECT @sender = 'DB SERVER - ' + @@SERVERNAME;
+
+-- External account using username/password
+EXECUTE msdb.dbo.sysmail_add_account_sp  
+	@account_name = 'External DBAdmin',
+	@email_address = 'AnAccount@ExternalService.com',
+	@display_name = @sender,
+	@description = 'Primary account for DB Admin profile',
+	@mailserver_name = 'mail.ExternalService.com',
+	@username = 'username',
+	@password = 'password',
+	@account_id = @newPriAccountId OUTPUT;
+
+-- Internal account using credentials from the account DB server is running under
+EXECUTE msdb.dbo.sysmail_add_account_sp  
+	@account_name = 'Internal DBAdmin',
+	@email_address = 'YourAccount@YourDomain.com',
+	@display_name = @sender,
+	@description = 'Secondary account for DB Admin profile',
+	@mailserver_name = 'mail.YourDomain.com',
+	@use_default_credentials = 1,
+	@account_id = @newSecAccountId OUTPUT;
+
+print 'Accounts Created: ' + @sender;
+
+    
+---- Add Accounts to Profile
+EXECUTE msdb.dbo.sysmail_add_profileaccount_sp
+	@profile_id = @newProfileId,
+	@account_id = @newPriAccountId,
+	@sequence_number = 1;
+
+EXECUTE msdb.dbo.sysmail_add_profileaccount_sp
+	@profile_id = @newProfileId,
+	@account_id = @newSecAccountId,
+	@sequence_number = 2;
+
+print 'Accounts assigned to Profile';
+
+Go
+
+---- And Then We Test
+-- Make sure you update the profile name with the value from above
+EXECUTE msdb.dbo.sp_send_dbmail
+	@profile_name = 'The Accidental Admin v2',
+	@subject = 'Test Database Mail Message',
+	@recipients = 'You@YourDomain.Com',
+	@body = 'Test Message';
+print 'Test Email Away!';
+
+GO	</pre></div></div>
+
+<p>Running this script creates a setup similar to what we created in the first section, though some of the names have been changed (and I have removed my email address from the list so I don&#8217;t get server updates when someone comes along and forgets to swap out the addresses).</p>
+<h2>And Now, Uses</h2>
+<p>So now that we have Database Mail setup, what are we going to use it for? Well, besides creating our own monitoring and email scripts, the built in Alerts component in SQL Server uses Database mail to tell us when critical parts of our server have decided to misbehave. SQL Agent jobs have the option to notify us when they fail and they do so using, yep, Database Mail. Setting up Database Mail and using it in each of these situations won&#8217;t prevent problems from occurring, but it is the difference between finding out when the problem is occurring and finding out after the server has melted down. </p>
+<p>Next week will be something interesting, but I haven&#8217;t determined what that will be yet, so we&#8217;ll figure it out as we go.</p>
+<style>
+.mylab, .hint{
+   margin: .5em 2em;
+   padding: 1em 1em 1em 90px;
+}
+.mylab{
+   border: 2px solid #CCEECC;
+   background-color: #DDFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/mylab.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.hint{
+   border: 2px solid #EEEECC;
+   background-color: #FFFFDD;
+   background-image: url(http://tiernok.com/LTDBlog/tip.png);
+   background-repeat: no-repeat;
+   background-position: 20px 20px;
+}
+.screenshot{
+   text-align: center;
+   font-size: .8em;
+   margin-bottom: 1em;
+}
+.acc_header{ position: relative; }
+.acc_header label{ float: left; width: 150px; font-weight: bold;}
+.acc_header br{  clear: left; }
+.acc_header .diff{ margin-top: 3px; }
+.evo_post_text dt{ width: 220px; }
+.evo_post_text dd{ margin-left: 230px; }
+</style>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/virtual-lab-setting-up-database-mail-on/feed/</wfw:commentRss>
+		<slash:comments>7</slash:comments>
+		</item>
+	</channel>
+</rss>

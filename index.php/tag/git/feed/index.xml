@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>git &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/git/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Access Git Commits during a TeamCity Build using Powershell</title>
+		<link>/index.php/uncategorized/access-git-commits-during-a-teamcity-build-using-powershell/</link>
+		<comments>/index.php/uncategorized/access-git-commits-during-a-teamcity-build-using-powershell/#respond</comments>
+		<pubDate>Wed, 29 Oct 2014 19:13:12 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Uncategorized]]></category>
+		<category><![CDATA[build automation]]></category>
+		<category><![CDATA[git]]></category>
+		<category><![CDATA[powershell]]></category>
+		<category><![CDATA[teamcity]]></category>
+
+		<guid isPermaLink="false">/?p=3026</guid>
+		<description><![CDATA[Recently I needed access to the list of commits that were included with each of my TeamCity builds. TeamCity provides a pretty big list of Predefined Build Parameters, but it doesn&#8217;t provide access to details of the commits it is currently building. Having Powershell and Git on my server, though, I can write some scripts [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p>Recently I needed access to the list of commits that were included with each of my TeamCity builds. TeamCity provides a pretty big list of <a href="https://confluence.jetbrains.com/display/TCD8/Predefined+Build+Parameters" title="TeamCity 8.x - Predefined Build Parameters">Predefined Build Parameters</a>, but it doesn&#8217;t provide access to details of the commits it is currently building. Having Powershell and Git on my server, though, I can write some scripts to extract not just information about the latest commit, but about any series of commits that have occurred.</p>
+<h1>Extracting Usable Commit Details</h1>
+<p>In this script, I am extracting just the list of authors, dates, and commit messages. I formatted the git log output so I could easily feed it into Powershell&#8217;s <a href="http://technet.microsoft.com/en-us/library/hh849900.aspx" title="MSDN - ConvertFrom-StringData">ConvertFrom-StringData</a> method to get an array of objects.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">function</span> Get<span class="sy0">-</span>CommitsFromGitLog<span class="br0">&#40;</span><span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$StartCommit</span><span class="sy0">,</span> <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$EndCommit</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="re0">$Cmd</span> <span class="sy0">=</span> <span class="st0">&quot;git log --pretty=format:&quot;</span><span class="st0">&quot;CommitHash=%H :: AuthorEmail=%ae :: AuthorDate=%ad :: Subject=%s&quot;</span><span class="st0">&quot; $StartCommit...$EndCommit&quot;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$Result</span> <span class="sy0">=</span> <span class="kw1">Invoke-Expression</span> <span class="re0">$Cmd</span>
+&nbsp; &nbsp; <span class="re0">$ParsedResult</span> <span class="sy0">=</span> <span class="re0">$Result</span> <span class="sy0">|</span> <span class="sy0">%</span><span class="br0">&#123;</span> ConvertFrom<span class="sy0">-</span>StringData<span class="br0">&#40;</span><span class="kw6">$_</span> <span class="kw4">-replace</span> <span class="st0">&quot; :: &quot;</span><span class="sy0">,</span> <span class="st0">&quot;<span class="es0">`n</span>&quot;</span><span class="br0">&#41;</span> &nbsp;<span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">return</span> <span class="re0">$ParsedResult</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">function Get-CommitsFromGitLog([string] $StartCommit, [string] $EndCommit){
+    $Cmd = "git log --pretty=format:""CommitHash=%H :: AuthorEmail=%ae :: AuthorDate=%ad :: Subject=%s"" $StartCommit...$EndCommit"
+
+    $Result = Invoke-Expression $Cmd
+    $ParsedResult = $Result | %{ ConvertFrom-StringData($_ -replace " :: ", "`n")  }
+
+    return $ParsedResult
+}</pre></div></div>
+
+<p>TeamCity defines a Build Parameter named <a href="https://confluence.jetbrains.com/display/TCD8/Predefined+Build+Parameters#PredefinedBuildParameters-ServerBuildProperties">build.vcs.number</a>, so we could use this script to get details about that specific commit like so:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1">Get<span class="sy0">-</span>CommitsFromGitLog <span class="sy0">-</span>StartCommit <span class="st0">&quot;%build.vcs.number%^&quot;</span> <span class="sy0">-</span>EndCommit <span class="st0">&quot;%build.vcs.number%&quot;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Get-CommitsFromGitLog -StartCommit "%build.vcs.number%^" -EndCommit "%build.vcs.number%"</pre></div></div>
+
+<p>The net effect is that I&#8217;m asking for all changes starting one commit before the identified one (the ^ at the end) through that identified one. </p>
+<p>Unfortunately, this is only the latest commit. Retrieving the details for a group of commits requires some additional work.</p>
+<h1>Finding the Previous Commit Hash</h1>
+<p>This is the tricky part. If TeamCity provided the build.vcs.number from the previous build, we would probably be using that. Though, realistically, if our build is successful and the prior one wasn&#8217;t, we would only be listing some of the changes being deployed. Really what we need is the build.vcs.number from the <em>last successful build</em>, which definitely isn&#8217;t built in.</p>
+<p>However, TeamCity does have a <a href="https://confluence.jetbrains.com/display/TCD8/REST+API" title="TeamCity REST API">REST API</a> that exposes details about prior builds. There is also a built in service account we can use to access that API, and the credentials and URL are all available in the REST API. So we can implement some calls without the extra pain of accidentally breaking the build every time Joe the developer changes his password and forgets he had it in the script too.</p>
+<p>The API exposes methods to access prior <a href="https://confluence.jetbrains.com/display/TCD8/REST+API#RESTAPI-BuildRequests" title="TeamCity 8.x - REST API - Build Requests">Build Requests</a>. For what we are doing, we want to get a build for a specific Build Type (the running build configuration) and in my case I want the last successful build, not just the last build. using the request for build by build type id, we would be looking for something like:</p>
+<p><code>$($TeamCityUrl)/app/rest/buildTypes/id:$($TeamCityBuildTypeId)/builds/status:SUCCESS</code></p>
+<p>Using <a href="http://technet.microsoft.com/en-us/library/hh849901.aspx" title="Powershell - Invoke-WebRequest">Invoke-WebRequest</a>, we can write a script that accesses that build information:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">function</span> Get<span class="sy0">-</span>TeamCityLastSuccessfulRun<span class="br0">&#40;</span><span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$TeamCityUrl</span><span class="sy0">,</span> <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$TeamCityBuildTypeId</span><span class="sy0">,</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$TeamCityUsername</span><span class="sy0">,</span> <span class="br0">&#91;</span><span class="re3">string</span><span class="br0">&#93;</span> <span class="re0">$TeamCityPassword</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$Credentials</span> <span class="sy0">=</span> <span class="st0">&quot;$($TeamCityUsername):$($TeamCityPassword)&quot;</span>
+&nbsp; &nbsp; <span class="re0">$AuthString</span> <span class="sy0">=</span> <span class="br0">&#91;</span>System.Convert<span class="br0">&#93;</span>::ToBase64String<span class="br0">&#40;</span><span class="br0">&#91;</span>System.Text.Encoding<span class="br0">&#93;</span>::UTF8.GetBytes<span class="br0">&#40;</span><span class="st0">&quot;$Credentials&quot;</span><span class="br0">&#41;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$Url</span> <span class="sy0">=</span> <span class="st0">&quot;$($TeamCityUrl)/app/rest/buildTypes/id:$($TeamCityBuildTypeId)/builds/status:SUCCESS&quot;</span> 
+&nbsp;
+&nbsp; &nbsp; <span class="re0">$Content</span> <span class="sy0">=</span> Invoke<span class="sy0">-</span>WebRequest <span class="st0">&quot;$Url&quot;</span> <span class="sy0">-</span>Headers <span class="sy0">@</span><span class="br0">&#123;</span><span class="st0">&quot;Authorization&quot;</span> <span class="sy0">=</span> <span class="st0">&quot;Basic $AuthString&quot;</span><span class="br0">&#41;</span><span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw3">return</span> <span class="re0">$Content</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">function Get-TeamCityLastSuccessfulRun([string] $TeamCityUrl, [string] $TeamCityBuildTypeId, 
+                                       [string] $TeamCityUsername, [string] $TeamCityPassword){
+
+    $Credentials = "$($TeamCityUsername):$($TeamCityPassword)"
+    $AuthString = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("$Credentials")
+
+    $Url = "$($TeamCityUrl)/app/rest/buildTypes/id:$($TeamCityBuildTypeId)/builds/status:SUCCESS" 
+
+    $Content = Invoke-WebRequest "$Url" -Headers @{"Authorization" = "Basic $AuthString")}
+
+    return $Content
+}</pre></div></div>
+
+<p>Now I can combine some parameters from TeamCity, <a href="https://technet.microsoft.com/en-us/library/hh849968.aspx" title="Powershell - Select-Xml">Select-Xml</a>, and the first script to get a list of commit information since the last successful TeamCity run.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="powershell"><thead><tr><td colspan="2"  class="head">PowerShell</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="re0">$Run</span> <span class="sy0">=</span> Get<span class="sy0">-</span>TeamCityLastSuccessfulRun <span class="sy0">-</span>TeamCityUrl <span class="st0">&quot;%teamcity.serverUrl%&quot;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">-</span>TeamCityBuildTypeId <span class="st0">&quot;%system.teamcity.buildType.id%&quot;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">-</span>TeamCityUsername <span class="st0">&quot;%system.teamcity.auth.userId%&quot;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">-</span>TeamCityPassword <span class="st0">&quot;%system.teamcity.auth.password%&quot;</span>
+&nbsp;
+<span class="re0">$LatestCommitFromRun</span> <span class="sy0">=</span> <span class="br0">&#40;</span>Select<span class="sy0">-</span>Xml <span class="sy0">-</span>Content <span class="st0">&quot;$Run&quot;</span> <span class="sy0">-</span>Xpath <span class="st0">&quot;/build/revisions/revision/@version&quot;</span><span class="br0">&#41;</span>.Node.Value
+&nbsp;
+<span class="re0">$CommitsSinceLastSuccess</span> <span class="sy0">=</span> Get<span class="sy0">-</span>CommitsFromGitLog <span class="sy0">-</span>StartCommit <span class="st0">&quot;$LatestCommitFromRun&quot;</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<span class="sy0">-</span>EndCommit <span class="st0">&quot;%build.vcs.number%&quot;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">$Run = Get-TeamCityLastSuccessfulRun -TeamCityUrl "%teamcity.serverUrl%" 
+                                     -TeamCityBuildTypeId "%system.teamcity.buildType.id%" 
+                                     -TeamCityUsername "%system.teamcity.auth.userId%"
+                                     -TeamCityPassword "%system.teamcity.auth.password%"
+
+$LatestCommitFromRun = (Select-Xml -Content "$Run" -Xpath "/build/revisions/revision/@version").Node.Value
+
+$CommitsSinceLastSuccess = Get-CommitsFromGitLog -StartCommit "$LatestCommitFromRun" 
+                                                 -EndCommit "%build.vcs.number%"</pre></div></div>
+
+<p>And there we have it, a cumulative list of authors and commits since the last successful build. You could use similar logic to pass in parameters to get the whole history since the last pinned build, a specific tag in the git repository, etc.</p>
+<h1>What Can You Do With This?</h1>
+<p>With those two functions, you now have the raw data about all commits that are being built/deployed with this build. You could use this data to automatically produce release notes, adding a basic HTML page to the product or website you are building. You could automatically append a list of contributors to a LATEST file with specifics about the build. If you have issue numbers or ticket numbers in the build, you could easily parse them out of the commit messages and output links in those documents. A richer contributors page is possible by outputting gravatar image tags using the authors emails addresses. Need auditability? Call a logging API with details about the commits, authors, and the URL back to the build in TeamCity.</p>
+<p>The development team at <a href="https://precisionlender.com/">PrecisionLender</a> uses similar scripts as part of our automated deployment processes, specifically to help add audit information to our tickets so that every ticket reflects when it successfully passed through the automated tests and was later deployed to production. When an auditor asks for proof that N tickets went through our process correctly, we simply open up the ticket and point at the activity log attached to it, including those custom entries from TeamCity that link back to the relevant successful build results.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/uncategorized/access-git-commits-during-a-teamcity-build-using-powershell/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+	</channel>
+</rss>

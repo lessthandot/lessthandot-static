@@ -1,0 +1,571 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>worker role &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/worker-role/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Azure Worker Role &#8211; Exiting Safely</title>
+		<link>/index.php/desktopdev/mstech/azure-worker-role-exiting-safely/</link>
+		<comments>/index.php/desktopdev/mstech/azure-worker-role-exiting-safely/#comments</comments>
+		<pubDate>Mon, 11 Feb 2013 18:59:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[worker role]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/02/azure-worker-role-exiting-safely/</guid>
+		<description><![CDATA[The basic Azure Worker Role consists of a run method, an endless loop, and a sleep statement. Earlier this week, Magnus Martensson walked through implementing a more sophisticated wait object than the generic Thread.Sleep call. Which reminded me of a problem inherent in the basic Microsoft template.
+
+Every exit is a crash.]]></description>
+				<content:encoded><![CDATA[<p>The basic Azure Worker Role consists of a run method, an endless loop, and a sleep statement. Earlier this week, Magnus Martensson walked through <a href="http://magnusmartensson.com/howto-wait-in-a-workerrole-using-system-timers-timer-and-system-threading-eventwaithandle-over-system-threading-thread-sleep" title="HowTo wait in a WorkerRole using Timer and EventWaitHandle over Thread.Sleep">implementing a more sophisticated wait object</a> than the generic Thread.Sleep call. Which reminded me of a problem inherent in the basic Microsoft template.</p>
+<p>Every exit is a crash.</p>
+<p>The basic Worker Role is a while(true) statement that alternates between doing work and sleeping for a period of time. When it&#8217;s time for Azure to recycle the instance, deploy a new one, scale&#8230;what happens to this while(true) statement?</p>
+<p>It&#8217;s killed. </p>
+<p>The more critical it was, the higher our chances it was in the work side of the work/sleep loop.</p>
+<p>(Ouch.)</p>
+<h2>The Basic Worker Role</h2>
+<p>Here is the worker class that Visual Studio generates on when creating a new Worker Role project:</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw4">class</span> WorkerRole <span class="sy0">:</span> RoleEntryPoint
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> Run<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// This is a sample worker implementation. Replace with your logic.</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;WorkerRole1 entry point called&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">while</span> <span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">Sleep</span><span class="br0">&#40;</span><span class="nu0">10000</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;Working&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">bool</span> OnStart<span class="br0">&#40;</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// Set the maximum number of concurrent connections </span>
+&nbsp; &nbsp; &nbsp; &nbsp; ServicePointManager<span class="sy0">.</span><span class="me1">DefaultConnectionLimit</span> <span class="sy0">=</span> <span class="nu0">12</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// For information on handling configuration changes</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// see the MSDN topic at http://go.microsoft.com/fwlink/?LinkId=166357.</span>
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">return</span> <span class="kw1">base</span><span class="sy0">.</span><span class="me1">OnStart</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public class WorkerRole : RoleEntryPoint
+{
+	public override void Run()
+	{
+		// This is a sample worker implementation. Replace with your logic.
+		Trace.WriteLine("WorkerRole1 entry point called", "Information");
+
+		while (true)
+		{
+			Thread.Sleep(10000);
+			Trace.WriteLine("Working", "Information");
+		}
+	}
+
+	public override bool OnStart()
+	{
+		// Set the maximum number of concurrent connections 
+		ServicePointManager.DefaultConnectionLimit = 12;
+
+		// For information on handling configuration changes
+		// see the MSDN topic at http://go.microsoft.com/fwlink/?LinkId=166357.
+
+		return base.OnStart();
+	}
+}</pre></div></div>
+
+<p>Azure calls the OnStart when it starts, then calls the Run method. This sample will hard crash when Azure scales it out of existence, swaps in new instances, decides it&#8217;s Windows patch time, lets us press the Stop button, and so on. </p>
+<p>Let&#8217;s see it in action. I&#8217;ve added a DoWork() method that sleeps for 10 seconds to simulate important work being done. I&#8217;ve also added Trace.WriteLine calls to the existing methods and to an override of the OnStop method, so we can see what&#8217;s happening.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> Run<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; <span class="co1">// This is a sample worker implementation. Replace with your logic.</span>
+&nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;BasicWorker - Entry point called&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">while</span> <span class="br0">&#40;</span><span class="kw1">true</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">Sleep</span><span class="br0">&#40;</span><span class="nu0">10000</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;BasicWorker - Starting some work&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; DoWork<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;BasicWorker - Finished some work&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw4">void</span> DoWork<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Thread<span class="sy0">.</span><span class="me1">Sleep</span><span class="br0">&#40;</span><span class="nu0">10000</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> OnStop<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;BasicWorker - OnStop&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">public override void Run()
+{
+	// This is a sample worker implementation. Replace with your logic.
+	Trace.WriteLine("BasicWorker - Entry point called", "Information");
+
+	while (true)
+	{
+		Thread.Sleep(10000);
+		Trace.WriteLine("BasicWorker - Starting some work", "Information");
+		DoWork();
+		Trace.WriteLine("BasicWorker - Finished some work", "Information");
+	}
+}
+
+public void DoWork()
+{
+	Thread.Sleep(10000);
+}
+
+public override void OnStop()
+{
+	Trace.WriteLine("BasicWorker - OnStop", "Information");
+}</pre></div></div>
+
+<p>If we run this in the emulator and suspend the worker role in the middle of our important work, it exits right on cue, in the middle of the work.</p>
+<p><b>Diagnostic Trace Output</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+</pre></td><td class="de1"><pre class="de1">Information: 000.1s - BasicWorker - Entry point called
+Information: 010.1s - BasicWorker - Starting some work
+Information: 020.1s - BasicWorker - Finished some work
+Information: 030.1s - BasicWorker - Starting some work
+Information: 040.1s - BasicWorker - Finished some work
+Information: 050.1s - BasicWorker - Starting some work
+Information: 056.1s - BasicWorker - OnStop</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Information: 000.1s - BasicWorker - Entry point called
+Information: 010.1s - BasicWorker - Starting some work
+Information: 020.1s - BasicWorker - Finished some work
+Information: 030.1s - BasicWorker - Starting some work
+Information: 040.1s - BasicWorker - Finished some work
+Information: 050.1s - BasicWorker - Starting some work
+Information: 056.1s - BasicWorker - OnStop</pre></div></div>
+
+<p><i>note: I later added timestamps to the Trace output for readability</i></p>
+<p>If this were a real worker role, we could have been doing just about anything in that step when it was killed. Is our system still in a good state?</p>
+<h2>A Cancel-able Worker Role</h2>
+<p>The base class for a WorkerRole is the RoleEntryPoint. As we saw above, it offers an OnStop method that will be called when the instance is suspended. More importantly, though, we are allowed to delay that OnStop method <a href="http://msdn.microsoft.com/en-us/library/microsoft.windowsazure.serviceruntime.roleentrypoint.onstop.aspx" title="RoleEntryPoint.OnStop, MSDN">up to 30 seconds</a> to finish up what we are working on.</p>
+<p><i>Note: Early last year (2012) this was extended to 5 minutes, though it&#8217;s not reflected in the documentation above.</i></p>
+<p>The first change we want to make is to replace the while(true) construct with a method that we can <a href="http://msdn.microsoft.com/en-us/library/dd997364.aspx" title="Cancellation in Managed Threads, MSDN">cancel</a>. Using a <a href="http://msdn.microsoft.com/en-us/library/system.threading.cancellationtokensource.aspx" title="CancellationTokenSource, MSDN">CancellationTokenSource</a>, we can instead loop while that token is not cancelled.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">private</span> CancellationTokenSource _cancellationTokenSource<span class="sy0">;</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> Run<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;SafeWorker - Entry point called&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; _cancellationTokenSource <span class="sy0">=</span> <span class="kw3">new</span> CancellationTokenSource<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> token <span class="sy0">=</span> _cancellationTokenSource<span class="sy0">.</span><span class="me1">Token</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">while</span> <span class="br0">&#40;</span><span class="sy0">!</span>token<span class="sy0">.</span><span class="me1">IsCancellationRequested</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;SafeWorker - Starting some work&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; DoWork<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;SafeWorker - Finished some work&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; token<span class="sy0">.</span><span class="me1">WaitHandle</span><span class="sy0">.</span><span class="me1">WaitOne</span><span class="br0">&#40;</span><span class="nu0">10000</span><span class="br0">&#41;</span><span class="sy0">;</span>&nbsp; &nbsp; <span class="co1">// sleep 10s or exit early if cancellation is signalled</span>
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="co1">// ...</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">private CancellationTokenSource _cancellationTokenSource;
+
+public override void Run()
+{
+	Trace.WriteLine("SafeWorker - Entry point called", "Information");
+	_cancellationTokenSource = new CancellationTokenSource();
+	var token = _cancellationTokenSource.Token;
+
+	while (!token.IsCancellationRequested)
+	{
+		Trace.WriteLine("SafeWorker - Starting some work", "Information");
+		DoWork();
+		Trace.WriteLine("SafeWorker - Finished some work", "Information");
+		token.WaitHandle.WaitOne(10000);	// sleep 10s or exit early if cancellation is signalled
+		// ...</pre></div></div>
+
+<p>Replacing the Thread.Sleep with a <a href="http://msdn.microsoft.com/en-us/library/cc189907.aspx" title="WaitOne, MSDN">WaitOne()</a> call will allow us to reduce the time to cancel. Unless it receives a signal (cancellation), the token will wait the specified number of milliseconds before continuing. Moving the WaitOne to the end ensures that if a cancellation is signaled, we won&#8217;t pick up one last bit of work before exiting.</p>
+<p>The other piece of the equation is making the OnStop wait until the we have safely exited the loop. We can achieve this by creating a &#8220;Safe to exit&#8221; WaitHandle that is only set after successfully exiting the loop. The OnStop will Cancel via the CancellationToken, then wait for the &#8220;Safe to exit&#8221; token to be set before returning.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="csharp"><thead><tr><td colspan="2"  class="head">C#</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">private</span> CancellationTokenSource _cancellationTokenSource<span class="sy0">;</span>
+<span class="kw1">private</span> ManualResetEvent _safeToExitHandle<span class="sy0">;</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> Run<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;SafeWorker - Entry point called&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; _cancellationTokenSource <span class="sy0">=</span> <span class="kw3">new</span> CancellationTokenSource<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; _safeToExitHandle <span class="sy0">=</span> <span class="kw3">new</span> ManualResetEvent<span class="br0">&#40;</span><span class="kw1">false</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; <span class="kw1">var</span> token <span class="sy0">=</span> _cancellationTokenSource<span class="sy0">.</span><span class="me1">Token</span><span class="sy0">;</span>
+&nbsp;
+&nbsp; &nbsp; <span class="kw1">while</span> <span class="br0">&#40;</span><span class="sy0">!</span>token<span class="sy0">.</span><span class="me1">IsCancellationRequested</span><span class="br0">&#41;</span>
+&nbsp; &nbsp; <span class="br0">&#123;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;SafeWorker - Starting some work&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; DoWork<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;SafeWorker - Finished some work&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; &nbsp; &nbsp; token<span class="sy0">.</span><span class="me1">WaitHandle</span><span class="sy0">.</span><span class="me1">WaitOne</span><span class="br0">&#40;</span><span class="nu0">10000</span><span class="br0">&#41;</span><span class="sy0">;</span>&nbsp; &nbsp; <span class="co1">// sleep 10s or exit early if cancellation is signalled</span>
+&nbsp; &nbsp; <span class="br0">&#125;</span>
+&nbsp;
+&nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;SafeWorker - Ready to exit&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; _safeToExitHandle<span class="sy0">.</span><span class="kw1">Set</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>&nbsp; &nbsp; <span class="co1">// cleanly exited the main loop</span>
+<span class="br0">&#125;</span>
+&nbsp;
+<span class="co1">// ...</span>
+&nbsp;
+<span class="kw1">public</span> <span class="kw1">override</span> <span class="kw4">void</span> OnStop<span class="br0">&#40;</span><span class="br0">&#41;</span>
+<span class="br0">&#123;</span>
+&nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;SafeWorker - OnStop Called&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; _cancellationTokenSource<span class="sy0">.</span><span class="me1">Cancel</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; _safeToExitHandle<span class="sy0">.</span><span class="me1">WaitOne</span><span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+&nbsp; &nbsp; Trace<span class="sy0">.</span><span class="me1">WriteLine</span><span class="br0">&#40;</span><span class="st0">&quot;SafeWorker - OnStop Complete, Exiting Safely&quot;</span>, <span class="st0">&quot;Information&quot;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+<span class="br0">&#125;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">private CancellationTokenSource _cancellationTokenSource;
+private ManualResetEvent _safeToExitHandle;
+
+public override void Run()
+{
+	Trace.WriteLine("SafeWorker - Entry point called", "Information");
+	_cancellationTokenSource = new CancellationTokenSource();
+	_safeToExitHandle = new ManualResetEvent(false);
+	var token = _cancellationTokenSource.Token;
+
+	while (!token.IsCancellationRequested)
+	{
+		Trace.WriteLine("SafeWorker - Starting some work", "Information");
+		DoWork();
+		Trace.WriteLine("SafeWorker - Finished some work", "Information");
+		token.WaitHandle.WaitOne(10000);	// sleep 10s or exit early if cancellation is signalled
+	}
+
+	Trace.WriteLine("SafeWorker - Ready to exit", "Information");
+	_safeToExitHandle.Set();	// cleanly exited the main loop
+}
+
+// ...
+
+public override void OnStop()
+{
+	Trace.WriteLine("SafeWorker - OnStop Called", "Information");
+	_cancellationTokenSource.Cancel();
+	_safeToExitHandle.WaitOne();
+	Trace.WriteLine("SafeWorker - OnStop Complete, Exiting Safely", "Information");
+}</pre></div></div>
+
+<p>Now if we run this like the BasicWorker above, hitting the Suspend button in the middle of the DoWork call, we see the system takes the time to exit out safely:</p>
+<p><b>Diagnostic Trace Output</b></p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1">Information: 000.0s - SafeWorker - Entry point called
+Information: 000.1s - SafeWorker - Starting some work
+Information: 010.1s - SafeWorker - Finished some work
+Information: 020.1s - SafeWorker - Starting some work
+Information: 030.1s - SafeWorker - Finished some work
+Information: 040.1s - SafeWorker - Starting some work
+Information: 046.4s - SafeWorker - OnStop Called
+Information: 050.1s - SafeWorker - Finished some work
+Information: 050.1s - SafeWorker - Ready to exit
+Information: 050.1s - SafeWorker - OnStop Complete, Exiting Safely</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">Information: 000.0s - SafeWorker - Entry point called
+Information: 000.1s - SafeWorker - Starting some work
+Information: 010.1s - SafeWorker - Finished some work
+Information: 020.1s - SafeWorker - Starting some work
+Information: 030.1s - SafeWorker - Finished some work
+Information: 040.1s - SafeWorker - Starting some work
+Information: 046.4s - SafeWorker - OnStop Called
+Information: 050.1s - SafeWorker - Finished some work
+Information: 050.1s - SafeWorker - Ready to exit
+Information: 050.1s - SafeWorker - OnStop Complete, Exiting Safely</pre></div></div>
+
+<p><i>note: I later added timestamps to the Trace output for readability</i></p>
+<p>We can see the OnStop call come in in the middle of our Starting some Work/Finished some work output, but instead of exiting immediately, the worker calmly finished up it&#8217;s work and then announced it was ready to exit (by setting the _safeToExitHandle WaitHandle).</p>
+<h2>Wrapping Up</h2>
+<p>Letting your application die in the middle of an operation is typically not a good idea. </p>
+<p>The example code for this post is available on github at <a href="https://github.com/tarwn/AzureWorkerRole_Cancellation" title="tarwn/AzureWorkerRole_Cancellation, GitHub">tarwn/AzureWorkerRole_Cancellation</a>. After finishing the code samples above, I went back and add seconds elapsed to the trace output message. I didn&#8217;t update the code samples above because it would have only served to distract from the real code.</p>
+<p>I haven&#8217;t posted on Azure as much as I probably should have, given how much of my time I spend working with it. Expect to see more posts on this in the upcoming months.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/azure-worker-role-exiting-safely/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Converting a .Net Console Project to an Azure Worker Role Project</title>
+		<link>/index.php/desktopdev/mstech/converting-a-net-console-project/</link>
+		<comments>/index.php/desktopdev/mstech/converting-a-net-console-project/#comments</comments>
+		<pubDate>Wed, 07 Nov 2012 11:28:00 +0000</pubDate>
+		<dc:creator><![CDATA[Eli Weinstock-Herman (tarwn)]]></dc:creator>
+				<category><![CDATA[Microsoft Technologies]]></category>
+		<category><![CDATA[azure]]></category>
+		<category><![CDATA[worker role]]></category>
+
+		<guid isPermaLink="false">/index.php/2012/11/converting-a-net-console-project/</guid>
+		<description><![CDATA[So lets say you're building a worker role for Azure, but started it out as a Console app for faster local debugging. It comes time to deploy it to Azure for the first time, but there's no option to convert a Console application to a Worker Role project.&#8230;]]></description>
+				<content:encoded><![CDATA[<p>So lets say you&#8217;re building a worker role for Azure, but started it out as a Console app for faster local debugging. It comes time to deploy it to Azure for the first time, but there&#8217;s no option to convert a Console application to a Worker Role project. We could copy all the code into a new project, but then we not only lose our faster debugging but also the history of commits we have made against the project. </p>
+<p>Luckily converting the existing Console project to be deployable as an Azure Worker Role project is fairly easy.</p>
+<p>For the purposes of this post, I have created a solution with an Existing Console project, an Azure Cloud Project, and an Existing Azure Worker Role project (we have to have at least one to create the Azure Cloud Project, it can be deleted later).</p>
+<div class="font-size: 85%; color: #666666; text-align: center">
+<img src="http://tiernok.com/LTDBlog/AzureWorkerRole/awr_01.png" alt="Solution Explorer" /><br />
+Solution Explorer view of the Sample Solution
+</div>
+<p>If we right click the Azure &#8220;Roles&#8221; folder, the option to use an existing Worker Role project is not available. Visual Studio enables or disables this option automatically, based on whether we have any assignable projects in the solution that aren&#8217;t already associated with the Azure project.</p>
+<div class="font-size: 85%; color: #666666; text-align: center">
+<img src="http://tiernok.com/LTDBlog/AzureWorkerRole/awr_02.png" alt="Add Role menu options" /><br />
+&#8220;Worker Role Project in Solution&#8221; is Disabled
+</div>
+<p>The first thing we want to do is add a RoleEntryPoint to the console application. To keep this simple, I&#8217;m going to convert the Program class to serve as the RoleEntryPoint also.</p>
+<p>To add the RoleEntryPoint class, I need to first add some azure references. I&#8217;m using Azure 1.8, so this means I&#8217;ll need the following 4 references:</p>
+<div class="font-size: 85%; color: #666666; text-align: center">
+<img src="http://tiernok.com/LTDBlog/AzureWorkerRole/awr_03.png" alt="Assembly References Dialog" /><br />
+Adding WindowsAzure References
+</div>
+<p><i>Note: The Storage SDK version number for Azure SDK 1.8 is 2.0. I suspect they chose to do this because they made a number of significant changes in the storage library that were not backwards compatible with 1.7.</i></p>
+<p><i>Note #2: I noticed that if you add a new worker role through Visual Studio, it uses StorageClient 1.7 still despite this being SDK 1.8. This may be a requirement from the Azure Diagnostics assembly, Diagnostics uses StorageClient and may still be a version behind. I would test this theory, but getting Diagnostics working properly tends to be somewhat painful.</i></p>
+<p>After adding the references, we can then add RoleEntryPoint inheritance to the Program. New Worker Roles have two methods they override from RoleEntryPoint, but the important one is Run (and why this isn&#8217;t abstract, I couldn&#8217;t tell you). </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+</pre></td><td class="de1"><pre class="de1">namespace ExistingConsoleApplication
+{
+&nbsp; &nbsp; public class Program : RoleEntryPoint
+&nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; static void Main(string[] args) /* Console entry point */
+&nbsp; &nbsp; &nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var ibl = new InterestingBusinessLogic();
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ibl.DoStuff();
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Console.Read();
+&nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; public override void Run()&nbsp; /* Worker Role entry point */
+&nbsp; &nbsp; &nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var ibl = new InterestingBusinessLogic();
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ibl.DoStuff();
+&nbsp; &nbsp; &nbsp; &nbsp; }
+&nbsp; &nbsp; }
+}</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">namespace ExistingConsoleApplication
+{
+	public class Program : RoleEntryPoint
+	{
+		static void Main(string[] args)	/* Console entry point */
+		{
+			var ibl = new InterestingBusinessLogic();
+			ibl.DoStuff();
+
+			Console.Read();
+		}
+
+		public override void Run()	/* Worker Role entry point */
+		{
+			var ibl = new InterestingBusinessLogic();
+			ibl.DoStuff();
+		}
+	}
+}</pre></div></div>
+
+<p>The last thing we need to do is add some information to the project file. I can open the file in Visual Studio by right clicking and selecting &#8220;Unload Project&#8221;, then right clicking again and selecting &#8220;Edit <i>project name</i>&#8220;. In the Property Group I need to add a single property named &#8220;RoleType&#8221; to identify this as a Worker (see the last entry):</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="text"><thead><tr><td colspan="2"  class="head">Text</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+</pre></td><td class="de1"><pre class="de1">&lt;PropertyGroup&gt;
+&nbsp; &nbsp; &lt;Configuration Condition=&quot; '$(Configuration)' == '' &quot;&gt;Debug&lt;/Configuration&gt;
+&nbsp; &nbsp; &lt;Platform Condition=&quot; '$(Platform)' == '' &quot;&gt;AnyCPU&lt;/Platform&gt;
+&nbsp; &nbsp; &lt;ProjectGuid&gt;{4B7C48CB-9899-47D0-95AB-2FD3C3B739CF}&lt;/ProjectGuid&gt;
+&nbsp; &nbsp; &lt;OutputType&gt;Exe&lt;/OutputType&gt;
+&nbsp; &nbsp; &lt;AppDesignerFolder&gt;Properties&lt;/AppDesignerFolder&gt;
+&nbsp; &nbsp; &lt;RootNamespace&gt;ExistingConsoleApplication&lt;/RootNamespace&gt;
+&nbsp; &nbsp; &lt;AssemblyName&gt;ExistingConsoleApplication&lt;/AssemblyName&gt;
+&nbsp; &nbsp; &lt;TargetFrameworkVersion&gt;v4.5&lt;/TargetFrameworkVersion&gt;
+&nbsp; &nbsp; &lt;FileAlignment&gt;512&lt;/FileAlignment&gt;
+&nbsp; &nbsp; &lt;RoleType&gt;Worker&lt;/RoleType&gt;
+&lt;/PropertyGroup&gt;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">&lt;PropertyGroup&gt;
+	&lt;Configuration Condition=" '$(Configuration)' == '' "&gt;Debug&lt;/Configuration&gt;
+	&lt;Platform Condition=" '$(Platform)' == '' "&gt;AnyCPU&lt;/Platform&gt;
+	&lt;ProjectGuid&gt;{4B7C48CB-9899-47D0-95AB-2FD3C3B739CF}&lt;/ProjectGuid&gt;
+	&lt;OutputType&gt;Exe&lt;/OutputType&gt;
+	&lt;AppDesignerFolder&gt;Properties&lt;/AppDesignerFolder&gt;
+	&lt;RootNamespace&gt;ExistingConsoleApplication&lt;/RootNamespace&gt;
+	&lt;AssemblyName&gt;ExistingConsoleApplication&lt;/AssemblyName&gt;
+	&lt;TargetFrameworkVersion&gt;v4.5&lt;/TargetFrameworkVersion&gt;
+	&lt;FileAlignment&gt;512&lt;/FileAlignment&gt;
+	&lt;RoleType&gt;Worker&lt;/RoleType&gt;
+&lt;/PropertyGroup&gt;</pre></div></div>
+
+<p>Save and reload the project, and now when we right click on the Azure Cloud Project Roles, the option to associate and existing project is available.</p>
+<div class="font-size: 85%; color: #666666; text-align: center">
+<img src="http://tiernok.com/LTDBlog/AzureWorkerRole/awr_04.png" alt="Add Role menu options" /><br />
+&#8220;Worker Role Project in Solution&#8221; is Available Now
+</div>
+<p>After adding the project, we can now run it either as a local console application or in the computer emulator as an emulated worker role.</p>
+<p><i>Note: Don&#8217;t forget that the compute emulator must run in elevated administrator mode.</i></p>
+<p>And there you have it, a Console project promoted to Azure Worker Role, preserving any history of commits that were made against the project and still runnable as either a console application or as a worker role.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/desktopdev/mstech/converting-a-net-console-project/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+	</channel>
+</rss>

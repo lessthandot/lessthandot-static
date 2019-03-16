@@ -1,0 +1,962 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>views &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/views/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>Using SELECT * in views gotcha</title>
+		<link>/index.php/datamgmt/dbadmin/using-select-in-views-gotcha/</link>
+		<comments>/index.php/datamgmt/dbadmin/using-select-in-views-gotcha/#comments</comments>
+		<pubDate>Tue, 12 Mar 2013 12:06:00 +0000</pubDate>
+		<dc:creator><![CDATA[Kevin Conan]]></dc:creator>
+				<category><![CDATA[Database Administration]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[sql]]></category>
+		<category><![CDATA[views]]></category>
+
+		<guid isPermaLink="false">/index.php/2013/03/using-select-in-views-gotcha/</guid>
+		<description><![CDATA[If ever a DBA walked up a mountain and came back down with two stones that had 10 commandments written on them, “thou shalt not use SELECT *” would be one of them.  
+However, that same DBA would turn around and within 5 minutes use it themselves!]]></description>
+				<content:encoded><![CDATA[<p>If ever a DBA walked up a mountain and came back down with two stones that had 10 commandments written on them, “thou shalt not use SELECT *” would be one of them.  However, that same DBA would turn around and within 5 minutes use it themselves!</p>
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/moses.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/moses.JPG?mtime=1363096883" width="233" height="311" /></a></div>
+<p>One place that DBAs use SELECT * is when they create views.  The idea is that you do actually want every column available to the view because the query that hits that view should limit which columns it wants returned.</p>
+<p>This works, but there is one big issue with it that most people learn the hard way.  If the schema of the source table that the view is selecting from changes, the view will NOT automatically update to include those changes.</p>
+<p>For example, let’s create a simple table with some data and a view over it (because we are using really simple code, I’m not going format visually the way I normally do).</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> tblViewExample <span class="br0">&#40;</span>col1 <span class="kw1">INT</span> <span class="sy0">NULL</span><span class="br0">&#41;</span>;
+GO
+<span class="kw1">CREATE</span> <span class="kw1">VIEW</span> vViewExample <span class="kw1">AS</span> <span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> tblViewExample
+GO
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">2</span><span class="br0">&#41;</span>;
+<span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span>;
+GO
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> vViewExample;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE tblViewExample (col1 INT NULL);
+GO
+CREATE VIEW vViewExample AS SELECT * FROM tblViewExample
+GO
+INSERT INTO vViewExample (col1) VALUES (1);
+INSERT INTO vViewExample (col1) VALUES (2);
+INSERT INTO vViewExample (col1) VALUES (3);
+GO
+SELECT * FROM vViewExample;</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/view1.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/view1.JPG?mtime=1363096883" width="67" height="83" /></a></div>
+<p>I did break the rule of no SELECT * again but it’s to demonstrate the point of this article.<br />
+So far everything is being returned as we expect it.  Now let’s change the schema of our table and see what happens.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> tblViewExample <span class="kw1">ADD</span> col2 <span class="kw1">INT</span> <span class="sy0">NULL</span>;
+GO
+<span class="kw1">UPDATE</span> tblViewExample <span class="kw1">SET</span> col2 <span class="sy0">=</span> col1 <span class="sy0">*</span> <span class="nu0">5</span>;
+GO
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> vViewExample;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE tblViewExample ADD col2 INT NULL;
+GO
+UPDATE tblViewExample SET col2 = col1 * 5;
+GO
+SELECT * FROM vViewExample;</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/view1.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/view1.JPG?mtime=1363096883" width="67" height="83" /></a></div>
+<p>Notice that col2 is missing even though the view is using SELECT *.  Let’s see what happens if we try to use the view to insert a new record with data in col2.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1, col2<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">5</span>, <span class="nu0">5</span><span class="br0">&#41;</span>;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO vViewExample (col1, col2) VALUES (5, 5);</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/view2.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/view2.JPG?mtime=1363096883" width="245" height="38" /></a></div>
+<p>To fix the “broken” view, we have to rebuild it.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">VIEW</span> vViewExample;
+GO
+<span class="kw1">CREATE</span> <span class="kw1">VIEW</span> vViewExample <span class="kw1">AS</span> <span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> tblViewExample</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP VIEW vViewExample;
+GO
+CREATE VIEW vViewExample AS SELECT * FROM tblViewExample</pre></div></div>
+
+<p>Now let’s try the insert statement again and then the select statement.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">INSERT</span> <span class="kw1">INTO</span> vViewExample <span class="br0">&#40;</span>col1, col2<span class="br0">&#41;</span> <span class="kw1">VALUES</span> <span class="br0">&#40;</span><span class="nu0">5</span>, <span class="nu0">5</span><span class="br0">&#41;</span>;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> vViewExample;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">INSERT INTO vViewExample (col1, col2) VALUES (5, 5);
+
+SELECT * FROM vViewExample;</pre></div></div>
+
+<div class="image_block"><a href="/wp-content/uploads/users/kconan/view3.JPG?mtime=1363096883"><img alt="" src="/wp-content/uploads/users/kconan/view3.JPG?mtime=1363096883" width="108" height="102" /></a></div>
+<p>And of course, let’s clean up after ourselves!</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">DROP</span> <span class="kw1">VIEW</span> vViewExample;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> tblViewExample;</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">DROP VIEW vViewExample;
+DROP TABLE tblViewExample;</pre></div></div>
+
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/dbadmin/using-select-in-views-gotcha/feed/</wfw:commentRss>
+		<slash:comments>3</slash:comments>
+		</item>
+		<item>
+		<title>SQL Advent 2011 Day 2: system tables and catalog views</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-2/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-2/#respond</comments>
+		<pubDate>Fri, 02 Dec 2011 09:07:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[administration]]></category>
+		<category><![CDATA[dmv]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[views]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-2/</guid>
+		<description><![CDATA[With the introduction of SQL Server 2005 system tables have been deprecated, there are three new set of objects to replace system tables: Compatibility Views, Dynamic Management Views and Catalog Views.
+
+Compatibility views replace the system tables, so while you still can use syscolumns, you should get into the habit of using sys.columns instead]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>With the introduction of SQL Server 2005 system tables have been deprecated, there are three new set of objects to replace system tables: Compatibility Views, Dynamic Management Views and Catalog Views. </p>
+<p>Compatibility views replace the system tables, so while you still can use syscolumns, you should get into the habit of using sys.columns instead</p>
+<h2>Every database</h2>
+<p>The following table maps the system tables or functions that live in every database in SQL Server 2000 to their equivalent system views or functions in SQL Server 2008.</p>
+<div class="tables">
+<table>
+<tr>
+<th>	System table or function	</th>
+<th>	System view or function	</th>
+<th>	Type of view or function	</th>
+</tr>
+<tr>
+<td>	fn_virtualfilestats	</td>
+<td>	sys.dm_io_virtual_file_stats	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>	syscolumns	</td>
+<td>	sys.columns	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	syscomments	</td>
+<td>	sys.sql_modules	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysconstraints	</td>
+<td>	sys.check_constraints	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.default_constraints	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.key_constraints	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.foreign_keys	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysdepends	</td>
+<td>	sys.sql_expression_dependencies	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysfilegroups	</td>
+<td>	sys.filegroups	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysfiles	</td>
+<td>	sys.database_files	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysforeignkeys	</td>
+<td>	sys.foreign_key_columns	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysindexes	</td>
+<td>	sys.indexes	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.partitions	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.allocation_units	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.dm_db_partition_stats	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>	sysindexkeys	</td>
+<td>	sys.index_columns	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysmembers	</td>
+<td>	sys.database_role_members	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysobjects	</td>
+<td>	sys.objects	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	syspermissions	</td>
+<td>	sys.database_permissions	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.server_permissions	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysprotects	</td>
+<td>	sys.database_permissions	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.server_permissions	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysreferences	</td>
+<td>	sys.foreign_keys	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	systypes	</td>
+<td>	sys.types	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysusers	</td>
+<td>	sys.database_principals	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysfulltextcatalogs	</td>
+<td>	sys.fulltext_catalogs	</td>
+<td>	Catalog view	</td>
+</tr>
+</table>
+</div>
+<p>
+<h2>Master database</h2>
+<p>The following table maps the system tables inside the master database in SQL Server 2000 to their equivalent system views or functions in SQL Server 2008.</p>
+<div class="tables">
+<table>
+<tr>
+<th>	System table	</th>
+<th>	System views or functions	</th>
+<th>	Type of view or function	</th>
+</tr>
+<tr>
+<td>	sysaltfiles	</td>
+<td>	sys.master_files	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	syscacheobjects	</td>
+<td>	sys.dm_exec_cached_plans	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.dm_exec_plan_attributes ()	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.dm_exec_sql_text	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.dm_exec_cached_plan_dependent_objects	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>	syscharsets	</td>
+<td>	sys.syscharsets	</td>
+<td>	Compatibility view	</td>
+</tr>
+<tr>
+<td>	sysconfigures	</td>
+<td>	sys.configurations	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	syscurconfigs	</td>
+<td>	sys.configurations	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysdatabases	</td>
+<td>	sys.databases	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysdevices	</td>
+<td>	sys.backup_devices	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	syslanguages	</td>
+<td>	sys.syslanguages	</td>
+<td>	Compatibility view	</td>
+</tr>
+<tr>
+<td>	syslockinfo	</td>
+<td>	sys.dm_tran_locks	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>	syslocks	</td>
+<td>	sys.dm_tran_locks	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>	syslogins	</td>
+<td>	sys.server_principals	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.sql_logins	</td>
+<td>		</td>
+</tr>
+<tr>
+<td>	sysmessages	</td>
+<td>	sys.messages	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysoledbusers	</td>
+<td>	sys.linked_logins	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysopentapes	</td>
+<td>	sys.dm_io_backup_tapes	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>	sysperfinfo	</td>
+<td>	sys.dm_os_performance_counters	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>	sysprocesses	</td>
+<td>	sys.dm_exec_connections	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.dm_exec_sessions	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>		</td>
+<td>	sys.dm_exec_requests	</td>
+<td>	Dynamic management view	</td>
+</tr>
+<tr>
+<td>	sysremotelogins	</td>
+<td>	sys.remote_logins	</td>
+<td>	Catalog view	</td>
+</tr>
+<tr>
+<td>	sysservers	</td>
+<td>	sys.servers	</td>
+<td>	Catalog view	</td>
+</tr>
+</table>
+</div>
+<p>As you can see in the tables above, the sysobjects system table maps to sys.objects.  In SQL Server 2005 we actually have a couple of views that take parts of sysobjects, below are these views</p>
+<p>sys.tables<br />
+sys.procedures<br />
+sys.views<br />
+sys.triggers</p>
+<p>As you can see, you now have a view for just tables, triggers, procedures and views.</p>
+<p></p>
+<h2>Some examples</h2>
+<p>Although Dynamic Management Views are listed in the tables above, I will not give examples in this post, I will have another post in this series focusing just on Dynamic Management Views.</p>
+<p>If you wanted a list of all stored procedures in SQL Server 2000, you would typically do something like the following</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name 
+<span class="kw1">FROM</span> sysobjects
+<span class="kw1">WHERE</span> type <span class="sy0">=</span> <span class="st0">'P'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name 
+FROM sysobjects
+WHERE type = 'P'</pre></div></div>
+
+<p>In SQL Server 2005 and up, you now have a view just for procedures</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name 
+<span class="kw1">FROM</span> sys.<span class="me1">procedures</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name 
+FROM sys.procedures</pre></div></div>
+
+<p>If you run those two queries you might get a different number of rows back, this is because the sys.procedures view has these 4 kinds of procedures</p>
+<ul>
+<li>P = SQL Stored procedure</li>
+<li>X = Extended stored procedure</li>
+<li>RF = Replication-filter-procedure</li>
+<li>PC = Assembly (CLR) stored-procedure</li>
+</ul>
+<p>In order to make them the same you would do</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name <span class="kw1">FROM</span> sysobjects
+<span class="kw1">WHERE</span> type <span class="sy0">IN</span> <span class="br0">&#40;</span> <span class="st0">'P'</span>,<span class="st0">'PC'</span>,<span class="st0">'RF'</span>,<span class="st0">'X'</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name FROM sysobjects
+WHERE type IN ( 'P','PC','RF','X')</pre></div></div>
+
+<p>That is the same as</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name 
+<span class="kw1">FROM</span> sys.<span class="me1">procedures</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name 
+FROM sys.procedures</pre></div></div>
+
+<p>A quick count of all the procs grouped by type</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="kw2">COUNT</span><span class="br0">&#40;</span><span class="sy0">*</span><span class="br0">&#41;</span>, type_desc
+<span class="kw1">FROM</span> sys.<span class="me1">procedures</span>
+<span class="kw1">GROUP</span> <span class="kw1">BY</span> type_desc</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT COUNT(*), type_desc
+FROM sys.procedures
+GROUP BY type_desc</pre></div></div>
+
+<p>A nice thing about these new views is that they have creation as well as modified dates, you can quickly see if a proc was ever modified or not</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name,
+&nbsp; &nbsp; <span class="kw1">CASE</span> <span class="kw1">WHEN</span> create_date <span class="sy0">=</span> modify_date 
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">THEN</span> <span class="st0">'Never Modified'</span> 
+&nbsp; &nbsp; &nbsp; &nbsp; <span class="kw1">ELSE</span> <span class="st0">'Modified'</span> <span class="kw1">END</span> <span class="kw1">AS</span> modified
+&nbsp;<span class="kw1">FROM</span> sys.<span class="me1">procedures</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name,
+	CASE WHEN create_date = modify_date 
+			THEN 'Never Modified' 
+		ELSE 'Modified' END AS modified
+ FROM sys.procedures</pre></div></div>
+
+<p>Or if you just want a list of procedures that have never been modified (by way of an alter statement, not a drop and a create of course)</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name
+&nbsp;<span class="kw1">FROM</span> sys.<span class="me1">procedures</span>
+<span class="kw1">WHERE</span> create_date <span class="sy0">=</span> modify_date</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name
+ FROM sys.procedures
+WHERE create_date = modify_date</pre></div></div>
+
+<hr />
+Let&#8217;s look at some other examples. The sys.messages view in  the master database is a replacement for the sysmessages system table. If you run these 2 queries which bring back the same error message you will notice something interesting.</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> 
+<span class="kw1">FROM</span> master..<span class="me1">sysmessages</span>
+<span class="kw1">WHERE</span> error<span class="sy0">=</span> <span class="nu0">1481</span>
+<span class="sy0">AND</span> msglangid <span class="sy0">=</span> <span class="nu0">1033</span>
+&nbsp;
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> 
+<span class="kw1">FROM</span> master.<span class="me1">sys</span>.<span class="me1">messages</span>
+<span class="kw1">WHERE</span> &nbsp;message_id <span class="sy0">=</span><span class="nu0">1481</span>
+<span class="sy0">AND</span> language_id <span class="sy0">=</span> <span class="nu0">1033</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * 
+FROM master..sysmessages
+WHERE error= 1481
+AND msglangid = 1033
+
+
+SELECT * 
+FROM master.sys.messages
+WHERE  message_id =1481
+AND language_id = 1033</pre></div></div>
+
+<p>output<br />
+&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;&#8212;</p>
+<p><em>Database mirroring could not repair physical page %S_PGID in database &#8220;%.*ls&#8221;. The mirroring partner could not be contacted or did not provide a copy of the page. Possible reasons include a lack of network connectivity or that the copy of the page kept by</p>
+<p>Database mirroring could not repair physical page %S_PGID in database &#8220;%.*ls&#8221;. The mirroring partner could not be contacted or did not provide a copy of the page. Possible reasons include a lack of network connectivity or that the copy of the page kept by the partner is also corrupted. To learn whether the partners are currently connected, view the mirroring_state_desc column of the sys.database_mirroring catalog view. If they are connected, for information about why the partner could not provide a copy of the page, examine its error log entries from around the time when this message was reported. Try to resolve the error and resume mirroring.</em></p>
+<p>As you can see the text is truncated to 255 characters in the old system views, in the new view you see the whole message.</p>
+<p>I only showed you examples for two of these tables, if I did all of them this post would take forever to write. You can investigate the other tables by yourself, maybe pick one or two a day and mess around with some queries.</p>
+<p>I would say, take a look at these views, start using them, learn them well because they will help you do your job better.</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-2/feed/</wfw:commentRss>
+		<slash:comments>0</slash:comments>
+		</item>
+		<item>
+		<title>how to make sure that the view will have the underlying table changes by using sp_refreshview</title>
+		<link>/index.php/datamgmt/datadesign/how-to-make-sure-that-the-view-will-have/</link>
+		<comments>/index.php/datamgmt/datadesign/how-to-make-sure-that-the-view-will-have/#comments</comments>
+		<pubDate>Wed, 28 Jan 2009 14:32:44 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[how to]]></category>
+		<category><![CDATA[sql server 2000]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[tip]]></category>
+		<category><![CDATA[trick]]></category>
+		<category><![CDATA[views]]></category>
+
+		<guid isPermaLink="false">/index.php/2009/01/how-to-make-sure-that-the-view-will-have/</guid>
+		<description><![CDATA[sp_refreshview or how to make sure that the view will have the underlying table changes Got a question about this on our Microsoft SQL Server Programming Forum so you know it is time for a quick blog post. Did you know that when you create a view and then later change the table the view [&#8230;]]]></description>
+				<content:encoded><![CDATA[<p><strong>sp_refreshview or how to make sure that the view will have the underlying table changes</strong></p>
+<p>Got a question about this on our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming Forum</a> so you know it is time for a quick blog post.</p>
+<p>Did you know that when you create a view and then later change the table the view is not updated?<br />
+let me show you what I mean.<br />
+Run the following block of code</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> TestTable <span class="br0">&#40;</span>id <span class="kw1">INT</span>,SomeCol <span class="kw1">VARCHAR</span><span class="br0">&#40;</span><span class="nu0">666</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> TestTable <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="st0">'ABC'</span><span class="br0">&#41;</span>
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestTable
+GO
+&nbsp;
+<span class="kw1">CREATE</span> <span class="kw1">VIEW</span> TestView
+<span class="kw1">AS</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestTable
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestView
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE TestTable (id INT,SomeCol VARCHAR(666))
+GO
+
+INSERT TestTable VALUES(1,'ABC')
+GO
+
+SELECT * FROM TestTable
+GO
+
+CREATE VIEW TestView
+AS
+SELECT * FROM TestTable
+GO
+
+SELECT * FROM TestView
+GO</pre></div></div>
+
+<p>Now we will change that table by adding another column</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">ALTER</span> <span class="kw1">TABLE</span> TestTable
+<span class="kw1">ADD</span> Col2 <span class="kw1">DATETIME</span> <span class="kw1">DEFAULT</span> <span class="kw1">CURRENT_TIMESTAMP</span>
+GO
+&nbsp;
+<span class="kw1">INSERT</span> TestTable<span class="br0">&#40;</span>id,SomeCol<span class="br0">&#41;</span> <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">2</span>,<span class="st0">'XYZ'</span><span class="br0">&#41;</span>
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">ALTER TABLE TestTable
+ADD Col2 DATETIME DEFAULT CURRENT_TIMESTAMP
+GO
+
+INSERT TestTable(id,SomeCol) VALUES(2,'XYZ')
+GO</pre></div></div>
+
+<p>Now run the selects again</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestTable
+GO
+&nbsp;
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestView
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM TestTable
+GO
+
+SELECT * FROM TestView
+GO</pre></div></div>
+
+<p>See what happened? The TestView does not include the Col2 column. So what can you do? There are at least two things that you can do. You can recreate the view with a create or alter statement or you can use sp_refreshview, run the code below to see how that works</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+</pre></td><td class="de1"><pre class="de1"><span class="kw3">sp_refreshview</span> TestView
+GO
+&nbsp;
+<span class="co1">--All good now</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> TestView
+GO
+&nbsp;
+&nbsp;
+<span class="co1">--Clean up this mess--</span>
+<span class="kw1">DROP</span> <span class="kw1">VIEW</span> TestView
+GO
+&nbsp;
+&nbsp;
+<span class="kw1">DROP</span> <span class="kw1">TABLE</span> TestTable
+GO</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">sp_refreshview TestView
+GO
+
+--All good now
+SELECT * FROM TestView
+GO
+
+
+--Clean up this mess--
+DROP VIEW TestView
+GO
+
+
+DROP TABLE TestTable
+GO</pre></div></div>
+
+<p>And yes I know &#8216;real&#8217; SQL programmers never use SELECT * and &#8216;real&#8217; SQL programmers name their defaults <img src="https://s.w.org/images/core/emoji/2/72x72/1f609.png" alt="😉" class="wp-smiley" style="height: 1em; max-height: 1em;" /></p>
+<p></p>
+<p>*** <strong>If you have a SQL related question try our <a href="http://forum.lessthandot.com/viewforum.php?f=17">Microsoft SQL Server Programming</a> forum or our <a href="http://forum.lessthandot.com/viewforum.php?f=22">Microsoft SQL Server Admin</a> forum</strong><ins></ins></p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/how-to-make-sure-that-the-view-will-have/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+		<item>
+		<title>Create a sorted view in SQL Server 2005 and SQL Server 2008</title>
+		<link>/index.php/datamgmt/datadesign/create-a-sorted-view-in-sql-server-2005-2008/</link>
+		<comments>/index.php/datamgmt/datadesign/create-a-sorted-view-in-sql-server-2005-2008/#comments</comments>
+		<pubDate>Wed, 05 Nov 2008 17:20:08 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[pitfalls]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[views]]></category>
+
+		<guid isPermaLink="false">/index.php/2008/11/create-a-sorted-view-in-sql-server-2005-2008/</guid>
+		<description><![CDATA[I saw that some people are hitting our site with a search for how to create a sorted view in SQL Server 2008.
+
+
+You all know that in SQL Server 2000 you can create a view and use TOP 100 PERCENT with ORDER By and it will be sorted. Since SQL server 2&#8230;]]></description>
+				<content:encoded><![CDATA[<p>I saw that some people are hitting our site with a search for how to create a sorted view in SQL Server 2008.</p>
+<p>You all know that in SQL Server 2000 you can create a view and use TOP 100 PERCENT with ORDER By and it will be sorted. Since SQL server 2005 that doesn&#8217;t work anymore. I actually never understood the need for sorted views to begin with, how hard is it to do something like this</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> 
+<span class="kw1">FROM</span> <span class="kw1">View</span>
+<span class="kw1">ORDER</span> <span class="kw1">By</span> <span class="kw1">Column</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * 
+FROM View
+ORDER By Column</pre></div></div>
+
+<p>Not hard, I guess pople want the convenience of opening the view in SSMS and it is sorted &#8216;correctly&#8217;<br />
+There is a way to get this to work in SQL server 2005, there is a hotfix that will &#8216;fix&#8217; this but you have to run in 2000 compatability mode.<br />
+The link to the fix is here: <a href="http://support.microsoft.com/default.aspx?scid=kb;en-us;926292&amp;sd=rss&amp;spid=2855">FIX: When you query through a view that uses the ORDER BY clause in SQL Server 2008, the result is still returned in random order</a></p>
+<p>Now let&#8217;s get started with the code<br />
+Create this table</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+9
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">table</span> TestSort <span class="br0">&#40;</span>id <span class="kw1">int</span> not null<span class="br0">&#41;</span>
+<span class="kw1">insert</span> TestSort <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">1</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> TestSort <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> TestSort <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">4</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> TestSort <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> TestSort <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">2</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> TestSort <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">7</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> TestSort <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">9</span><span class="br0">&#41;</span>
+<span class="kw1">insert</span> TestSort <span class="kw1">values</span><span class="br0">&#40;</span><span class="nu0">6</span><span class="br0">&#41;</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create table TestSort (id int not null)
+insert TestSort values(1)
+insert TestSort values(3)
+insert TestSort values(4)
+insert TestSort values(5)
+insert TestSort values(2)
+insert TestSort values(7)
+insert TestSort values(9)
+insert TestSort values(6)</pre></div></div>
+
+<p>And create the view</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">view</span> vTestSort
+<span class="kw1">as</span>
+<span class="kw1">select</span> <span class="kw1">top</span> <span class="nu0">100</span> <span class="kw1">percent</span> id <span class="kw1">from</span> TestSort
+<span class="kw1">order</span> <span class="kw1">by</span> id</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create view vTestSort
+as
+select top 100 percent id from TestSort
+order by id</pre></div></div>
+
+<p> Now do a select from the view</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> vTestSort</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from vTestSort</pre></div></div>
+
+<p>(result set)<br />
+1<br />
+3<br />
+4<br />
+5<br />
+2<br />
+7<br />
+9<br />
+6</p>
+<p>Oops it is not sorted<br />
+Let&#8217;s try something else, we will use 99.99 percent</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">view</span> vTestSort2
+<span class="kw1">as</span>
+<span class="kw1">select</span> <span class="kw1">top</span> <span class="nu0">99.99</span> <span class="kw1">percent</span> &nbsp;id <span class="kw1">from</span> TestSort
+<span class="kw1">order</span> <span class="kw1">by</span> id</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create view vTestSort2
+as
+select top 99.99 percent  id from TestSort
+order by id</pre></div></div>
+
+<p>Run the select against the view</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> vTestSort2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from vTestSort2</pre></div></div>
+
+<p>(result set)<br />
+1<br />
+2<br />
+3<br />
+4<br />
+5<br />
+6<br />
+7<br />
+9</p>
+<p>look at that, magic! It works</p>
+<p>Let&#8217;s try another way by using the max value of an integer</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">create</span> <span class="kw1">view</span> vTestSort3
+<span class="kw1">as</span>
+<span class="kw1">select</span> <span class="kw1">top</span> <span class="nu0">2147483648</span> id <span class="kw1">from</span> TestSort
+<span class="kw1">order</span> <span class="kw1">by</span> id</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">create view vTestSort3
+as
+select top 2147483648 id from TestSort
+order by id</pre></div></div>
+
+<p>Run the select against the view</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> vTestSort3</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from vTestSort3</pre></div></div>
+
+<p>(result set)<br />
+1<br />
+2<br />
+3<br />
+4<br />
+5<br />
+6<br />
+7<br />
+9</p>
+<p>And bingo, it also works.</p>
+<p>Now, just because this works right now it doesn&#8217;t mean that it will work after you apply the next hotfix or service pack. Why not doing this instead</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">select</span> <span class="sy0">*</span> <span class="kw1">from</span> vTestSort3
+<span class="kw1">order</span> <span class="kw1">by</span> id</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">select * from vTestSort3
+order by id</pre></div></div>
+
+<p>That will always work and you don&#8217;t have to deal with unexpected results down the road</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/create-a-sorted-view-in-sql-server-2005-2008/feed/</wfw:commentRss>
+		<slash:comments>6</slash:comments>
+		</item>
+	</channel>
+</rss>

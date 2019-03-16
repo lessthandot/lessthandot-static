@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom"
+	xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+	xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+	>
+
+<channel>
+	<title>intersect &#8211; LessthanDot</title>
+	<atom:link href="/index.php/tag/intersect/feed/" rel="self" type="application/rss+xml" />
+	<link>/</link>
+	<description>A Technical Community for IT Professionals</description>
+	<lastBuildDate>Sat, 09 Mar 2019 12:50:36 +0000</lastBuildDate>
+	<language>en-US</language>
+	<sy:updatePeriod>hourly</sy:updatePeriod>
+	<sy:updateFrequency>1</sy:updateFrequency>
+	<generator>https://wordpress.org/?v=4.6.1</generator>
+	<item>
+		<title>SQL Advent 2011 Day 14: EXCEPT and INTERSECT SET Operations</title>
+		<link>/index.php/datamgmt/datadesign/sql-advent-2011-day-14/</link>
+		<comments>/index.php/datamgmt/datadesign/sql-advent-2011-day-14/#comments</comments>
+		<pubDate>Thu, 15 Dec 2011 11:31:00 +0000</pubDate>
+		<dc:creator><![CDATA[SQLDenis]]></dc:creator>
+				<category><![CDATA[Data Modelling and Design]]></category>
+		<category><![CDATA[Database Programming]]></category>
+		<category><![CDATA[Microsoft SQL Server]]></category>
+		<category><![CDATA[Microsoft SQL Server Admin]]></category>
+		<category><![CDATA[except]]></category>
+		<category><![CDATA[intersect]]></category>
+		<category><![CDATA[sql server 2005]]></category>
+		<category><![CDATA[sql server 2008]]></category>
+		<category><![CDATA[union]]></category>
+
+		<guid isPermaLink="false">/index.php/2011/12/sql-advent-2011-day-14/</guid>
+		<description><![CDATA[Today we are going to take a look at  EXCEPT and INTERSECT SET Operations]]></description>
+				<content:encoded><![CDATA[<p>In my <a href="/index.php/DataMgmt/DataDesign/are-you-ready-for-sql">Are you ready for SQL Server 2012 or are you still partying like it is 1999?</a> post, I wrote about how you should start using SQL Server 2005 and SQL Server 2008 functionality now in order to prepare for SQL Server 2012. I still see tons of code that is written in the pre 2005 style and people still keep using those functions, procs and statements even though SQL Server 2005 and 2008 have much better functionality.</p>
+<p>Today we are going to take a look at  EXCEPT and INTERSECT SET Operations. This stuff is pretty simple so this post won&#8217;t be that long.</p>
+<p>First create this simple table with 5 rows, notice id 5 is missing</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test1<span class="br0">&#40;</span>id <span class="kw1">int</span>, SomeVal <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span>, OtherVal <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Test1 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="st0">'11111'</span>,<span class="st0">'111'</span><span class="br0">&#41;</span> 
+<span class="kw1">INSERT</span> Test1 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">2</span>,<span class="st0">'22222'</span>,<span class="st0">'222'</span><span class="br0">&#41;</span> 
+<span class="kw1">INSERT</span> Test1 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">3</span>,<span class="st0">'33333'</span>,<span class="st0">'333'</span><span class="br0">&#41;</span> 
+<span class="kw1">INSERT</span> Test1 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">4</span>,<span class="st0">'44444'</span>,<span class="st0">'444'</span><span class="br0">&#41;</span> 
+<span class="kw1">INSERT</span> Test1 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">6</span>,<span class="st0">'66666'</span>,<span class="st0">'666'</span><span class="br0">&#41;</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test1(id int, SomeVal char(5), OtherVal char(3))
+INSERT Test1 VALUES(1,'11111','111') 
+INSERT Test1 VALUES(2,'22222','222') 
+INSERT Test1 VALUES(3,'33333','333') 
+INSERT Test1 VALUES(4,'44444','444') 
+INSERT Test1 VALUES(6,'66666','666') </pre></div></div>
+
+<p>Create this table with 4 rows, notice id 3 is missing but it has id 5 which the previous created table does not have</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">CREATE</span> <span class="kw1">TABLE</span> Test2<span class="br0">&#40;</span>id <span class="kw1">int</span>, SomeVal <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">5</span><span class="br0">&#41;</span>, OtherVal <span class="kw1">char</span><span class="br0">&#40;</span><span class="nu0">3</span><span class="br0">&#41;</span><span class="br0">&#41;</span>
+<span class="kw1">INSERT</span> Test2 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">1</span>,<span class="st0">'11111'</span>,<span class="st0">'111'</span><span class="br0">&#41;</span> 
+<span class="kw1">INSERT</span> Test2 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">2</span>,<span class="st0">'22222'</span>,<span class="st0">'222'</span><span class="br0">&#41;</span> 
+<span class="kw1">INSERT</span> Test2 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">4</span>,<span class="st0">'44444'</span>,<span class="st0">'444'</span><span class="br0">&#41;</span> 
+<span class="kw1">INSERT</span> Test2 <span class="kw1">VALUES</span><span class="br0">&#40;</span><span class="nu0">5</span>,<span class="st0">'55555'</span>,<span class="st0">'555'</span><span class="br0">&#41;</span> </pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">CREATE TABLE Test2(id int, SomeVal char(5), OtherVal char(3))
+INSERT Test2 VALUES(1,'11111','111') 
+INSERT Test2 VALUES(2,'22222','222') 
+INSERT Test2 VALUES(4,'44444','444') 
+INSERT Test2 VALUES(5,'55555','555') </pre></div></div>
+
+<p>
+<h2>UNION SET Operation</h2>
+<p>This is just a quick look at the UNION SET operation first. When you do a UNION, you will get all the rows that exists in either table. It will return a distinct set, if the row exists in both tables, you will only get back the row once. If the row exists more than once in a table, you will also get it back just once</p>
+<p>Run the following code </p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test2
+<span class="kw1">UNION</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test1</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Test2
+UNION
+SELECT *
+FROM Test1</pre></div></div>
+
+<p></p>
+<p>Output</p>
+<pre>id	SomeVal	OtherVal
+1	11111	111
+2	22222	222
+3	33333	333
+4	44444	444
+5	55555	555
+6	66666	666</pre>
+<p></p>
+<p>As you can see, each value from both tables is returned once</p>
+<p>When you change the UNION to a UNION ALL, you will get all rows from both tables</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test2
+<span class="kw1">UNION</span> <span class="sy0">ALL</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test1</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Test2
+UNION ALL
+SELECT *
+FROM Test1</pre></div></div>
+
+<p></p>
+<p>Output</p>
+<pre>id	SomeVal	OtherVal
+1	11111	111
+2	22222	222
+4	44444	444
+5	55555	555
+1	11111	111
+2	22222	222
+3	33333	333
+4	44444	444
+6	66666	666</pre>
+<p></p>
+<p>As you can see whatever is in both tables was returned<br />
+</p>
+<h2>EXCEPT SET Operation</h2>
+<p>The EXCEPT SET operation returns a distinct set of rows from the top table that do not exists in the bottom table. Duplicates just like with UNION are eliminated</p>
+<p>Run this query</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test1
+<span class="kw1">EXCEPT</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Test1
+EXCEPT
+SELECT *
+FROM Test2</pre></div></div>
+
+<p></p>
+<p>Output</p>
+<pre>id	SomeVal	OtherVal
+3	33333	333
+6	66666	666</pre>
+<p></p>
+<p>As you can see the two rows from Test1 that do not exists in table Test2 are returned</p>
+<p>If you flip the tables around, you will see that the one row from Test2 that does not exists in table Test1 is returned</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test2
+<span class="kw1">EXCEPT</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test1</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Test2
+EXCEPT
+SELECT *
+FROM Test1</pre></div></div>
+
+<p></p>
+<p>Output</p>
+<pre>id	SomeVal	OtherVal
+5	55555	555</pre>
+<h2>INTERSECT SET Operation</h2>
+<p>The INTERSECT SET operation returns a distinct result of rows that exists in both tables.</p>
+<p>In this case the rows that exists in both table Test1 and table Test2 are returned</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test1
+<span class="kw1">INTERSECT</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test2</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Test1
+INTERSECT
+SELECT *
+FROM Test2</pre></div></div>
+
+<p></p>
+<p>Output</p>
+<pre>id	SomeVal	OtherVal
+1	11111	111
+2	22222	222
+4	44444	444</pre>
+<p></p>
+<p>Flipping the tables around makes no difference, the same result as in the previous query is returned</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test2
+<span class="kw1">INTERSECT</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test1</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Test2
+INTERSECT
+SELECT *
+FROM Test1</pre></div></div>
+
+<p></p>
+<p>Output</p>
+<pre>id	SomeVal	OtherVal
+1	11111	111
+2	22222	222
+4	44444	444</pre>
+<p></p>
+<h2>Some more stuff</h2>
+<p>You are not just limited to 2 tables, you can also combine these SET operations. Here is a silly example that will return everything which exists in table Test1 that also exists in the set of table Test1 and table Test2. Of course everything in table Test1 will be returned</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+4
+5
+6
+7
+8
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test1
+<span class="kw1">INTERSECT</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test2
+<span class="kw1">UNION</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span>
+<span class="kw1">FROM</span> Test1</pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT *
+FROM Test1
+INTERSECT
+SELECT *
+FROM Test2
+UNION
+SELECT *
+FROM Test1</pre></div></div>
+
+<p></p>
+<pre>id	SomeVal	OtherVal
+1	11111	111
+2	22222	222
+3	33333	333
+4	44444	444
+6	66666	666</pre>
+<p></p>
+<p>Here are two more example<br />
+This query does not return any rows on my system, this means that all 67 rows in each table exist in both databases</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> model.<span class="me1">sys</span>.<span class="me1">sysobjects</span> <span class="kw1">WHERE</span> xtype <span class="sy0">=</span> <span class="st0">'S'</span>
+<span class="kw1">EXCEPT</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> tempdb.<span class="me1">sys</span>.<span class="me1">sysobjects</span> <span class="kw1">WHERE</span> xtype <span class="sy0">=</span> <span class="st0">'S'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM model.sys.sysobjects WHERE xtype = 'S'
+EXCEPT
+SELECT * FROM tempdb.sys.sysobjects WHERE xtype = 'S'</pre></div></div>
+
+<p></p>
+<p>The query below will give me all the rows that exists in both table, this is of course 67</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> model.<span class="me1">sys</span>.<span class="me1">sysobjects</span> <span class="kw1">WHERE</span> xtype <span class="sy0">=</span> <span class="st0">'S'</span>
+<span class="kw1">INTERSECT</span>
+<span class="kw1">SELECT</span> <span class="sy0">*</span> <span class="kw1">FROM</span> tempdb.<span class="me1">sys</span>.<span class="me1">sysobjects</span> <span class="kw1">WHERE</span> xtype <span class="sy0">=</span> <span class="st0">'S'</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT * FROM model.sys.sysobjects WHERE xtype = 'S'
+INTERSECT
+SELECT * FROM tempdb.sys.sysobjects WHERE xtype = 'S'</pre></div></div>
+
+<p>You could use a query like that to find for example tables, procedures or other objects that do or do not exists in two different databases</p>
+<p>This query will give me the names of all the procedures that exists in db1 but not in db2</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name <span class="kw1">FROM</span> db1.<span class="me1">sys</span>.<span class="me1">procedures</span> 
+<span class="kw1">EXCEPT</span>
+<span class="kw1">SELECT</span> name <span class="kw1">FROM</span> db2.<span class="me1">sys</span>.<span class="me1">procedures</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name FROM db1.sys.procedures 
+EXCEPT
+SELECT name FROM db2.sys.procedures</pre></div></div>
+
+<p>This query will give me the names of all the procedures that exists in db1 and also in db2</p>
+
+<div class="bwp-syntax-block clearfix">
+<div class="bwp-syntax-toolbar"><div class="bwp-syntax-control"><a href="javascript:;" class="bwp-syntax-source-switch" title="View Source Code"></a></div></div>
+<div class="bwp-syntax-wrapper clearfix bwp-syntax-simple"><table class="tsql"><thead><tr><td colspan="2"  class="head">T-SQL</td></tr></thead><tbody><tr class="li1"><td class="ln"><pre class="de1">1
+2
+3
+</pre></td><td class="de1"><pre class="de1"><span class="kw1">SELECT</span> name <span class="kw1">FROM</span> db1.<span class="me1">sys</span>.<span class="me1">procedures</span> 
+<span class="kw1">INTERSECT</span>
+<span class="kw1">SELECT</span> name <span class="kw1">FROM</span> db2.<span class="me1">sys</span>.<span class="me1">procedures</span></pre></td></tr></tbody></table></div>
+<div class="bwp-syntax-source"><pre class="no-parse">SELECT name FROM db1.sys.procedures 
+INTERSECT
+SELECT name FROM db2.sys.procedures</pre></div></div>
+
+<p>That is it for today, come back tomorrow for post number 15 in this series</p>
+]]></content:encoded>
+			<wfw:commentRss>/index.php/datamgmt/datadesign/sql-advent-2011-day-14/feed/</wfw:commentRss>
+		<slash:comments>4</slash:comments>
+		</item>
+	</channel>
+</rss>
